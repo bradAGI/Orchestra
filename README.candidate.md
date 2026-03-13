@@ -287,7 +287,7 @@ Practical flow from repository tooling:
 
 ## License
 
-Repository-level license declaration: **Not detected in repository analysis**.
+Primary project license: **Apache License 2.0** (`apps/backend/LICENSE`).
 
 Observed license artifacts:
 
@@ -355,5 +355,5 @@ Observed license artifacts:
 
 ## Assumptions & Uncertainties
 
-- License signals are mixed: `docs/openapi.yaml` advertises `Proprietary`, while `apps/backend/LICENSE` contains Apache-2.0 text and additional license artifacts exist under `licenses/`.
+- Additional third-party license notices are present under `licenses/`.
 - `apps/desktop/README.md` references files under `docs/plans/` that are not present in this repository snapshot.

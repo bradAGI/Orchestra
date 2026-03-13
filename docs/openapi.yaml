@@ -3,7 +3,8 @@ info:
   title: Orchestra API
   version: 1.0.0
   license:
-    name: Proprietary
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
   description: 'OpenAPI specification for the Orchestra backend used by the desktop control plane.
 
 

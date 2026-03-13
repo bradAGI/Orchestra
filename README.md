@@ -18,9 +18,6 @@ Orchestra is a multi-component orchestration platform for running and observing 
 - [Deployment](#deployment)
 - [Contributing](#contributing)
 - [License](#license)
-- [Evidence Map](#evidence-map)
-- [Evidence Files](#evidence-files)
-- [Assumptions & Uncertainties](#assumptions--uncertainties)
 
 ## Introduction
 
@@ -287,7 +284,7 @@ Practical flow from repository tooling:
 
 ## License
 
-Repository-level license declaration: **Not detected in repository analysis**.
+Primary project license: **Apache License 2.0** (`apps/backend/LICENSE`).
 
 Observed license artifacts:
 
@@ -295,65 +292,3 @@ Observed license artifacts:
 - `licenses/NOTICE`
 - `licenses/OPEN_AI_LICENSE`
 - `licenses/UNFIREHOSE_LICENSE`
-
-## Evidence Map
-
-| Claim | Evidence files | Confidence |
-|---|---|---|
-| Monorepo includes backend, desktop, TUI, shared packages | `apps/backend`, `apps/desktop`, `apps/tui`, `packages/protocol` | High |
-| Backend exposes REST + SSE + WebSocket routes | `apps/backend/internal/api/router.go`, `apps/backend/internal/api/events.go`, `docs/openapi.yaml` | High |
-| Daemon initializes orchestrator, tracker, MCP, telemetry workers | `apps/backend/internal/app/run.go` | High |
-| Desktop implements multi-section operator console | `apps/desktop/src/App.tsx`, `apps/desktop/src/app/routes/sections.ts` | High |
-| Desktop stores backend profiles and encrypted agent tokens | `apps/desktop/electron/main.cjs`, `apps/desktop/electron/preload.cjs` | High |
-| SQLite warehouse schema for projects/sessions/events/issues/runs/history | `apps/backend/internal/db/schema.go` | High |
-| Shared protocol schemas and fixtures support compatibility | `packages/protocol/README.md`, `packages/protocol/schemas/v1/*`, `packages/test-fixtures/api/v1/*` | High |
-| CI enforces backend checks and desktop release gate | `.github/workflows/orchestra-backend.yml`, `.github/workflows/orchestra-desktop-smoke.yml` | High |
-| Docker + systemd deployment assets are provided | `ops/docker/Dockerfile.backend`, `ops/systemd/orchestrad.service` | High |
-
-## Evidence Files
-
-- `apps/backend/cmd/orchestra/main.go`
-- `apps/backend/cmd/orchestrad/main.go`
-- `apps/backend/internal/app/run.go`
-- `apps/backend/internal/api/router.go`
-- `apps/backend/internal/api/events.go`
-- `apps/backend/internal/api/openapi.go`
-- `apps/backend/internal/api/docs.go`
-- `apps/backend/internal/config/load.go`
-- `apps/backend/internal/db/schema.go`
-- `apps/backend/go.mod`
-- `apps/desktop/package.json`
-- `apps/desktop/electron/main.cjs`
-- `apps/desktop/electron/preload.cjs`
-- `apps/desktop/src/App.tsx`
-- `apps/desktop/src/app/routes/sections.ts`
-- `apps/desktop/src/lib/orchestra-client.ts`
-- `apps/tui/main.go`
-- `apps/tui/manager.go`
-- `apps/tui/go.mod`
-- `packages/protocol/README.md`
-- `packages/protocol/package.json`
-- `packages/protocol/types/v1.ts`
-- `packages/config-spec/README.md`
-- `packages/test-fixtures/README.md`
-- `docs/openapi.yaml`
-- `docs/index.md`
-- `docs/usage/getting-started.md`
-- `.github/workflows/orchestra-backend.yml`
-- `.github/workflows/orchestra-desktop-smoke.yml`
-- `.github/workflows/orchestra-release-artifacts.yml`
-- `.github/workflows/make-all.yml`
-- `.github/workflows/pr-description-lint.yml`
-- `.github/scripts/check-orchestra-naming.sh`
-- `Makefile`
-- `ops/docker/Dockerfile.backend`
-- `ops/systemd/orchestrad.service`
-- `test_api.sh`
-- `test_api_post.sh`
-- `test_projects.sh`
-- `verify_projects.sh`
-
-## Assumptions & Uncertainties
-
-- License signals are mixed: `docs/openapi.yaml` advertises `Proprietary`, while `apps/backend/LICENSE` contains Apache-2.0 text and additional license artifacts exist under `licenses/`.
-- `apps/desktop/README.md` references files under `docs/plans/` that are not present in this repository snapshot.
