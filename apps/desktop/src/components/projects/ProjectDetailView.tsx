@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import {
     ArrowLeft, Folder, Globe, History, Zap, ExternalLink,
-    Calendar, Code as CodeIcon, GitBranch, RefreshCcw, Trash2, Github,
-    FileText, Activity, Layers, ChevronRight, File, Folder as FolderIcon, Info, ShieldCheck, AlertCircle, Terminal
+    Calendar, GitBranch, RefreshCcw, Trash2, Github,
+    FileText, Layers, ChevronRight, File, Folder as FolderIcon, AlertCircle, Terminal
 } from 'lucide-react'
 import type { Project, ProjectStats, SnapshotPayload } from '@/lib/orchestra-types'
 import { Button } from '@/components/ui/button'
@@ -61,7 +61,7 @@ interface ProjectDetailViewProps {
 
 type CommitInfo = GitCommit | { message: string; author: string; date: string; hash?: string }
 
-type ProjectTab = 'overview' | 'tasks' | 'files' | 'git' | 'terminal'
+type ProjectTab = 'overview' | 'files' | 'git' | 'terminal'
 
 export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     project,
@@ -170,7 +170,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         setTabError(null)
 
         if (!config || !project.id) return
-        if (activeTab === 'overview' || activeTab === 'tasks' || activeTab === 'terminal') return
+        if (activeTab === 'overview' || activeTab === 'terminal') return
         if (!pathExists) return
 
         const loadTabData = async () => {
@@ -319,7 +319,6 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     const pathExists = project.path_exists !== false
     const tabs = [
         { id: 'overview', label: 'Overview', icon: <Layers size={14} />, needsPath: false },
-        { id: 'tasks', label: 'Board', icon: <CodeIcon size={14} />, needsPath: false },
         { id: 'files', label: 'Files', icon: <FileText size={14} />, needsPath: true },
         { id: 'git', label: 'Git', icon: <GitBranch size={14} />, needsPath: true },
         { id: 'terminal', label: 'Terminal', icon: <Terminal size={14} />, needsPath: true },
@@ -359,30 +358,30 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                         Back
                     </Button>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                         <AppTooltip content="Force metadata and filesystem sync">
                             <Button
                                 variant="outline"
                                 size="sm"
-                                className="gap-2 text-xs"
+                                className="h-8 w-8 p-0"
                                 onClick={handleRefresh}
                                 disabled={refreshing}
                             >
                                 <RefreshCcw size={14} className={refreshing ? 'animate-spin' : ''} />
-                                Refresh
                             </Button>
                         </AppTooltip>
 
                         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                             <DialogTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="gap-2 text-xs text-red-500 hover:text-red-400 hover:bg-red-500/10 border-red-500/20"
-                                >
-                                    <Trash2 size={14} />
-                                    Remove
-                                </Button>
+                                <AppTooltip content="Remove project from workspace">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 w-8 p-0 text-red-500 hover:text-red-400 hover:bg-red-500/10 border-red-500/20"
+                                    >
+                                        <Trash2 size={14} />
+                                    </Button>
+                                </AppTooltip>
                             </DialogTrigger>
                             <DialogContent className="sm:max-w-md bg-popover border-border shadow-2xl">
                                 <DialogHeader>
@@ -472,16 +471,28 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                         </div>
                     </div>
 
-                    <div className="flex gap-2">
-                        {!project.github_token && (
+                    <div className="flex gap-1.5">
+                        {project.github_token ? (
+                            <AppTooltip content={`GitHub connected as ${project.github_owner}/${project.github_repo}`}>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-2 h-8 px-3 text-xs border-green-500/20 text-green-500 cursor-default"
+                                >
+                                    <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                                    <Github size={14} />
+                                    GitHub Connected
+                                </Button>
+                            </AppTooltip>
+                        ) : (
                             <AppTooltip content="Authenticate with GitHub to enable PR creation">
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="gap-2 h-9 bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20"
+                                    className="gap-2 h-8 px-3 text-xs bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20"
                                     onClick={() => void handleConnectGitHub()}
                                 >
-                                    <Github size={16} />
+                                    <Github size={14} />
                                     Connect GitHub
                                 </Button>
                             </AppTooltip>
@@ -491,10 +502,10 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="gap-2 h-9 border-border/60"
+                                    className="gap-2 h-8 px-3 text-xs border-border/60"
                                     onClick={() => void openExternalTarget(project.remote_url)}
                                 >
-                                    <Globe size={16} />
+                                    <Globe size={14} />
                                     Git Repo
                                 </Button>
                             </AppTooltip>
@@ -535,29 +546,33 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
             >
                 <div className="p-8 min-h-full flex flex-col">
                     {activeTab === 'overview' && (
-                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 flex-1">
+                        <div className="flex-1 flex flex-col">
                             {!pathExists && (
-                                <div className="flex items-center gap-3 mb-6 p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 text-amber-400">
-                                    <AlertCircle size={18} className="shrink-0" />
-                                    <div>
-                                        <p className="text-sm font-bold">Project path not found on disk</p>
-                                        <p className="text-xs text-amber-400/70 mt-0.5 font-mono">{project.root_path}</p>
-                                        <p className="text-xs text-amber-400/60 mt-1">Files, Git, and Terminal tabs are unavailable. Session history and task data are still accessible.</p>
-                                    </div>
+                                <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl border border-amber-500/30 bg-amber-500/5 text-amber-400 text-xs">
+                                    <AlertCircle size={14} className="shrink-0" />
+                                    <span>Path not found: <span className="font-mono">{project.root_path}</span> — Files, Git, Terminal unavailable</span>
                                 </div>
                             )}
-                            {/* Stats Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                                <StatCard title="Total Sessions" value={stats?.total_sessions || 0} icon={<History size={20} />} color="blue" />
-                                <StatCard title="Token Throughput" value={((stats?.total_input || 0) + (stats?.total_output || 0)).toLocaleString()} icon={<Zap size={20} />} color="amber" />
-                                <StatCard title="Last Active" value={stats?.last_active ? new Date(stats.last_active).toLocaleDateString() : 'N/A'} icon={<Calendar size={20} />} color="green" />
+                            {/* Stats Row */}
+                            <div className="flex items-center gap-4 mb-6">
+                                <div className="flex items-center gap-2 border border-border/30 rounded-xl px-3 py-2 bg-card/40">
+                                    <History size={14} className="text-blue-500" />
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Sessions</span>
+                                    <span className="text-sm font-bold">{stats?.total_sessions || 0}</span>
+                                </div>
+                                <div className="flex items-center gap-2 border border-border/30 rounded-xl px-3 py-2 bg-card/40">
+                                    <Zap size={14} className="text-amber-500" />
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Tokens</span>
+                                    <span className="text-sm font-bold">{((stats?.total_input || 0) + (stats?.total_output || 0)).toLocaleString()}</span>
+                                </div>
+                                <div className="flex items-center gap-2 border border-border/30 rounded-xl px-3 py-2 bg-card/40">
+                                    <Calendar size={14} className="text-green-500" />
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Last Active</span>
+                                    <span className="text-sm font-bold">{stats?.last_active ? new Date(stats.last_active).toLocaleDateString() : 'N/A'}</span>
+                                </div>
                             </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'tasks' && (
-                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 flex-1 flex flex-col">
-                            <div className="bg-card/40 rounded-2xl border border-border/40 p-6 backdrop-blur-sm flex-1 flex flex-col">
+                            {/* Board */}
+                            <div className="bg-card/40 rounded-xl border border-border/30 p-6 backdrop-blur-sm flex-1 flex flex-col">
                                 <KanbanBoard
                                     loadingState={loadingState}
                                     snapshot={snapshot}
@@ -573,7 +588,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                     )}
 
                     {activeTab === 'files' && (
-                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 flex-1 flex flex-col min-h-0">
+                        <div className="flex-1 flex flex-col min-h-0">
                             {tabError ? (
                                 <div className="flex flex-col items-center justify-center py-20 text-red-400 bg-red-500/5 border border-red-500/20 rounded-xl">
                                     <AlertCircle size={48} className="mb-4" />
@@ -586,10 +601,10 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                 </div>
                             ) : (
                                 <div className="flex-1 flex gap-4 min-h-0 text-left">
-                                    {/* Explorer */}
-                                    <div className="w-1/3 bg-card/40 border border-border/40 rounded-xl overflow-hidden shadow-inner flex flex-col">
-                                        <div className="p-2 border-b border-border/40 bg-muted/10 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 flex items-center justify-between">
-                                            <span>Explorer</span>
+                                    {/* File Tree */}
+                                    <div className="w-1/3 bg-card/40 border border-border/30 rounded-xl overflow-hidden shadow-inner flex flex-col">
+                                        <div className="p-2 border-b border-border/40 bg-muted/10 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 flex items-center justify-between">
+                                            <span>Files</span>
                                             <div className="h-1.5 w-1.5 rounded-full bg-primary/40" />
                                         </div>
                                         <div className="flex-1 overflow-auto custom-scrollbar text-left">
@@ -603,7 +618,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                     </div>
 
                                      {/* Content Viewer */}
-                                     <div className="flex-1 bg-card border border-border/40 rounded-xl overflow-hidden shadow-2xl flex flex-col">
+                                     <div className="flex-1 bg-card border border-border/30 rounded-xl overflow-hidden shadow-2xl flex flex-col">
                                          <div className="p-2 border-b border-border/40 bg-muted/10 flex items-center justify-between">
                                             <div className="flex items-center gap-2 overflow-hidden">
                                                 <File size={12} className="text-primary/60 shrink-0" />
@@ -626,9 +641,8 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                                     <div className="h-full flex items-center justify-center opacity-20 italic text-sm">Loading content...</div>
                                                 )
                                             ) : (
-                                                <div className="h-full flex flex-col items-center justify-center opacity-20 grayscale py-32 text-center">
-                                                    <FileText size={64} className="mb-4 mx-auto" />
-                                                    <p className="text-sm font-bold uppercase tracking-widest">Select a file to view content</p>
+                                                <div className="h-full flex items-center justify-center text-muted-foreground/30 text-sm">
+                                                    Select a file to view
                                                 </div>
                                             )}
                                         </div>
@@ -639,7 +653,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                     )}
 
                     {activeTab === 'git' && (
-                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 flex-1">
+                        <div className="flex-1">
                             {tabError ? (
                                 <div className="flex flex-col items-center justify-center py-20 text-red-400 bg-red-500/5 border border-red-500/20 rounded-xl">
                                     <AlertCircle size={48} className="mb-4" />
@@ -653,13 +667,12 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                             ) : (
                                 <div className="space-y-8 pb-8">
                                      {/* Git Operations Bar */}
-                                     <div className="flex items-center gap-3 bg-card/40 border border-border/40 p-3 rounded-xl backdrop-blur-md sticky top-0 z-10">
-                                        <div className="flex-1 flex gap-2">
+                                     <div className="flex items-center gap-2 bg-card/40 border border-border/30 rounded-xl p-2 backdrop-blur-md sticky top-0 z-10">
                                             <AppTooltip content="Stage and commit all workspace changes">
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    className="gap-2 bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+                                                    className="gap-2 h-8 bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
                                                     onClick={() => setShowCommitDialog(true)}
                                                     disabled={gitPending}
                                                 >
@@ -671,7 +684,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    className="gap-2"
+                                                    className="gap-2 h-8"
                                                     onClick={() => handleGitAction('push')}
                                                     disabled={gitPending}
                                                 >
@@ -683,7 +696,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    className="gap-2"
+                                                    className="gap-2 h-8"
                                                     onClick={() => handleGitAction('pull')}
                                                     disabled={gitPending}
                                                 >
@@ -691,35 +704,21 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                                     Pull
                                                 </Button>
                                             </AppTooltip>
-                                        </div>
-
-                                        <div className="flex items-center gap-2 px-3 border-l border-border/40">
-                                            <AppTooltip content="Launch a new autonomous agent task for this project">
-                                                <Button
-                                                    size="sm"
-                                                    className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 font-black uppercase tracking-widest text-[10px]"
-                                                    onClick={() => onCreateIssue('Todo')}
-                                                >
-                                                    <Zap size={14} fill="currentColor" />
-                                                    Spawn Agent Fix
-                                                </Button>
-                                            </AppTooltip>
-                                        </div>
                                     </div>
 
                                     {showCommitDialog && (
-                                         <div className="p-4 bg-popover border border-primary/30 rounded-xl animate-in zoom-in-95 duration-200 shadow-2xl shadow-primary/10 text-left">
-                                             <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-3 px-1">Commit Changes</p>
+                                         <div className="p-3 bg-popover border border-border/30 rounded-xl shadow-lg text-left">
+                                             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-2">Commit Message</p>
                                              <textarea
-                                                 className="w-full bg-background/50 border border-border rounded-lg p-3 text-sm focus:outline-none focus:border-primary/50 transition-colors mb-4 resize-none"
-                                                placeholder="Enter commit message..."
+                                                 className="w-full bg-background/50 border border-border/30 rounded-lg p-2.5 text-sm focus:outline-none focus:border-primary/50 transition-colors mb-3 resize-none"
+                                                placeholder="Describe your changes..."
                                                 rows={2}
                                                 value={commitMessage}
                                                 onChange={(e) => setCommitMessage(e.target.value)}
                                             />
                                             <div className="flex justify-end gap-2">
-                                                <Button variant="ghost" size="sm" onClick={() => setShowCommitDialog(false)}>Cancel</Button>
-                                                <Button size="sm" onClick={() => handleGitAction('commit')} disabled={!commitMessage.trim() || gitPending}>Confirm Commit</Button>
+                                                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setShowCommitDialog(false)}>Cancel</Button>
+                                                <Button size="sm" className="h-8 text-xs" onClick={() => handleGitAction('commit')} disabled={!commitMessage.trim() || gitPending}>Commit</Button>
                                             </div>
                                         </div>
                                     )}
@@ -742,7 +741,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                                     View Full Diff
                                                 </Button>
                                             </div>
-                                             <div className="bg-amber-500/[0.03] border border-amber-500/20 rounded-xl p-2 text-left">
+                                             <div className="bg-amber-500/[0.03] border border-border/30 rounded-xl p-2 text-left">
                                                 {gitStatus.map((item, idx) => (
                                                     <div 
                                                         key={idx} 
@@ -767,7 +766,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                     )}
 
                                     {/* Commit History */}
-                                    <div className="space-y-4">
+                                    <div className="space-y-2">
                                         <div className="flex items-center gap-2 px-1 text-left">
                                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Commit History</h3>
                                         </div>
@@ -783,30 +782,24 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                                     : new Date(commit.date).toLocaleString();
 
                                                 return (
-                                                    <div 
-                                                        key={idx} 
-                                                        className="bg-card/40 border border-border/40 rounded-xl p-4 flex gap-4 items-start group hover:border-primary/30 transition-colors shadow-sm text-left cursor-pointer"
+                                                    <div
+                                                        key={idx}
+                                                        className="border border-border/30 rounded-xl px-3 py-2.5 flex gap-3 items-center group hover:border-primary/30 transition-colors text-left cursor-pointer"
                                                         onClick={() => handleViewDiff(commit.hash)}
                                                     >
-                                                        <div className="mt-1">
-                                                            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold group-hover:bg-primary/20 group-hover:text-primary transition-colors">
-                                                                {commit.author?.slice(0, 2).toUpperCase() || '??'}
-                                                            </div>
+                                                        <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-[9px] font-bold shrink-0 group-hover:bg-primary/20 group-hover:text-primary transition-colors">
+                                                            {commit.author?.slice(0, 2).toUpperCase() || '??'}
                                                         </div>
                                                         <div className="flex-1 min-w-0 text-left">
-                                                            <div className="flex items-center justify-between mb-1">
-                                                                 <p className="text-sm font-bold truncate group-hover:text-primary transition-colors">{commit.message}</p>
-                                                                 <span className="text-[10px] font-mono text-muted-foreground bg-muted/50 px-1.5 rounded group-hover:bg-primary/10 group-hover:text-primary/70 transition-colors">{commit.hash?.slice(0, 7)}</span>
-                                                            </div>
-                                                            <div className="flex items-center gap-3 text-[10px] text-muted-foreground uppercase tracking-widest">
+                                                            <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{commit.message}</p>
+                                                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                                                                 <span className="font-bold text-primary/70">{commit.author}</span>
-                                                                <span>•</span>
+                                                                <span className="opacity-40">·</span>
                                                                 <span>{dateStr}</span>
                                                             </div>
                                                         </div>
-                                                        <div className="self-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <ChevronRight size={16} className="text-primary" />
-                                                        </div>
+                                                        <span className="text-[10px] font-mono text-muted-foreground/60 shrink-0">{commit.hash?.slice(0, 7)}</span>
+                                                        <ChevronRight size={14} className="text-muted-foreground/20 group-hover:text-primary transition-colors shrink-0" />
                                                     </div>
                                                 );
                                             })
@@ -818,8 +811,8 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                     )}
 
                     {activeTab === 'terminal' && config && (
-                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 flex-1 flex flex-col min-h-0">
-                             <div className="flex-1 flex flex-col bg-background rounded-xl border border-border/40 overflow-hidden shadow-2xl relative">
+                        <div className="flex-1 flex flex-col min-h-0">
+                             <div className="flex-1 flex flex-col bg-background rounded-xl border border-border/30 overflow-hidden shadow-2xl relative">
                                  <div className="p-2 border-b border-border/40 bg-muted/10 flex items-center justify-between shrink-0">
                                     <div className="flex items-center gap-3">
                                         <Terminal size={14} className="text-primary" />
@@ -980,29 +973,6 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </div>
-    )
-}
-
-function StatCard({ title, value, icon, color }: { title: string, value: string | number, icon: React.ReactNode, color: string }) {
-    const colorClasses: Record<string, string> = {
-        blue: 'bg-blue-500/10 text-blue-500',
-        amber: 'bg-amber-500/10 text-amber-500',
-        green: 'bg-green-500/10 text-green-500',
-        primary: 'bg-primary/10 text-primary',
-        red: 'bg-red-500/10 text-red-500',
-        destructive: 'bg-red-500/10 text-red-500',
-    }
-
-    return (
-        <div className="bg-card/40 border border-border/40 rounded-xl p-5 shadow-sm hover:border-primary/20 transition-colors group text-left">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1 group-hover:text-foreground transition-colors">{title}</p>
-            <div className="flex items-center justify-between">
-                <p className="text-2xl font-bold">{value}</p>
-                <div className={`p-2 rounded-lg ${colorClasses[color] || colorClasses.primary}`}>
-                    {icon}
-                </div>
-            </div>
         </div>
     )
 }

@@ -740,111 +740,74 @@ export function CreateTaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl bg-card border-none shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] p-0 overflow-hidden max-h-[90vh] flex flex-col rounded-2xl">
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
-          <form onSubmit={handleSubmit} className="flex flex-col h-full min-h-[400px]">
-            {/* Main Content Area */}
-            <div className="flex-1 p-8 space-y-6">
-              <input
-                autoFocus
-                className="w-full bg-transparent border-none outline-none text-2xl font-semibold placeholder:text-muted-foreground/30 focus:ring-0 focus:outline-none focus:border-b focus:border-border/30 p-0 pb-2 selection:bg-primary/30 transition-colors"
-                placeholder="Task Title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-              />
-              <textarea
-                className="w-full bg-transparent border-none outline-none text-base placeholder:text-muted-foreground/20 focus:ring-0 focus:outline-none p-0 resize-none min-h-[100px] selection:bg-primary/20 leading-relaxed"
-                placeholder="Add a description..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
+      <DialogContent className="max-w-xl bg-card border-border/30 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] p-0 overflow-hidden max-h-[80vh] flex flex-col rounded-2xl">
+        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+          <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pt-6 pb-4 space-y-4">
+            <input
+              autoFocus
+              className="w-full bg-transparent border-none outline-none text-xl font-bold placeholder:text-muted-foreground/20 focus:ring-0 focus:outline-none p-0 selection:bg-primary/30"
+              placeholder="What needs to be done?"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+            <textarea
+              className="w-full bg-transparent border-none outline-none text-sm text-foreground/70 placeholder:text-muted-foreground/15 focus:ring-0 focus:outline-none p-0 resize-none min-h-[80px] selection:bg-primary/20 leading-relaxed"
+              placeholder="Describe the task for the agent..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
 
-              {/* Tool Management Section */}
-              {allTools.length > 0 && (
-                <div className="space-y-3 pt-4 border-t border-border/10">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-[8px] font-black uppercase tracking-widest text-muted-foreground">
-                      <Wrench size={10} /> Initial Capabilities
-                    </div>
-                    <span className="text-[8px] font-bold text-primary/60">{allTools.length - disabledTools.length} Tools Enabled</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {allTools.map((tool) => {
-                      const isDisabled = disabledTools.includes(tool.name)
-                      return (
-                        <button
-                          key={tool.name}
-                          type="button"
-                          onClick={() => handleToggleTool(tool.name)}
-                          className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase border transition-all ${isDisabled ? 'border-border text-muted-foreground/40 opacity-40 hover:opacity-60' : 'border-primary/20 bg-primary/10 text-primary hover:bg-primary/20'}`}
-                        >
-                          {tool.name.includes('_') ? tool.name.split('_')[1] : tool.name}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
+          {submitError && (
+            <div className="mx-6 mb-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+              {submitError}
             </div>
+          )}
 
-            {/* Attribute & Action Bar */}
-            <div className="border-t border-border/10 p-4 bg-muted/20 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ProjectSelector
-                  value={projectID}
-                  projects={projects}
-                  onChange={setProjectID}
-                />
-
-                <AgentSelector
-                  value={assignee}
-                  agents={availableAgents}
-                  onChange={(val) => {
-                    setAssignee(val)
-                    // Automatically sync provider when agent is assigned
-                    const agentName = val.replace('agent-', '')
-                    if (availableAgents.includes(agentName)) {
-                      setProvider(agentName)
-                    } else if (val === '') {
-                      setProvider(availableAgents.length > 0 ? availableAgents[0] : '')
-                    }
-                  }}
-                />
-
-              </div>
-
-              {submitError && (
-                <div className="mx-8 mb-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-                  {submitError}
-                </div>
-              )}
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onOpenChange(false)}
-                  disabled={pending}
-                  className="text-muted-foreground/50 hover:text-foreground h-8 px-3 font-semibold text-[11px] uppercase tracking-wider"
-                >
-                  Discard
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={pending || !title.trim()}
-                  className="h-8 px-5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 font-bold uppercase tracking-widest text-[11px]"
-                >
-                  {pending ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    'Create Task'
-                  )}
-                </Button>
-              </div>
+          <div className="border-t border-border/20 px-4 py-3 flex items-center justify-between bg-muted/10">
+            <div className="flex items-center gap-1">
+              <ProjectSelector
+                value={projectID}
+                projects={projects}
+                onChange={setProjectID}
+              />
+              <div className="w-px h-4 bg-border/20 mx-1" />
+              <AgentSelector
+                value={assignee}
+                agents={availableAgents}
+                onChange={(val) => {
+                  setAssignee(val)
+                  const agentName = val.replace('agent-', '')
+                  if (availableAgents.includes(agentName)) {
+                    setProvider(agentName)
+                  } else if (val === '') {
+                    setProvider(availableAgents.length > 0 ? availableAgents[0] : '')
+                  }
+                }}
+              />
             </div>
-          </form>
-        </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => onOpenChange(false)}
+                disabled={pending}
+                className="text-muted-foreground/40 hover:text-foreground h-7 px-3 text-[10px] font-bold uppercase tracking-widest"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={pending || !title.trim() || !projectID}
+                className="h-7 px-4 bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 font-bold uppercase tracking-widest text-[10px] disabled:opacity-30"
+              >
+                {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create'}
+              </Button>
+            </div>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   )

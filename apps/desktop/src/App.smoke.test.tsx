@@ -244,6 +244,7 @@ describe('App smoke render', () => {
         disconnect() {}
       },
     )
+    Element.prototype.scrollIntoView = vi.fn()
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
@@ -291,9 +292,9 @@ describe('App smoke render', () => {
 
     await waitFor(() => {
       expect(screen.getAllByText(/Tasks/i).length).toBeGreaterThan(0)
-      expect(screen.getByText(/To Do/i)).toBeTruthy()
-      expect(screen.getByText(/In Progress/i)).toBeTruthy()
-      expect(screen.getByText(/Done/i)).toBeTruthy()
+      expect(screen.getAllByText(/To Do/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/In Progress/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Done/i).length).toBeGreaterThan(0)
     })
   })
 
@@ -852,6 +853,161 @@ describe('App smoke render', () => {
       expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/v1/projects'), expect.objectContaining({ method: 'POST' }))
     })
   })
+
+
+
+
+
+
+  it('opens issue inspector when clicking a task on the board', async () => {
+    setupDesktopBridge()
+    const issues = [
+      {
+        id: 'issue-inspect',
+        issue_identifier: 'OPS-42',
+        identifier: 'OPS-42',
+        title: 'Inspect this task',
+        description: 'Details here',
+        state: 'Todo',
+        assignee_id: 'agent-codex',
+        priority: 2,
+        project_id: '',
+      },
+    ]
+    setupFetch(defaultSnapshot(), {
+      onFetch: (url) => {
+        if (url.includes('/api/v1/issues/OPS-42/history')) {
+          return new Response(JSON.stringify({ history: [] }), { status: 200 })
+        }
+        if (url.includes('/api/v1/issues/OPS-42')) {
+          return new Response(JSON.stringify(issues[0]), { status: 200 })
+        }
+        if (url.includes('/api/v1/issues')) {
+          return new Response(JSON.stringify({ issues }), { status: 200 })
+        }
+        return null
+      },
+    })
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+
+    await waitFor(() => {
+      expect(screen.getByText('Inspect this task')).toBeTruthy()
+    })
+
+    // Click the task card to open inspector
+    fireEvent.click(screen.getByText('Inspect this task'))
+
+    // Should open the issue inspection dialog
+    await waitFor(() => {
+      expect(screen.getByText(/Issue Inspection/i)).toBeTruthy()
+      expect(screen.getByText('OPS-42')).toBeTruthy()
+    })
+  })
+
+
+  it('state dropdown changes task state in issue inspector', async () => {
+    setupDesktopBridge()
+    const issues = [
+      {
+        id: 'issue-state',
+        issue_identifier: 'OPS-60',
+        identifier: 'OPS-60',
+        title: 'State change task',
+        description: '',
+        state: 'Todo',
+        assignee_id: 'agent-codex',
+        priority: 1,
+        project_id: '',
+      },
+    ]
+    const fetchMock = setupFetch(defaultSnapshot(), {
+      onFetch: (url, init) => {
+        if (url.includes('/api/v1/issues/OPS-60/history')) {
+          return new Response(JSON.stringify({ history: [] }), { status: 200 })
+        }
+        if (url.includes('/api/v1/issues/OPS-60') && init?.method === 'PATCH') {
+          return new Response(JSON.stringify({ ...issues[0], state: 'Done' }), { status: 200 })
+        }
+        if (url.includes('/api/v1/issues/OPS-60')) {
+          return new Response(JSON.stringify(issues[0]), { status: 200 })
+        }
+        if (url.includes('/api/v1/issues')) {
+          return new Response(JSON.stringify({ issues }), { status: 200 })
+        }
+        return null
+      },
+    })
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+
+    await waitFor(() => {
+      expect(screen.getByText('State change task')).toBeTruthy()
+    })
+
+    fireEvent.click(screen.getByText('State change task'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/Issue Inspection/i)).toBeTruthy()
+    })
+
+    // Find the state dropdown in the inspector and change it
+    // The CustomDropdown renders a button with the current value "Todo"
+    // We need to find the one inside the dialog
+    const dialog = screen.getByRole('dialog')
+
+    // Find the dropdown trigger showing "Todo" in the dialog header area
+    const todoButtons = within(dialog).getAllByText('Todo')
+    // Click the dropdown trigger (should be a button)
+    const dropdownTrigger = todoButtons.find(el => el.closest('button'))
+    expect(dropdownTrigger).toBeTruthy()
+    fireEvent.click(dropdownTrigger!)
+
+    // Select "Done" from the dropdown options
+    await waitFor(() => {
+      const doneOptions = screen.getAllByText('Done')
+      const doneOption = doneOptions[doneOptions.length - 1]
+      fireEvent.click(doneOption)
+    })
+
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(
+        (call) => String(call[0]).includes('/api/v1/issues/OPS-60') && call[1]?.method === 'PATCH',
+      )).toBe(true)
+    })
+  })
+
+  it('sidebar navigation switches between all sections', async () => {
+    setupDesktopBridge()
+    setupFetch(defaultSnapshot())
+
+    render(<App />)
+
+    // Dashboard is the initial view
+    await waitFor(() => {
+      expect(screen.getAllByText(/Dashboard/i).length).toBeGreaterThan(0)
+    })
+
+    const sections = [
+      { testId: 'sidebar-nav-issues', label: /Tasks/i },
+      { testId: 'sidebar-nav-projects', label: /Projects/i },
+      { testId: 'sidebar-nav-timeline', label: /Activity Feed/i },
+      { testId: 'sidebar-nav-settings', label: /Settings/i },
+    ]
+
+    for (const section of sections) {
+      fireEvent.click(screen.getByTestId(section.testId))
+      await waitFor(() => {
+        const btn = screen.getByTestId(section.testId)
+        expect(btn.getAttribute('aria-current')).toBe('page')
+      })
+    }
+  })
+
 
   it('toggles theme and updates root dark class', async () => {
     setupDesktopBridge()

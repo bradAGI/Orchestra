@@ -155,7 +155,7 @@ export function IssueDetailView({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-4 px-2 pb-4 border-b border-border/40 shrink-0">
+      <div className="flex items-center justify-between gap-4 px-2 py-3 border-b border-border/40 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${stateDot}`} />
           <Badge variant="outline" className="shrink-0 font-mono text-[11px] px-2 py-0.5 bg-primary/5 text-primary border-primary/20">
@@ -163,7 +163,7 @@ export function IssueDetailView({
           </Badge>
           <h2 className="text-base font-bold truncate">{title}</h2>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-3 shrink-0">
           <CustomDropdown
             className="w-28"
             value={localState}
@@ -192,62 +192,66 @@ export function IssueDetailView({
 
       {/* ── Operational Plan ── */}
       <div className="px-2 py-4 shrink-0">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/60 flex items-center gap-2">
-            <CheckCircle2 size={12} className="text-primary/60" />
-            Operational Plan
-          </h3>
-          {planItems.length > 0 && (
-            <div className="flex items-center gap-2">
-              <div className="h-1 w-16 bg-muted/30 rounded-full overflow-hidden">
-                <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${(completedCount / planItems.length) * 100}%` }} />
+        <div className="bg-card/60 border border-border/30 rounded-xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/60 flex items-center gap-2">
+              <CheckCircle2 size={12} className="text-primary/60" />
+              Operational Plan
+            </h3>
+            {planItems.length > 0 && (
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-16 bg-muted/30 rounded-full overflow-hidden">
+                  <div className="h-full bg-primary rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(var(--primary),0.3)]" style={{ width: `${(completedCount / planItems.length) * 100}%` }} />
+                </div>
+                <span className="text-[10px] font-mono text-muted-foreground/40">{completedCount}/{planItems.length}</span>
               </div>
-              <span className="text-[10px] font-mono text-muted-foreground/40">{completedCount}/{planItems.length}</span>
+            )}
+          </div>
+
+          {description && (
+            <p className="text-sm text-foreground/70 leading-relaxed mb-3">{description}</p>
+          )}
+
+          {planItems.length > 0 ? (
+            <div className="space-y-1.5 max-h-[200px] overflow-auto custom-scrollbar">
+              {planItems.map((item, idx) => (
+                <div key={idx} className="flex items-start gap-2.5 py-1">
+                  <div className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors ${item.done ? 'bg-primary border-primary text-primary-foreground' : 'border-border/50'}`}>
+                    {item.done && <CheckCircle2 size={10} />}
+                  </div>
+                  <span className={`text-sm leading-snug ${item.done ? 'text-muted-foreground/40 line-through' : 'text-foreground/90'}`}>{item.text}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-3 text-muted-foreground/30 border-2 border-dashed border-border/30 rounded-lg py-6">
+              {isRunning ? (
+                <><Loader2 size={12} className="animate-spin text-primary/40" /><span className="text-xs">Agent working — plan updates as steps are identified...</span></>
+              ) : localState === 'Todo' ? (
+                <span className="text-xs">Assign an agent and set to "In Progress" to begin.</span>
+              ) : (
+                <span className="text-xs">No plan steps recorded.</span>
+              )}
             </div>
           )}
         </div>
-
-        {description && (
-          <p className="text-sm text-foreground/80 leading-relaxed mb-3">{description}</p>
-        )}
-
-        {planItems.length > 0 ? (
-          <div className="space-y-1.5 max-h-[200px] overflow-auto custom-scrollbar">
-            {planItems.map((item, idx) => (
-              <div key={idx} className="flex items-start gap-2.5 py-1">
-                <div className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors ${item.done ? 'bg-primary border-primary text-primary-foreground' : 'border-border/50'}`}>
-                  {item.done && <CheckCircle2 size={10} />}
-                </div>
-                <span className={`text-sm leading-snug ${item.done ? 'text-muted-foreground/40 line-through' : 'text-foreground/90'}`}>{item.text}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex items-center gap-3 text-muted-foreground/30">
-            {isRunning ? (
-              <><Loader2 size={12} className="animate-spin text-primary/40" /><span className="text-xs">Agent working — plan updates as steps are identified...</span></>
-            ) : localState === 'Todo' ? (
-              <span className="text-xs">Assign an agent and set to "In Progress" to begin.</span>
-            ) : (
-              <span className="text-xs">No plan steps recorded.</span>
-            )}
-          </div>
-        )}
       </div>
 
       {/* ── Tabs ── */}
-      <div className="flex items-center border-y border-border/40 shrink-0">
-        {tabItems.map(tab => (
+      <div className="flex items-center gap-0 border-y border-border/40 shrink-0">
+        {tabItems.map((tab, idx) => (
           <button
             key={tab.id}
             onClick={() => setBottomTab(tab.id)}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-[10px] font-bold uppercase tracking-[0.15em] transition-all border-b-2 ${
+              idx < tabItems.length - 1 ? 'border-r border-border/20' : ''
+            } ${
               bottomTab === tab.id
-                ? 'border-primary text-primary bg-primary/5'
-                : 'border-transparent text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/10'
+                ? 'border-b-primary text-primary bg-primary/5'
+                : 'border-b-transparent text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/10'
             }`}
           >
-            <tab.icon size={12} />
+            <tab.icon size={14} />
             {tab.label}
             {tab.count !== undefined && tab.count > 0 && (
               <span className={`text-[9px] font-mono px-1 rounded ${bottomTab === tab.id ? 'text-primary/60' : 'text-muted-foreground/30'}`}>{tab.count}</span>
@@ -286,9 +290,9 @@ export function IssueDetailView({
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em]">No events recorded</p>
               </div>
             ) : (
-              <div className="divide-y divide-border/20">
+              <div>
                 {meaningfulEvents.map((item, idx) => (
-                  <div key={item.id || idx} className="flex items-start gap-3 px-4 py-3 hover:bg-muted/10 transition-colors">
+                  <div key={item.id || idx} className={`flex items-start gap-3 px-4 py-3 hover:bg-muted/10 transition-colors ${idx % 2 === 1 ? 'bg-muted/5' : 'bg-transparent'}`}>
                     <div className="mt-0.5 grid h-5 w-5 place-items-center rounded-full bg-muted/30 shrink-0">
                       {getEventIcon(item.kind)}
                     </div>
@@ -300,7 +304,7 @@ export function IssueDetailView({
                         )}
                       </div>
                       {item.message && (
-                        <p className="text-[11px] text-muted-foreground/60 mt-0.5 line-clamp-2">{item.message}</p>
+                        <p className="text-[11px] text-muted-foreground/60 mt-0.5 line-clamp-1">{item.message}</p>
                       )}
                     </div>
                     <span className="text-[9px] text-muted-foreground/30 font-mono shrink-0 mt-0.5">
@@ -319,8 +323,20 @@ export function IssueDetailView({
             {logsLoading ? (
               <div className="h-full flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary/30" /></div>
             ) : logs && !logs.includes('# No logs available') ? (
-              <div className="h-full bg-[#0d1117] overflow-auto">
-                <pre className="p-4 text-[11px] font-mono text-[#c9d1d9] whitespace-pre-wrap leading-[1.7] selection:bg-primary/30">{logs}</pre>
+              <div className="flex flex-col h-full bg-[#0d1117] overflow-auto">
+                <pre className="flex-1 p-4 text-[11px] font-mono text-[#c9d1d9] whitespace-pre-wrap leading-[1.7] selection:bg-primary/30">{
+                  logs.split('\n').map((line, i) => {
+                    const lineNum = String(i + 1).padStart(4, ' ')
+                    // Render markdown-like headings slightly better
+                    if (line.startsWith('# ')) {
+                      return <span key={i}><span className="text-[#484f58] select-none">{lineNum}  </span><span className="text-[#58a6ff] font-bold">{line}</span>{'\n'}</span>
+                    }
+                    if (line.startsWith('## ')) {
+                      return <span key={i}><span className="text-[#484f58] select-none">{lineNum}  </span><span className="text-[#58a6ff] font-semibold">{line}</span>{'\n'}</span>
+                    }
+                    return <span key={i}><span className="text-[#484f58] select-none">{lineNum}  </span>{line}{'\n'}</span>
+                  })
+                }</pre>
               </div>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground/20 gap-3">
@@ -346,7 +362,7 @@ export function IssueDetailView({
               </div>
             ) : (
               <div className="flex h-full">
-                <div className="w-52 border-r border-border/30 shrink-0 overflow-auto">
+                <div className="w-52 border-r border-border/30 shrink-0 overflow-auto bg-card/60">
                   <div className="p-2 text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground/40 border-b border-border/20 px-3">
                     {diffFiles.length} file{diffFiles.length !== 1 ? 's' : ''} changed
                   </div>
@@ -355,7 +371,7 @@ export function IssueDetailView({
                       key={f.path}
                       onClick={() => setActiveDiffFile(f.path)}
                       className={`w-full text-left px-3 py-2 text-[11px] truncate transition-colors ${
-                        activeDiffFile === f.path ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:bg-muted/20'
+                        activeDiffFile === f.path ? 'bg-primary/10 text-primary font-medium border-l-2 border-primary' : 'text-muted-foreground hover:bg-muted/20'
                       }`}
                     >
                       {f.path.split('/').pop()}

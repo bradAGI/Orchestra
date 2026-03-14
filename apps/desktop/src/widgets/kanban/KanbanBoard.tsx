@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Activity,
   CircleDashed,
   Folder,
   FolderTree,
   Layout,
   Play,
+  Plus,
   Rows,
   Square,
   Ticket,
   Trash2,
+  X,
 } from 'lucide-react'
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react'
 
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
@@ -252,9 +252,9 @@ export function KanbanBoard({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/40 pb-4 shrink-0">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 rounded-md border bg-muted/20 px-2 py-1">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-md border bg-muted/20 px-1.5 py-0.5">
             <span className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/60">State</span>
             <CustomDropdown
               className="w-40"
@@ -267,7 +267,7 @@ export function KanbanBoard({
             />
           </div>
 
-          <div className="flex items-center gap-2 rounded-md border bg-muted/20 px-2 py-1">
+          <div className="flex items-center gap-1.5 rounded-md border bg-muted/20 px-1.5 py-0.5">
             <span className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/60">Project</span>
             <CustomDropdown
               className="w-56"
@@ -281,17 +281,15 @@ export function KanbanBoard({
           </div>
 
           {(stateFilter !== 'all' || projectFilter !== 'all') ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-[10px] text-muted-foreground hover:text-foreground"
+            <button
+              className="grid h-5 w-5 place-items-center rounded-full text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors"
               onClick={() => {
                 setStateFilter('all')
                 setProjectFilter('all')
               }}
             >
-              Clear filters
-            </Button>
+              <X className="h-3 w-3" />
+            </button>
           ) : null}
         </div>
 
@@ -336,17 +334,15 @@ export function KanbanBoard({
                   <span className="text-[11px] font-medium text-muted-foreground/50">{column.items.length}</span>
                 </div>
                 <AppTooltip content={`Create Task in ${column.title}`}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 text-muted-foreground hover:bg-muted/50"
+                  <button
+                    className="grid h-6 w-6 place-items-center rounded-md border border-dashed border-muted-foreground/30 text-muted-foreground/50 hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all"
                     onClick={(e) => {
                       e.stopPropagation()
                       handleCreateClick(column.id)
                     }}
                   >
-                    <span className="text-lg font-light">+</span>
-                  </Button>
+                    <Plus className="h-3 w-3" />
+                  </button>
                 </AppTooltip>
               </div>
 
@@ -359,8 +355,7 @@ export function KanbanBoard({
                   Array.from({ length: 3 }).map((_, idx) => <Skeleton key={idx} className="h-28 w-full rounded-lg" />)
                 ) : column.items.length === 0 ? (
                   <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
-                    <div className="mb-2 h-8 w-8 rounded-full border-2 border-dashed border-muted-foreground/20" />
-                    <p className="text-[10px] uppercase tracking-widest text-muted-foreground/40">Empty</p>
+                    <p className="text-[10px] uppercase tracking-widest text-muted-foreground/30">{column.title}</p>
                   </div>
                 ) : (
                   column.items.map((item) => {
@@ -373,88 +368,67 @@ export function KanbanBoard({
                         onClick={() => void onInspectIssue(getActionIssueRef(item))}
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-[9px] font-black uppercase tracking-tight text-muted-foreground/60 group-hover:text-primary transition-colors">
-                              {item.issue_identifier}
-                            </span>
-                          </div>
-                          <div className="flex flex-col items-end gap-1.5">
-                            <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground/30 tabular-nums">
-                              {item.at
-                                ? new Date(item.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                : item.due_at
-                                  ? 'Retry'
-                                  : ''}
-                            </span>
-                            <div
-                              data-no-drag="true"
-                              className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all translate-x-1 group-hover:translate-x-0"
-                            >
-                              {item.state === 'Todo' && item.assignee_id && item.assignee_id !== 'Unassigned' && onIssueUpdate && (
-                                <AppTooltip content="Launch agent session">
-                                  <button
-                                    type="button"
-                                    data-no-drag="true"
-                                    className="p-1 rounded-md text-emerald-500/60 hover:text-emerald-500 hover:bg-emerald-500/10 transition-all"
+                          <span className="font-mono text-[11px] font-black uppercase tracking-tight text-primary/80 group-hover:text-primary transition-colors">
+                            {item.issue_identifier}
+                          </span>
+                          <div
+                            data-no-drag="true"
+                            className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all translate-x-1 group-hover:translate-x-0"
+                          >
+                            {item.state === 'Todo' && item.assignee_id && item.assignee_id !== 'Unassigned' && onIssueUpdate && (
+                              <AppTooltip content="Launch agent session">
+                                <button
+                                  type="button"
+                                  data-no-drag="true"
+                                  className="p-1 rounded-md text-emerald-500/60 hover:text-emerald-500 hover:bg-emerald-500/10 transition-all"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    void onIssueUpdate(getActionIssueRef(item), { state: 'In Progress' })
+                                  }}
+                                >
+                                  <Play className="h-2.5 w-2.5 fill-current" />
+                                </button>
+                              </AppTooltip>
+                            )}
+                            {item.state === 'In Progress' && onStopSession && (
+                              <AppTooltip content="Stop session">
+                                <button
+                                  type="button"
+                                  data-no-drag="true"
+                                  className="p-1 rounded-md text-amber-500/60 hover:text-amber-500 hover:bg-amber-500/10 transition-all"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    void onStopSession(getActionIssueRef(item))
+                                  }}
+                                >
+                                  <Square className="h-2 w-2 fill-current" />
+                                </button>
+                              </AppTooltip>
+                            )}
+                            {onIssueDelete && (
+                              <AppTooltip content="Permanently delete">
+                                <button
+                                  type="button"
+                                  data-no-drag="true"
+                                  aria-label={`Delete task ${item.issue_identifier}`}
+                                  className="p-1 rounded-md text-muted-foreground/40 hover:text-red-500 hover:bg-red-500/10 transition-all"
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      void onIssueUpdate(getActionIssueRef(item), { state: 'In Progress' })
+                                      setDeleteTaskError('')
+                                      setIssueToDelete({ identifier: getActionIssueRef(item), title: item.title })
+                                      setDeleteDialogOpen(true)
                                     }}
-                                  >
-                                    <Play className="h-2.5 w-2.5 fill-current" />
-                                  </button>
-                                </AppTooltip>
-                              )}
-                              {item.state === 'In Progress' && onStopSession && (
-                                <AppTooltip content="Stop session">
-                                  <button
-                                    type="button"
-                                    data-no-drag="true"
-                                    className="p-1 rounded-md text-amber-500/60 hover:text-amber-500 hover:bg-amber-500/10 transition-all"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      void onStopSession(getActionIssueRef(item))
-                                    }}
-                                  >
-                                    <Square className="h-2 w-2 fill-current" />
-                                  </button>
-                                </AppTooltip>
-                              )}
-                              {onIssueDelete && (
-                                <AppTooltip content="Permanently delete">
-                                  <button
-                                    type="button"
-                                    data-no-drag="true"
-                                    aria-label={`Delete task ${item.issue_identifier}`}
-                                    className="p-1 rounded-md text-muted-foreground/40 hover:text-red-500 hover:bg-red-500/10 transition-all"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setDeleteTaskError('')
-                                        setIssueToDelete({ identifier: getActionIssueRef(item), title: item.title })
-                                        setDeleteDialogOpen(true)
-                                      }}
-                                  >
-                                    <Trash2 className="h-2.5 w-2.5" />
-                                  </button>
-                                </AppTooltip>
-                              )}
-                            </div>
+                                >
+                                  <Trash2 className="h-2.5 w-2.5" />
+                                </button>
+                              </AppTooltip>
+                            )}
                           </div>
                         </div>
-                        <p className="mt-2.5 line-clamp-2 text-[12px] font-bold leading-[1.4] text-foreground/90 group-hover:text-foreground transition-colors">
+                        <p className="mt-1.5 line-clamp-2 text-[12px] font-bold leading-[1.4] text-foreground/90 group-hover:text-foreground transition-colors">
                           {item.title || item.description || item.last_message || item.error || 'No message'}
                         </p>
-                        {Array.isArray(item.labels) && item.labels.length > 0 && (
-                          <div className="mt-2.5 flex flex-wrap gap-1">
-                            {item.labels.slice(0, 2).map((label: string) => (
-                              <Badge key={label} variant="outline" className="px-1 py-0 text-[8px] font-black uppercase tracking-widest bg-muted/30 text-muted-foreground/60 border-border/40">
-                                {label}
-                              </Badge>
-                            ))}
-                            {item.labels.length > 2 && <span className="text-[8px] font-black text-muted-foreground/30">+{item.labels.length - 2}</span>}
-                          </div>
-                        )}
-                        <div className="mt-4 flex items-center justify-between border-t border-border/40 pt-2.5">
+                        <div className="mt-3 flex items-center justify-between border-t border-border/40 pt-2.5">
                           <div data-no-drag="true">
                             <AgentSelector
                               value={item.assignee_id || ''}
@@ -467,10 +441,9 @@ export function KanbanBoard({
                             />
                           </div>
                           {item.session_id ? (
-                            <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[8px] font-black uppercase tracking-widest text-amber-500 animate-in fade-in duration-500">
-                              <Activity className="h-2 w-2 animate-pulse" />
-                              <span>Live</span>
-                            </div>
+                            <AppTooltip content="Live session">
+                              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                            </AppTooltip>
                           ) : null}
                         </div>
                       </Card>
@@ -497,7 +470,6 @@ export function KanbanBoard({
                     <th className="px-4 py-3">Title</th>
                     <th className="px-4 py-3 w-32">Assignee</th>
                     <th className="px-4 py-3 w-28">Status</th>
-                    <th className="px-4 py-3 w-32 text-right">Activity</th>
                     <th className="px-4 py-3 w-20 text-right"></th>
                   </tr>
                 </thead>
@@ -508,23 +480,22 @@ export function KanbanBoard({
                       className="group hover:bg-muted/30 transition-colors cursor-pointer"
                       onClick={() => void onInspectIssue(getActionIssueRef(item))}
                     >
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <span className="font-mono text-xs font-bold text-primary">{item.issue_identifier}</span>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col gap-0.5">
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2">
                           <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
                             {item.title || item.detail || 'No Title'}
                           </span>
                           {item.lane === 'running' && (
-                            <div className="flex items-center gap-1.5 text-[10px] text-amber-500 font-bold uppercase tracking-tighter">
-                              <Activity className="h-3 w-3" />
-                              Active session
-                            </div>
+                            <AppTooltip content="Live session">
+                              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                            </AppTooltip>
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-4">
                         <AgentSelector
                           value={item.assignee_id || ''}
                           agents={availableAgents}
@@ -535,18 +506,13 @@ export function KanbanBoard({
                           }}
                         />
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <div className={`h-1.5 w-1.5 rounded-full ${item.state === 'Done' ? 'bg-primary' : item.state === 'In Progress' ? 'bg-amber-500 animate-pulse' : 'bg-muted-foreground/40'}`} />
                           <span className="text-xs font-medium text-muted-foreground">{item.state}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
-                        <span className="text-[10px] font-mono text-muted-foreground/60">
-                          {item.at ? new Date(item.at).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
-                        </span>
-                      </td>
-                      <td className="px-2 py-3 text-right">
+                      <td className="px-2 py-4 text-right">
                         <div className="flex items-center justify-end gap-1">
                           {item.state === 'Todo' && item.assignee_id && item.assignee_id !== 'Unassigned' && onIssueUpdate && (
                             <button
