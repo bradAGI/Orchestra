@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -15,8 +17,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/orchestra/orchestra/apps/backend/internal/db"
-	"github.com/orchestra/orchestra/apps/backend/internal/utils/git"
 	"github.com/rs/zerolog"
+	_ "modernc.org/sqlite"
 )
 
 var (
@@ -156,8 +158,399 @@ func StartWatcher(ctx context.Context, database *db.DB, manualRoots []string, lo
 			// 4. Gemini CLI
 			scanDirectory(ctx, database, manualRoots, filepath.Join(homeDir, ".gemini", "logs"), "gemini", logger)
 			scanDirectory(ctx, database, manualRoots, filepath.Join(homeDir, ".gemini", "sessions"), "gemini", logger)
+			scanGeminiJSON(ctx, database, manualRoots, filepath.Join(homeDir, ".gemini"), logger)
+
+			// 5. OpenCode
+			scanOpenCodeSQLite(ctx, database, manualRoots, filepath.Join(homeDir, ".local", "share", "opencode", "opencode.db"), logger)
 		}
 	}
+}
+
+type geminiChatFile struct {
+	SessionID   string `json:"sessionId"`
+	ProjectHash string `json:"projectHash"`
+	StartTime   string `json:"startTime"`
+	LastUpdated string `json:"lastUpdated"`
+	Messages    []struct {
+		ID        string `json:"id"`
+		Timestamp string `json:"timestamp"`
+		Type      string `json:"type"`
+		Content   any    `json:"content"`
+		Tokens    struct {
+			Input  int `json:"input"`
+			Output int `json:"output"`
+		} `json:"tokens"`
+	} `json:"messages"`
+}
+
+type geminiLogEntry struct {
+	SessionID string `json:"sessionId"`
+	MessageID int    `json:"messageId"`
+	Type      string `json:"type"`
+	Message   string `json:"message"`
+	Timestamp string `json:"timestamp"`
+}
+
+func scanGeminiJSON(ctx context.Context, database *db.DB, manualRoots []string, geminiHome string, logger zerolog.Logger) {
+	aliasMap := loadGeminiProjectAliases(filepath.Join(geminiHome, "projects.json"))
+
+	tmpRoot := filepath.Join(geminiHome, "tmp")
+	chatGlobs, _ := filepath.Glob(filepath.Join(tmpRoot, "*", "chats", "session-*.json"))
+	for _, chatFile := range chatGlobs {
+		if shouldProcessJSONFile(ctx, database, chatFile) {
+			processGeminiChatFile(ctx, database, manualRoots, aliasMap, chatFile, logger)
+		}
+	}
+
+	logGlobs, _ := filepath.Glob(filepath.Join(tmpRoot, "*", "logs.json"))
+	for _, logFile := range logGlobs {
+		if shouldProcessJSONFile(ctx, database, logFile) {
+			processGeminiLogsFile(ctx, database, manualRoots, aliasMap, logFile, logger)
+		}
+	}
+}
+
+func loadGeminiProjectAliases(projectsPath string) map[string]string {
+	data, err := os.ReadFile(projectsPath)
+	if err != nil {
+		return map[string]string{}
+	}
+
+	var payload struct {
+		Projects map[string]string `json:"projects"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return map[string]string{}
+	}
+
+	aliases := make(map[string]string, len(payload.Projects))
+	for root, alias := range payload.Projects {
+		if strings.TrimSpace(alias) == "" || strings.TrimSpace(root) == "" {
+			continue
+		}
+		aliases[alias] = root
+	}
+
+	return aliases
+}
+
+func shouldProcessJSONFile(ctx context.Context, database *db.DB, filePath string) bool {
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return false
+	}
+
+	lastSeen := getOffset(ctx, database, filePath)
+	return info.ModTime().UnixNano() > lastSeen
+}
+
+func saveJSONFileCheckpoint(ctx context.Context, database *db.DB, filePath string) {
+	if info, err := os.Stat(filePath); err == nil {
+		saveOffset(ctx, database, filePath, info.ModTime().UnixNano())
+	}
+}
+
+func geminiAliasFromPath(filePath string) string {
+	parts := strings.Split(filepath.Clean(filePath), string(os.PathSeparator))
+	for i := 0; i < len(parts)-1; i++ {
+		if parts[i] == "tmp" {
+			return parts[i+1]
+		}
+	}
+	return ""
+}
+
+func resolveGeminiProject(ctx context.Context, database *db.DB, manualRoots []string, aliasMap map[string]string, filePath string, logger zerolog.Logger) string {
+	alias := geminiAliasFromPath(filePath)
+	if root, ok := aliasMap[alias]; ok {
+		projectID, err := database.UpsertProject(ctx, root, "")
+		if err == nil {
+			return projectID
+		}
+		logger.Debug().Err(err).Str("root", root).Msg("failed to upsert gemini project alias root")
+	}
+
+	projectID, _ := findProjectRoot(ctx, database, filePath, manualRoots, logger)
+	return projectID
+}
+
+func processGeminiChatFile(ctx context.Context, database *db.DB, manualRoots []string, aliasMap map[string]string, filePath string, logger zerolog.Logger) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return
+	}
+
+	var chat geminiChatFile
+	if err := json.Unmarshal(data, &chat); err != nil {
+		return
+	}
+
+	if chat.SessionID == "" {
+		return
+	}
+
+	projectID := resolveGeminiProject(ctx, database, manualRoots, aliasMap, filePath, logger)
+	_ = database.RecordSession(ctx, chat.SessionID, projectID, "", chat.SessionID, "gemini", "unknown")
+
+	for idx, msg := range chat.Messages {
+		kind := strings.TrimSpace(msg.Type)
+		if kind == "" {
+			kind = "message"
+		}
+
+		ts := msg.Timestamp
+		if ts == "" {
+			ts = chat.LastUpdated
+		}
+		if ts == "" {
+			ts = chat.StartTime
+		}
+		if ts == "" {
+			ts = time.Now().Format(time.RFC3339)
+		}
+
+		eventKey := msg.ID
+		if eventKey == "" {
+			eventKey = fmt.Sprintf("%d", idx)
+		}
+		eventHash := sha256.Sum256([]byte("gemini-chat:" + chat.SessionID + ":" + eventKey))
+		eventID := hex.EncodeToString(eventHash[:16])
+
+		message := geminiContentText(msg.Content)
+		if message == "" {
+			message = kind
+		}
+
+		raw, _ := json.Marshal(msg)
+		_ = database.RecordEvent(ctx, eventID, chat.SessionID, kind, sanitizePII(message), raw, msg.Tokens.Input, msg.Tokens.Output, ts)
+	}
+
+	saveJSONFileCheckpoint(ctx, database, filePath)
+}
+
+func geminiContentText(content any) string {
+	switch value := content.(type) {
+	case string:
+		return strings.TrimSpace(value)
+	case []any:
+		parts := make([]string, 0, len(value))
+		for _, item := range value {
+			if m, ok := item.(map[string]any); ok {
+				if text, ok := m["text"].(string); ok {
+					trimmed := strings.TrimSpace(text)
+					if trimmed != "" {
+						parts = append(parts, trimmed)
+					}
+				}
+			}
+		}
+		return strings.Join(parts, "\n")
+	default:
+		return ""
+	}
+}
+
+func processGeminiLogsFile(ctx context.Context, database *db.DB, manualRoots []string, aliasMap map[string]string, filePath string, logger zerolog.Logger) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return
+	}
+
+	var entries []geminiLogEntry
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return
+	}
+
+	projectID := resolveGeminiProject(ctx, database, manualRoots, aliasMap, filePath, logger)
+
+	for _, entry := range entries {
+		if entry.SessionID == "" {
+			continue
+		}
+		_ = database.RecordSession(ctx, entry.SessionID, projectID, "", entry.SessionID, "gemini", "unknown")
+
+		ts := entry.Timestamp
+		if ts == "" {
+			ts = time.Now().Format(time.RFC3339)
+		}
+
+		eventHash := sha256.Sum256([]byte(fmt.Sprintf("gemini-log:%s:%d:%s", entry.SessionID, entry.MessageID, entry.Type)))
+		eventID := hex.EncodeToString(eventHash[:16])
+		kind := entry.Type
+		if kind == "" {
+			kind = "log"
+		}
+		raw, _ := json.Marshal(entry)
+		_ = database.RecordEvent(ctx, eventID, entry.SessionID, kind, sanitizePII(entry.Message), raw, 0, 0, ts)
+	}
+
+	saveJSONFileCheckpoint(ctx, database, filePath)
+}
+
+func scanOpenCodeSQLite(ctx context.Context, database *db.DB, manualRoots []string, dbPath string, logger zerolog.Logger) {
+	if _, err := os.Stat(dbPath); err != nil {
+		return
+	}
+
+	extDB, err := sql.Open("sqlite", "file:"+dbPath+"?mode=ro")
+	if err != nil {
+		logger.Debug().Err(err).Msg("failed to open opencode sqlite db")
+		return
+	}
+	defer extDB.Close()
+
+	messageCheckpointKey := "opencode:message:time_created"
+	partCheckpointKey := "opencode:part:time_created"
+	lastMessage := getOffset(ctx, database, messageCheckpointKey)
+	lastPart := getOffset(ctx, database, partCheckpointKey)
+
+	maxMessage := lastMessage
+	maxPart := lastPart
+
+	msgRows, err := extDB.QueryContext(ctx, `
+		SELECT m.id, m.session_id, m.time_created, m.data, COALESCE(s.directory, '')
+		FROM message m
+		LEFT JOIN session s ON s.id = m.session_id
+		WHERE m.time_created > ?
+		ORDER BY m.time_created ASC
+	`, lastMessage)
+	if err == nil {
+		defer msgRows.Close()
+		for msgRows.Next() {
+			var messageID, sessionID, dataJSON, directory string
+			var createdAt int64
+			if err := msgRows.Scan(&messageID, &sessionID, &createdAt, &dataJSON, &directory); err != nil {
+				continue
+			}
+			if createdAt > maxMessage {
+				maxMessage = createdAt
+			}
+
+			projectID := ""
+			if strings.TrimSpace(directory) != "" {
+				if id, err := database.UpsertProject(ctx, directory, ""); err == nil {
+					projectID = id
+				}
+			}
+			_ = database.RecordSession(ctx, sessionID, projectID, "", sessionID, "opencode", "unknown")
+
+			var payload map[string]any
+			if err := json.Unmarshal([]byte(dataJSON), &payload); err != nil {
+				continue
+			}
+
+			role, _ := payload["role"].(string)
+			kind := "message"
+			if role != "" {
+				kind = "message_" + role
+			}
+			msg := ""
+			if summary, ok := payload["summary"].(string); ok {
+				msg = strings.TrimSpace(summary)
+			}
+			if msg == "" {
+				msg = kind
+			}
+
+			inputTokens, outputTokens := extractOpenCodeTokens(payload)
+			timestamp := msEpochToRFC3339(createdAt)
+			eventHash := sha256.Sum256([]byte("opencode-message:" + messageID))
+			eventID := hex.EncodeToString(eventHash[:16])
+			_ = database.RecordEvent(ctx, eventID, sessionID, kind, sanitizePII(msg), []byte(dataJSON), inputTokens, outputTokens, timestamp)
+		}
+	}
+
+	partRows, err := extDB.QueryContext(ctx, `
+		SELECT p.id, p.session_id, p.time_created, p.data, COALESCE(s.directory, '')
+		FROM part p
+		LEFT JOIN session s ON s.id = p.session_id
+		WHERE p.time_created > ?
+		ORDER BY p.time_created ASC
+	`, lastPart)
+	if err == nil {
+		defer partRows.Close()
+		for partRows.Next() {
+			var partID, sessionID, dataJSON, directory string
+			var createdAt int64
+			if err := partRows.Scan(&partID, &sessionID, &createdAt, &dataJSON, &directory); err != nil {
+				continue
+			}
+			if createdAt > maxPart {
+				maxPart = createdAt
+			}
+
+			projectID := ""
+			if strings.TrimSpace(directory) != "" {
+				if id, err := database.UpsertProject(ctx, directory, ""); err == nil {
+					projectID = id
+				}
+			}
+			_ = database.RecordSession(ctx, sessionID, projectID, "", sessionID, "opencode", "unknown")
+
+			var payload map[string]any
+			if err := json.Unmarshal([]byte(dataJSON), &payload); err != nil {
+				continue
+			}
+
+			kind, _ := payload["type"].(string)
+			if kind == "" {
+				kind = "part"
+			}
+			message := extractOpenCodePartText(payload)
+			if message == "" {
+				message = kind
+			}
+
+			timestamp := msEpochToRFC3339(createdAt)
+			eventHash := sha256.Sum256([]byte("opencode-part:" + partID))
+			eventID := hex.EncodeToString(eventHash[:16])
+			_ = database.RecordEvent(ctx, eventID, sessionID, "part_"+kind, sanitizePII(message), []byte(dataJSON), 0, 0, timestamp)
+		}
+	}
+
+	if maxMessage > lastMessage {
+		saveOffset(ctx, database, messageCheckpointKey, maxMessage)
+	}
+	if maxPart > lastPart {
+		saveOffset(ctx, database, partCheckpointKey, maxPart)
+	}
+}
+
+func extractOpenCodeTokens(payload map[string]any) (int, int) {
+	tokens, ok := payload["tokens"].(map[string]any)
+	if !ok {
+		return 0, 0
+	}
+	var in, out int
+	if v, ok := tokens["input"].(float64); ok {
+		in = int(v)
+	}
+	if v, ok := tokens["output"].(float64); ok {
+		out = int(v)
+	}
+	return in, out
+}
+
+func extractOpenCodePartText(payload map[string]any) string {
+	if text, ok := payload["text"].(string); ok {
+		if trimmed := strings.TrimSpace(text); trimmed != "" {
+			return trimmed
+		}
+	}
+	if tool, ok := payload["tool"].(string); ok {
+		return "tool:" + tool
+	}
+	if reason, ok := payload["reason"].(string); ok {
+		return reason
+	}
+	return ""
+}
+
+func msEpochToRFC3339(ms int64) string {
+	if ms <= 0 {
+		return time.Now().Format(time.RFC3339)
+	}
+	return time.UnixMilli(ms).UTC().Format(time.RFC3339)
 }
 
 func scanDirectory(ctx context.Context, database *db.DB, manualRoots []string, dir string, provider string, logger zerolog.Logger) {
@@ -223,12 +616,8 @@ func deriveProjectFromPath(path string) string {
 				}
 				return derived
 			}
-			// Fallback: naive replacement (won't be on disk but keeps old behavior for DB linkage)
-			naive := strings.ReplaceAll(seg, "-", "/")
-			if !strings.HasPrefix(naive, "/") {
-				naive = "/" + naive
-			}
-			return filepath.Clean(naive)
+			// No valid path found on disk - return empty to skip project creation
+			return ""
 		}
 	}
 	return ""
@@ -320,33 +709,36 @@ func findProjectRoot(ctx context.Context, database *db.DB, path string, manualRo
 		cleanPath = eval
 	}
 
-	// 1. Try Git
-	rootPath, remoteURL, err := git.ProjectInfo(ctx, filepath.Dir(cleanPath))
-	if err == nil {
-		projectID, _ := database.UpsertProject(ctx, rootPath, remoteURL)
-		logger.Debug().Str("path", cleanPath).Str("root", rootPath).Str("id", projectID).Msg("found git root")
-		return projectID, rootPath
+	// Try to match against existing projects in the DB only.
+	// The watcher never creates projects — users add them explicitly via the API.
+	projects, err := database.GetProjects(ctx)
+	if err != nil {
+		return "", ""
 	}
 
-	// 2. Try Manual Roots
-	for _, root := range manualRoots {
-		absRoot := filepath.Clean(root)
+	// 1. Check if the file path falls under any known project root
+	for _, p := range projects {
+		absRoot := filepath.Clean(p.RootPath)
 		if eval, err := filepath.EvalSymlinks(absRoot); err == nil {
 			absRoot = eval
 		}
-
-		if strings.HasPrefix(cleanPath, absRoot) {
-			projectID, _ := database.UpsertProject(ctx, absRoot, "local://"+filepath.Base(absRoot))
-			logger.Debug().Str("path", cleanPath).Str("root", absRoot).Str("id", projectID).Msg("found manual root")
-			return projectID, absRoot
+		if strings.HasPrefix(cleanPath, absRoot+"/") || cleanPath == absRoot {
+			return p.ID, p.RootPath
 		}
 	}
 
-	// 3. Try Deriving from Tool-Specific path
+	// 2. Try deriving the project path from the tool-specific encoded path,
+	//    then match against existing projects
 	if derived := deriveProjectFromPath(cleanPath); derived != "" {
-		projectID, _ := database.UpsertProject(ctx, derived, "derived://"+filepath.Base(derived))
-		logger.Debug().Str("path", cleanPath).Str("derived", derived).Str("id", projectID).Msg("derived project from path")
-		return projectID, derived
+		for _, p := range projects {
+			absRoot := filepath.Clean(p.RootPath)
+			if eval, err := filepath.EvalSymlinks(absRoot); err == nil {
+				absRoot = eval
+			}
+			if strings.HasPrefix(derived, absRoot+"/") || derived == absRoot {
+				return p.ID, p.RootPath
+			}
+		}
 	}
 
 	return "", ""
@@ -391,9 +783,17 @@ func processHistoryFile(ctx context.Context, database *db.DB, path string, provi
 				sid = entry.Session_ID
 			}
 			if sid != "" && entry.Project != "" {
-				projectID, _ := database.UpsertProject(ctx, entry.Project, "")
-				logger.Debug().Str("sid", sid).Str("project", entry.Project).Str("id", projectID).Msg("linking session to project from history")
-				_ = database.UpdateSessionProject(ctx, sid, projectID)
+				// Only link to existing projects — never auto-create from history
+				projects, _ := database.GetProjects(ctx)
+				for _, p := range projects {
+					cleanRoot := filepath.Clean(p.RootPath)
+					cleanProject := filepath.Clean(entry.Project)
+					if strings.HasPrefix(cleanProject, cleanRoot+"/") || cleanProject == cleanRoot {
+						logger.Debug().Str("sid", sid).Str("project", entry.Project).Str("id", p.ID).Msg("linking session to project from history")
+						_ = database.UpdateSessionProject(ctx, sid, p.ID)
+						break
+					}
+				}
 			}
 		}
 	}
