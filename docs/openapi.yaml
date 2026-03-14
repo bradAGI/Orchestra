@@ -1261,6 +1261,175 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/projects/{project_id}/git/branches:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: List git branches
+      operationId: getProjectGitBranches
+      tags: [Projects]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Branch list with current branch
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current: { type: string }
+                  branches: { type: array, items: { type: string } }
+
+  /api/v1/projects/{project_id}/github/issues:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: List GitHub issues
+      operationId: getProjectGitHubIssues
+      tags: [Projects, GitHub]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: state
+          in: query
+          schema: { type: string, enum: [open, closed, all], default: open }
+      responses:
+        '200':
+          description: List of GitHub issues
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/GitHubIssue' }
+    post:
+      summary: Create a GitHub issue
+      operationId: createProjectGitHubIssue
+      tags: [Projects, GitHub]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string }
+                body: { type: string }
+                labels: { type: array, items: { type: string } }
+      responses:
+        '201':
+          description: Created issue
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GitHubIssue' }
+
+  /api/v1/projects/{project_id}/github/issues/{number}:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema: { type: string }
+      - name: number
+        in: path
+        required: true
+        schema: { type: integer }
+    patch:
+      summary: Update a GitHub issue
+      operationId: updateProjectGitHubIssue
+      tags: [Projects, GitHub]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                body: { type: string }
+                state: { type: string, enum: [open, closed] }
+      responses:
+        '200':
+          description: Updated issue
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GitHubIssue' }
+
+  /api/v1/projects/{project_id}/github/pulls:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: List GitHub pull requests
+      operationId: getProjectGitHubPulls
+      tags: [Projects, GitHub]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: List of pull requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/GitHubPR' }
+    post:
+      summary: Create a GitHub pull request
+      operationId: createProjectGitHubPull
+      tags: [Projects, GitHub]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, head, base]
+              properties:
+                title: { type: string }
+                body: { type: string }
+                head: { type: string }
+                base: { type: string }
+      responses:
+        '201':
+          description: Created PR
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  html_url: { type: string }
+                  number: { type: integer }
+
+  /api/v1/projects/{project_id}/github/pulls/{number}/diff:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema: { type: string }
+      - name: number
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      summary: Get PR diff
+      operationId: getProjectGitHubPullDiff
+      tags: [Projects, GitHub]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Diff content
+          content:
+            text/plain:
+              schema: { type: string }
+
   /api/v1/terminal/{session_id}:
     parameters:
     - in: path
@@ -1915,3 +2084,50 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DocItem'
+    GitHubIssue:
+      type: object
+      properties:
+        number: { type: integer }
+        title: { type: string }
+        body: { type: string }
+        state: { type: string }
+        html_url: { type: string }
+        created_at: { type: string }
+        updated_at: { type: string }
+        labels:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+        user:
+          type: object
+          properties:
+            login: { type: string }
+            avatar_url: { type: string }
+    GitHubPR:
+      type: object
+      properties:
+        number: { type: integer }
+        title: { type: string }
+        body: { type: string }
+        state: { type: string }
+        html_url: { type: string }
+        diff_url: { type: string }
+        created_at: { type: string }
+        merged_at: { type: string, nullable: true }
+        head:
+          type: object
+          properties:
+            ref: { type: string }
+            label: { type: string }
+        base:
+          type: object
+          properties:
+            ref: { type: string }
+            label: { type: string }
+        user:
+          type: object
+          properties:
+            login: { type: string }
+            avatar_url: { type: string }
