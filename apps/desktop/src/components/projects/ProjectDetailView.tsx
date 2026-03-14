@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import {
     ArrowLeft, Folder, Globe, History, Zap, ExternalLink,
     Calendar, GitBranch, RefreshCcw, Trash2, Github,
-    FileText, Layers, ChevronRight, File, Folder as FolderIcon, FolderOpen, AlertCircle, Search, X, Code, Database, Image, Ticket, Plus
+    FileText, Layers, ChevronRight, File, Folder as FolderIcon, FolderOpen, AlertCircle, Search, X, Code, Database, Image, Ticket, Plus, Loader2
 } from 'lucide-react'
 import type { Project, ProjectStats, SnapshotPayload } from '@/lib/orchestra-types'
 import { Button } from '@/components/ui/button'
@@ -20,15 +20,22 @@ import {
     disconnectProjectGitHub,
     fetchProjectFileContent,
     fetchProjectGitHubIssues,
+    fetchProjectGitBranches,
+    fetchProjectGitHubPulls,
+    fetchProjectGitHubPullDiff,
+    createProjectGitHubIssue,
+    updateProjectGitHubIssue,
+    createProjectGitHubPull,
     type BackendConfig,
     type GitCommit,
     type GitHubIssue,
+    type GitHubPR,
     type GitStatusEntry,
     type IssueListItem,
     type IssueUpdatePayload,
     type ProjectTreeNode,
 } from '@/lib/orchestra-client'
-import { getAgentIcon } from '@/components/app-shell/shared/controls'
+import { getAgentIcon, CustomDropdown } from '@/components/app-shell/shared/controls'
 import { AppTooltip } from '../ui/tooltip-wrapper'
 import { Skeleton } from '@/components/ui/skeleton'
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react'
@@ -92,7 +99,6 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     const [folderLoadPending, setFolderLoadPending] = useState<Record<string, boolean>>({})
     const [fileQuery, setFileQuery] = useState('')
     const [focusedPath, setFocusedPath] = useState<string | null>(null)
-    const [issueFilter, setIssueFilter] = useState('all')
     const [showHiddenFiles, setShowHiddenFiles] = useState(false)
     const [selectedFile, setSelectedFile] = useState<string | null>(null)
     const [fileContent, setFileContent] = useState<string | null>(null)
@@ -117,6 +123,24 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     const [diffFiles, setDiffFiles] = useState<{path: string, content: string}[]>([])
     const [activeDiffFile, setActiveDiffFile] = useState<string | null>(null)
     const [githubIssues, setGithubIssues] = useState<GitHubIssue[]>([])
+    const [gitSubTab, setGitSubTab] = useState<'commits' | 'issues' | 'prs'>('commits')
+    const [branches, setBranches] = useState<{ current: string; branches: string[] }>({ current: '', branches: [] })
+    const [selectedBranch, setSelectedBranch] = useState('')
+    const [ghIssueFilter, setGhIssueFilter] = useState<'open' | 'closed' | 'all'>('open')
+    const [ghPulls, setGhPulls] = useState<GitHubPR[]>([])
+    const [expandedIssue, setExpandedIssue] = useState<number | null>(null)
+    const [expandedPR, setExpandedPR] = useState<number | null>(null)
+    const [prDiff, setPrDiff] = useState<string>('')
+    const [prDiffLoading, setPrDiffLoading] = useState(false)
+    const [createIssueOpen, setCreateIssueOpen] = useState(false)
+    const [createPROpen, setCreatePROpen] = useState(false)
+    const [newIssueTitle, setNewIssueTitle] = useState('')
+    const [newIssueBody, setNewIssueBody] = useState('')
+    const [newPRTitle, setNewPRTitle] = useState('')
+    const [newPRBody, setNewPRBody] = useState('')
+    const [newPRHead, setNewPRHead] = useState('')
+    const [newPRBase, setNewPRBase] = useState('main')
+    const [ghSubmitting, setGhSubmitting] = useState(false)
     const refreshTimersRef = React.useRef<number[]>([])
 
     useEffect(() => {
@@ -126,35 +150,29 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         }
     }, [])
 
-    // Fetch GitHub issues for Backlog column
+    // Fetch branches on git tab activation
     useEffect(() => {
-        if (!config || !project.github_token) return
-        let cancelled = false
-        fetchProjectGitHubIssues(config, project.id)
-            .then(issues => { if (!cancelled) setGithubIssues(issues) })
-            .catch(() => { if (!cancelled) setGithubIssues([]) })
-        return () => { cancelled = true }
-    }, [config, project.id, project.github_token])
+        if (activeTab !== 'git' || !config || !pathExists) return
+        fetchProjectGitBranches(config, project.id)
+            .then(b => { setBranches(b); if (!selectedBranch) setSelectedBranch(b.current) })
+            .catch(() => {})
+    }, [activeTab, config, project.id])
 
-    // Merge GitHub issues into board as Backlog items
-    const mergedBoardIssues = useMemo(() => {
-        const localIssues = boardIssues.filter(i => i.project_id === project.id)
-        const ghItems: IssueListItem[] = githubIssues.map(gh => ({
-            id: `github-${gh.number}`,
-            issue_id: `github-${gh.number}`,
-            identifier: `GH-${gh.number}`,
-            issue_identifier: `GH-${gh.number}`,
-            title: gh.title,
-            description: gh.body,
-            state: 'Backlog',
-            project_id: project.id,
-            url: gh.html_url,
-        }))
-        // Don't add GitHub issues that already exist locally (by title match)
-        const localTitles = new Set(localIssues.map(i => i.title))
-        const uniqueGh = ghItems.filter(gh => !localTitles.has(gh.title))
-        return [...localIssues, ...uniqueGh]
-    }, [boardIssues, githubIssues, project.id])
+    // Fetch GitHub issues when filter changes
+    useEffect(() => {
+        if (activeTab !== 'git' || gitSubTab !== 'issues' || !config || !project.github_token) return
+        fetchProjectGitHubIssues(config, project.id, ghIssueFilter)
+            .then(setGithubIssues)
+            .catch(() => setGithubIssues([]))
+    }, [activeTab, gitSubTab, ghIssueFilter, config, project.id, project.github_token])
+
+    // Fetch PRs
+    useEffect(() => {
+        if (activeTab !== 'git' || gitSubTab !== 'prs' || !config || !project.github_token) return
+        fetchProjectGitHubPulls(config, project.id)
+            .then(setGhPulls)
+            .catch(() => setGhPulls([]))
+    }, [activeTab, gitSubTab, config, project.id, project.github_token])
 
     useEffect(() => {
         setFileQuery('')
@@ -732,7 +750,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                 <KanbanBoard
                                     loadingState={loadingState}
                                     snapshot={snapshot}
-                                    boardIssues={mergedBoardIssues}
+                                    boardIssues={boardIssues.filter(i => i.project_id === project.id)}
                                     projects={[project]}
                                     availableAgents={availableAgents}
                                     onInspectIssue={onInspectIssue}
@@ -871,208 +889,392 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                     )}
 
                     {activeTab === 'git' && (
-                        <div className="flex-1 space-y-6">
-                            {/* Issues List */}
-                            {(() => {
-                                const stateColors: Record<string, string> = {
-                                    'Backlog': 'bg-muted-foreground/20', 'Todo': 'bg-muted-foreground/40',
-                                    'In Progress': 'bg-amber-500', 'Review': 'bg-blue-500', 'Done': 'bg-primary',
-                                }
-                                const filtered = issueFilter === 'all' ? mergedBoardIssues : mergedBoardIssues.filter(i => i.state === issueFilter)
-                                return (
-                                    <div>
-                                        <div className="flex items-center justify-between mb-3">
-                                            <div className="flex items-center gap-1">
-                                                {['all', 'Backlog', 'Todo', 'In Progress', 'Review', 'Done'].map(state => (
-                                                    <button key={state} onClick={() => setIssueFilter(state)}
-                                                        className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest transition-colors ${issueFilter === state ? 'bg-primary/10 text-primary' : 'text-muted-foreground/30 hover:text-muted-foreground'}`}>
-                                                        {state === 'all' ? 'All' : state}
-                                                    </button>
+                        <div className="flex-1 flex flex-col min-h-0">
+                            {/* Sub-tabs */}
+                            <div className="flex items-center border-b border-border/30 shrink-0 mb-4">
+                                {[
+                                    { id: 'commits', label: 'Commits' },
+                                    { id: 'issues', label: 'Issues' },
+                                    { id: 'prs', label: 'Pull Requests' },
+                                ].map(tab => (
+                                    <button key={tab.id} onClick={() => setGitSubTab(tab.id as 'commits' | 'issues' | 'prs')}
+                                        className={`px-4 py-2 text-[10px] font-bold uppercase tracking-widest border-b-2 transition-colors ${
+                                            gitSubTab === tab.id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground/40 hover:text-muted-foreground'
+                                        }`}>
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Commits sub-tab */}
+                            {gitSubTab === 'commits' && (
+                                <div className="flex-1 overflow-auto custom-scrollbar space-y-6">
+                                    {/* Branch selector */}
+                                    <div className="flex items-center gap-3">
+                                        <CustomDropdown
+                                            className="w-48"
+                                            value={selectedBranch}
+                                            options={branches.branches.map(b => ({ label: b, value: b }))}
+                                            onChange={setSelectedBranch}
+                                        />
+                                    </div>
+
+                                    {tabError ? (
+                                        <div className="flex flex-col items-center justify-center py-20 text-red-400 bg-red-500/5 border border-red-500/20 rounded-xl">
+                                            <AlertCircle size={48} className="mb-4" />
+                                            <p className="text-sm font-bold uppercase tracking-widest">Git Loading Failed</p>
+                                            <p className="text-xs mt-2 font-mono">{tabError}</p>
+                                        </div>
+                                    ) : loadingTab ? (
+                                        <div className="space-y-4">
+                                            {[1, 2, 3].map(i => <Skeleton key={i} className="h-24 w-full" />)}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-8 pb-8">
+                                             {/* Git Operations Bar */}
+                                             <div className="flex items-center gap-2 bg-card/40 border border-border/30 rounded-xl p-2 backdrop-blur-md sticky top-0 z-10">
+                                                    <AppTooltip content="Stage and commit all workspace changes">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="gap-2 h-8 bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+                                                            onClick={() => setShowCommitDialog(true)}
+                                                            disabled={gitPending}
+                                                        >
+                                                            <History size={14} />
+                                                            Commit
+                                                        </Button>
+                                                    </AppTooltip>
+                                                    <AppTooltip content="Push local commits to origin">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="gap-2 h-8"
+                                                            onClick={() => handleGitAction('push')}
+                                                            disabled={gitPending}
+                                                        >
+                                                            <Globe size={14} />
+                                                            Push
+                                                        </Button>
+                                                    </AppTooltip>
+                                                    <AppTooltip content="Pull latest changes from remote branch">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="gap-2 h-8"
+                                                            onClick={() => handleGitAction('pull')}
+                                                            disabled={gitPending}
+                                                        >
+                                                            <RefreshCcw size={14} className={gitPending ? 'animate-spin' : ''} />
+                                                            Pull
+                                                        </Button>
+                                                    </AppTooltip>
+                                            </div>
+
+                                            {showCommitDialog && (
+                                                 <div className="p-3 bg-popover border border-border/30 rounded-xl shadow-lg text-left">
+                                                     <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-2">Commit Message</p>
+                                                     <textarea
+                                                         className="w-full bg-background/50 border border-border/30 rounded-lg p-2.5 text-sm focus:outline-none focus:border-primary/50 transition-colors mb-3 resize-none"
+                                                        placeholder="Describe your changes..."
+                                                        rows={2}
+                                                        value={commitMessage}
+                                                        onChange={(e) => setCommitMessage(e.target.value)}
+                                                    />
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setShowCommitDialog(false)}>Cancel</Button>
+                                                        <Button size="sm" className="h-8 text-xs" onClick={() => handleGitAction('commit')} disabled={!commitMessage.trim() || gitPending}>Commit</Button>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Uncommitted Changes */}
+                                            {gitStatus.length > 0 && (
+                                                <div className="space-y-3">
+                                                    <div className="flex items-center justify-between px-1">
+                                                        <div className="flex items-center gap-2 text-left">
+                                                            <div className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Uncommitted Changes ({gitStatus.length})</h3>
+                                                        </div>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-6 text-[9px] uppercase tracking-widest font-bold text-amber-500/60 hover:text-amber-500 hover:bg-amber-500/10 gap-1.5"
+                                                            onClick={() => handleViewDiff()}
+                                                        >
+                                                            <FileText size={10} />
+                                                            View Full Diff
+                                                        </Button>
+                                                    </div>
+                                                     <div className="bg-amber-500/[0.03] border border-border/30 rounded-xl p-2 text-left">
+                                                        {gitStatus.map((item, idx) => (
+                                                            <div
+                                                                key={idx}
+                                                                className="flex items-center justify-between p-2 hover:bg-amber-500/5 rounded-lg transition-colors group text-left cursor-pointer"
+                                                                onClick={() => handleViewDiff()}
+                                                            >
+                                                                <div className="flex items-center gap-3 overflow-hidden text-left">
+                                                                    <div className={`text-[10px] font-mono font-bold w-6 h-5 flex items-center justify-center rounded ${
+                                                                        item.status === 'M' ? 'bg-blue-500/20 text-blue-400' :
+                                                                        item.status === '??' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                                        'bg-red-500/20 text-red-400'
+                                                                    }`}>
+                                                                        {item.status}
+                                                                    </div>
+                                                                    <span className="text-xs font-mono truncate text-muted-foreground group-hover:text-foreground transition-colors">{item.path}</span>
+                                                                </div>
+                                                                <ChevronRight size={12} className="text-muted-foreground/20 group-hover:text-amber-500/40 transition-colors" />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Commit History */}
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-2 px-1 text-left">
+                                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Commit History</h3>
+                                                </div>
+                                                {gitHistory.length === 0 ? (
+                                                    <div className="flex flex-col items-center justify-center py-20 opacity-40 text-center">
+                                                        <GitBranch size={48} className="mb-4 mx-auto" />
+                                                        <p className="text-sm font-bold uppercase tracking-widest text-center">No Git History Available</p>
+                                                    </div>
+                                                ) : (
+                                                    gitHistory.map((commit, idx) => {
+                                                        const dateStr = /^\d+$/.test(commit.date)
+                                                            ? new Date(parseInt(commit.date) * 1000).toLocaleString()
+                                                            : new Date(commit.date).toLocaleString();
+
+                                                        return (
+                                                            <div
+                                                                key={idx}
+                                                                className="border border-border/30 rounded-xl px-3 py-2.5 flex gap-3 items-center group hover:border-primary/30 transition-colors text-left cursor-pointer"
+                                                                onClick={() => handleViewDiff(commit.hash)}
+                                                            >
+                                                                <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-[9px] font-bold shrink-0 group-hover:bg-primary/20 group-hover:text-primary transition-colors">
+                                                                    {commit.author?.slice(0, 2).toUpperCase() || '??'}
+                                                                </div>
+                                                                <div className="flex-1 min-w-0 text-left">
+                                                                    <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{commit.message}</p>
+                                                                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                                                                        <span className="font-bold text-primary/70">{commit.author}</span>
+                                                                        <span className="opacity-40">·</span>
+                                                                        <span>{dateStr}</span>
+                                                                    </div>
+                                                                </div>
+                                                                <span className="text-[10px] font-mono text-muted-foreground/60 shrink-0">{commit.hash?.slice(0, 7)}</span>
+                                                                <ChevronRight size={14} className="text-muted-foreground/20 group-hover:text-primary transition-colors shrink-0" />
+                                                            </div>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Issues sub-tab */}
+                            {gitSubTab === 'issues' && (
+                                <div className="flex-1 overflow-auto custom-scrollbar">
+                                    {!project.github_token ? (
+                                        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground/20">
+                                            <Github size={32} className="mb-3" />
+                                            <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Connect GitHub to view issues</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {/* Filter + Create bar */}
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-1">
+                                                    {(['open', 'closed', 'all'] as const).map(state => (
+                                                        <button key={state} onClick={() => setGhIssueFilter(state)}
+                                                            className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${ghIssueFilter === state ? 'bg-primary/10 text-primary' : 'text-muted-foreground/30 hover:text-muted-foreground'}`}>
+                                                            {state}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <Button variant="outline" size="sm" className="h-7 gap-1.5 text-[10px]" onClick={() => setCreateIssueOpen(true)}>
+                                                    <Plus size={12} /> New Issue
+                                                </Button>
+                                            </div>
+
+                                            {/* Issue list */}
+                                            <div className="border border-border/30 rounded-xl overflow-hidden">
+                                                {githubIssues.length === 0 ? (
+                                                    <div className="py-12 text-center text-muted-foreground/20 text-[10px] font-bold uppercase tracking-[0.2em]">No issues</div>
+                                                ) : githubIssues.map(issue => (
+                                                    <div key={issue.number}>
+                                                        <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/10 cursor-pointer border-b border-border/10"
+                                                             onClick={() => setExpandedIssue(expandedIssue === issue.number ? null : issue.number)}>
+                                                            <div className={`h-2 w-2 rounded-full ${issue.state === 'open' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                                                            <span className="font-mono text-[10px] text-muted-foreground/40">#{issue.number}</span>
+                                                            <span className="text-sm font-medium flex-1 truncate">{issue.title}</span>
+                                                            {issue.labels?.map(l => (
+                                                                <span key={l.name} className="px-1.5 py-0.5 rounded text-[8px] bg-muted/30 text-muted-foreground/50">{l.name}</span>
+                                                            ))}
+                                                            <ChevronRight size={12} className={`text-muted-foreground/30 transition-transform ${expandedIssue === issue.number ? 'rotate-90' : ''}`} />
+                                                        </div>
+                                                        {expandedIssue === issue.number && (
+                                                            <div className="px-4 py-4 bg-muted/5 border-b border-border/10 space-y-3">
+                                                                <p className="text-sm text-foreground/60 whitespace-pre-wrap">{issue.body || 'No description'}</p>
+                                                                <div className="flex gap-2">
+                                                                    <Button variant="outline" size="sm" className="h-6 text-[9px]"
+                                                                        onClick={async () => {
+                                                                            if (!config) return
+                                                                            try {
+                                                                                await updateProjectGitHubIssue(config, project.id, issue.number, { state: issue.state === 'open' ? 'closed' : 'open' })
+                                                                                const issues = await fetchProjectGitHubIssues(config, project.id, ghIssueFilter)
+                                                                                setGithubIssues(issues)
+                                                                            } catch {}
+                                                                        }}>
+                                                                        {issue.state === 'open' ? 'Close' : 'Reopen'}
+                                                                    </Button>
+                                                                    <Button variant="outline" size="sm" className="h-6 text-[9px]"
+                                                                        onClick={() => onCreateIssue('Backlog')}>
+                                                                        Import to Board
+                                                                    </Button>
+                                                                    <a href={issue.html_url} target="_blank" rel="noopener noreferrer"
+                                                                        className="inline-flex items-center gap-1 px-2 h-6 rounded border border-border/30 text-[9px] text-muted-foreground hover:text-primary">
+                                                                        <ExternalLink size={10} /> View on GitHub
+                                                                    </a>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 ))}
                                             </div>
-                                            <Button variant="outline" size="sm" className="h-6 gap-1 text-[9px] font-bold uppercase tracking-widest" onClick={() => onCreateIssue('Backlog')}>
-                                                <Plus size={10} /> New
-                                            </Button>
-                                        </div>
-                                        <div className="border border-border/30 rounded-xl overflow-hidden max-h-[250px] overflow-y-auto custom-scrollbar">
-                                            {filtered.length === 0 ? (
-                                                <div className="py-8 text-center text-muted-foreground/20 text-[10px] font-bold uppercase tracking-[0.2em]">No issues</div>
-                                            ) : (
-                                                <table className="w-full">
-                                                    <tbody className="divide-y divide-border/15">
-                                                        {filtered.map(issue => {
-                                                            const id = issue.identifier || issue.issue_identifier || ''
-                                                            return (
-                                                                <tr key={issue.id || issue.issue_id} className="hover:bg-muted/10 transition-colors cursor-pointer group"
-                                                                    onClick={() => void onInspectIssue(id)}>
-                                                                    <td className="px-3 py-2 w-6"><div className={`h-1.5 w-1.5 rounded-full ${stateColors[issue.state || ''] || 'bg-muted-foreground/20'}`} /></td>
-                                                                    <td className="px-2 py-2 w-20"><span className={`font-mono text-[10px] font-bold ${id.startsWith('GH-') ? 'text-muted-foreground/40' : 'text-primary/70'}`}>{id}</span></td>
-                                                                    <td className="px-2 py-2"><span className="text-xs text-foreground/80 group-hover:text-primary transition-colors truncate block">{issue.title}</span></td>
-                                                                    <td className="px-2 py-2 w-20 text-right">
-                                                                        {issue.assignee_id ? <span className="inline-flex">{getAgentIcon(issue.assignee_id.replace('agent-', ''), 10)}</span> : null}
-                                                                    </td>
-                                                                </tr>
-                                                            )
-                                                        })}
-                                                    </tbody>
-                                                </table>
+
+                                            {/* Create Issue Dialog */}
+                                            {createIssueOpen && (
+                                                <div className="p-4 border border-border/30 rounded-xl bg-card/60 space-y-3">
+                                                    <input className="w-full bg-transparent text-sm font-bold outline-none placeholder:text-muted-foreground/20"
+                                                        placeholder="Issue title..." value={newIssueTitle} onChange={e => setNewIssueTitle(e.target.value)} />
+                                                    <textarea className="w-full bg-transparent text-sm outline-none resize-none min-h-[60px] placeholder:text-muted-foreground/15"
+                                                        placeholder="Description..." value={newIssueBody} onChange={e => setNewIssueBody(e.target.value)} />
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={() => { setCreateIssueOpen(false); setNewIssueTitle(''); setNewIssueBody('') }}>Cancel</Button>
+                                                        <Button size="sm" className="h-7 text-[10px]" disabled={!newIssueTitle.trim() || ghSubmitting}
+                                                            onClick={async () => {
+                                                                if (!config) return
+                                                                setGhSubmitting(true)
+                                                                try {
+                                                                    await createProjectGitHubIssue(config, project.id, { title: newIssueTitle, body: newIssueBody })
+                                                                    setCreateIssueOpen(false); setNewIssueTitle(''); setNewIssueBody('')
+                                                                    const issues = await fetchProjectGitHubIssues(config, project.id, ghIssueFilter)
+                                                                    setGithubIssues(issues)
+                                                                } finally { setGhSubmitting(false) }
+                                                            }}>Create</Button>
+                                                    </div>
+                                                </div>
                                             )}
                                         </div>
-                                    </div>
-                                )
-                            })()}
-
-                            {tabError ? (
-                                <div className="flex flex-col items-center justify-center py-20 text-red-400 bg-red-500/5 border border-red-500/20 rounded-xl">
-                                    <AlertCircle size={48} className="mb-4" />
-                                    <p className="text-sm font-bold uppercase tracking-widest">Git Loading Failed</p>
-                                    <p className="text-xs mt-2 font-mono">{tabError}</p>
-                                </div>
-                            ) : loadingTab ? (
-                                <div className="space-y-4">
-                                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-24 w-full" />)}
-                                </div>
-                            ) : (
-                                <div className="space-y-8 pb-8">
-                                     {/* Git Operations Bar */}
-                                     <div className="flex items-center gap-2 bg-card/40 border border-border/30 rounded-xl p-2 backdrop-blur-md sticky top-0 z-10">
-                                            <AppTooltip content="Stage and commit all workspace changes">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="gap-2 h-8 bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
-                                                    onClick={() => setShowCommitDialog(true)}
-                                                    disabled={gitPending}
-                                                >
-                                                    <History size={14} />
-                                                    Commit
-                                                </Button>
-                                            </AppTooltip>
-                                            <AppTooltip content="Push local commits to origin">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="gap-2 h-8"
-                                                    onClick={() => handleGitAction('push')}
-                                                    disabled={gitPending}
-                                                >
-                                                    <Globe size={14} />
-                                                    Push
-                                                </Button>
-                                            </AppTooltip>
-                                            <AppTooltip content="Pull latest changes from remote branch">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="gap-2 h-8"
-                                                    onClick={() => handleGitAction('pull')}
-                                                    disabled={gitPending}
-                                                >
-                                                    <RefreshCcw size={14} className={gitPending ? 'animate-spin' : ''} />
-                                                    Pull
-                                                </Button>
-                                            </AppTooltip>
-                                    </div>
-
-                                    {showCommitDialog && (
-                                         <div className="p-3 bg-popover border border-border/30 rounded-xl shadow-lg text-left">
-                                             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-2">Commit Message</p>
-                                             <textarea
-                                                 className="w-full bg-background/50 border border-border/30 rounded-lg p-2.5 text-sm focus:outline-none focus:border-primary/50 transition-colors mb-3 resize-none"
-                                                placeholder="Describe your changes..."
-                                                rows={2}
-                                                value={commitMessage}
-                                                onChange={(e) => setCommitMessage(e.target.value)}
-                                            />
-                                            <div className="flex justify-end gap-2">
-                                                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setShowCommitDialog(false)}>Cancel</Button>
-                                                <Button size="sm" className="h-8 text-xs" onClick={() => handleGitAction('commit')} disabled={!commitMessage.trim() || gitPending}>Commit</Button>
-                                            </div>
-                                        </div>
                                     )}
+                                </div>
+                            )}
 
-                                    {/* Uncommitted Changes */}
-                                    {gitStatus.length > 0 && (
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between px-1">
-                                                <div className="flex items-center gap-2 text-left">
-                                                    <div className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Uncommitted Changes ({gitStatus.length})</h3>
-                                                </div>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="sm" 
-                                                    className="h-6 text-[9px] uppercase tracking-widest font-bold text-amber-500/60 hover:text-amber-500 hover:bg-amber-500/10 gap-1.5"
-                                                    onClick={() => handleViewDiff()}
-                                                >
-                                                    <FileText size={10} />
-                                                    View Full Diff
+                            {/* PRs sub-tab */}
+                            {gitSubTab === 'prs' && (
+                                <div className="flex-1 overflow-auto custom-scrollbar">
+                                    {!project.github_token ? (
+                                        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground/20">
+                                            <Github size={32} className="mb-3" />
+                                            <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Connect GitHub to view PRs</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            <div className="flex items-center justify-end">
+                                                <Button variant="outline" size="sm" className="h-7 gap-1.5 text-[10px]" onClick={() => setCreatePROpen(true)}>
+                                                    <Plus size={12} /> New PR
                                                 </Button>
                                             </div>
-                                             <div className="bg-amber-500/[0.03] border border-border/30 rounded-xl p-2 text-left">
-                                                {gitStatus.map((item, idx) => (
-                                                    <div 
-                                                        key={idx} 
-                                                        className="flex items-center justify-between p-2 hover:bg-amber-500/5 rounded-lg transition-colors group text-left cursor-pointer"
-                                                        onClick={() => handleViewDiff()}
-                                                    >
-                                                        <div className="flex items-center gap-3 overflow-hidden text-left">
-                                                            <div className={`text-[10px] font-mono font-bold w-6 h-5 flex items-center justify-center rounded ${
-                                                                item.status === 'M' ? 'bg-blue-500/20 text-blue-400' :
-                                                                item.status === '??' ? 'bg-emerald-500/20 text-emerald-400' :
-                                                                'bg-red-500/20 text-red-400'
-                                                            }`}>
-                                                                {item.status}
-                                                            </div>
-                                                            <span className="text-xs font-mono truncate text-muted-foreground group-hover:text-foreground transition-colors">{item.path}</span>
+
+                                            <div className="border border-border/30 rounded-xl overflow-hidden">
+                                                {ghPulls.length === 0 ? (
+                                                    <div className="py-12 text-center text-muted-foreground/20 text-[10px] font-bold uppercase tracking-[0.2em]">No pull requests</div>
+                                                ) : ghPulls.map(pr => (
+                                                    <div key={pr.number}>
+                                                        <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/10 cursor-pointer border-b border-border/10"
+                                                             onClick={async () => {
+                                                                 if (expandedPR === pr.number) { setExpandedPR(null); return }
+                                                                 setExpandedPR(pr.number)
+                                                                 setPrDiffLoading(true)
+                                                                 try {
+                                                                     const diff = await fetchProjectGitHubPullDiff(config!, project.id, pr.number)
+                                                                     setPrDiff(diff)
+                                                                 } catch { setPrDiff('Failed to load diff') }
+                                                                 finally { setPrDiffLoading(false) }
+                                                             }}>
+                                                            <div className={`h-2 w-2 rounded-full ${pr.state === 'open' ? 'bg-emerald-500' : pr.merged_at ? 'bg-purple-500' : 'bg-red-500'}`} />
+                                                            <span className="font-mono text-[10px] text-muted-foreground/40">#{pr.number}</span>
+                                                            <span className="text-sm font-medium flex-1 truncate">{pr.title}</span>
+                                                            <span className="text-[9px] text-muted-foreground/30 font-mono">{pr.head.ref} &rarr; {pr.base.ref}</span>
+                                                            <ChevronRight size={12} className={`text-muted-foreground/30 transition-transform ${expandedPR === pr.number ? 'rotate-90' : ''}`} />
                                                         </div>
-                                                        <ChevronRight size={12} className="text-muted-foreground/20 group-hover:text-amber-500/40 transition-colors" />
+                                                        {expandedPR === pr.number && (
+                                                            <div className="border-b border-border/10">
+                                                                {pr.body && <p className="px-4 py-3 text-sm text-foreground/60 whitespace-pre-wrap bg-muted/5">{pr.body}</p>}
+                                                                <div className="px-4 py-2 flex gap-2 bg-muted/5">
+                                                                    <a href={pr.html_url} target="_blank" rel="noopener noreferrer"
+                                                                        className="inline-flex items-center gap-1 px-2 h-6 rounded border border-border/30 text-[9px] text-muted-foreground hover:text-primary">
+                                                                        <ExternalLink size={10} /> View on GitHub
+                                                                    </a>
+                                                                </div>
+                                                                <div className="bg-[#0d1117] overflow-auto max-h-[400px]">
+                                                                    {prDiffLoading ? (
+                                                                        <div className="py-8 text-center"><Loader2 className="h-4 w-4 animate-spin text-primary/30 mx-auto" /></div>
+                                                                    ) : (
+                                                                        <Prism language="diff" style={oneDark} customStyle={{ margin: 0, padding: '1rem', background: 'transparent', fontSize: '11px' }} showLineNumbers={false}>
+                                                                            {prDiff}
+                                                                        </Prism>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>
+
+                                            {/* Create PR Dialog */}
+                                            {createPROpen && (
+                                                <div className="p-4 border border-border/30 rounded-xl bg-card/60 space-y-3">
+                                                    <input className="w-full bg-transparent text-sm font-bold outline-none placeholder:text-muted-foreground/20"
+                                                        placeholder="PR title..." value={newPRTitle} onChange={e => setNewPRTitle(e.target.value)} />
+                                                    <textarea className="w-full bg-transparent text-sm outline-none resize-none min-h-[60px] placeholder:text-muted-foreground/15"
+                                                        placeholder="Description..." value={newPRBody} onChange={e => setNewPRBody(e.target.value)} />
+                                                    <div className="flex gap-3">
+                                                        <div className="flex-1">
+                                                            <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground/30 mb-1 block">Head</label>
+                                                            <CustomDropdown className="w-full" value={newPRHead || selectedBranch}
+                                                                options={branches.branches.map(b => ({ label: b, value: b }))}
+                                                                onChange={setNewPRHead} />
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground/30 mb-1 block">Base</label>
+                                                            <CustomDropdown className="w-full" value={newPRBase}
+                                                                options={branches.branches.map(b => ({ label: b, value: b }))}
+                                                                onChange={setNewPRBase} />
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={() => { setCreatePROpen(false); setNewPRTitle(''); setNewPRBody('') }}>Cancel</Button>
+                                                        <Button size="sm" className="h-7 text-[10px]" disabled={!newPRTitle.trim() || ghSubmitting}
+                                                            onClick={async () => {
+                                                                if (!config) return
+                                                                setGhSubmitting(true)
+                                                                try {
+                                                                    await createProjectGitHubPull(config, project.id, { title: newPRTitle, body: newPRBody, head: newPRHead || selectedBranch, base: newPRBase })
+                                                                    setCreatePROpen(false); setNewPRTitle(''); setNewPRBody('')
+                                                                    const pulls = await fetchProjectGitHubPulls(config, project.id)
+                                                                    setGhPulls(pulls)
+                                                                } finally { setGhSubmitting(false) }
+                                                            }}>Create PR</Button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
-
-                                    {/* Commit History */}
-                                    <div className="space-y-2">
-                                        <div className="flex items-center gap-2 px-1 text-left">
-                                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Commit History</h3>
-                                        </div>
-                                        {gitHistory.length === 0 ? (
-                                            <div className="flex flex-col items-center justify-center py-20 opacity-40 text-center">
-                                                <GitBranch size={48} className="mb-4 mx-auto" />
-                                                <p className="text-sm font-bold uppercase tracking-widest text-center">No Git History Available</p>
-                                            </div>
-                                        ) : (
-                                            gitHistory.map((commit, idx) => {
-                                                const dateStr = /^\d+$/.test(commit.date)
-                                                    ? new Date(parseInt(commit.date) * 1000).toLocaleString()
-                                                    : new Date(commit.date).toLocaleString();
-
-                                                return (
-                                                    <div
-                                                        key={idx}
-                                                        className="border border-border/30 rounded-xl px-3 py-2.5 flex gap-3 items-center group hover:border-primary/30 transition-colors text-left cursor-pointer"
-                                                        onClick={() => handleViewDiff(commit.hash)}
-                                                    >
-                                                        <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-[9px] font-bold shrink-0 group-hover:bg-primary/20 group-hover:text-primary transition-colors">
-                                                            {commit.author?.slice(0, 2).toUpperCase() || '??'}
-                                                        </div>
-                                                        <div className="flex-1 min-w-0 text-left">
-                                                            <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{commit.message}</p>
-                                                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                                                                <span className="font-bold text-primary/70">{commit.author}</span>
-                                                                <span className="opacity-40">·</span>
-                                                                <span>{dateStr}</span>
-                                                            </div>
-                                                        </div>
-                                                        <span className="text-[10px] font-mono text-muted-foreground/60 shrink-0">{commit.hash?.slice(0, 7)}</span>
-                                                        <ChevronRight size={14} className="text-muted-foreground/20 group-hover:text-primary transition-colors shrink-0" />
-                                                    </div>
-                                                );
-                                            })
-                                        )}
-                                    </div>
                                 </div>
                             )}
                         </div>

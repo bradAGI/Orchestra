@@ -41,7 +41,6 @@ import {
   deleteIssue,
   fetchSessionDetail,
   fetchMCPTools,
-  fetchProjectGitHubIssues,
   type IssueCreatePayload,
   type IssueUpdatePayload,
   type IssueListItem,
@@ -92,7 +91,6 @@ export default function App() {
   const [snapshot, setSnapshot] = useState<SnapshotPayload | null>(null)
   const [timeline, setTimeline] = useState<TimelineItem[]>([])
   const [boardIssues, setBoardIssues] = useState<IssueListItem[]>([])
-  const [githubBacklogIssues, setGithubBacklogIssues] = useState<IssueListItem[]>([])
   const [loadingConfig, setLoadingConfig] = useState(false)
   const [savingConfig, setSavingConfig] = useState(false)
   const [profilesPending, setProfilesPending] = useState(false)
@@ -349,50 +347,8 @@ export default function App() {
     }
   }, [config, activeSection])
 
-  // Fetch GitHub issues for connected projects and merge into backlog
-  useEffect(() => {
-    if (!config || projects.length === 0) return
-    let mounted = true
-    const connectedProjects = projects.filter(p => p.github_token)
-    if (connectedProjects.length === 0) {
-      setGithubBacklogIssues([])
-      return
-    }
-
-    Promise.all(
-      connectedProjects.map(async (p) => {
-        try {
-          const ghIssues = await fetchProjectGitHubIssues(config, p.id)
-          return ghIssues.map(gh => ({
-            id: `github-${gh.number}`,
-            issue_id: `github-${gh.number}`,
-            identifier: `GH-${gh.number}`,
-            issue_identifier: `GH-${gh.number}`,
-            title: gh.title,
-            description: gh.body,
-            state: 'Backlog',
-            project_id: p.id,
-            url: gh.html_url,
-          } as IssueListItem))
-        } catch {
-          return [] as IssueListItem[]
-        }
-      })
-    ).then(results => {
-      if (!mounted) return
-      const all = results.flat()
-      // Deduplicate against local issues by title
-      const localTitles = new Set(boardIssues.map(i => i.title))
-      setGithubBacklogIssues(all.filter(gh => !localTitles.has(gh.title)))
-    })
-
-    return () => { mounted = false }
-  }, [config, projects, boardIssues])
-
-  // Merged board: local issues + GitHub backlog
-  const allBoardIssues = useMemo(() => [...boardIssues, ...githubBacklogIssues], [boardIssues, githubBacklogIssues])
-  const allBoardIssuesRef = useRef(allBoardIssues)
-  allBoardIssuesRef.current = allBoardIssues
+  const allBoardIssuesRef = useRef(boardIssues)
+  allBoardIssuesRef.current = boardIssues
 
   const handleAgentConfigSave = async (nextAgentConfig: { commands: Record<string, string>; agent_provider: string }) => {
     if (!config) return
@@ -1059,7 +1015,7 @@ export default function App() {
                   <KanbanBoard
                     loadingState={loadingState}
                     snapshot={snapshot}
-                    boardIssues={allBoardIssues}
+                    boardIssues={boardIssues}
                     projects={projects}
                     availableAgents={availableAgents}
                     onInspectIssue={handleInspectIssueFromList}

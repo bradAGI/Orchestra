@@ -3,11 +3,13 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -572,7 +574,11 @@ func (s *Server) GetProjectGitStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cmd := exec.CommandContext(r.Context(), "git", "log", "-n", "20", "--pretty=format:%H|%an|%at|%s")
+	gitLogArgs := []string{"log", "-n", "20", "--pretty=format:%H|%an|%at|%s"}
+	if branch := r.URL.Query().Get("branch"); branch != "" {
+		gitLogArgs = append(gitLogArgs, branch)
+	}
+	cmd := exec.CommandContext(r.Context(), "git", gitLogArgs...)
 	cmd.Dir = project.RootPath
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -659,7 +665,11 @@ func (s *Server) GetProjectGitHubIssues(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	issues, err := github.ListIssues(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken)
+	state := r.URL.Query().Get("state")
+	if state == "" {
+		state = "open"
+	}
+	issues, err := github.ListIssues(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, state)
 	if err != nil {
 		s.logger.Warn().Err(err).Str("project_id", projectID).Msg("failed to fetch github issues")
 		writeJSONError(w, http.StatusBadGateway, "github_fetch_failed", "failed to fetch issues from GitHub")
@@ -668,4 +678,215 @@ func (s *Server) GetProjectGitHubIssues(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(issues)
+}
+
+func (s *Server) GetProjectGitBranches(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	// Get current branch
+	currentCmd := exec.CommandContext(r.Context(), "git", "rev-parse", "--abbrev-ref", "HEAD")
+	currentCmd.Dir = project.RootPath
+	currentOut, err := currentCmd.Output()
+	if err != nil {
+		s.logger.Warn().Err(err).Str("project_id", projectID).Msg("failed to get current branch")
+		writeJSONError(w, http.StatusInternalServerError, "git_failed", "failed to get current branch")
+		return
+	}
+	current := strings.TrimSpace(string(currentOut))
+
+	// Get all branches
+	branchCmd := exec.CommandContext(r.Context(), "git", "branch", "--list")
+	branchCmd.Dir = project.RootPath
+	branchOut, err := branchCmd.Output()
+	if err != nil {
+		s.logger.Warn().Err(err).Str("project_id", projectID).Msg("failed to list branches")
+		writeJSONError(w, http.StatusInternalServerError, "git_failed", "failed to list branches")
+		return
+	}
+
+	var branches []string
+	for _, line := range strings.Split(string(branchOut), "\n") {
+		name := strings.TrimSpace(strings.TrimPrefix(line, "*"))
+		if name != "" {
+			branches = append(branches, name)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"current":  current,
+		"branches": branches,
+	})
+}
+
+func (s *Server) CreateProjectGitHubIssue(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
+		writeJSONError(w, http.StatusBadRequest, "github_not_configured", "GitHub is not configured for this project")
+		return
+	}
+
+	var req github.CreateIssueRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+		return
+	}
+
+	if req.Title == "" {
+		writeJSONError(w, http.StatusBadRequest, "invalid_request", "title is required")
+		return
+	}
+
+	issue, err := github.CreateIssue(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, req)
+	if err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Msg("failed to create github issue")
+		writeJSONError(w, http.StatusBadGateway, "github_create_failed", fmt.Sprintf("failed to create issue: %v", err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(issue)
+}
+
+func (s *Server) UpdateProjectGitHubIssue(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	numberStr := chi.URLParam(r, "number")
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_number", "invalid issue number")
+		return
+	}
+
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
+		writeJSONError(w, http.StatusBadRequest, "github_not_configured", "GitHub is not configured for this project")
+		return
+	}
+
+	var req github.UpdateIssueRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+		return
+	}
+
+	issue, err := github.UpdateIssue(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, number, req)
+	if err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Int("number", number).Msg("failed to update github issue")
+		writeJSONError(w, http.StatusBadGateway, "github_update_failed", fmt.Sprintf("failed to update issue: %v", err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(issue)
+}
+
+func (s *Server) GetProjectGitHubPulls(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]any{})
+		return
+	}
+
+	prs, err := github.ListPullRequests(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken)
+	if err != nil {
+		s.logger.Warn().Err(err).Str("project_id", projectID).Msg("failed to fetch github pull requests")
+		writeJSONError(w, http.StatusBadGateway, "github_fetch_failed", "failed to fetch pull requests from GitHub")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(prs)
+}
+
+func (s *Server) GetProjectGitHubPullDiff(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	numberStr := chi.URLParam(r, "number")
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_number", "invalid pull request number")
+		return
+	}
+
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
+		writeJSONError(w, http.StatusBadRequest, "github_not_configured", "GitHub is not configured for this project")
+		return
+	}
+
+	diff, err := github.GetPullRequestDiff(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, number)
+	if err != nil {
+		s.logger.Warn().Err(err).Str("project_id", projectID).Int("number", number).Msg("failed to fetch PR diff")
+		writeJSONError(w, http.StatusBadGateway, "github_fetch_failed", fmt.Sprintf("failed to fetch PR diff: %v", err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte(diff))
+}
+
+func (s *Server) CreateProjectGitHubPull(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
+		writeJSONError(w, http.StatusBadRequest, "github_not_configured", "GitHub is not configured for this project")
+		return
+	}
+
+	var req github.PRRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+		return
+	}
+
+	if req.Title == "" || req.Head == "" || req.Base == "" {
+		writeJSONError(w, http.StatusBadRequest, "invalid_request", "title, head, and base are required")
+		return
+	}
+
+	pr, err := github.CreatePullRequest(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, req)
+	if err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Msg("failed to create github pull request")
+		writeJSONError(w, http.StatusBadGateway, "github_create_failed", fmt.Sprintf("failed to create pull request: %v", err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(pr)
 }

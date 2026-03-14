@@ -654,10 +654,71 @@ export type GitHubIssue = {
   state: string
   html_url: string
   labels: { name: string }[]
+  created_at?: string
+  updated_at?: string
+  user?: { login: string; avatar_url: string }
 }
 
-export async function fetchProjectGitHubIssues(config: BackendConfig, projectId: string): Promise<GitHubIssue[]> {
-  return requestJSON<GitHubIssue[]>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/issues`)
+export type GitHubPR = {
+  number: number
+  title: string
+  body: string
+  state: string
+  html_url: string
+  diff_url: string
+  head: { ref: string; label: string }
+  base: { ref: string; label: string }
+  user: { login: string; avatar_url: string }
+  created_at: string
+  merged_at: string | null
+}
+
+export type GitBranches = {
+  current: string
+  branches: string[]
+}
+
+export async function fetchProjectGitHubIssues(config: BackendConfig, projectId: string, state: string = 'open'): Promise<GitHubIssue[]> {
+  return requestJSON<GitHubIssue[]>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/issues?state=${state}`)
+}
+
+export async function fetchProjectGitBranches(config: BackendConfig, projectId: string): Promise<GitBranches> {
+  return requestJSON<GitBranches>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/branches`)
+}
+
+export async function fetchProjectGitHubPulls(config: BackendConfig, projectId: string): Promise<GitHubPR[]> {
+  return requestJSON<GitHubPR[]>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/pulls`)
+}
+
+export async function fetchProjectGitHubPullDiff(config: BackendConfig, projectId: string, number: number): Promise<string> {
+  const response = await fetch(`${config.baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/github/pulls/${number}/diff`, {
+    headers: buildHeaders(config),
+  })
+  return response.text()
+}
+
+export async function createProjectGitHubIssue(config: BackendConfig, projectId: string, payload: { title: string; body: string; labels?: string[] }): Promise<GitHubIssue> {
+  return requestJSON<GitHubIssue>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/issues`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateProjectGitHubIssue(config: BackendConfig, projectId: string, number: number, payload: { title?: string; body?: string; state?: string }): Promise<GitHubIssue> {
+  return requestJSON<GitHubIssue>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/issues/${number}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function createProjectGitHubPull(config: BackendConfig, projectId: string, payload: { title: string; body: string; head: string; base: string }): Promise<{ html_url: string; number: number }> {
+  return requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/pulls`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
 }
 
 export async function disconnectProjectGitHub(config: BackendConfig, projectId: string): Promise<void> {
