@@ -47,11 +47,7 @@ func initialModel(noStart bool) *model {
 }
 
 func (m *model) Init() tea.Cmd {
-	// Auto-start backend only if requested
-	if !m.noStart {
-		m.backend.Start(func() {})
-	}
-
+	// Services start manually via 's' key. No auto-start.
 	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
 		return eventMsg{}
 	})

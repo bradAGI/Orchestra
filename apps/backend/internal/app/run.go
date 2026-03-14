@@ -31,7 +31,6 @@ import (
 	trackergithub "github.com/orchestra/orchestra/apps/backend/internal/tracker/github"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker/memory"
 	trackersqlite "github.com/orchestra/orchestra/apps/backend/internal/tracker/sqlite"
-	"github.com/orchestra/orchestra/apps/backend/internal/utils/git"
 	"github.com/orchestra/orchestra/apps/backend/internal/workspace"
 	"github.com/rs/zerolog"
 )
@@ -231,8 +230,34 @@ func processExecutionTick(
 		}
 	}
 
-	publishLifecycleEvent(pubsub, "hook_started", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create"})
-	workspacePath, created, createRes, err := workspaceService.EnsureIssueWorkspace(entry.IssueIdentifier, activeProviderName, workspaceHooks)
+	// If the task belongs to a project, use the project's root_path as the workspace
+	// so the agent operates on the actual codebase, not an empty temp directory.
+	var workspacePath string
+	var created bool
+	var createRes workspace.HookResult
+	var err error
+	if entry.ProjectID != "" && warehouseDB != nil {
+		project, projErr := warehouseDB.GetProjectByID(context.Background(), entry.ProjectID)
+		if projErr == nil && project.RootPath != "" && filepath.IsAbs(project.RootPath) {
+			if info, statErr := os.Stat(project.RootPath); statErr == nil && info.IsDir() {
+				workspacePath = project.RootPath
+				logger.Info().Str("issue_id", entry.IssueID).Str("project_path", workspacePath).Msg("using project root as workspace")
+			}
+		}
+	}
+
+	if workspacePath == "" {
+		// Fallback to the generated workspace if no project path available
+		publishLifecycleEvent(pubsub, "hook_started", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create"})
+		var ensureErr error
+		workspacePath, created, createRes, ensureErr = workspaceService.EnsureIssueWorkspace(entry.IssueIdentifier, activeProviderName, workspaceHooks)
+		if ensureErr != nil {
+			err = ensureErr
+		}
+	} else {
+		publishLifecycleEvent(pubsub, "hook_started", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create"})
+		publishLifecycleEvent(pubsub, "hook_completed", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create", "reused": true})
+	}
 	if err != nil {
 		publishLifecycleEvent(pubsub, "hook_failed", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create", "error": err.Error(), "output": createRes.Output})
 		attempt := entry.TurnCount + 1
@@ -385,13 +410,8 @@ func processExecutionTick(
 	_ = logfile.ResetLatestLog(workspaceRoot, entry.IssueIdentifier, sessionID)
 
 	if warehouseDB != nil {
-		rootPath, remoteURL, _ := git.ProjectInfo(context.Background(), workspaceRoot)
-		projectID, err := warehouseDB.UpsertProject(context.Background(), rootPath, remoteURL)
-		if err == nil {
-			_ = warehouseDB.RecordSession(context.Background(), sessionID, projectID, entry.IssueID, sessionID, activeProviderName, "main")
-		} else {
-			logger.Warn().Err(err).Msg("failed to upsert project for telemetry")
-		}
+		// Link session to the task's project — never create new projects from the execution worker
+		_ = warehouseDB.RecordSession(context.Background(), sessionID, entry.ProjectID, entry.IssueID, sessionID, activeProviderName, "main")
 	}
 
 	result, runErr := registry.RunTurn(runCtx, activeProvider, agents.TurnRequest{
@@ -505,6 +525,12 @@ func processExecutionTick(
 	}
 
 	service.RecordRunSuccess(entry.IssueID, activeProviderName)
+
+	// Move issue to Done on successful completion
+	if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"state": "Done"}); err != nil {
+		logger.Warn().Err(err).Str("issue_id", entry.IssueID).Msg("failed to set issue to Done after success")
+	}
+
 	publishLifecycleEvent(pubsub, "run_succeeded", map[string]any{
 		"issue_id":         entry.IssueID,
 		"issue_identifier": entry.IssueIdentifier,
@@ -515,7 +541,7 @@ func processExecutionTick(
 
 	runAfterHook()
 
-	logger.Info().Str("issue_id", entry.IssueID).Str("session_id", result.SessionID).Msg("agent run completed")
+	logger.Info().Str("issue_id", entry.IssueID).Str("session_id", result.SessionID).Msg("agent run completed — issue moved to Done")
 	publishSnapshot(pubsub, service)
 }
 

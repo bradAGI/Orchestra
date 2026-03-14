@@ -38,7 +38,7 @@ import {
 } from '@/lib/orchestra-client'
 import type { SnapshotPayload, Project, ProjectStats, GlobalStats } from '@/lib/orchestra-types'
 import { usePlatform } from '@/hooks/use-platform'
-import { AgentSelector, CustomDropdown, PriorityIcon, PriorityLabel, PrioritySelector, ProjectSelector } from '@/components/app-shell/shared/controls'
+import { AgentSelector, CustomDropdown, ProjectSelector } from '@/components/app-shell/shared/controls'
 
 type BackendProfile = {
   id: string
@@ -125,17 +125,6 @@ export function DashboardOverview({
               <CardDescription className="text-[10px] font-medium text-muted-foreground/60">Cross-repository agent coordination hub</CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <AppTooltip content="Create a new task">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 rounded-xl px-3 text-[10px] font-black uppercase tracking-widest bg-primary/5 border-primary/20 text-primary hover:bg-primary/10 transition-all shadow-lg shadow-primary/5 hover:-translate-y-0.5 active:translate-y-0"
-                  onClick={onCreateTask}
-                >
-                  <Plus size={14} className="mr-1.5" strokeWidth={3} />
-                  New Task
-                </Button>
-              </AppTooltip>
               <AppTooltip content="Open all workspaces">
                 <Button
                   variant="ghost"
@@ -162,13 +151,13 @@ export function DashboardOverview({
                   <div key={p.id} className="relative group">
                     <button
                       onClick={() => onProjectClick(p.id)}
-                      className={`flex w-full items-center justify-between rounded-xl border p-2.5 transition-all duration-300 shadow-sm ${
+                      className={`flex w-full items-center justify-between rounded-xl border px-3 py-3 transition-all duration-300 shadow-sm ${
                         isActive 
                           ? 'border-primary/30 bg-primary/5 hover:bg-primary/10 shadow-lg shadow-primary/5' 
                           : 'border-border/40 bg-muted/20 hover:bg-muted/40 hover:border-border/60 hover:-translate-y-0.5'
                       }`}
                     >
-                      <div className="flex items-center gap-4 min-w-0 flex-1">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className={`rounded-xl p-2.5 transition-all duration-500 ${
                           isActive 
                             ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/40 rotate-0' 
@@ -186,31 +175,32 @@ export function DashboardOverview({
                           <p className="text-[10px] text-muted-foreground/50 font-mono truncate">{p.root_path}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-6 shrink-0 pr-2">
-                        <div className="flex flex-col items-end">
-                          <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground/40">Sessions</span>
-                          <span className="text-xs font-bold tabular-nums">{stats[p.id]?.total_sessions || 0}</span>
+                      <div className="flex items-center gap-2.5 shrink-0 pl-3 border-l border-border/30">
+                        {isActive && onJumpToTerminal && (
+                          <AppTooltip content="Jump to Terminal">
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-7 w-7 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 border border-primary/40"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onJumpToTerminal(runningIssue.issue_identifier)
+                              }}
+                            >
+                              <Terminal size={12} strokeWidth={3} />
+                            </Button>
+                          </AppTooltip>
+                        )}
+                        <div className="min-w-[86px] rounded-xl border border-border/50 bg-background/80 px-2.5 py-1.5 text-right shadow-sm transition-colors group-hover:border-primary/25 group-hover:bg-primary/[0.04]">
+                          <span className="block text-[7px] font-black uppercase tracking-[0.18em] text-muted-foreground/55">Sessions</span>
+                          <div className="mt-1 flex items-baseline justify-end gap-1">
+                            <span className="text-sm font-black tabular-nums leading-none text-foreground/90">{stats[p.id]?.total_sessions || 0}</span>
+                            <span className="text-[8px] font-bold uppercase tracking-wider text-muted-foreground/45">total</span>
+                          </div>
                         </div>
                         <ChevronRight size={16} className={`transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/20 group-hover:text-primary/40 group-hover:translate-x-0.5'}`} />
                       </div>
                     </button>
-                    {isActive && onJumpToTerminal && (
-                      <div className="absolute right-12 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                        <AppTooltip content="Jump to Terminal">
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-7 w-7 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 border border-primary/40"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onJumpToTerminal(runningIssue.issue_identifier)
-                            }}
-                          >
-                            <Terminal size={12} strokeWidth={3} />
-                          </Button>
-                        </AppTooltip>
-                      </div>
-                    )}
                   </div>
                 )
               })}
@@ -238,32 +228,58 @@ export function DashboardOverview({
                 <Activity size={48} className="mb-4" />
                 <p className="text-[10px] font-black uppercase tracking-[0.2em]">Telemetry Pending</p>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {Object.entries(warehouseStats.provider_usage)
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([name, tokens]) => {
-                    const percentage = Math.max(5, (tokens / warehouseStats.total_tokens) * 100)
+            ) : (() => {
+              const providerColors: Record<string, { dot: string; bar: string }> = {
+                claude: { dot: 'bg-orange-500', bar: 'bg-gradient-to-r from-orange-600/50 to-orange-400/50' },
+                codex: { dot: 'bg-emerald-500', bar: 'bg-gradient-to-r from-emerald-600/50 to-emerald-400/50' },
+                gemini: { dot: 'bg-blue-500', bar: 'bg-gradient-to-r from-blue-600/50 to-blue-400/50' },
+                opencode: { dot: 'bg-violet-500', bar: 'bg-gradient-to-r from-violet-600/50 to-violet-400/50' },
+                anthropic: {
+                  dot: 'bg-emerald-500 dark:bg-blue-500',
+                  bar: 'bg-gradient-to-r from-emerald-600/50 to-emerald-400/50 dark:from-blue-600/50 dark:to-blue-400/50',
+                },
+                openai: {
+                  dot: 'bg-blue-500 dark:bg-emerald-500',
+                  bar: 'bg-gradient-to-r from-blue-600/50 to-blue-400/50 dark:from-emerald-600/50 dark:to-emerald-400/50',
+                },
+              }
+              const defaultColor = { dot: 'bg-primary', bar: 'bg-gradient-to-r from-primary/60 to-primary/30' }
+              const formatTokens = (t: number) => t >= 1_000_000 ? `${(t / 1_000_000).toFixed(1)}M` : t >= 1_000 ? `${(t / 1_000).toFixed(1)}K` : String(t)
+              const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+              const maxTokens = Math.max(1, ...Object.values(warehouseStats.provider_usage))
+
+              // Show all known providers, even those with 0 tokens
+              const allProviders = ['claude', 'codex', 'gemini', 'opencode', 'anthropic', 'openai']
+              const entries = allProviders.map(name => [name, warehouseStats.provider_usage[name] ?? 0] as const)
+
+              return (
+                <div className="space-y-4">
+                  {entries.map(([name, tokens]) => {
+                    const percentage = tokens > 0 ? Math.max(5, (tokens / maxTokens) * 100) : 0
+                    const colors = providerColors[name] ?? defaultColor
                     return (
                       <div key={name} className="space-y-2 group/bar">
                         <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
                           <span className="flex items-center gap-2">
-                            <div className={`h-1.5 w-1.5 rounded-full ${name.includes('claude') ? 'bg-orange-500' : name.includes('gemini') ? 'bg-blue-500' : 'bg-primary'} shadow-[0_0_8px_rgba(var(--primary),0.4)]`} />
-                            {name}
+                            <div className={`h-1.5 w-1.5 rounded-full ${colors.dot} shadow-[0_0_8px_rgba(var(--primary),0.4)]`} />
+                            {capitalize(name)}
                           </span>
-                          <span className="text-muted-foreground group-hover/bar:text-primary transition-colors">{(tokens / 1000).toFixed(1)}k</span>
+                          <span className="text-muted-foreground group-hover/bar:text-primary transition-colors">
+                            {tokens > 0 ? formatTokens(tokens) : <span className="text-muted-foreground/30">no data</span>}
+                          </span>
                         </div>
                         <div className="h-1.5 w-full bg-muted/30 rounded-full overflow-hidden border border-border/10">
                           <div
-                            className={`h-full transition-all duration-1000 ease-out shadow-lg ${name.includes('claude') ? 'bg-gradient-to-r from-orange-600/50 to-orange-400/50' : name.includes('gemini') ? 'bg-gradient-to-r from-blue-600/50 to-blue-400/50' : 'bg-gradient-to-r from-primary/60 to-primary/30'}`}
+                            className={`h-full transition-all duration-1000 ease-out shadow-lg ${colors.bar}`}
                             style={{ width: `${percentage}%` }}
                           />
                         </div>
                       </div>
                     )
                   })}
-              </div>
-            )}
+                </div>
+              )
+            })()}
           </CardContent>
         </Card>
       </div>
@@ -670,27 +686,25 @@ export function CreateTaskDialog({
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [state, setState] = useState(initialState)
-  const [priority, setPriority] = useState(0)
   const [assignee, setAssignee] = useState('Unassigned')
   const [provider, setProvider] = useState('')
   const [disabledTools, setDisabledTools] = useState<string[]>([])
-  const [projectID, setProjectID] = useState(initialProjectID)
+  const [projectID, setProjectID] = useState(initialProjectID || (projects.length > 0 ? projects[0].id : ''))
   const [pending, setPending] = useState(false)
   const [submitError, setSubmitError] = useState('')
 
   useEffect(() => {
     if (open) {
       setState(initialState)
-      setProjectID(initialProjectID)
+      setProjectID(initialProjectID || (projects.length > 0 ? projects[0].id : ''))
       setTitle('')
       setDescription('')
-      setPriority(0)
       setAssignee('Unassigned')
       setProvider(availableAgents.length > 0 ? availableAgents[0] : '')
       setDisabledTools([])
       setSubmitError('')
     }
-  }, [open, initialState, initialProjectID, availableAgents])
+  }, [open, initialState, initialProjectID, availableAgents, projects])
 
   const handleToggleTool = (name: string) => {
     setDisabledTools(prev => 
@@ -710,7 +724,6 @@ export function CreateTaskDialog({
         title,
         description,
         state,
-        priority,
         assignee_id: assignee,
         project_id: projectID,
         provider,
@@ -734,14 +747,14 @@ export function CreateTaskDialog({
             <div className="flex-1 p-8 space-y-6">
               <input
                 autoFocus
-                className="w-full bg-transparent border-none text-2xl font-semibold placeholder:text-muted-foreground/30 focus:ring-0 p-0 selection:bg-primary/30"
+                className="w-full bg-transparent border-none outline-none text-2xl font-semibold placeholder:text-muted-foreground/30 focus:ring-0 focus:outline-none focus:border-b focus:border-border/30 p-0 pb-2 selection:bg-primary/30 transition-colors"
                 placeholder="Task Title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
               />
               <textarea
-                className="w-full bg-transparent border-none text-base placeholder:text-muted-foreground/20 focus:ring-0 p-0 resize-none min-h-[100px] selection:bg-primary/20 leading-relaxed"
+                className="w-full bg-transparent border-none outline-none text-base placeholder:text-muted-foreground/20 focus:ring-0 focus:outline-none p-0 resize-none min-h-[100px] selection:bg-primary/20 leading-relaxed"
                 placeholder="Add a description..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -799,10 +812,6 @@ export function CreateTaskDialog({
                   }}
                 />
 
-                <PrioritySelector
-                  value={priority}
-                  onChange={setPriority}
-                />
               </div>
 
               {submitError && (

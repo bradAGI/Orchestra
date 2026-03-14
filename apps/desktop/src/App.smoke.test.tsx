@@ -385,49 +385,6 @@ describe('App smoke render', () => {
     })
   })
 
-  it('inspects issue from running list row click', async () => {
-    setupDesktopBridge()
-    setupFetch(defaultSnapshot(1))
-
-    render(<App />)
-
-    fireEvent.click(await screen.findByTestId('sidebar-nav-running'))
-
-    const row = await screen.findByText('OPS-1')
-    fireEvent.click(row)
-
-    await waitFor(() => {
-      expect(screen.getByText('Issue Inspection')).toBeTruthy()
-      expect(screen.getAllByText('OPS-1').length).toBeGreaterThan(0)
-    })
-  })
-
-  it('renders running list in deterministic issue-identifier order', async () => {
-    setupDesktopBridge()
-    setupFetch({
-      generated_at: '2026-03-06T00:00:00Z',
-      counts: { running: 3, retrying: 0 },
-      running: [
-        { issue_id: '3', issue_identifier: 'OPS-C', state: 'running', session_id: 's3' },
-        { issue_id: '2', issue_identifier: 'OPS-A', state: 'running', session_id: 's2' },
-        { issue_id: '1', issue_identifier: 'OPS-B', state: 'running', session_id: 's1' },
-      ],
-      retrying: [],
-      codex_totals: { input_tokens: 0, output_tokens: 0, total_tokens: 0, seconds_run: 0 },
-      rate_limits: null,
-    })
-
-    render(<App />)
-
-    fireEvent.click(await screen.findByTestId('sidebar-nav-running'))
-
-    await waitFor(() => {
-      const rows = screen.getAllByRole('button').filter(b => b.textContent?.startsWith('OPS-'))
-      const labels = rows.map((button) => button.textContent)
-      expect(labels).toEqual(['OPS-A', 'OPS-B', 'OPS-C'])
-    })
-  })
-
   it('creates backend profile from settings', async () => {
     const bridge = setupDesktopBridge()
     setupFetch(defaultSnapshot())

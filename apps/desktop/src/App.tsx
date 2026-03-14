@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, Database, FolderTree, Gauge, History, LayoutDashboard, ListTodo, RefreshCcw, Settings2, ShieldCheck, Ticket, Cpu, Zap, FileText, Terminal } from 'lucide-react'
+import { Activity, Database, FolderTree, Gauge, History, LayoutDashboard, RefreshCcw, Settings2, ShieldCheck, Ticket, Cpu, Zap, FileText, Terminal } from 'lucide-react'
 import {
   IssueDetailView,
   CreateTaskDialog,
@@ -68,10 +68,10 @@ import {
 } from '@app/routes/sections'
 import { TimelineCard } from '@widgets/timeline'
 import { KanbanBoard } from '@widgets/kanban'
-import { OperationsQueueCard } from '@widgets/running'
 import type { IssueDetailResult, ToolSummary } from '@widgets/issue-detail/types'
 import { Command } from 'cmdk'
 import type { BackendConfig } from '@/lib/orchestra-client'
+import { AppTooltipProvider } from '@/components/ui/tooltip-wrapper'
 
 type BackendProfile = {
   id: string
@@ -586,7 +586,11 @@ export default function App() {
     if (!config) return
     try {
       await stopIssueSession(config, identifier, provider)
-      setStatusMessage(`Session for ${identifier}${provider ? ` (${provider})` : ''} termination signaled.`)
+      // Move task back to Todo when stopped
+      await updateIssue(config, identifier, { state: 'Todo' })
+      setStatusMessage(`Session for ${identifier} stopped. Task moved to Todo.`)
+      const updatedIssues = await fetchIssues(config)
+      setBoardIssues(updatedIssues)
       await handleRefresh()
       await executeIssueLookup(identifier)
     } catch (err) {
@@ -876,7 +880,7 @@ export default function App() {
   }
 
   return (
-    <>
+    <AppTooltipProvider>
       <AppShell
         items={sidebarItems}
         activeSection={activeSection}
@@ -909,11 +913,6 @@ export default function App() {
         <div className="mt-4 grid min-w-0 grid-cols-12 gap-3 flex-1">
               {sectionVisibility.showDashboard ? (
                 <>
-                  <section className="col-span-12 grid grid-cols-2 gap-3 h-fit">
-                    <MetricCard title="Active Sessions" value={metrics.running} icon={<Activity className="h-3.5 w-3.5 text-primary" />} hint="Issues currently being processed" />
-                    <MetricCard title="Fleet Token Usage" value={metrics.totalTokens} icon={<Zap className="h-3.5 w-3.5 text-blue-500" />} hint="Aggregate compute consumption" />
-                  </section>
-
                   <section className="col-span-12 h-fit">
                     <DashboardOverview
                       projects={projects}
@@ -924,12 +923,8 @@ export default function App() {
                       onCreateTask={() => setCreateTaskDialogOpen(true)}
                       onJumpToTerminal={handleJumpToTerminal}
                       onProjectClick={(id) => {
-                        if (id) {
-                          setSelectedProjectID(id)
-                          setActiveSection('projects')
-                        } else {
-                          setActiveSection('projects')
-                        }
+                        setSelectedProjectID(id || null)
+                        setActiveSection('projects')
                       }}
                     />
                   </section>
@@ -1003,17 +998,6 @@ export default function App() {
                     onIssueDelete={handleIssueDelete}
                     onStopSession={handleStopSession}
                     onCreateIssue={handleCreateIssue}
-                  />
-                </section>
-              ) : null}
-
-              {sectionVisibility.showRunning ? (
-                <section className="col-span-12 flex flex-col">
-                  <OperationsQueueCard 
-                    loadingState={loadingState} 
-                    snapshot={snapshot} 
-                    onInspectIssue={handleInspectIssueFromList} 
-                    onJumpToTerminal={handleJumpToTerminal}
                   />
                 </section>
               ) : null}
@@ -1233,6 +1217,6 @@ export default function App() {
           )}
         </Command.List>
       </Command.Dialog>
-    </>
+    </AppTooltipProvider>
   )
 }

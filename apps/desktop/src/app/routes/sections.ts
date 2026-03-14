@@ -1,5 +1,4 @@
 import {
-  ListTodo,
   Cpu,
   Database,
   FileText,
@@ -24,12 +23,6 @@ export const sidebarItems: SidebarItem[] = [
     label: 'Tasks',
     description: 'Task board and inspector',
     icon: Ticket,
-  },
-  {
-    id: 'running',
-    label: 'Running',
-    description: 'Active execution queue',
-    icon: ListTodo,
   },
   {
     id: 'projects',

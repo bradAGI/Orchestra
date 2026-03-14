@@ -36,6 +36,7 @@ type RunningEntry struct {
 	Title           string   `json:"title,omitempty"`
 	State           string   `json:"state"`
 	AssigneeID      string   `json:"assignee_id,omitempty"`
+	ProjectID       string   `json:"project_id,omitempty"`
 	SessionID       string   `json:"session_id"`
 	Provider        string   `json:"provider"`
 	SessionLogPath  string   `json:"session_log_path,omitempty"`
@@ -125,7 +126,7 @@ func NewService() *Service {
 	return &Service{
 		running:          make([]RunningEntry, 0),
 		retrying:         make([]RetryEntry, 0),
-		activeStates:     []string{"todo", "in progress"},
+		activeStates:     []string{"in progress"},
 		terminalStates:   []string{"done", "cancelled", "canceled", "closed", "duplicate"},
 		maxConcurrent:    4,
 		maxByState:       map[string]int{},
@@ -817,6 +818,7 @@ func (s *Service) enqueueCandidates(candidates []tracker.Issue) {
 			Title:           issue.Title,
 			State:           issue.State,
 			AssigneeID:      issue.AssigneeID,
+			ProjectID:       issue.ProjectID,
 			Provider:        targetProvider,
 			DisabledTools:   append([]string(nil), issue.DisabledTools...),
 			StartedAt:       now,

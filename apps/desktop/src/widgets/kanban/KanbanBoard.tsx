@@ -5,7 +5,6 @@ import {
   Folder,
   FolderTree,
   Layout,
-  MoreHorizontal,
   Play,
   Rows,
   Square,
@@ -27,7 +26,7 @@ import {
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AppTooltip } from '@/components/ui/tooltip-wrapper'
-import { AgentSelector, CustomDropdown, PriorityIcon, PriorityLabel } from '@/components/app-shell/shared/controls'
+import { AgentSelector, CustomDropdown } from '@/components/app-shell/shared/controls'
 import type { IssueListItem, IssueUpdatePayload } from '@/lib/orchestra-client'
 import type { Project, SnapshotPayload } from '@/lib/orchestra-types'
 
@@ -75,7 +74,6 @@ export function KanbanBoard({
   }
 
   const [stateFilter, setStateFilter] = useState<string>('all')
-  const [priorityFilter, setPriorityFilter] = useState<string>('all')
   const [projectFilter, setProjectFilter] = useState<string>(projects.length === 1 ? projects[0].id : 'all')
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -192,9 +190,8 @@ export function KanbanBoard({
 
   const filterItem = (item: EnrichedIssue) => {
     const stateMatch = stateFilter === 'all' || item.state === stateFilter
-    const priorityMatch = priorityFilter === 'all' || String(item.priority ?? 0) === priorityFilter
     const projectMatch = projectFilter === 'all' || item.project_id === projectFilter
-    return stateMatch && priorityMatch && projectMatch
+    return stateMatch && projectMatch
   }
 
   const todoItems = enrichedIssues.filter((i) => i.state === 'Todo').filter(filterItem)
@@ -271,23 +268,6 @@ export function KanbanBoard({
           </div>
 
           <div className="flex items-center gap-2 rounded-md border bg-muted/20 px-2 py-1">
-            <span className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/60">Priority</span>
-            <CustomDropdown
-              className="w-40"
-              value={priorityFilter}
-              options={[
-                { label: 'All Priorities', value: 'all', icon: <MoreHorizontal className="h-3 w-3" /> },
-                { label: 'No Priority', value: '0', icon: <PriorityIcon priority={0} className="h-3 w-3" /> },
-                { label: 'Low', value: '1', icon: <PriorityIcon priority={1} className="h-3 w-3" /> },
-                { label: 'Medium', value: '2', icon: <PriorityIcon priority={2} className="h-3 w-3" /> },
-                { label: 'High', value: '3', icon: <PriorityIcon priority={3} className="h-3 w-3" /> },
-                { label: 'Urgent', value: '4', icon: <PriorityIcon priority={4} className="h-3 w-3" /> },
-              ]}
-              onChange={setPriorityFilter}
-            />
-          </div>
-
-          <div className="flex items-center gap-2 rounded-md border bg-muted/20 px-2 py-1">
             <span className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/60">Project</span>
             <CustomDropdown
               className="w-56"
@@ -300,14 +280,13 @@ export function KanbanBoard({
             />
           </div>
 
-          {(stateFilter !== 'all' || priorityFilter !== 'all' || projectFilter !== 'all') ? (
+          {(stateFilter !== 'all' || projectFilter !== 'all') ? (
             <Button
               variant="ghost"
               size="sm"
               className="h-7 px-2 text-[10px] text-muted-foreground hover:text-foreground"
               onClick={() => {
                 setStateFilter('all')
-                setPriorityFilter('all')
                 setProjectFilter('all')
               }}
             >
@@ -374,7 +353,7 @@ export function KanbanBoard({
               <OverlayScrollbarsComponent
                 element="div"
                 options={osOptions}
-                className={`flex-1 flex flex-col gap-2 rounded-xl p-1.5 transition-colors min-h-0 ${isDraggingOver === column.id ? 'bg-primary/5 ring-2 ring-primary/20 ring-inset' : 'bg-muted/10'}`}
+                className={`flex-1 flex flex-col gap-2 rounded-xl p-1.5 transition-colors min-h-0 border border-border/40 ${isDraggingOver === column.id ? 'bg-primary/5 ring-2 ring-primary/20 ring-inset' : 'bg-muted/10'}`}
               >
                 {loadingState ? (
                   Array.from({ length: 3 }).map((_, idx) => <Skeleton key={idx} className="h-28 w-full rounded-lg" />)
@@ -385,28 +364,16 @@ export function KanbanBoard({
                   </div>
                 ) : (
                   column.items.map((item) => {
-                    const priority = Number(item.priority ?? 0)
-                    const priorityBorderClass =
-                      priority === 4 ? 'hover:border-red-500/40' :
-                        priority === 3 ? 'hover:border-amber-500/40' :
-                          priority === 2 ? 'hover:border-blue-500/40' :
-                            'hover:border-primary/20'
-
                     return (
                       <Card
                         key={item.issue_id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, getActionIssueRef(item))}
-                        className={`group relative cursor-grab border-transparent bg-card p-3.5 shadow-sm transition-all duration-300 ${priorityBorderClass} hover:shadow-xl hover:shadow-primary/5 active:cursor-grabbing active:scale-[0.98] rounded-xl`}
+                        className="group relative cursor-grab border-transparent bg-card p-3.5 shadow-sm transition-all duration-300 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5 active:cursor-grabbing active:scale-[0.98] rounded-xl"
                         onClick={() => void onInspectIssue(getActionIssueRef(item))}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2">
-                            <AppTooltip content={<PriorityLabel priority={priority} />}>
-                              <div className="p-1 rounded-md bg-muted/50 border border-border/50">
-                                <PriorityIcon priority={priority} className="h-2.5 w-2.5" />
-                              </div>
-                            </AppTooltip>
                             <span className="font-mono text-[9px] font-black uppercase tracking-tight text-muted-foreground/60 group-hover:text-primary transition-colors">
                               {item.issue_identifier}
                             </span>
@@ -530,7 +497,6 @@ export function KanbanBoard({
                     <th className="px-4 py-3">Title</th>
                     <th className="px-4 py-3 w-32">Assignee</th>
                     <th className="px-4 py-3 w-28">Status</th>
-                    <th className="px-4 py-3 w-28">Priority</th>
                     <th className="px-4 py-3 w-32 text-right">Activity</th>
                     <th className="px-4 py-3 w-20 text-right"></th>
                   </tr>
@@ -573,14 +539,6 @@ export function KanbanBoard({
                         <div className="flex items-center gap-2">
                           <div className={`h-1.5 w-1.5 rounded-full ${item.state === 'Done' ? 'bg-primary' : item.state === 'In Progress' ? 'bg-amber-500 animate-pulse' : 'bg-muted-foreground/40'}`} />
                           <span className="text-xs font-medium text-muted-foreground">{item.state}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <PriorityIcon priority={Number(item.priority ?? 0)} className="h-3.5 w-3.5" />
-                          <span className="text-xs text-muted-foreground">
-                            <PriorityLabel priority={Number(item.priority ?? 0)} />
-                          </span>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">

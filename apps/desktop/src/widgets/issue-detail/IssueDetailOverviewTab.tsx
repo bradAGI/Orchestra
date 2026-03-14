@@ -25,7 +25,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { AppTooltip } from '@/components/ui/tooltip-wrapper'
-import { CustomDropdown, PriorityIcon, PriorityLabel } from '@/components/app-shell/shared/controls'
+import { CustomDropdown } from '@/components/app-shell/shared/controls'
 import type { TimelineItem } from '@/components/app-shell/types'
 import type { RunningEntry } from '@/lib/orchestra-types'
 import { extractOperationalPlanItems, type IssueHook } from './IssueDetailUtils'
@@ -59,7 +59,6 @@ export function OverviewTab({
   handleToggleTool,
   issueHistory,
   getEventIcon,
-  priority,
   branchName,
   updatedAt,
   issueUrl,
@@ -93,7 +92,6 @@ export function OverviewTab({
   handleToggleTool: (toolName: string) => Promise<void>
   issueHistory: IssueHistoryEntry[]
   getEventIcon: (kind: string) => React.ReactNode
-  priority: number
   branchName: string
   updatedAt: string
   issueUrl: string
@@ -434,15 +432,11 @@ export function OverviewTab({
           <div className="col-span-4 flex flex-col divide-y divide-border bg-muted/10 overflow-hidden">
             <div className="grid grid-cols-1 divide-y divide-border shrink-0">
               <div className="p-2.5">
-                <div className="text-[8px] font-black uppercase tracking-widest text-muted-foreground mb-1">Status & Priority</div>
+                <div className="text-[8px] font-black uppercase tracking-widest text-muted-foreground mb-1">Status</div>
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2 text-[11px] font-bold text-foreground/90">
                     <div className={`h-1.5 w-1.5 rounded-full ${localState === 'In Progress' ? 'bg-amber-500 animate-pulse' : 'bg-primary'}`} />
                     {localState}
-                  </div>
-                  <div className="flex items-center gap-2 text-[11px] font-bold text-foreground/90">
-                    <PriorityIcon priority={priority} className="h-3 w-3" />
-                    <PriorityLabel priority={priority} />
                   </div>
                 </div>
               </div>

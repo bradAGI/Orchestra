@@ -131,10 +131,10 @@ func (c *Client) SearchIssues(ctx context.Context, query string) ([]tracker.Issu
 func (c *Client) CreateIssue(ctx context.Context, title, description, state string, priority int, assigneeID, projectID string, provider string, disabledTools []string) (*tracker.Issue, error) {
 	id := uuid.New().String()
 
-	// Simple identifier generation: OPS-count+1
-	var count int
-	_ = c.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM issues").Scan(&count)
-	identifier := fmt.Sprintf("OPS-%d", count+1)
+	// Identifier generation: OPS-{max+1} so identifiers never repeat after deletion
+	var maxNum int
+	_ = c.db.QueryRowContext(ctx, "SELECT COALESCE(MAX(CAST(SUBSTR(identifier, 5) AS INTEGER)), 0) FROM issues WHERE identifier LIKE 'OPS-%'").Scan(&maxNum)
+	identifier := fmt.Sprintf("OPS-%d", maxNum+1)
 
 	disabledToolsStr := strings.Join(disabledTools, ",")
 

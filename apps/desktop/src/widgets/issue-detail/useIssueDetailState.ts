@@ -42,7 +42,6 @@ export function useIssueDetailState({
   const description = (typed.description as string) || ''
   const state = (typed.state as string) || 'Todo'
   const assigneeId = (typed.assignee_id as string) || 'Unassigned'
-  const priority = (typed.priority as number) || 0
   const projectId = (typed.project_id as string) || ''
   const branchName = (typed.branch_name as string) || ''
   const issueUrl = (typed.url as string) || ''
@@ -121,7 +120,6 @@ export function useIssueDetailState({
     issueId,
     title,
     description,
-    priority,
     projectId,
     branchName,
     issueUrl,

@@ -1,6 +1,16 @@
 import { forwardRef, useEffect, useRef, useState, type MutableRefObject, type ReactElement, type ReactNode, type Ref } from 'react'
 import { AlertCircle, Bot, ChevronDown, CircleDashed, Folder, FolderTree, MoreHorizontal, SignalHigh, SignalLow, SignalMedium, User } from 'lucide-react'
 
+export function getAgentIcon(name: string, size = 12): ReactNode {
+  const lower = name.toLowerCase()
+  const imgClass = `rounded-sm object-contain`
+  if (lower.includes('claude')) return <img src="/Anthropic_Symbol_1.png" width={size} height={size} alt="Claude" className={`${imgClass} dark:invert`} />
+  if (lower.includes('codex')) return <img src="/OpenAI_Symbol_1.png" width={size} height={size} alt="Codex" className={`${imgClass} dark:invert`} />
+  if (lower.includes('gemini')) return <img src="/Google_Symbol_1.png" width={size} height={size} alt="Gemini" className={imgClass} />
+  if (lower.includes('opencode')) return <img src="/opencode.png" width={size} height={size} alt="OpenCode" className={imgClass} />
+  return <Bot size={size} className="text-primary/60" />
+}
+
 type DropdownValue = string | number
 
 type CustomDropdownProps<T extends DropdownValue> = {
@@ -66,13 +76,13 @@ function CustomDropdownImpl<T extends DropdownValue>(
         onClick={() => setIsOpen(!isOpen)}
         className={triggerContent
           ? 'flex items-center w-full h-full'
-          : `flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium transition-all hover:border-primary/40 focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 ${isOpen ? 'border-primary ring-2 ring-primary/20' : ''}`}
+          : `flex w-auto min-w-full items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium transition-all hover:border-primary/40 focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 ${isOpen ? 'border-primary ring-2 ring-primary/20' : ''}`}
       >
         {triggerContent || (
           <>
-            <div className="flex items-center gap-2 truncate">
+            <div className="flex items-center gap-2 whitespace-nowrap">
               {selectedOption?.icon}
-              <span className="truncate">{selectedOption?.label || placeholder}</span>
+              <span className="whitespace-nowrap">{selectedOption?.label || placeholder}</span>
             </div>
             <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
           </>
@@ -80,7 +90,7 @@ function CustomDropdownImpl<T extends DropdownValue>(
       </button>
 
       {isOpen && (
-        <div className={`absolute left-0 z-[100] w-full min-w-[160px] overflow-hidden rounded-xl border border-border bg-card p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 ${direction === 'up' ? 'bottom-full mb-1 origin-bottom' : 'top-full mt-1 origin-top'}`}>
+        <div className={`absolute left-0 z-[100] w-max min-w-full overflow-hidden rounded-xl border border-border bg-card p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 ${direction === 'up' ? 'bottom-full mb-1 origin-bottom' : 'top-full mt-1 origin-top'}`}>
           <div className="max-h-[300px] overflow-auto">
             {options.map((option) => (
               <button
@@ -93,7 +103,7 @@ function CustomDropdownImpl<T extends DropdownValue>(
                 className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-medium transition-colors ${option.value === value ? 'bg-primary/10 text-primary' : 'text-foreground hover:bg-muted/50'}`}
               >
                 {option.icon}
-                <span className="flex-1 truncate">{option.label}</span>
+                <span className="flex-1 whitespace-nowrap">{option.label}</span>
                 {option.value === value && <div className="h-1.5 w-1.5 rounded-full bg-primary" />}
               </button>
             ))}
@@ -114,15 +124,12 @@ export function AgentSelector({ value, agents, onChange }: { value: string; agen
       className="bg-transparent border-none hover:bg-muted/20 !h-7 !px-2 rounded-md transition-colors shadow-none"
       value={normalizedValue || 'Unassigned'}
       direction="up"
-      options={[
-        { label: 'Unassigned', value: 'Unassigned', icon: <User size={12} className="opacity-40" /> },
-        ...agents.map((a) => ({ label: a, value: a, icon: <Bot size={12} className="text-primary/60" /> })),
-      ]}
-      onChange={(v) => onChange(v === 'Unassigned' ? '' : `agent-${v}`)}
+      options={agents.map((a) => ({ label: a, value: a, icon: getAgentIcon(a) }))}
+      onChange={(v) => onChange(`agent-${v}`)}
       triggerContent={
         <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground/70 uppercase">
-          {value !== 'Unassigned' ? <Bot size={12} className="text-primary/60" /> : <User size={12} className="opacity-40" />}
-          <span className="truncate max-w-[80px]">{value || 'Assignee'}</span>
+          {normalizedValue && normalizedValue !== 'Unassigned' ? getAgentIcon(normalizedValue) : <User size={12} className="opacity-40" />}
+          <span className="truncate max-w-[80px]">{normalizedValue || 'Assignee'}</span>
         </div>
       }
     />

@@ -74,7 +74,6 @@ export type IssueUpdatePayload = {
   state?: string
   assignee_id?: string
   provider?: string
-  priority?: number
   title?: string
   description?: string
   project_id?: string
@@ -86,7 +85,6 @@ export type IssueCreatePayload = {
   title: string
   description: string
   state: string
-  priority: number
   assignee_id: string
   project_id: string
   provider?: string

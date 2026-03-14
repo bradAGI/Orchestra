@@ -410,14 +410,33 @@ func geminiAliasFromPath(filePath string) string {
 	return ""
 }
 
+// matchExistingProject finds a project by directory path without creating one.
+func matchExistingProject(ctx context.Context, database *db.DB, directory string) string {
+	if strings.TrimSpace(directory) == "" {
+		return ""
+	}
+	cleanDir := filepath.Clean(directory)
+	projects, _ := database.GetProjects(ctx)
+	for _, p := range projects {
+		cleanRoot := filepath.Clean(p.RootPath)
+		if cleanDir == cleanRoot || strings.HasPrefix(cleanDir, cleanRoot+"/") {
+			return p.ID
+		}
+	}
+	return ""
+}
+
 func resolveGeminiProject(ctx context.Context, database *db.DB, manualRoots []string, aliasMap map[string]string, filePath string, logger zerolog.Logger) string {
+	// Match against existing projects only — never create new ones
 	alias := geminiAliasFromPath(filePath)
 	if root, ok := aliasMap[alias]; ok {
-		projectID, err := database.UpsertProject(ctx, root, "")
-		if err == nil {
-			return projectID
+		projects, _ := database.GetProjects(ctx)
+		cleanRoot := filepath.Clean(root)
+		for _, p := range projects {
+			if filepath.Clean(p.RootPath) == cleanRoot {
+				return p.ID
+			}
 		}
-		logger.Debug().Err(err).Str("root", root).Msg("failed to upsert gemini project alias root")
 	}
 
 	projectID, _ := findProjectRoot(ctx, database, filePath, manualRoots, logger)
@@ -593,12 +612,7 @@ func scanOpenCodeSQLite(ctx context.Context, database *db.DB, manualRoots []stri
 				maxMessage = rowID
 			}
 
-			projectID := ""
-			if strings.TrimSpace(directory) != "" {
-				if id, err := database.UpsertProject(ctx, directory, ""); err == nil {
-					projectID = id
-				}
-			}
+			projectID := matchExistingProject(ctx, database, directory)
 			_ = database.RecordSession(ctx, sessionID, projectID, "", sessionID, "opencode", "unknown")
 
 			var payload map[string]any
@@ -653,12 +667,7 @@ func scanOpenCodeSQLite(ctx context.Context, database *db.DB, manualRoots []stri
 				maxPart = rowID
 			}
 
-			projectID := ""
-			if strings.TrimSpace(directory) != "" {
-				if id, err := database.UpsertProject(ctx, directory, ""); err == nil {
-					projectID = id
-				}
-			}
+			projectID := matchExistingProject(ctx, database, directory)
 			_ = database.RecordSession(ctx, sessionID, projectID, "", sessionID, "opencode", "unknown")
 
 			var payload map[string]any

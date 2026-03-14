@@ -130,6 +130,10 @@ export function getFileIcon(path: string, active: boolean) {
   }
 }
 
+export function extractPlanFromText(text: string): PlanItem[] {
+  return parsePlanItemsFromText(text)
+}
+
 function parsePlanItemsFromText(text: string): PlanItem[] {
   if (!text) return []
 
