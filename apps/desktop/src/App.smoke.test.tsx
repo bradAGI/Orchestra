@@ -1009,6 +1009,312 @@ describe('App smoke render', () => {
   })
 
 
+  it('creates a task from the kanban board and it appears in Todo column', async () => {
+    setupDesktopBridge()
+    const projects = [
+      { id: 'proj-1', name: 'My Project', root_path: '/tmp/proj', remote_url: '' },
+    ]
+    const issues: Array<Record<string, unknown>> = []
+    const fetchMockRef = setupFetch(defaultSnapshot(), {
+      onFetch: (url, init) => {
+        if (url.includes('/api/v1/projects')) {
+          return new Response(JSON.stringify(projects), { status: 200 })
+        }
+        if (url.includes('/api/v1/issues') && init?.method === 'POST') {
+          const body = JSON.parse(init?.body as string)
+          const created = {
+            id: 'issue-new',
+            issue_identifier: 'OPS-99',
+            identifier: 'OPS-99',
+            title: body.title,
+            description: body.description ?? '',
+            state: body.state ?? 'Todo',
+            assignee_id: body.assignee_id ?? '',
+            priority: 2,
+            project_id: body.project_id ?? '',
+          }
+          issues.push(created)
+          return new Response(JSON.stringify(created), { status: 201 })
+        }
+        if (url.includes('/api/v1/issues?') || (url.includes('/api/v1/issues') && (!init || init.method === 'GET'))) {
+          return new Response(JSON.stringify({ issues }), { status: 200 })
+        }
+        return null
+      },
+    })
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/To Do/i).length).toBeGreaterThan(0)
+    })
+
+    // Open command palette and create task
+    fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+
+    await waitFor(() => {
+      expect(screen.getByText(/Create New Task/i)).toBeTruthy()
+    })
+
+    fireEvent.click(screen.getByText(/Create New Task/i))
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/What needs to be done/i)).toBeTruthy()
+    })
+
+    fireEvent.change(screen.getByPlaceholderText(/What needs to be done/i), {
+      target: { value: 'Build the feature' },
+    })
+
+    // Submit (project auto-selected since only one exists)
+    const submitButton = screen.getAllByRole('button').find(
+      (btn) => btn.textContent === 'Create' && (btn as HTMLButtonElement).type === 'submit',
+    )
+    expect(submitButton).toBeTruthy()
+    fireEvent.click(submitButton!)
+
+    await waitFor(() => {
+      expect(fetchMockRef.mock.calls.some(
+        (call) => String(call[0]).includes('/api/v1/issues') && call[1]?.method === 'POST',
+      )).toBe(true)
+    })
+  })
+
+  it('task create dialog requires a project selection', async () => {
+    setupDesktopBridge()
+    setupFetch(defaultSnapshot(), {
+      onFetch: (url) => {
+        if (url.includes('/api/v1/projects')) {
+          return new Response(JSON.stringify([]), { status: 200 })
+        }
+        return null
+      },
+    })
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/To Do/i).length).toBeGreaterThan(0)
+    })
+
+    fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+
+    await waitFor(() => {
+      expect(screen.getByText(/Create New Task/i)).toBeTruthy()
+    })
+    fireEvent.click(screen.getByText(/Create New Task/i))
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/What needs to be done/i)).toBeTruthy()
+    })
+
+    fireEvent.change(screen.getByPlaceholderText(/What needs to be done/i), {
+      target: { value: 'Some task' },
+    })
+
+    // Create button should be disabled: no project selected
+    const submitButton = screen.getAllByRole('button').find(
+      (btn) => btn.textContent === 'Create' && (btn as HTMLButtonElement).type === 'submit',
+    )
+    expect(submitButton).toBeTruthy()
+    expect((submitButton as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('navigates to project detail view when clicking a project', async () => {
+    setupDesktopBridge()
+    const projects = [
+      { id: 'proj-1', name: 'Alpha Project', root_path: '/home/user/alpha', remote_url: 'https://github.com/test/alpha' },
+    ]
+    setupFetch(defaultSnapshot(), {
+      onFetch: (url) => {
+        if (url.includes('/api/v1/projects/proj-1/stats')) {
+          return new Response(JSON.stringify({ total_sessions: 5, total_input: 1000, total_output: 2000 }), { status: 200 })
+        }
+        if (url.includes('/api/v1/projects')) {
+          return new Response(JSON.stringify(projects), { status: 200 })
+        }
+        return null
+      },
+    })
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByTestId('sidebar-nav-projects'))
+
+    await waitFor(() => {
+      expect(screen.getByText('Alpha Project')).toBeTruthy()
+    })
+
+    fireEvent.click(screen.getByText('Alpha Project'))
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Alpha Project').length).toBeGreaterThan(0)
+      expect(screen.getByText(/\/home\/user\/alpha/)).toBeTruthy()
+    })
+  })
+
+  it('shows path not found warning for projects with missing paths', async () => {
+    setupDesktopBridge()
+    const projects = [
+      { id: 'proj-missing', name: 'Ghost Project', root_path: '/nonexistent/path', remote_url: '', path_exists: false },
+    ]
+    setupFetch(defaultSnapshot(), {
+      onFetch: (url) => {
+        if (url.includes('/api/v1/projects/proj-missing/stats')) {
+          return new Response(JSON.stringify({ total_sessions: 0, total_input: 0, total_output: 0 }), { status: 200 })
+        }
+        if (url.includes('/api/v1/projects')) {
+          return new Response(JSON.stringify(projects), { status: 200 })
+        }
+        return null
+      },
+    })
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByTestId('sidebar-nav-projects'))
+
+    await waitFor(() => {
+      expect(screen.getByText('Ghost Project')).toBeTruthy()
+    })
+
+    fireEvent.click(screen.getByText('Ghost Project'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/Path not found/i)).toBeTruthy()
+      expect(screen.getAllByText(/\/nonexistent\/path/).length).toBeGreaterThan(0)
+    })
+  })
+
+  it('deletes project from project grid view', async () => {
+    setupDesktopBridge()
+    const projects = [
+      { id: 'proj-del', name: 'Doomed Project', root_path: '/tmp/doomed', remote_url: '' },
+    ]
+    const fetchMockRef = setupFetch(defaultSnapshot(), {
+      onFetch: (url, init) => {
+        if (url.includes('/api/v1/projects/proj-del/stats')) {
+          return new Response(JSON.stringify({ total_sessions: 0, total_input: 0, total_output: 0 }), { status: 200 })
+        }
+        if (url.includes('/api/v1/projects/proj-del') && init?.method === 'DELETE') {
+          projects.splice(0, projects.length)
+          return new Response(null, { status: 204 })
+        }
+        if (url.includes('/api/v1/projects')) {
+          return new Response(JSON.stringify(projects), { status: 200 })
+        }
+        return null
+      },
+    })
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByTestId('sidebar-nav-projects'))
+
+    await waitFor(() => {
+      expect(screen.getByText('Doomed Project')).toBeTruthy()
+    })
+
+    // The ProjectGrid card has a delete button that calls setProjectToDelete
+    // Find the card and its delete button (the second icon button in the card overlay)
+    const allButtons = screen.getAllByRole('button')
+    // Find buttons with hover:text-destructive class (the trash button on project card)
+    const trashButton = allButtons.find(btn =>
+      btn.className.includes('hover:text-destructive'),
+    )
+    expect(trashButton).toBeTruthy()
+    fireEvent.click(trashButton!)
+
+    // ProjectGrid delete confirmation dialog
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: /Remove Project/i }))
+
+    await waitFor(() => {
+      expect(fetchMockRef.mock.calls.some(
+        (call) => String(call[0]).includes('/api/v1/projects/proj-del') && call[1]?.method === 'DELETE',
+      )).toBe(true)
+    })
+  })
+
+  it('activity tab loads and displays events in issue inspector', async () => {
+    setupDesktopBridge()
+    const issues = [
+      {
+        id: 'issue-hist',
+        issue_identifier: 'OPS-50',
+        identifier: 'OPS-50',
+        title: 'History task',
+        description: '',
+        state: 'In Progress',
+        assignee_id: 'agent-codex',
+        priority: 1,
+        project_id: '',
+      },
+    ]
+    const historyEntries = [
+      { id: 'h1', kind: 'state_change', message: 'State changed to In Progress', timestamp: '2026-03-06T00:01:00Z' },
+      { id: 'h2', kind: 'run_started', message: 'Agent session initiated', timestamp: '2026-03-06T00:02:00Z' },
+    ]
+    setupFetch(defaultSnapshot(), {
+      onFetch: (url) => {
+        if (url.includes('/api/v1/issues/OPS-50/history')) {
+          return new Response(JSON.stringify({ history: historyEntries }), { status: 200 })
+        }
+        if (url.includes('/api/v1/issues/OPS-50')) {
+          return new Response(JSON.stringify(issues[0]), { status: 200 })
+        }
+        if (url.includes('/api/v1/issues')) {
+          return new Response(JSON.stringify({ issues }), { status: 200 })
+        }
+        return null
+      },
+    })
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+
+    await waitFor(() => {
+      expect(screen.getByText('History task')).toBeTruthy()
+    })
+
+    fireEvent.click(screen.getByText('History task'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/Issue Inspection/i)).toBeTruthy()
+    })
+
+    // Activity tab active by default; entries with allowed kinds should render
+    await waitFor(() => {
+      expect(screen.getAllByText(/state change/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/run started/i).length).toBeGreaterThan(0)
+    })
+  })
+
+  it('command palette opens with Ctrl+K', async () => {
+    setupDesktopBridge()
+    setupFetch(defaultSnapshot())
+
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Dashboard/i).length).toBeGreaterThan(0)
+    })
+
+    fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/Type a command or search/i)).toBeTruthy()
+      expect(screen.getByText(/Go to Dashboard/i)).toBeTruthy()
+      expect(screen.getByText(/Go to Tasks/i)).toBeTruthy()
+      expect(screen.getByText(/Create New Task/i)).toBeTruthy()
+    })
+  })
+
   it('toggles theme and updates root dark class', async () => {
     setupDesktopBridge()
     setupFetch(defaultSnapshot())
