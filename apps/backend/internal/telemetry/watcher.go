@@ -204,22 +204,114 @@ func saveOffset(ctx context.Context, database *db.DB, path string, offset int64)
 }
 
 func deriveProjectFromPath(path string) string {
-	// Claude paths look like: /home/traves/.claude/projects/-home-traves-repo-name/...
+	// Claude paths encode the project working directory as a dash-separated segment:
+	//   /home/traves/.claude/projects/-home-traves-Development-symphony-main/session.jsonl
+	// Dashes replace path separators, but folder names may also contain dashes (e.g. "symphony-main").
+	// We reconstruct the real path by greedily consuming segments and checking the filesystem.
 	segments := strings.Split(path, string(os.PathSeparator))
 	for _, seg := range segments {
 		if strings.HasPrefix(seg, "-home-") || strings.HasPrefix(seg, "-tmp-") || strings.HasPrefix(seg, "-usr-") {
-			derived := strings.ReplaceAll(seg, "-", "/")
-			if !strings.HasPrefix(derived, "/") {
-				derived = "/" + derived
+			parts := strings.Split(seg, "-")
+			// Skip the leading empty element (from the leading dash)
+			if len(parts) > 0 && parts[0] == "" {
+				parts = parts[1:]
 			}
-			clean := filepath.Clean(derived)
-			if eval, err := filepath.EvalSymlinks(clean); err == nil {
-				return eval
+			derived := greedyResolvePath(parts)
+			if derived != "" {
+				if eval, err := filepath.EvalSymlinks(derived); err == nil {
+					return eval
+				}
+				return derived
 			}
-			return clean
+			// Fallback: naive replacement (won't be on disk but keeps old behavior for DB linkage)
+			naive := strings.ReplaceAll(seg, "-", "/")
+			if !strings.HasPrefix(naive, "/") {
+				naive = "/" + naive
+			}
+			return filepath.Clean(naive)
 		}
 	}
 	return ""
+}
+
+// greedyResolvePath reconstructs a filesystem path from dash-split segments.
+// Claude Code encodes project paths by replacing "/" with "-" and non-separator
+// special characters (dots, spaces) with sequences that produce empty segments
+// when split on "-". For example:
+//
+//	"1. Personal"  → "1--Personal"  (split: ["1","","Personal"])
+//	"symphony-main"→ "symphony-main" (split: ["symphony","main"])
+//
+// The algorithm greedily tries the longest filesystem match at each level,
+// rejoining segments with "-" and collapsing empty segments into ". " to
+// recover the original directory name.
+func greedyResolvePath(parts []string) string {
+	if len(parts) == 0 {
+		return ""
+	}
+
+	current := "/" + parts[0]
+	parts = parts[1:]
+
+	for len(parts) > 0 {
+		found := false
+		for take := len(parts); take >= 1; take-- {
+			segment := recoverSegmentName(parts[:take])
+			candidate := current + "/" + segment
+			if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+				current = candidate
+				parts = parts[take:]
+				found = true
+				break
+			}
+			// Also try "." as joiner (e.g. "6.GroupProjects" encoded as "6-GroupProjects")
+			if take >= 2 && parts[0] != "" {
+				dotCandidate := current + "/" + parts[0] + "." + strings.Join(parts[1:take], "-")
+				if info, err := os.Stat(dotCandidate); err == nil && info.IsDir() {
+					current = dotCandidate
+					parts = parts[take:]
+					found = true
+					break
+				}
+			}
+		}
+		if !found {
+			current = current + "/" + parts[0]
+			parts = parts[1:]
+		}
+	}
+
+	if _, err := os.Stat(current); err == nil {
+		return current
+	}
+	return ""
+}
+
+// recoverSegmentName rejoins dash-split parts into a directory name.
+// Empty parts (from "--" sequences) are collapsed: an empty part followed by
+// a non-empty part becomes ". " + next (e.g. ["1","","Personal"] → "1. Personal").
+// An empty part at the end is dropped. Adjacent non-empty parts are joined with "-".
+func recoverSegmentName(parts []string) string {
+	var b strings.Builder
+	for i := 0; i < len(parts); i++ {
+		if parts[i] == "" {
+			// Double-dash marker: next segment is prefixed with ". "
+			if i+1 < len(parts) {
+				if b.Len() > 0 {
+					// nothing between current and the dot
+				}
+				b.WriteString(". ")
+				b.WriteString(parts[i+1])
+				i++ // skip the next part
+			}
+		} else {
+			if b.Len() > 0 && !strings.HasSuffix(b.String(), ". ") {
+				b.WriteString("-")
+			}
+			b.WriteString(parts[i])
+		}
+	}
+	return b.String()
 }
 
 func findProjectRoot(ctx context.Context, database *db.DB, path string, manualRoots []string, logger zerolog.Logger) (string, string) {
