@@ -41,6 +41,9 @@ import {
   deleteIssue,
   fetchSessionDetail,
   fetchMCPTools,
+  fetchProjectGitHubIssues,
+  createProjectGitHubIssue,
+  updateProjectGitHubIssue,
   type IssueCreatePayload,
   type IssueUpdatePayload,
   type IssueListItem,
@@ -91,6 +94,7 @@ export default function App() {
   const [snapshot, setSnapshot] = useState<SnapshotPayload | null>(null)
   const [timeline, setTimeline] = useState<TimelineItem[]>([])
   const [boardIssues, setBoardIssues] = useState<IssueListItem[]>([])
+  const [githubBacklogIssues, setGithubBacklogIssues] = useState<IssueListItem[]>([])
   const [loadingConfig, setLoadingConfig] = useState(false)
   const [savingConfig, setSavingConfig] = useState(false)
   const [profilesPending, setProfilesPending] = useState(false)
@@ -347,8 +351,35 @@ export default function App() {
     }
   }, [config, activeSection])
 
-  const allBoardIssuesRef = useRef(boardIssues)
-  allBoardIssuesRef.current = boardIssues
+  // Fetch GitHub issues for connected projects → Kanban backlog
+  useEffect(() => {
+    if (!config || projects.length === 0) return
+    let mounted = true
+    const connected = projects.filter(p => p.github_token)
+    if (connected.length === 0) { setGithubBacklogIssues([]); return }
+
+    Promise.all(connected.map(async (p) => {
+      try {
+        const ghIssues = await fetchProjectGitHubIssues(config, p.id)
+        return ghIssues.map(gh => ({
+          id: `github-${gh.number}`, issue_id: `github-${gh.number}`,
+          identifier: `GH-${gh.number}`, issue_identifier: `GH-${gh.number}`,
+          title: gh.title, description: gh.body, state: 'Backlog',
+          project_id: p.id, url: gh.html_url,
+        } as IssueListItem))
+      } catch { return [] as IssueListItem[] }
+    })).then(results => {
+      if (!mounted) return
+      const all = results.flat()
+      const localTitles = new Set(boardIssues.map(i => i.title))
+      setGithubBacklogIssues(all.filter(gh => !localTitles.has(gh.title)))
+    })
+    return () => { mounted = false }
+  }, [config, projects, boardIssues])
+
+  const allBoardIssues = useMemo(() => [...boardIssues, ...githubBacklogIssues], [boardIssues, githubBacklogIssues])
+  const allBoardIssuesRef = useRef(allBoardIssues)
+  allBoardIssuesRef.current = allBoardIssues
 
   const handleAgentConfigSave = async (nextAgentConfig: { commands: Record<string, string>; agent_provider: string }) => {
     if (!config) return
@@ -598,6 +629,58 @@ export default function App() {
 
       await updateIssue(config, identifier, updates)
 
+      // If title/description changed and project is GitHub-connected, sync to GitHub
+      const updatesRec = updates as Record<string, unknown>
+      if (updatesRec.title || updatesRec.description) {
+        const issue = allBoardIssuesRef.current.find(i =>
+          i.identifier === identifier || i.issue_identifier === identifier
+        )
+        if (issue?.project_id && issue.url?.includes('github.com')) {
+          const project = projects.find(p => p.id === issue.project_id)
+          if (project?.github_token) {
+            // Extract GH issue number from URL (e.g. .../issues/22)
+            const ghMatch = issue.url.match(/\/issues\/(\d+)$/)
+            if (ghMatch) {
+              const ghNumber = parseInt(ghMatch[1], 10)
+              try {
+                await updateProjectGitHubIssue(config, project.id, ghNumber, {
+                  ...(updatesRec.title ? { title: updatesRec.title as string } : {}),
+                  ...(updatesRec.description ? { body: updatesRec.description as string } : {}),
+                })
+              } catch {
+                // GitHub sync failed silently — local update still succeeded
+              }
+            }
+          }
+        }
+      }
+
+      // If state changed, sync open/closed to GitHub
+      if (updatesRec.state) {
+        const issue = allBoardIssuesRef.current.find(i =>
+          i.identifier === identifier || i.issue_identifier === identifier
+        )
+        if (issue?.project_id && issue.url?.includes('github.com')) {
+          const proj = projects.find(p => p.id === issue.project_id)
+          if (proj?.github_token) {
+            const ghMatch = issue.url.match(/\/issues\/(\d+)$/)
+            if (ghMatch) {
+              const ghNumber = parseInt(ghMatch[1], 10)
+              const ghState = updatesRec.state === 'Done' ? 'closed' : 'open'
+              // Only sync if transitioning to/from Done
+              const previousState = issue.state
+              if (updatesRec.state === 'Done' || previousState === 'Done') {
+                try {
+                  await updateProjectGitHubIssue(config, proj.id, ghNumber, { state: ghState })
+                } catch {
+                  // GitHub sync failed silently — local update still succeeded
+                }
+              }
+            }
+          }
+        }
+      }
+
       // Instantly update the board issues for snappy drag-and-drop
       const updatedIssues = await fetchIssues(config)
       setBoardIssues(updatedIssues)
@@ -635,12 +718,41 @@ export default function App() {
   const handleTaskSubmit = async (payload: IssueCreatePayload) => {
     if (!config) return
     try {
-      await createIssue(config, payload)
+      const localIssue = await createIssue(config, payload)
+
+      // If project is GitHub-connected, also create a GitHub issue and link it
+      const project = projects.find(p => p.id === payload.project_id)
+      if (project?.github_token && project.github_owner && project.github_repo) {
+        try {
+          const ghIssue = await createProjectGitHubIssue(config, project.id, {
+            title: payload.title,
+            body: payload.description || '',
+          })
+          // Link the local task to the GitHub issue via url field
+          const issueId = localIssue?.identifier || localIssue?.issue_identifier || ''
+          if (issueId && ghIssue.html_url) {
+            await updateIssue(config, issueId, { url: ghIssue.html_url } as IssueUpdatePayload)
+          }
+        } catch {
+          // GitHub create failed — local task still exists
+        }
+      }
+
       setStatusMessage(`Task "${payload.title}" created.`)
 
       // Instantly update the board issues so it appears without waiting for an SSE cycle
       const updatedIssues = await fetchIssues(config)
       setBoardIssues(updatedIssues)
+
+      // Refetch GitHub issues for the project so the new linked issue shows up immediately
+      if (project?.github_token) {
+        try {
+          const ghIssues = await fetchProjectGitHubIssues(config, project.id, 'open')
+          void ghIssues // triggers githubBacklogIssues effect via setBoardIssues above
+        } catch {
+          // non-critical
+        }
+      }
 
       void handleRefresh()
     } catch (err) {
@@ -652,6 +764,25 @@ export default function App() {
     if (!config) return
 
     try {
+      // Close the linked GitHub issue before deleting locally
+      const issueToClose = allBoardIssuesRef.current.find(i =>
+        i.identifier === identifier || i.issue_identifier === identifier
+      )
+      if (issueToClose?.project_id && issueToClose.url?.includes('github.com')) {
+        const proj = projects.find(p => p.id === issueToClose.project_id)
+        if (proj?.github_token) {
+          const ghMatch = issueToClose.url.match(/\/issues\/(\d+)$/)
+          if (ghMatch) {
+            const ghNumber = parseInt(ghMatch[1], 10)
+            try {
+              await updateProjectGitHubIssue(config, proj.id, ghNumber, { state: 'closed' })
+            } catch {
+              // GitHub close failed silently — proceed with local delete
+            }
+          }
+        }
+      }
+
       await deleteIssue(config, identifier)
       setStatusMessage(`Task ${identifier} deleted.`)
 
@@ -1015,7 +1146,7 @@ export default function App() {
                   <KanbanBoard
                     loadingState={loadingState}
                     snapshot={snapshot}
-                    boardIssues={boardIssues}
+                    boardIssues={allBoardIssues}
                     projects={projects}
                     availableAgents={availableAgents}
                     onInspectIssue={handleInspectIssueFromList}
@@ -1151,6 +1282,7 @@ export default function App() {
       <CreateTaskDialog
         open={createTaskDialogOpen}
         onOpenChange={setCreateTaskDialogOpen}
+        config={config}
         initialState={createTaskInitialState}
         availableAgents={availableAgents}
         allTools={allTools}

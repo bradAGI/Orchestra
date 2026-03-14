@@ -158,13 +158,26 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
             .catch(() => {})
     }, [activeTab, config, project.id])
 
-    // Fetch GitHub issues when filter changes
+    // Fetch GitHub issues on mount (for backlog) and when filter changes in Git > Issues
     useEffect(() => {
-        if (activeTab !== 'git' || gitSubTab !== 'issues' || !config || !project.github_token) return
-        fetchProjectGitHubIssues(config, project.id, ghIssueFilter)
+        if (!config || !project.github_token) return
+        const state = (activeTab === 'git' && gitSubTab === 'issues') ? ghIssueFilter : 'open'
+        fetchProjectGitHubIssues(config, project.id, state)
             .then(setGithubIssues)
             .catch(() => setGithubIssues([]))
     }, [activeTab, gitSubTab, ghIssueFilter, config, project.id, project.github_token])
+
+    // Poll GitHub issues every 60s for the active project
+    useEffect(() => {
+        if (!config || !project.github_token) return
+        const interval = setInterval(() => {
+            const state = (activeTab === 'git' && gitSubTab === 'issues') ? ghIssueFilter : 'open'
+            fetchProjectGitHubIssues(config, project.id, state)
+                .then(setGithubIssues)
+                .catch(() => {})
+        }, 60000)
+        return () => clearInterval(interval)
+    }, [config, project.id, project.github_token, activeTab, gitSubTab, ghIssueFilter])
 
     // Fetch PRs
     useEffect(() => {
@@ -691,24 +704,6 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                     <p className="pb-3 text-[10px] text-red-400">{githubActionError}</p>
                 ) : null}
 
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-2 border border-border/30 rounded-lg px-2.5 py-1.5 bg-card/40">
-                        <History size={12} className="text-blue-500" />
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Sessions</span>
-                        <span className="text-xs font-bold tabular-nums">{stats?.total_sessions || 0}</span>
-                    </div>
-                    <div className="flex items-center gap-2 border border-border/30 rounded-lg px-2.5 py-1.5 bg-card/40">
-                        <Zap size={12} className="text-amber-500" />
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Tokens</span>
-                        <span className="text-xs font-bold tabular-nums">{((stats?.total_input || 0) + (stats?.total_output || 0)).toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center gap-2 border border-border/30 rounded-lg px-2.5 py-1.5 bg-card/40">
-                        <Calendar size={12} className="text-green-500" />
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Last Active</span>
-                        <span className="text-xs font-bold">{stats?.last_active ? new Date(stats.last_active).toLocaleDateString() : 'N/A'}</span>
-                    </div>
-                </div>
-
                 {/* Tabs */}
                 <div className="flex gap-1">
                     {tabs.map((tab) => {
@@ -750,7 +745,19 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                 <KanbanBoard
                                     loadingState={loadingState}
                                     snapshot={snapshot}
-                                    boardIssues={boardIssues.filter(i => i.project_id === project.id)}
+                                    boardIssues={(() => {
+                                        const local = boardIssues.filter(i => i.project_id === project.id)
+                                        const localTitles = new Set(local.map(i => i.title))
+                                        const ghBacklog: IssueListItem[] = githubIssues
+                                            .filter(gh => !localTitles.has(gh.title))
+                                            .map(gh => ({
+                                                id: `github-${gh.number}`, issue_id: `github-${gh.number}`,
+                                                identifier: `GH-${gh.number}`, issue_identifier: `GH-${gh.number}`,
+                                                title: gh.title, description: gh.body, state: 'Backlog',
+                                                project_id: project.id, url: gh.html_url,
+                                            }))
+                                        return [...local, ...ghBacklog]
+                                    })()}
                                     projects={[project]}
                                     availableAgents={availableAgents}
                                     onInspectIssue={onInspectIssue}

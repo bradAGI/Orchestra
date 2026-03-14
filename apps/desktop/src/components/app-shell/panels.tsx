@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Ansi from 'ansi-to-react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import { Activity, AlertCircle, AlertTriangle, AppWindow, Bot, Check, CheckCircle2, ChevronDown, Circle, CircleDashed, Cpu, Eye, EyeOff, FileText, Folder, FolderTree, GitBranch, Loader2, ListChecks, MoreHorizontal, ShieldCheck, SignalHigh, SignalLow, SignalMedium, Square, Terminal, User, Users, Globe, Wrench, Clock, Search, LayoutDashboard, ListTodo, History, Ticket, Database, Settings2, Sun, Moon, Download, RefreshCcw, Info, BarChart3, Zap, Layout, Rows, Play, ChevronRight, File, ExternalLink, Plus, Trash2, Keyboard, X, TrendingUp, Code, Layers } from 'lucide-react'
+import { Activity, AlertCircle, AlertTriangle, AppWindow, Bot, Check, CheckCircle2, ChevronDown, Circle, CircleDashed, Cpu, Eye, EyeOff, FileText, Folder, FolderTree, GitBranch, Loader2, ListChecks, MoreHorizontal, ShieldCheck, SignalHigh, SignalLow, SignalMedium, Square, Terminal, User, Users, Globe, Wrench, Clock, Search, LayoutDashboard, ListTodo, History, Ticket, Database, Settings2, Sun, Moon, Download, RefreshCcw, Info, BarChart3, Zap, Layout, Rows, Play, ChevronRight, File, ExternalLink, Plus, Trash2, Keyboard, X, TrendingUp, Code, Layers, Mic } from 'lucide-react'
 import * as Tooltip from '@radix-ui/react-tooltip'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -28,6 +28,8 @@ import {
   fetchIssueDiff,
   fetchIssueLogs,
   fetchIssueHistory,
+  fetchSTTHealth,
+  transcribeAudio,
   updateIssue,
   createGitHubPR,
   type BackendConfig,

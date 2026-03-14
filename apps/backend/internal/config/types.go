@@ -31,6 +31,10 @@ type Config struct {
 	TelemetryProviders       []string
 	TelemetryRetentionDays   int
 	TelemetryStoreRawPayload bool
+	STTWhisperBin            string
+	STTWhisperModelPath      string
+	STTWhisperThreads        int
+	STTWhisperLanguage       string
 }
 
 func (c Config) PortString() string {

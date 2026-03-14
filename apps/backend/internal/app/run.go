@@ -526,9 +526,9 @@ func processExecutionTick(
 
 	service.RecordRunSuccess(entry.IssueID, activeProviderName)
 
-	// Move issue to Done on successful completion
-	if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"state": "Done"}); err != nil {
-		logger.Warn().Err(err).Str("issue_id", entry.IssueID).Msg("failed to set issue to Done after success")
+	// Move issue to Review on successful completion
+	if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"state": "Review"}); err != nil {
+		logger.Warn().Err(err).Str("issue_id", entry.IssueID).Msg("failed to set issue to Review after success")
 	}
 
 	publishLifecycleEvent(pubsub, "run_succeeded", map[string]any{
@@ -541,7 +541,7 @@ func processExecutionTick(
 
 	runAfterHook()
 
-	logger.Info().Str("issue_id", entry.IssueID).Str("session_id", result.SessionID).Msg("agent run completed — issue moved to Done")
+	logger.Info().Str("issue_id", entry.IssueID).Str("session_id", result.SessionID).Msg("agent run completed — issue moved to Review")
 	publishSnapshot(pubsub, service)
 }
 

@@ -3,6 +3,7 @@ import {
   CircleDashed,
   Folder,
   FolderTree,
+  Github,
   Layout,
   Play,
   Plus,
@@ -392,6 +393,9 @@ export function KanbanBoard({
                           <span className="font-mono text-[11px] font-black uppercase tracking-tight text-primary/80 group-hover:text-primary transition-colors">
                             {item.issue_identifier}
                           </span>
+                          {item.url && typeof item.url === 'string' && item.url.includes('github.com') && (
+                            <Github size={10} className="text-muted-foreground/30" />
+                          )}
                           <div
                             data-no-drag="true"
                             className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all translate-x-1 group-hover:translate-x-0"
@@ -449,6 +453,11 @@ export function KanbanBoard({
                         <p className="mt-1.5 line-clamp-2 text-[12px] font-bold leading-[1.4] text-foreground/90 group-hover:text-foreground transition-colors">
                           {item.title || item.description || item.last_message || item.error || 'No message'}
                         </p>
+                        {projects.length > 1 && item.project_id && (
+                          <span className="mt-1 text-[9px] text-muted-foreground/30 font-medium truncate block">
+                            {projects.find(p => p.id === item.project_id)?.name}
+                          </span>
+                        )}
                         <div className="mt-3 flex items-center justify-between border-t border-border/40 pt-2.5 overflow-hidden">
                           <div data-no-drag="true" className="min-w-0">
                             <AgentSelector
@@ -456,7 +465,8 @@ export function KanbanBoard({
                               agents={availableAgents}
                               onChange={(value) => {
                                 if (onIssueUpdate) {
-                                   void onIssueUpdate(getActionIssueRef(item), { assignee_id: value })
+                                   const agentName = value.replace('agent-', '')
+                                   void onIssueUpdate(getActionIssueRef(item), { assignee_id: value, provider: agentName })
                                 }
                               }}
                             />

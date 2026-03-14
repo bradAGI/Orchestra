@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle2, FileText, History, Info, Loader2, Terminal } from 'lucide-react'
+import { CheckCircle2, FileText, Github, History, Info, Loader2, Terminal } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Prism } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -309,6 +309,16 @@ export function IssueDetailView({
                   {content}
                 </div>
               ))}
+              {typed.url && typeof typed.url === 'string' && (typed.url as string).includes('github.com') && (
+                <div className="px-4 py-3 border-b border-border/10">
+                  <label className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground/30 mb-1.5 block">GitHub</label>
+                  <a href={typed.url as string} target="_blank" rel="noopener noreferrer"
+                    className="text-xs text-primary/60 hover:text-primary flex items-center gap-1.5 transition-colors">
+                    <Github size={12} />
+                    {(typed.url as string).replace('https://github.com/', '')}
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         )}

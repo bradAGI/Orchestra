@@ -131,10 +131,23 @@ func (c *Client) SearchIssues(ctx context.Context, query string) ([]tracker.Issu
 func (c *Client) CreateIssue(ctx context.Context, title, description, state string, priority int, assigneeID, projectID string, provider string, disabledTools []string) (*tracker.Issue, error) {
 	id := uuid.New().String()
 
-	// Identifier generation: OPS-{max+1} so identifiers never repeat after deletion
+	// Identifier generation: use project name as prefix (e.g. FETCH-1, NUDGE-1)
+	prefix := "OPS"
+	if projectID != "" {
+		var projName string
+		_ = c.db.QueryRowContext(ctx, "SELECT name FROM projects WHERE id = ?", projectID).Scan(&projName)
+		if projName != "" {
+			// Uppercase, remove spaces, max 10 chars
+			clean := strings.ToUpper(strings.ReplaceAll(projName, " ", ""))
+			if len(clean) > 10 {
+				clean = clean[:10]
+			}
+			prefix = clean
+		}
+	}
 	var maxNum int
-	_ = c.db.QueryRowContext(ctx, "SELECT COALESCE(MAX(CAST(SUBSTR(identifier, 5) AS INTEGER)), 0) FROM issues WHERE identifier LIKE 'OPS-%'").Scan(&maxNum)
-	identifier := fmt.Sprintf("OPS-%d", maxNum+1)
+	_ = c.db.QueryRowContext(ctx, "SELECT COALESCE(MAX(CAST(SUBSTR(identifier, LENGTH(?) + 2) AS INTEGER)), 0) FROM issues WHERE identifier LIKE ? || '-%'", prefix, prefix).Scan(&maxNum)
+	identifier := fmt.Sprintf("%s-%d", prefix, maxNum+1)
 
 	disabledToolsStr := strings.Join(disabledTools, ",")
 

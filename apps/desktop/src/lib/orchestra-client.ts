@@ -97,6 +97,20 @@ export type GitHubPRResult = {
   [key: string]: unknown
 }
 
+export type STTHealth = {
+  ready: boolean
+  binary?: string
+  model?: string
+  language?: string
+  reason?: string
+}
+
+export type STTTranscriptionResult = {
+  text: string
+  elapsed_ms?: number
+  language?: string
+}
+
 class APIError extends Error {
   code: string
 
@@ -724,5 +738,22 @@ export async function createProjectGitHubPull(config: BackendConfig, projectId: 
 export async function disconnectProjectGitHub(config: BackendConfig, projectId: string): Promise<void> {
   await requestJSON<void>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/disconnect`, {
     method: 'POST',
+  })
+}
+
+export async function fetchSTTHealth(config: BackendConfig): Promise<STTHealth> {
+  return requestJSON<STTHealth>(config, '/api/v1/stt/health')
+}
+
+export async function transcribeAudio(config: BackendConfig, audio: Blob, language?: string): Promise<STTTranscriptionResult> {
+  const form = new FormData()
+  form.append('audio', audio, 'recording.webm')
+  if (language && language.trim() !== '') {
+    form.append('language', language.trim())
+  }
+
+  return requestJSON<STTTranscriptionResult>(config, '/api/v1/stt/transcribe', {
+    method: 'POST',
+    body: form,
   })
 }

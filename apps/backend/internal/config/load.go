@@ -57,6 +57,10 @@ func Load() (Config, error) {
 	telemetryProvidersRaw := getenvOrEmpty("ORCHESTRA_TELEMETRY_PROVIDERS")
 	telemetryRetentionDaysRaw := getenvOrEmpty("ORCHESTRA_TELEMETRY_RETENTION_DAYS")
 	telemetryStoreRawPayloadRaw := getenvOrEmpty("ORCHESTRA_TELEMETRY_STORE_RAW_PAYLOAD")
+	sttWhisperBin := getenvOrEmpty("ORCHESTRA_STT_WHISPER_BIN")
+	sttWhisperModelPath := getenvOrEmpty("ORCHESTRA_STT_WHISPER_MODEL")
+	sttWhisperThreadsRaw := getenvOrEmpty("ORCHESTRA_STT_WHISPER_THREADS")
+	sttWhisperLanguage := getenvOrDefault("ORCHESTRA_STT_WHISPER_LANGUAGE", "en")
 
 	workflowOverrides := loadWorkflowOverrides(strings.TrimSpace(workflowPath))
 	if host == "" {
@@ -218,6 +222,12 @@ func Load() (Config, error) {
 		}
 	}
 	telemetryStoreRawPayload := parseBoolWithDefault(telemetryStoreRawPayloadRaw, false)
+	sttWhisperThreads := 0
+	if strings.TrimSpace(sttWhisperThreadsRaw) != "" {
+		if parsed, err := strconv.Atoi(strings.TrimSpace(sttWhisperThreadsRaw)); err == nil && parsed > 0 {
+			sttWhisperThreads = parsed
+		}
+	}
 
 	return Config{
 		Host:                     strings.TrimSpace(host),
@@ -249,6 +259,10 @@ func Load() (Config, error) {
 		TelemetryProviders:       telemetryProviders,
 		TelemetryRetentionDays:   telemetryRetentionDays,
 		TelemetryStoreRawPayload: telemetryStoreRawPayload,
+		STTWhisperBin:            strings.TrimSpace(sttWhisperBin),
+		STTWhisperModelPath:      strings.TrimSpace(sttWhisperModelPath),
+		STTWhisperThreads:        sttWhisperThreads,
+		STTWhisperLanguage:       strings.TrimSpace(sttWhisperLanguage),
 	}, nil
 }
 
