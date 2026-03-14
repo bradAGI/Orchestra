@@ -101,9 +101,12 @@ func Run(logger zerolog.Logger) error {
 
 	cleanupTerminalWorkspaces(orchestratorService, trackerClient, workspaceService, cfg.WorkspaceHooks, logger)
 
-	go startGarbageCollector(orchestratorService, warehouseDB, cfg.WorkspaceRoot, logger)
+	go startGarbageCollector(orchestratorService, warehouseDB, cfg.WorkspaceRoot, cfg.TelemetryRetentionDays, logger)
 	go startRefreshWorker(orchestratorService, pubsub, logger)
-	go telemetry.StartWatcher(context.Background(), warehouseDB, cfg.ProjectRoots, logger)
+	go telemetry.StartWatcher(context.Background(), warehouseDB, cfg.ProjectRoots, telemetry.Options{
+		Providers:       cfg.TelemetryProviders,
+		StoreRawPayload: cfg.TelemetryStoreRawPayload,
+	}, logger)
 
 	toolExecutor := tools.NewLinearToolExecutor(trackerClient)
 	go startExecutionWorker(orchestratorService, agentRegistry, provider, cfg.AgentProvider, cfg.WorkspaceRoot, cfg.WorkflowFile, cfg.AgentMaxTurns, toolExecutor.Execute, tools.TrackerToolSpecs(), cfg.WorkspaceHooks, pubsub, warehouseDB, logger)
@@ -538,16 +541,19 @@ func cleanupTerminalWorkspaces(service *orchestrator.Service, trackerClient trac
 	}
 }
 
-func startGarbageCollector(service *orchestrator.Service, warehouseDB *db.DB, root string, logger zerolog.Logger) {
+func startGarbageCollector(service *orchestrator.Service, warehouseDB *db.DB, root string, retentionDays int, logger zerolog.Logger) {
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
+			if retentionDays <= 0 {
+				retentionDays = 7
+			}
 			// Prune old database events (keep 7 days)
 			if warehouseDB != nil {
-				affected, err := warehouseDB.PruneEvents(context.Background(), 7)
+				affected, err := warehouseDB.PruneEvents(context.Background(), retentionDays)
 				if err != nil {
 					logger.Warn().Err(err).Msg("database pruning failed")
 				} else if affected > 0 {

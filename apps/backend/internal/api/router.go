@@ -128,6 +128,7 @@ func NewRouterWithPubSub(
 	protected.Get("/api/v1/sessions/{session_id}", server.GetSessionDetail)
 	protected.Post("/api/v1/issues/{issue_identifier}/pr", server.CreateGitHubPR)
 	protected.Get("/api/v1/warehouse/stats", server.GetWarehouseStats)
+	protected.Get("/api/v1/telemetry/health", server.GetTelemetryHealth)
 	r.Get("/api/v1/github/login", server.HandleGitHubLogin)
 	r.Get("/api/v1/github/callback", server.HandleGitHubCallback)
 

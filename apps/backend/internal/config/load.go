@@ -54,6 +54,9 @@ func Load() (Config, error) {
 	githubClientID := getenvOrEmpty("ORCHESTRA_GITHUB_CLIENT_ID")
 	githubClientSecret := getenvOrEmpty("ORCHESTRA_GITHUB_CLIENT_SECRET")
 	mcpServersRaw := getenvOrEmpty("ORCHESTRA_MCP_SERVERS")
+	telemetryProvidersRaw := getenvOrEmpty("ORCHESTRA_TELEMETRY_PROVIDERS")
+	telemetryRetentionDaysRaw := getenvOrEmpty("ORCHESTRA_TELEMETRY_RETENTION_DAYS")
+	telemetryStoreRawPayloadRaw := getenvOrEmpty("ORCHESTRA_TELEMETRY_STORE_RAW_PAYLOAD")
 
 	workflowOverrides := loadWorkflowOverrides(strings.TrimSpace(workflowPath))
 	if host == "" {
@@ -204,6 +207,17 @@ func Load() (Config, error) {
 	trackerWorkerAssigneeIDs := parseStateList(trackerWorkerAssigneeIDsRaw)
 	projectRoots := parseStateList(projectRootsRaw)
 	mcpServers := parseMCPServers(mcpServersRaw)
+	telemetryProviders := parseStateList(telemetryProvidersRaw)
+	if len(telemetryProviders) == 0 {
+		telemetryProviders = []string{"claude", "codex", "gemini", "opencode"}
+	}
+	telemetryRetentionDays := 7
+	if strings.TrimSpace(telemetryRetentionDaysRaw) != "" {
+		if parsed, err := strconv.Atoi(strings.TrimSpace(telemetryRetentionDaysRaw)); err == nil && parsed > 0 {
+			telemetryRetentionDays = parsed
+		}
+	}
+	telemetryStoreRawPayload := parseBoolWithDefault(telemetryStoreRawPayloadRaw, false)
 
 	return Config{
 		Host:                     strings.TrimSpace(host),
@@ -228,10 +242,13 @@ func Load() (Config, error) {
 			BeforeRun:    strings.TrimSpace(workspaceBeforeRun),
 			AfterRun:     strings.TrimSpace(workspaceAfterRun),
 		},
-		ProjectRoots:       projectRoots,
-		GitHubClientID:     githubClientID,
-		GitHubClientSecret: githubClientSecret,
-		MCPServers:         mcpServers,
+		ProjectRoots:             projectRoots,
+		GitHubClientID:           githubClientID,
+		GitHubClientSecret:       githubClientSecret,
+		MCPServers:               mcpServers,
+		TelemetryProviders:       telemetryProviders,
+		TelemetryRetentionDays:   telemetryRetentionDays,
+		TelemetryStoreRawPayload: telemetryStoreRawPayload,
 	}, nil
 }
 
@@ -557,4 +574,19 @@ func parseStateConcurrencyMap(raw any) map[string]int {
 		return nil
 	}
 	return out
+}
+
+func parseBoolWithDefault(raw string, fallback bool) bool {
+	trimmed := strings.TrimSpace(strings.ToLower(raw))
+	if trimmed == "" {
+		return fallback
+	}
+	switch trimmed {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return fallback
+	}
 }

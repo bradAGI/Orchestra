@@ -28,6 +28,9 @@ type Config struct {
 	GitHubClientID           string
 	GitHubClientSecret       string
 	MCPServers               map[string]string // Name -> Command or URL
+	TelemetryProviders       []string
+	TelemetryRetentionDays   int
+	TelemetryStoreRawPayload bool
 }
 
 func (c Config) PortString() string {

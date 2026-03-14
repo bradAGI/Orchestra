@@ -12,7 +12,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,7 +28,107 @@ var (
 	piiIPRegex    = regexp.MustCompile(`\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b`)
 	piiKeyRegex   = regexp.MustCompile(`(?i)(api[_-]?key|secret|password|token)["'=\s:]+([a-zA-Z0-9_\-\.]{16,})`)
 	preambleRegex = regexp.MustCompile(`^(?i)(shadow\s*clone|blackops\s*session)[:-]?\s*`)
+	healthState   = newHealthState()
 )
+
+type Options struct {
+	Providers       []string
+	StoreRawPayload bool
+}
+
+type ProviderHealth struct {
+	Provider           string `json:"provider"`
+	LastSuccessAt      string `json:"last_success_at"`
+	SourcesScanned     int64  `json:"sources_scanned"`
+	EventsWritten      int64  `json:"events_written"`
+	EventsDropped      int64  `json:"events_dropped"`
+	ParseErrors        int64  `json:"parse_errors"`
+	LastScanDurationMs int64  `json:"last_scan_duration_ms"`
+}
+
+type HealthSnapshot struct {
+	LastTickAt string           `json:"last_tick_at"`
+	Providers  []ProviderHealth `json:"providers"`
+}
+
+type telemetryHealthState struct {
+	mu        sync.Mutex
+	lastTick  time.Time
+	providers map[string]*ProviderHealth
+}
+
+func newHealthState() *telemetryHealthState {
+	return &telemetryHealthState{providers: map[string]*ProviderHealth{}}
+}
+
+func (s *telemetryHealthState) beginTick() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.lastTick = time.Now().UTC()
+}
+
+func (s *telemetryHealthState) provider(provider string) *ProviderHealth {
+	if p, ok := s.providers[provider]; ok {
+		return p
+	}
+	p := &ProviderHealth{Provider: provider}
+	s.providers[provider] = p
+	return p
+}
+
+func (s *telemetryHealthState) addSource(provider string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p := s.provider(provider)
+	p.SourcesScanned++
+}
+
+func (s *telemetryHealthState) addEvent(provider string, count int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p := s.provider(provider)
+	p.EventsWritten += count
+}
+
+func (s *telemetryHealthState) addDropped(provider string, count int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p := s.provider(provider)
+	p.EventsDropped += count
+}
+
+func (s *telemetryHealthState) addParseError(provider string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p := s.provider(provider)
+	p.ParseErrors++
+}
+
+func (s *telemetryHealthState) markSuccess(provider string, started time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p := s.provider(provider)
+	p.LastSuccessAt = time.Now().UTC().Format(time.RFC3339)
+	p.LastScanDurationMs = time.Since(started).Milliseconds()
+}
+
+func (s *telemetryHealthState) snapshot() HealthSnapshot {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	providers := make([]ProviderHealth, 0, len(s.providers))
+	for _, p := range s.providers {
+		providers = append(providers, *p)
+	}
+	sort.Slice(providers, func(i, j int) bool { return providers[i].Provider < providers[j].Provider })
+	return HealthSnapshot{
+		LastTickAt: s.lastTick.Format(time.RFC3339),
+		Providers:  providers,
+	}
+}
+
+func Health() HealthSnapshot {
+	return healthState.snapshot()
+}
 
 func sanitizePII(text string) string {
 	if text == "" {
@@ -123,10 +225,11 @@ func extractTokens(raw map[string]interface{}) (input, output int) {
 }
 
 // StartWatcher begins watching external agent log directories
-func StartWatcher(ctx context.Context, database *db.DB, manualRoots []string, logger zerolog.Logger) {
+func StartWatcher(ctx context.Context, database *db.DB, manualRoots []string, opts Options, logger zerolog.Logger) {
 	if database == nil {
 		return
 	}
+	providerSet := normalizeProviderSet(opts.Providers)
 
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
@@ -138,32 +241,68 @@ func StartWatcher(ctx context.Context, database *db.DB, manualRoots []string, lo
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			healthState.beginTick()
 			// 0. History Files (to map sessions to projects)
-			processHistoryFile(ctx, database, filepath.Join(homeDir, ".claude", "history.jsonl"), "claude", logger)
-			processHistoryFile(ctx, database, filepath.Join(homeDir, ".codex", "history.jsonl"), "codex", logger)
-			processHistoryFile(ctx, database, filepath.Join(homeDir, ".gemini", "history.jsonl"), "gemini", logger)
+			if providerSet["claude"] {
+				processHistoryFile(ctx, database, filepath.Join(homeDir, ".claude", "history.jsonl"), "claude", logger)
+			}
+			if providerSet["codex"] {
+				processHistoryFile(ctx, database, filepath.Join(homeDir, ".codex", "history.jsonl"), "codex", logger)
+			}
+			if providerSet["gemini"] {
+				processHistoryFile(ctx, database, filepath.Join(homeDir, ".gemini", "history.jsonl"), "gemini", logger)
+			}
 
 			// 1. Claude Code
-			scanDirectory(ctx, database, manualRoots, filepath.Join(homeDir, ".claude", "projects"), "claude", logger)
-			scanDirectory(ctx, database, manualRoots, filepath.Join(homeDir, ".claude", "logs"), "claude", logger)
+			if providerSet["claude"] {
+				scanDirectory(ctx, database, manualRoots, filepath.Join(homeDir, ".claude", "projects"), "claude", opts, logger)
+				scanDirectory(ctx, database, manualRoots, filepath.Join(homeDir, ".claude", "logs"), "claude", opts, logger)
+			}
 
 			// 2. Codex
-			scanDirectory(ctx, database, manualRoots, filepath.Join(homeDir, ".codex", "sessions"), "codex", logger)
-			scanDirectory(ctx, database, manualRoots, filepath.Join(homeDir, ".codex", "log"), "codex", logger)
+			if providerSet["codex"] {
+				scanDirectory(ctx, database, manualRoots, filepath.Join(homeDir, ".codex", "sessions"), "codex", opts, logger)
+				scanDirectory(ctx, database, manualRoots, filepath.Join(homeDir, ".codex", "log"), "codex", opts, logger)
+			}
 
 			// 3. OpenCode
-			scanDirectory(ctx, database, manualRoots, filepath.Join(homeDir, ".opencode", "logs"), "opencode", logger)
-			scanDirectory(ctx, database, manualRoots, filepath.Join(homeDir, ".opencode", "sessions"), "opencode", logger)
+			if providerSet["opencode"] {
+				scanDirectory(ctx, database, manualRoots, filepath.Join(homeDir, ".opencode", "logs"), "opencode", opts, logger)
+				scanDirectory(ctx, database, manualRoots, filepath.Join(homeDir, ".opencode", "sessions"), "opencode", opts, logger)
+			}
 
 			// 4. Gemini CLI
-			scanDirectory(ctx, database, manualRoots, filepath.Join(homeDir, ".gemini", "logs"), "gemini", logger)
-			scanDirectory(ctx, database, manualRoots, filepath.Join(homeDir, ".gemini", "sessions"), "gemini", logger)
-			scanGeminiJSON(ctx, database, manualRoots, filepath.Join(homeDir, ".gemini"), logger)
+			if providerSet["gemini"] {
+				scanDirectory(ctx, database, manualRoots, filepath.Join(homeDir, ".gemini", "logs"), "gemini", opts, logger)
+				scanDirectory(ctx, database, manualRoots, filepath.Join(homeDir, ".gemini", "sessions"), "gemini", opts, logger)
+				scanGeminiJSON(ctx, database, manualRoots, filepath.Join(homeDir, ".gemini"), opts, logger)
+			}
 
 			// 5. OpenCode
-			scanOpenCodeSQLite(ctx, database, manualRoots, filepath.Join(homeDir, ".local", "share", "opencode", "opencode.db"), logger)
+			if providerSet["opencode"] {
+				scanOpenCodeSQLite(ctx, database, manualRoots, filepath.Join(homeDir, ".local", "share", "opencode", "opencode.db"), opts, logger)
+			}
 		}
 	}
+}
+
+func normalizeProviderSet(providers []string) map[string]bool {
+	defaultSet := map[string]bool{"claude": true, "codex": true, "gemini": true, "opencode": true}
+	if len(providers) == 0 {
+		return defaultSet
+	}
+	set := map[string]bool{}
+	for _, provider := range providers {
+		trimmed := strings.ToLower(strings.TrimSpace(provider))
+		if trimmed == "" {
+			continue
+		}
+		set[trimmed] = true
+	}
+	if len(set) == 0 {
+		return defaultSet
+	}
+	return set
 }
 
 type geminiChatFile struct {
@@ -191,23 +330,26 @@ type geminiLogEntry struct {
 	Timestamp string `json:"timestamp"`
 }
 
-func scanGeminiJSON(ctx context.Context, database *db.DB, manualRoots []string, geminiHome string, logger zerolog.Logger) {
+func scanGeminiJSON(ctx context.Context, database *db.DB, manualRoots []string, geminiHome string, opts Options, logger zerolog.Logger) {
+	started := time.Now()
+	healthState.addSource("gemini")
 	aliasMap := loadGeminiProjectAliases(filepath.Join(geminiHome, "projects.json"))
 
 	tmpRoot := filepath.Join(geminiHome, "tmp")
 	chatGlobs, _ := filepath.Glob(filepath.Join(tmpRoot, "*", "chats", "session-*.json"))
 	for _, chatFile := range chatGlobs {
 		if shouldProcessJSONFile(ctx, database, chatFile) {
-			processGeminiChatFile(ctx, database, manualRoots, aliasMap, chatFile, logger)
+			processGeminiChatFile(ctx, database, manualRoots, aliasMap, chatFile, opts, logger)
 		}
 	}
 
 	logGlobs, _ := filepath.Glob(filepath.Join(tmpRoot, "*", "logs.json"))
 	for _, logFile := range logGlobs {
 		if shouldProcessJSONFile(ctx, database, logFile) {
-			processGeminiLogsFile(ctx, database, manualRoots, aliasMap, logFile, logger)
+			processGeminiLogsFile(ctx, database, manualRoots, aliasMap, logFile, opts, logger)
 		}
 	}
+	healthState.markSuccess("gemini", started)
 }
 
 func loadGeminiProjectAliases(projectsPath string) map[string]string {
@@ -240,13 +382,21 @@ func shouldProcessJSONFile(ctx context.Context, database *db.DB, filePath string
 		return false
 	}
 
-	lastSeen := getOffset(ctx, database, filePath)
-	return info.ModTime().UnixNano() > lastSeen
+	lastMtime := getOffset(ctx, database, filePath+":mtime")
+	lastSize := getOffset(ctx, database, filePath+":size")
+	currentMtime := info.ModTime().UnixNano()
+	currentSize := info.Size()
+
+	if currentMtime > lastMtime {
+		return true
+	}
+	return currentSize != lastSize
 }
 
 func saveJSONFileCheckpoint(ctx context.Context, database *db.DB, filePath string) {
 	if info, err := os.Stat(filePath); err == nil {
-		saveOffset(ctx, database, filePath, info.ModTime().UnixNano())
+		saveOffset(ctx, database, filePath+":mtime", info.ModTime().UnixNano())
+		saveOffset(ctx, database, filePath+":size", info.Size())
 	}
 }
 
@@ -274,14 +424,16 @@ func resolveGeminiProject(ctx context.Context, database *db.DB, manualRoots []st
 	return projectID
 }
 
-func processGeminiChatFile(ctx context.Context, database *db.DB, manualRoots []string, aliasMap map[string]string, filePath string, logger zerolog.Logger) {
+func processGeminiChatFile(ctx context.Context, database *db.DB, manualRoots []string, aliasMap map[string]string, filePath string, opts Options, logger zerolog.Logger) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
+		healthState.addParseError("gemini")
 		return
 	}
 
 	var chat geminiChatFile
 	if err := json.Unmarshal(data, &chat); err != nil {
+		healthState.addParseError("gemini")
 		return
 	}
 
@@ -322,7 +474,12 @@ func processGeminiChatFile(ctx context.Context, database *db.DB, manualRoots []s
 		}
 
 		raw, _ := json.Marshal(msg)
-		_ = database.RecordEvent(ctx, eventID, chat.SessionID, kind, sanitizePII(message), raw, msg.Tokens.Input, msg.Tokens.Output, ts)
+		rawPayload := raw
+		if !opts.StoreRawPayload {
+			rawPayload = nil
+		}
+		_ = database.RecordEvent(ctx, eventID, chat.SessionID, kind, sanitizePII(message), rawPayload, msg.Tokens.Input, msg.Tokens.Output, ts)
+		healthState.addEvent("gemini", 1)
 	}
 
 	saveJSONFileCheckpoint(ctx, database, filePath)
@@ -350,14 +507,16 @@ func geminiContentText(content any) string {
 	}
 }
 
-func processGeminiLogsFile(ctx context.Context, database *db.DB, manualRoots []string, aliasMap map[string]string, filePath string, logger zerolog.Logger) {
+func processGeminiLogsFile(ctx context.Context, database *db.DB, manualRoots []string, aliasMap map[string]string, filePath string, opts Options, logger zerolog.Logger) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
+		healthState.addParseError("gemini")
 		return
 	}
 
 	var entries []geminiLogEntry
 	if err := json.Unmarshal(data, &entries); err != nil {
+		healthState.addParseError("gemini")
 		return
 	}
 
@@ -381,13 +540,20 @@ func processGeminiLogsFile(ctx context.Context, database *db.DB, manualRoots []s
 			kind = "log"
 		}
 		raw, _ := json.Marshal(entry)
-		_ = database.RecordEvent(ctx, eventID, entry.SessionID, kind, sanitizePII(entry.Message), raw, 0, 0, ts)
+		rawPayload := raw
+		if !opts.StoreRawPayload {
+			rawPayload = nil
+		}
+		_ = database.RecordEvent(ctx, eventID, entry.SessionID, kind, sanitizePII(entry.Message), rawPayload, 0, 0, ts)
+		healthState.addEvent("gemini", 1)
 	}
 
 	saveJSONFileCheckpoint(ctx, database, filePath)
 }
 
-func scanOpenCodeSQLite(ctx context.Context, database *db.DB, manualRoots []string, dbPath string, logger zerolog.Logger) {
+func scanOpenCodeSQLite(ctx context.Context, database *db.DB, manualRoots []string, dbPath string, opts Options, logger zerolog.Logger) {
+	started := time.Now()
+	healthState.addSource("opencode")
 	if _, err := os.Stat(dbPath); err != nil {
 		return
 	}
@@ -399,8 +565,8 @@ func scanOpenCodeSQLite(ctx context.Context, database *db.DB, manualRoots []stri
 	}
 	defer extDB.Close()
 
-	messageCheckpointKey := "opencode:message:time_created"
-	partCheckpointKey := "opencode:part:time_created"
+	messageCheckpointKey := "opencode:message:rowid"
+	partCheckpointKey := "opencode:part:rowid"
 	lastMessage := getOffset(ctx, database, messageCheckpointKey)
 	lastPart := getOffset(ctx, database, partCheckpointKey)
 
@@ -408,22 +574,23 @@ func scanOpenCodeSQLite(ctx context.Context, database *db.DB, manualRoots []stri
 	maxPart := lastPart
 
 	msgRows, err := extDB.QueryContext(ctx, `
-		SELECT m.id, m.session_id, m.time_created, m.data, COALESCE(s.directory, '')
+		SELECT m.rowid, m.id, m.session_id, m.time_created, m.data, COALESCE(s.directory, '')
 		FROM message m
 		LEFT JOIN session s ON s.id = m.session_id
-		WHERE m.time_created > ?
-		ORDER BY m.time_created ASC
+		WHERE m.rowid > ?
+		ORDER BY m.rowid ASC
 	`, lastMessage)
 	if err == nil {
 		defer msgRows.Close()
 		for msgRows.Next() {
 			var messageID, sessionID, dataJSON, directory string
-			var createdAt int64
-			if err := msgRows.Scan(&messageID, &sessionID, &createdAt, &dataJSON, &directory); err != nil {
+			var createdAt, rowID int64
+			if err := msgRows.Scan(&rowID, &messageID, &sessionID, &createdAt, &dataJSON, &directory); err != nil {
+				healthState.addParseError("opencode")
 				continue
 			}
-			if createdAt > maxMessage {
-				maxMessage = createdAt
+			if rowID > maxMessage {
+				maxMessage = rowID
 			}
 
 			projectID := ""
@@ -436,6 +603,7 @@ func scanOpenCodeSQLite(ctx context.Context, database *db.DB, manualRoots []stri
 
 			var payload map[string]any
 			if err := json.Unmarshal([]byte(dataJSON), &payload); err != nil {
+				healthState.addParseError("opencode")
 				continue
 			}
 
@@ -456,27 +624,33 @@ func scanOpenCodeSQLite(ctx context.Context, database *db.DB, manualRoots []stri
 			timestamp := msEpochToRFC3339(createdAt)
 			eventHash := sha256.Sum256([]byte("opencode-message:" + messageID))
 			eventID := hex.EncodeToString(eventHash[:16])
-			_ = database.RecordEvent(ctx, eventID, sessionID, kind, sanitizePII(msg), []byte(dataJSON), inputTokens, outputTokens, timestamp)
+			rawPayload := []byte(dataJSON)
+			if !opts.StoreRawPayload {
+				rawPayload = nil
+			}
+			_ = database.RecordEvent(ctx, eventID, sessionID, kind, sanitizePII(msg), rawPayload, inputTokens, outputTokens, timestamp)
+			healthState.addEvent("opencode", 1)
 		}
 	}
 
 	partRows, err := extDB.QueryContext(ctx, `
-		SELECT p.id, p.session_id, p.time_created, p.data, COALESCE(s.directory, '')
+		SELECT p.rowid, p.id, p.session_id, p.time_created, p.data, COALESCE(s.directory, '')
 		FROM part p
 		LEFT JOIN session s ON s.id = p.session_id
-		WHERE p.time_created > ?
-		ORDER BY p.time_created ASC
+		WHERE p.rowid > ?
+		ORDER BY p.rowid ASC
 	`, lastPart)
 	if err == nil {
 		defer partRows.Close()
 		for partRows.Next() {
 			var partID, sessionID, dataJSON, directory string
-			var createdAt int64
-			if err := partRows.Scan(&partID, &sessionID, &createdAt, &dataJSON, &directory); err != nil {
+			var createdAt, rowID int64
+			if err := partRows.Scan(&rowID, &partID, &sessionID, &createdAt, &dataJSON, &directory); err != nil {
+				healthState.addParseError("opencode")
 				continue
 			}
-			if createdAt > maxPart {
-				maxPart = createdAt
+			if rowID > maxPart {
+				maxPart = rowID
 			}
 
 			projectID := ""
@@ -489,6 +663,7 @@ func scanOpenCodeSQLite(ctx context.Context, database *db.DB, manualRoots []stri
 
 			var payload map[string]any
 			if err := json.Unmarshal([]byte(dataJSON), &payload); err != nil {
+				healthState.addParseError("opencode")
 				continue
 			}
 
@@ -504,7 +679,12 @@ func scanOpenCodeSQLite(ctx context.Context, database *db.DB, manualRoots []stri
 			timestamp := msEpochToRFC3339(createdAt)
 			eventHash := sha256.Sum256([]byte("opencode-part:" + partID))
 			eventID := hex.EncodeToString(eventHash[:16])
-			_ = database.RecordEvent(ctx, eventID, sessionID, "part_"+kind, sanitizePII(message), []byte(dataJSON), 0, 0, timestamp)
+			rawPayload := []byte(dataJSON)
+			if !opts.StoreRawPayload {
+				rawPayload = nil
+			}
+			_ = database.RecordEvent(ctx, eventID, sessionID, "part_"+kind, sanitizePII(message), rawPayload, 0, 0, timestamp)
+			healthState.addEvent("opencode", 1)
 		}
 	}
 
@@ -514,6 +694,7 @@ func scanOpenCodeSQLite(ctx context.Context, database *db.DB, manualRoots []stri
 	if maxPart > lastPart {
 		saveOffset(ctx, database, partCheckpointKey, maxPart)
 	}
+	healthState.markSuccess("opencode", started)
 }
 
 func extractOpenCodeTokens(payload map[string]any) (int, int) {
@@ -553,7 +734,9 @@ func msEpochToRFC3339(ms int64) string {
 	return time.UnixMilli(ms).UTC().Format(time.RFC3339)
 }
 
-func scanDirectory(ctx context.Context, database *db.DB, manualRoots []string, dir string, provider string, logger zerolog.Logger) {
+func scanDirectory(ctx context.Context, database *db.DB, manualRoots []string, dir string, provider string, opts Options, logger zerolog.Logger) {
+	started := time.Now()
+	healthState.addSource(provider)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return
 	}
@@ -573,9 +756,10 @@ func scanDirectory(ctx context.Context, database *db.DB, manualRoots []string, d
 			return nil
 		}
 
-		processFile(ctx, database, manualRoots, path, provider, logger)
+		processFile(ctx, database, manualRoots, path, provider, opts, logger)
 		return nil
 	})
+	healthState.markSuccess(provider, started)
 }
 
 func getOffset(ctx context.Context, database *db.DB, path string) int64 {
@@ -800,7 +984,7 @@ func processHistoryFile(ctx context.Context, database *db.DB, path string, provi
 	saveOffset(ctx, database, path, bytesRead)
 }
 
-func processFile(ctx context.Context, database *db.DB, manualRoots []string, path string, provider string, logger zerolog.Logger) {
+func processFile(ctx context.Context, database *db.DB, manualRoots []string, path string, provider string, opts Options, logger zerolog.Logger) {
 	fileInfo, err := os.Stat(path)
 	if err != nil {
 		return
@@ -858,9 +1042,15 @@ func processFile(ctx context.Context, database *db.DB, manualRoots []string, pat
 				kind := stripPreamble(entry.Type)
 
 				input, output := extractTokens(raw)
-				_ = database.RecordEvent(ctx, eventID, sid, kind, msg, []byte(line), input, output, entry.Timestamp)
+				rawPayload := []byte(line)
+				if !opts.StoreRawPayload {
+					rawPayload = nil
+				}
+				_ = database.RecordEvent(ctx, eventID, sid, kind, msg, rawPayload, input, output, entry.Timestamp)
+				healthState.addEvent(provider, 1)
 			}
 		} else {
+			healthState.addParseError(provider)
 			// Fallback for plain text .log files
 			if len(strings.TrimSpace(line)) > 0 {
 				_ = database.RecordSession(ctx, fallbackSessionID, projectID, "", fallbackSessionID, provider, "unknown")
@@ -869,7 +1059,12 @@ func processFile(ctx context.Context, database *db.DB, manualRoots []string, pat
 				if strings.Contains(strings.ToLower(line), "error") {
 					kind = "error"
 				}
-				_ = database.RecordEvent(ctx, eventID, fallbackSessionID, kind, sanitizePII(line), []byte(line), 0, 0, time.Now().Format(time.RFC3339))
+				rawPayload := []byte(line)
+				if !opts.StoreRawPayload {
+					rawPayload = nil
+				}
+				_ = database.RecordEvent(ctx, eventID, fallbackSessionID, kind, sanitizePII(line), rawPayload, 0, 0, time.Now().Format(time.RFC3339))
+				healthState.addEvent(provider, 1)
 			}
 		}
 	}
