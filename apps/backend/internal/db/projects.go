@@ -198,6 +198,7 @@ type Project struct {
 	GitHubOwner string `json:"github_owner"`
 	GitHubRepo  string `json:"github_repo"`
 	GitHubToken string `json:"github_token"`
+	PathExists  bool   `json:"path_exists"`
 }
 
 type ProjectStats struct {

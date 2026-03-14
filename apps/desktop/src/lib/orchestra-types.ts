@@ -100,6 +100,7 @@ export type Project = {
   github_owner?: string
   github_repo?: string
   github_token?: string
+  path_exists?: boolean
 }
 
 export type ProjectStats = {

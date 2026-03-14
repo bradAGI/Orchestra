@@ -164,6 +164,9 @@ func (s *Server) GetProjects(w http.ResponseWriter, r *http.Request) {
 
 	for i := range projects {
 		projects[i].GitHubToken = redactProjectToken(projects[i].GitHubToken)
+		if info, err := os.Stat(projects[i].RootPath); err == nil && info.IsDir() {
+			projects[i].PathExists = true
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

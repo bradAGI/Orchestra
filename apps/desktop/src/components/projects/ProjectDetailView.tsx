@@ -171,6 +171,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
 
         if (!config || !project.id) return
         if (activeTab === 'overview' || activeTab === 'tasks' || activeTab === 'terminal') return
+        if (!pathExists) return
 
         const loadTabData = async () => {
             setLoadingTab(true)
@@ -315,12 +316,13 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         }
     }
 
+    const pathExists = project.path_exists !== false
     const tabs = [
-        { id: 'overview', label: 'Overview', icon: <Layers size={14} /> },
-        { id: 'tasks', label: 'Board', icon: <CodeIcon size={14} /> },
-        { id: 'files', label: 'Files', icon: <FileText size={14} /> },
-        { id: 'git', label: 'Git', icon: <GitBranch size={14} /> },
-        { id: 'terminal', label: 'Terminal', icon: <Terminal size={14} /> },
+        { id: 'overview', label: 'Overview', icon: <Layers size={14} />, needsPath: false },
+        { id: 'tasks', label: 'Board', icon: <CodeIcon size={14} />, needsPath: false },
+        { id: 'files', label: 'Files', icon: <FileText size={14} />, needsPath: true },
+        { id: 'git', label: 'Git', icon: <GitBranch size={14} />, needsPath: true },
+        { id: 'terminal', label: 'Terminal', icon: <Terminal size={14} />, needsPath: true },
     ] as const
 
     const osOptions = useMemo(() => ({
@@ -502,20 +504,26 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
 
                 {/* Tabs */}
                 <div className="flex gap-1">
-                    {tabs.map((tab) => (
-                        <AppTooltip key={tab.id} content={`View project ${tab.label}`}>
-                            <button
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === tab.id
-                                    ? 'border-primary text-primary'
-                                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                    {tabs.map((tab) => {
+                        const disabled = tab.needsPath && !pathExists
+                        return (
+                            <AppTooltip key={tab.id} content={disabled ? `${tab.label} unavailable — project path not found on disk` : `View project ${tab.label}`}>
+                                <button
+                                    onClick={() => !disabled && setActiveTab(tab.id)}
+                                    className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-bold uppercase tracking-widest transition-all ${
+                                        disabled
+                                            ? 'border-transparent text-muted-foreground/30 cursor-not-allowed'
+                                            : activeTab === tab.id
+                                                ? 'border-primary text-primary'
+                                                : 'border-transparent text-muted-foreground hover:text-foreground'
                                     }`}
-                            >
-                                {tab.icon}
-                                {tab.label}
-                            </button>
-                        </AppTooltip>
-                    ))}
+                                >
+                                    {tab.icon}
+                                    {tab.label}
+                                </button>
+                            </AppTooltip>
+                        )
+                    })}
                 </div>
             </div>
 
@@ -528,6 +536,16 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                 <div className="p-8 min-h-full flex flex-col">
                     {activeTab === 'overview' && (
                         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 flex-1">
+                            {!pathExists && (
+                                <div className="flex items-center gap-3 mb-6 p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 text-amber-400">
+                                    <AlertCircle size={18} className="shrink-0" />
+                                    <div>
+                                        <p className="text-sm font-bold">Project path not found on disk</p>
+                                        <p className="text-xs text-amber-400/70 mt-0.5 font-mono">{project.root_path}</p>
+                                        <p className="text-xs text-amber-400/60 mt-1">Files, Git, and Terminal tabs are unavailable. Session history and task data are still accessible.</p>
+                                    </div>
+                                </div>
+                            )}
                             {/* Stats Grid */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                                 <StatCard title="Total Sessions" value={stats?.total_sessions || 0} icon={<History size={20} />} color="blue" />
