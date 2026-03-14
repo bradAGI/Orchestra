@@ -514,6 +514,27 @@ func (s *Server) GetArtifactContent(w http.ResponseWriter, r *http.Request) {
 func (s *Server) GetIssueDiff(w http.ResponseWriter, r *http.Request) {
 	identifier := chi.URLParam(r, "issue_identifier")
 	provider := r.URL.Query().Get("provider")
+
+	// Try the project directory first (agents run in the actual project)
+	if s.db != nil {
+		issues, searchErr := s.orchestrator.SearchIssues(r.Context(), identifier)
+		if searchErr == nil && len(issues) > 0 && issues[0].ProjectID != "" {
+			project, projErr := s.db.GetProjectByID(r.Context(), issues[0].ProjectID)
+			if projErr == nil && project.RootPath != "" && filepath.IsAbs(project.RootPath) {
+				cmd := exec.CommandContext(r.Context(), "git", "diff", "HEAD")
+				cmd.Dir = project.RootPath
+				out, gitErr := cmd.CombinedOutput()
+				if gitErr == nil && len(out) > 0 {
+					w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+					w.WriteHeader(http.StatusOK)
+					_, _ = w.Write(out)
+					return
+				}
+			}
+		}
+	}
+
+	// Fallback to workspace-based diff
 	diff, err := s.orchestrator.GetDiff(identifier, provider)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "diff_failed", err.Error())

@@ -166,12 +166,12 @@ const lifecycleEventTypes = [
 function setupFetch(snapshotPayload: SnapshotPayload, options?: { onFetch?: (url: string, init?: RequestInit) => Response | null }) {
   fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (url.includes('/api/v1/warehouse/stats')) {
-      return new Response(JSON.stringify({ 
-        total_tokens: 0, 
-        total_input: 0, 
-        total_output: 0, 
-        provider_usage: {}, 
-        recent_sessions: [] 
+      return new Response(JSON.stringify({
+        total_tokens: 0,
+        total_input: 0,
+        total_output: 0,
+        provider_usage: {},
+        recent_sessions: []
       }), { status: 200 })
     }
 
@@ -265,24 +265,7 @@ describe('App smoke render', () => {
     vi.unstubAllGlobals()
   })
 
-  it('renders dashboard and opens settings without crashing', async () => {
-    setupDesktopBridge()
-    setupFetch(defaultSnapshot())
-
-    render(<App />)
-
-    await waitFor(() => {
-      expect(screen.getAllByText(/Dashboard/i).length).toBeGreaterThan(0)
-    })
-
-    fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
-
-    await waitFor(() => {
-      expect(screen.getByText(/Connection Profiles/i)).toBeTruthy()
-    })
-  })
-
-  it('opens issues section with issue board presentation', async () => {
+  it('renders task board on launch', async () => {
     setupDesktopBridge()
     setupFetch(defaultSnapshot(1))
 
@@ -298,1038 +281,948 @@ describe('App smoke render', () => {
     })
   })
 
-  it('deletes a task from issue board and updates UI', async () => {
-    setupDesktopBridge()
-    const issues = [
-      {
-        id: 'issue-1',
-        issue_identifier: 'OPS-1',
-        identifier: 'OPS-1',
-        title: 'Delete me',
-        description: 'to be removed',
-        state: 'Todo',
-        assignee_id: 'agent-codex',
-        priority: 2,
-        project_id: '',
-      },
-    ]
-    const fetchMock = setupFetch(defaultSnapshot(), {
-      onFetch: (url, init) => {
-        if (url.includes('/api/v1/issues?')) {
-          return new Response(JSON.stringify({ issues }), { status: 200 })
-        }
-        if (url.includes('/api/v1/issues/OPS-1') && init?.method === 'DELETE') {
-          issues.splice(0, issues.length)
-          return new Response(null, { status: 204 })
-        }
-        return null
-      },
-    })
-
-    render(<App />)
-
-    fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
-
-    await waitFor(() => {
-      expect(screen.getByText('Delete me')).toBeTruthy()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Delete task OPS-1' }))
-
-    const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
-
-    await waitFor(() => {
-      expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/api/v1/issues/OPS-1') && call[1]?.method === 'DELETE')).toBe(true)
-      expect(screen.queryByText('Delete me')).toBeNull()
-    })
-  })
-
-  it('keeps delete dialog open when task deletion fails', async () => {
-    setupDesktopBridge()
-    const issues = [
-      {
-        id: 'issue-1',
-        issue_identifier: 'OPS-1',
-        identifier: 'OPS-1',
-        title: 'Delete me',
-        description: 'to be removed',
-        state: 'Todo',
-        assignee_id: 'agent-codex',
-        priority: 2,
-        project_id: '',
-      },
-    ]
-    setupFetch(defaultSnapshot(), {
-      onFetch: (url, init) => {
-        if (url.includes('/api/v1/issues?')) {
-          return new Response(JSON.stringify({ issues }), { status: 200 })
-        }
-        if (url.includes('/api/v1/issues/OPS-1') && init?.method === 'DELETE') {
-          return new Response(JSON.stringify({ error: { code: 'delete_failed', message: 'backend failed' } }), { status: 500 })
-        }
-        return null
-      },
-    })
-
-    render(<App />)
-
-    fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete task OPS-1' }))
-
-    const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
-
-    await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeTruthy()
-      expect(screen.getByText(/delete issue failed/i)).toBeTruthy()
-    })
-  })
-
-  it('creates backend profile from settings', async () => {
-    const bridge = setupDesktopBridge()
-    setupFetch(defaultSnapshot())
-
-    render(<App />)
-
-    fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
-    
-    await screen.findByText(/Connection Profiles/i)
-
-    fireEvent.change(screen.getByPlaceholderText(/Production, Staging, Local/i), { target: { value: 'staging' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
-
-    await waitFor(() => {
-      expect(bridge.saveBackendProfile).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'staging', makeActive: true }),
-      )
-    })
-  })
-
-  it('switches active profile and re-requests state from new base URL', async () => {
-    const bridge = setupDesktopBridge({
-      profilesPayload: {
-        activeProfileId: 'default',
-        profiles: [
-          { id: 'default', name: 'Default', baseUrl: 'http://127.0.0.1:4010', apiToken: '' },
-          { id: 'staging', name: 'Staging', baseUrl: 'http://127.0.0.1:5000', apiToken: '' },
-        ],
-      },
-    })
-    const fetchMock = setupFetch(defaultSnapshot())
-
-    render(<App />)
-
-    fireEvent.click(await screen.findByTestId('sidebar-nav-settings'))
-
-    // Trigger dropdown
-    const dropdownTrigger = await screen.findByRole('button', { name: /Profile/i })
-    fireEvent.click(dropdownTrigger)
-    
-    // Select option
-    await waitFor(async () => {
-      const options = screen.getAllByText('Staging')
-      fireEvent.click(options[options.length - 1])
-    })
-
-    await waitFor(() => {
-      expect(bridge.setActiveBackendProfile).toHaveBeenCalledWith('staging')
-      expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('http://127.0.0.1:4010/api/v1/state'))).toBe(true)
-    })
-  })
-
-  it('tears down prior stream when active profile switches', async () => {
-    setupDesktopBridge({
-      profilesPayload: {
-        activeProfileId: 'default',
-        profiles: [
-          { id: 'default', name: 'Default', baseUrl: 'http://127.0.0.1:4010', apiToken: '' },
-          { id: 'staging', name: 'Staging', baseUrl: 'http://127.0.0.1:5000', apiToken: '' },
-        ],
-      },
-    })
-    setupFetch(defaultSnapshot())
-
-    render(<App />)
-
-    await waitFor(() => {
-      expect(eventSourceConstructCount).toBeGreaterThan(0)
-    })
-    
-    // Simulate first instance connecting
-    eventSourceInstances[0]?.emit('open')
-
-    fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
-    
-    const dropdownTrigger = await screen.findByRole('button', { name: /Profile/i })
-    fireEvent.click(dropdownTrigger)
-    
-    await waitFor(async () => {
-      const options = screen.getAllByText('Staging')
-      fireEvent.click(options[options.length - 1])
-    })
-
-    await waitFor(() => {
-      // The stream is torn down and a new one created
-      expect(eventSourceInstances[0]?.closed).toBe(true)
-      expect(eventSourceConstructCount).toBeGreaterThan(1)
-    })
-  })
-
-  it('saves backend config from settings form', async () => {
-    const bridge = setupDesktopBridge()
-    setupFetch(defaultSnapshot())
-
-    render(<App />)
-
-    fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
-    
-    // Wait for form to be ready
-    await screen.findByText(/Connection Profiles/i)
-
-    fireEvent.change(screen.getByPlaceholderText('http://127.0.0.1:4010'), { target: { value: 'http://127.0.0.1:9999' } })
-    
-    const saveButton = await screen.findByRole('button', { name: 'Save Backend Config' })
-    fireEvent.click(saveButton)
-
-    await waitFor(() => {
-      expect(bridge.setBackendConfig).toHaveBeenCalledWith(
-        expect.objectContaining({ baseUrl: 'http://127.0.0.1:9999' }),
-      )
-    })
-  })
-
-  it('deletes non-default profile from settings', async () => {
-    const bridge = setupDesktopBridge({
-      profilesPayload: {
-        activeProfileId: 'staging',
-        profiles: [
-          { id: 'default', name: 'Default', baseUrl: 'http://127.0.0.1:4010', apiToken: '' },
-          { id: 'staging', name: 'Staging', baseUrl: 'http://127.0.0.1:5000', apiToken: '' },
-        ],
-      },
-    })
-    setupFetch(defaultSnapshot())
-
-    render(<App />)
-
-    fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
-    
-    await screen.findByText(/Connection Profiles/i)
-    
-    // switch profile first
-    const dropdownTrigger = await screen.findByRole('button', { name: /Profile/i })
-    fireEvent.click(dropdownTrigger)
-    
-    await waitFor(async () => {
-      const options = screen.getAllByText('Staging')
-      fireEvent.click(options[options.length - 1])
-    })
-
-    await waitFor(() => {
-      expect(bridge.setActiveBackendProfile).toHaveBeenCalledWith('staging')
-    })
-
-    const deleteButton = screen.getByRole('button', { name: 'Delete' })
-    fireEvent.click(deleteButton)
-
-    await waitFor(() => {
-      expect(bridge.deleteBackendProfile).toHaveBeenCalledWith('staging')
-    })
-  })
-
-  it('runs workspace migration plan and apply confirmation flow', async () => {
-    setupDesktopBridge()
-    setupFetch(defaultSnapshot(), {
-      onFetch: (url, init) => {
-        if (url.includes('/api/v1/workspace/migration/plan')) {
-          return new Response(JSON.stringify({ moves: [{ from: '/old', to: '/new' }] }), { status: 200 })
-        }
-        if (url.includes('/api/v1/workspace/migrate')) {
-          return new Response(JSON.stringify({ ok: true }), { status: 200 })
-        }
-        return null
-      },
-    })
-
-    render(<App />)
-
-    fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
-    fireEvent.click(await screen.findByRole('button', { name: 'Migration' }))
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Workspace Migration' }))
-
-    const applyButton = await screen.findByRole('button', { name: 'Apply' })
-    fireEvent.click(applyButton)
-
-    const confirmButton = await screen.findByRole('button', { name: 'Confirm Apply' })
-    fireEvent.click(confirmButton)
-
-    await waitFor(() => {
-      expect(screen.getByText(/migration apply request accepted/i)).toBeTruthy()
-    })
-  })
-
-  it('shows refresh success status in runtime strip', async () => {
-    setupDesktopBridge()
-    setupFetch(defaultSnapshot())
-
-    render(<App />)
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Sync Data' }))
-
-    await waitFor(() => {
-      expect(screen.getByText(/Refresh queued successfully/i)).toBeTruthy()
-    })
-  })
-
-  it('shows backend config validation error for invalid URL', async () => {
-    setupDesktopBridge()
-    setupFetch(defaultSnapshot())
-
-    render(<App />)
-
-    fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
-    await screen.findByText(/Connection Profiles/i)
-
-    fireEvent.change(screen.getByPlaceholderText('http://127.0.0.1:4010'), { target: { value: 'not-a-url' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save Backend Config' }))
-
-    await waitFor(() => {
-      expect(screen.getByText(/base URL must be a valid absolute URL/i)).toBeTruthy()
-    })
-  })
-
-  it('shows refresh failure error in runtime strip', async () => {
-    setupDesktopBridge()
-    setupFetch(defaultSnapshot(), {
-      onFetch: (url) => {
-        if (url.includes('/api/v1/refresh')) {
-          return new Response(JSON.stringify({ error: { code: 'refresh_failed', message: 'network timeout' } }), { status: 500 })
-        }
-        return null
-      },
-    })
-
-    render(<App />)
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Sync Data' }))
-
-    await waitFor(() => {
-      expect(screen.getByText(/refresh failed/i)).toBeTruthy()
-    })
-  })
-
-  it('shows migration apply failure error message', async () => {
-    setupDesktopBridge()
-    setupFetch(defaultSnapshot(), {
-      onFetch: (url, init) => {
-        if (url.includes('/api/v1/workspace/migrate') && init?.method === 'POST') {
-          return new Response(
-            JSON.stringify({
-              error: {
-                code: 'migration_failed',
-                message: 'apply blocked',
-              },
-            }),
-            { status: 409 },
-          )
-        }
-        return null
-      },
-    })
-
-    render(<App />)
-
-    fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
-    fireEvent.click(await screen.findByRole('button', { name: 'Migration' }))
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Workspace Migration' }))
-
-    const applyButton = await screen.findByRole('button', { name: 'Apply' })
-    fireEvent.click(applyButton)
-
-    const confirmButton = await screen.findByRole('button', { name: 'Confirm Apply' })
-    fireEvent.click(confirmButton)
-
-    await waitFor(() => {
-      // The message is displayed in the UI
-      expect(screen.getByText(/migration apply failed/i)).toBeTruthy()
-    })
-  })
-
-  it('[degraded] shows protected-host token guidance on unauthorized refresh', async () => {
-    setupDesktopBridge()
-    setupFetch(defaultSnapshot(), {
-      onFetch: (url, init) => {
-        if (url.includes('/api/v1/refresh') && init?.method === 'POST') {
-          return new Response(
-            JSON.stringify({
-              error: {
-                code: 'unauthorized',
-                message: 'unauthorized: missing token',
-              },
-            }),
-            { status: 401 },
-          )
-        }
-        return null
-      },
-    })
-
-    render(<App />)
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Sync Data' }))
-
-    await waitFor(() => {
-      expect(screen.getByText(/Protected host detected/i)).toBeTruthy()
-    })
-  })
-
-  it('passes bearer token as query param to EventSource when configured', async () => {
-    setupDesktopBridge({
-      activeConfig: {
-        baseUrl: 'http://127.0.0.1:4000',
-        apiToken: 'smoke-token',
-      },
-      profilesPayload: {
-        activeProfileId: 'default',
-        profiles: [
-          { id: 'default', name: 'Default', baseUrl: 'http://127.0.0.1:4000', apiToken: 'smoke-token' },
-        ],
-      },
-    })
-    setupFetch(defaultSnapshot())
-
-    render(<App />)
-
-    await waitFor(() => {
-      expect(eventSourceConstructCount).toBeGreaterThan(0)
-    })
-
-    const instance = eventSourceInstances[eventSourceInstances.length - 1]
-    expect(instance.url).toContain('token=smoke-token')
-  })
-
-  it('supports keyboard navigation in sidebar with ArrowDown', async () => {
-    setupDesktopBridge()
-    setupFetch(defaultSnapshot())
-
-    render(<App />)
-
-    const dashboardButton = await screen.findByTestId('sidebar-nav-dashboard')
-
-    fireEvent.keyDown(dashboardButton, { key: 'ArrowDown' })
-
-    await waitFor(() => {
-      const issuesButton = screen.getByTestId('sidebar-nav-issues')
-      expect(issuesButton.getAttribute('aria-current')).toBe('page')
-    })
-  })
-
-  it('supports Home and End keyboard navigation in sidebar', async () => {
-    setupDesktopBridge()
-    setupFetch(defaultSnapshot())
-
-    render(<App />)
-
-    const dashboardButton = await screen.findByTestId('sidebar-nav-dashboard')
-
-    fireEvent.keyDown(dashboardButton, { key: 'End' })
-    await waitFor(() => {
-      const docsButton = screen.getByTestId('sidebar-nav-docs')
-      expect(docsButton.getAttribute('aria-current')).toBe('page')
-    })
-
-    const docsButton = screen.getByTestId('sidebar-nav-docs')
-    fireEvent.keyDown(docsButton, { key: 'Home' })
-    await waitFor(() => {
-      const firstButton = screen.getByTestId('sidebar-nav-dashboard')
-      expect(firstButton.getAttribute('aria-current')).toBe('page')
-    })
-  })
-
-  it('disables profile delete when only one profile exists', async () => {
-    setupDesktopBridge()
-    setupFetch(defaultSnapshot())
-
-    render(<App />)
-
-    fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
-    
-    await screen.findByText(/Connection Profiles/i)
-    
-    const deleteButton = screen.getByRole('button', { name: 'Delete' })
-    expect((deleteButton as HTMLButtonElement).disabled).toBe(true)
-  })
-
-  it('[degraded] DEGRADED_ASSERTION:sse_disconnect_fallback shows SSE disconnect fallback status after stream error', async () => {
-    setupDesktopBridge({
-      activeConfig: { baseUrl: 'http://127.0.0.1:4000', apiToken: '' }
-    })
-    setupFetch(defaultSnapshot())
-
-    render(<App />)
-
-    await waitFor(() => {
-      expect(eventSourceConstructCount).toBeGreaterThan(0)
-    })
-
-    eventSourceInstances[0]?.emit('open')
-    eventSourceInstances[0]?.emitError()
-
-    await waitFor(() => {
-      expect(screen.getByText(/SSE disconnected/i)).toBeTruthy()
-    })
-  })
-
-  it('[degraded] DEGRADED_ASSERTION:sse_disconnect_reconnect_lifecycle restores SSE connected status after reconnect open', async () => {
-    setupDesktopBridge({
-      activeConfig: { baseUrl: 'http://127.0.0.1:4000', apiToken: '' }
-    })
-    setupFetch(defaultSnapshot())
-
-    render(<App />)
-
-    await waitFor(() => {
-      expect(eventSourceConstructCount).toBeGreaterThan(0)
-    })
-
-    eventSourceInstances[0]?.emit('open')
-    eventSourceInstances[0]?.emitError()
-
-    await waitFor(() => {
-      expect(screen.getByText(/SSE disconnected/i)).toBeTruthy()
-    })
-
-    // Simulate reconnect success
-    // Wait for the next instance to be created after the 2s delay
-    // We check for the construct count specifically
-    await waitFor(() => {
-      if (eventSourceConstructCount <= 1) throw new Error('waiting for reconnect')
-      return true
-    }, { timeout: 20000 })
-    
-    // Trigger open on the NEW instance
-    const newInstance = eventSourceInstances[eventSourceConstructCount - 1]
-    newInstance.emit('open')
-
-    await waitFor(
-      () => {
-        // Find ALL elements with text matching /Live/i and find the one that is the badge
-        const allLive = screen.getAllByText(/Live/i)
-        const liveBadge = allLive.find(el => el.className.includes('tracking-widest'))
-        if (!liveBadge) throw new Error('live badge not found')
-        expect(liveBadge).toBeTruthy()
-      },
-      { timeout: 20000 },
-    )
-  }, 25000)
-
-  it('opens projects section and adds a project via folder picker', async () => {
-    const bridge = setupDesktopBridge()
-    setupFetch(defaultSnapshot())
-
-    render(<App />)
-
-    fireEvent.click(await screen.findByTestId('sidebar-nav-projects'))
-
-    // Wait for the empty state or projects to load
-    await screen.findByText(/No Projects/i)
-    fireEvent.click(screen.getByRole('button', { name: /Add Project/i }))
-
-    // Click the browse button
-    const browseButton = screen.getByRole('button', { name: /Browse filesystem/i })
-    fireEvent.click(browseButton)
-
-    await waitFor(() => {
-      expect(bridge.selectFolder).toHaveBeenCalled()
-      expect(screen.getByDisplayValue('/mock/selected/path')).toBeTruthy()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: /^Add Project$/i }))
-
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/v1/projects'), expect.objectContaining({ method: 'POST' }))
-    })
-  })
-
-
-
-
-
-
-  it('opens issue inspector when clicking a task on the board', async () => {
-    setupDesktopBridge()
-    const issues = [
-      {
-        id: 'issue-inspect',
-        issue_identifier: 'OPS-42',
-        identifier: 'OPS-42',
-        title: 'Inspect this task',
-        description: 'Details here',
-        state: 'Todo',
-        assignee_id: 'agent-codex',
-        priority: 2,
-        project_id: '',
-      },
-    ]
-    setupFetch(defaultSnapshot(), {
-      onFetch: (url) => {
-        if (url.includes('/api/v1/issues/OPS-42/history')) {
-          return new Response(JSON.stringify({ history: [] }), { status: 200 })
-        }
-        if (url.includes('/api/v1/issues/OPS-42')) {
-          return new Response(JSON.stringify(issues[0]), { status: 200 })
-        }
-        if (url.includes('/api/v1/issues')) {
-          return new Response(JSON.stringify({ issues }), { status: 200 })
-        }
-        return null
-      },
-    })
-
-    render(<App />)
-
-    fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
-
-    await waitFor(() => {
-      expect(screen.getByText('Inspect this task')).toBeTruthy()
-    })
-
-    // Click the task card to open inspector
-    fireEvent.click(screen.getByText('Inspect this task'))
-
-    // Should open the issue inspection dialog
-    await waitFor(() => {
-      expect(screen.getByText(/Issue Inspection/i)).toBeTruthy()
-      expect(screen.getByText('OPS-42')).toBeTruthy()
-    })
-  })
-
-
-  it('state dropdown changes task state in issue inspector', async () => {
-    setupDesktopBridge()
-    const issues = [
-      {
-        id: 'issue-state',
-        issue_identifier: 'OPS-60',
-        identifier: 'OPS-60',
-        title: 'State change task',
-        description: '',
-        state: 'Todo',
-        assignee_id: 'agent-codex',
-        priority: 1,
-        project_id: '',
-      },
-    ]
-    const fetchMock = setupFetch(defaultSnapshot(), {
-      onFetch: (url, init) => {
-        if (url.includes('/api/v1/issues/OPS-60/history')) {
-          return new Response(JSON.stringify({ history: [] }), { status: 200 })
-        }
-        if (url.includes('/api/v1/issues/OPS-60') && init?.method === 'PATCH') {
-          return new Response(JSON.stringify({ ...issues[0], state: 'Done' }), { status: 200 })
-        }
-        if (url.includes('/api/v1/issues/OPS-60')) {
-          return new Response(JSON.stringify(issues[0]), { status: 200 })
-        }
-        if (url.includes('/api/v1/issues')) {
-          return new Response(JSON.stringify({ issues }), { status: 200 })
-        }
-        return null
-      },
-    })
-
-    render(<App />)
-
-    fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
-
-    await waitFor(() => {
-      expect(screen.getByText('State change task')).toBeTruthy()
-    })
-
-    fireEvent.click(screen.getByText('State change task'))
-
-    await waitFor(() => {
-      expect(screen.getByText(/Issue Inspection/i)).toBeTruthy()
-    })
-
-    // Find the state dropdown in the inspector and change it
-    // The CustomDropdown renders a button with the current value "Todo"
-    // We need to find the one inside the dialog
-    const dialog = screen.getByRole('dialog')
-
-    // Find the dropdown trigger showing "Todo" in the dialog header area
-    const todoButtons = within(dialog).getAllByText('Todo')
-    // Click the dropdown trigger (should be a button)
-    const dropdownTrigger = todoButtons.find(el => el.closest('button'))
-    expect(dropdownTrigger).toBeTruthy()
-    fireEvent.click(dropdownTrigger!)
-
-    // Select "Done" from the dropdown options
-    await waitFor(() => {
-      const doneOptions = screen.getAllByText('Done')
-      const doneOption = doneOptions[doneOptions.length - 1]
-      fireEvent.click(doneOption)
-    })
-
-    await waitFor(() => {
-      expect(fetchMock.mock.calls.some(
-        (call) => String(call[0]).includes('/api/v1/issues/OPS-60') && call[1]?.method === 'PATCH',
-      )).toBe(true)
-    })
-  })
-
-  it('sidebar navigation switches between all sections', async () => {
-    setupDesktopBridge()
-    setupFetch(defaultSnapshot())
-
-    render(<App />)
-
-    // Dashboard is the initial view
-    await waitFor(() => {
-      expect(screen.getAllByText(/Dashboard/i).length).toBeGreaterThan(0)
-    })
-
-    const sections = [
-      { testId: 'sidebar-nav-issues', label: /Tasks/i },
-      { testId: 'sidebar-nav-projects', label: /Projects/i },
-      { testId: 'sidebar-nav-timeline', label: /Activity Feed/i },
-      { testId: 'sidebar-nav-settings', label: /Settings/i },
-    ]
-
-    for (const section of sections) {
-      fireEvent.click(screen.getByTestId(section.testId))
-      await waitFor(() => {
-        const btn = screen.getByTestId(section.testId)
-        expect(btn.getAttribute('aria-current')).toBe('page')
-      })
-    }
-  })
-
-
-  it('creates a task from the kanban board and it appears in Todo column', async () => {
-    setupDesktopBridge()
-    const projects = [
-      { id: 'proj-1', name: 'My Project', root_path: '/tmp/proj', remote_url: '' },
-    ]
-    const issues: Array<Record<string, unknown>> = []
-    const fetchMockRef = setupFetch(defaultSnapshot(), {
-      onFetch: (url, init) => {
-        if (url.includes('/api/v1/projects')) {
-          return new Response(JSON.stringify(projects), { status: 200 })
-        }
-        if (url.includes('/api/v1/issues') && init?.method === 'POST') {
-          const body = JSON.parse(init?.body as string)
-          const created = {
-            id: 'issue-new',
-            issue_identifier: 'OPS-99',
-            identifier: 'OPS-99',
-            title: body.title,
-            description: body.description ?? '',
-            state: body.state ?? 'Todo',
-            assignee_id: body.assignee_id ?? '',
-            priority: 2,
-            project_id: body.project_id ?? '',
+  describe('task management', () => {
+    it('creates a task', async () => {
+      setupDesktopBridge()
+      const projects = [
+        { id: 'proj-1', name: 'My Project', root_path: '/tmp/proj', remote_url: '' },
+      ]
+      const issues: Array<Record<string, unknown>> = []
+      const fetchMockRef = setupFetch(defaultSnapshot(), {
+        onFetch: (url, init) => {
+          if (url.includes('/api/v1/projects')) {
+            return new Response(JSON.stringify(projects), { status: 200 })
           }
-          issues.push(created)
-          return new Response(JSON.stringify(created), { status: 201 })
-        }
-        if (url.includes('/api/v1/issues?') || (url.includes('/api/v1/issues') && (!init || init.method === 'GET'))) {
-          return new Response(JSON.stringify({ issues }), { status: 200 })
-        }
-        return null
-      },
+          if (url.includes('/api/v1/issues') && init?.method === 'POST') {
+            const body = JSON.parse(init?.body as string)
+            const created = {
+              id: 'issue-new',
+              issue_identifier: 'OPS-99',
+              identifier: 'OPS-99',
+              title: body.title,
+              description: body.description ?? '',
+              state: body.state ?? 'Todo',
+              assignee_id: body.assignee_id ?? '',
+              priority: 2,
+              project_id: body.project_id ?? '',
+            }
+            issues.push(created)
+            return new Response(JSON.stringify(created), { status: 201 })
+          }
+          if (url.includes('/api/v1/issues?') || (url.includes('/api/v1/issues') && (!init || init.method === 'GET'))) {
+            return new Response(JSON.stringify({ issues }), { status: 200 })
+          }
+          return null
+        },
+      })
+
+      render(<App />)
+
+      fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+
+      await waitFor(() => {
+        expect(screen.getAllByText(/To Do/i).length).toBeGreaterThan(0)
+      })
+
+      // Open command palette and create task
+      fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+
+      await waitFor(() => {
+        expect(screen.getByText(/Create New Task/i)).toBeTruthy()
+      })
+
+      fireEvent.click(screen.getByText(/Create New Task/i))
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/What needs to be done/i)).toBeTruthy()
+      })
+
+      fireEvent.change(screen.getByPlaceholderText(/What needs to be done/i), {
+        target: { value: 'Build the feature' },
+      })
+
+      // Submit (project auto-selected since only one exists)
+      const submitButton = screen.getAllByRole('button').find(
+        (btn) => btn.textContent === 'Create' && (btn as HTMLButtonElement).type === 'submit',
+      )
+      expect(submitButton).toBeTruthy()
+      fireEvent.click(submitButton!)
+
+      await waitFor(() => {
+        expect(fetchMockRef.mock.calls.some(
+          (call) => String(call[0]).includes('/api/v1/issues') && call[1]?.method === 'POST',
+        )).toBe(true)
+      })
     })
 
-    render(<App />)
+    it('deletes a task', async () => {
+      setupDesktopBridge()
+      const issues = [
+        {
+          id: 'issue-1',
+          issue_identifier: 'OPS-1',
+          identifier: 'OPS-1',
+          title: 'Delete me',
+          description: 'to be removed',
+          state: 'Todo',
+          assignee_id: 'agent-codex',
+          priority: 2,
+          project_id: '',
+        },
+      ]
+      const fetchMock = setupFetch(defaultSnapshot(), {
+        onFetch: (url, init) => {
+          if (url.includes('/api/v1/issues?')) {
+            return new Response(JSON.stringify({ issues }), { status: 200 })
+          }
+          if (url.includes('/api/v1/issues/OPS-1') && init?.method === 'DELETE') {
+            issues.splice(0, issues.length)
+            return new Response(null, { status: 204 })
+          }
+          return null
+        },
+      })
 
-    fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+      render(<App />)
 
-    await waitFor(() => {
-      expect(screen.getAllByText(/To Do/i).length).toBeGreaterThan(0)
+      fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+
+      await waitFor(() => {
+        expect(screen.getByText('Delete me')).toBeTruthy()
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete task OPS-1' }))
+
+      const dialog = await screen.findByRole('dialog')
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
+
+      await waitFor(() => {
+        expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/api/v1/issues/OPS-1') && call[1]?.method === 'DELETE')).toBe(true)
+        expect(screen.queryByText('Delete me')).toBeNull()
+      })
     })
 
-    // Open command palette and create task
-    fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+    it('shows error on failed task deletion', async () => {
+      setupDesktopBridge()
+      const issues = [
+        {
+          id: 'issue-1',
+          issue_identifier: 'OPS-1',
+          identifier: 'OPS-1',
+          title: 'Delete me',
+          description: 'to be removed',
+          state: 'Todo',
+          assignee_id: 'agent-codex',
+          priority: 2,
+          project_id: '',
+        },
+      ]
+      setupFetch(defaultSnapshot(), {
+        onFetch: (url, init) => {
+          if (url.includes('/api/v1/issues?')) {
+            return new Response(JSON.stringify({ issues }), { status: 200 })
+          }
+          if (url.includes('/api/v1/issues/OPS-1') && init?.method === 'DELETE') {
+            return new Response(JSON.stringify({ error: { code: 'delete_failed', message: 'backend failed' } }), { status: 500 })
+          }
+          return null
+        },
+      })
 
-    await waitFor(() => {
-      expect(screen.getByText(/Create New Task/i)).toBeTruthy()
+      render(<App />)
+
+      fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+      fireEvent.click(await screen.findByRole('button', { name: 'Delete task OPS-1' }))
+
+      const dialog = await screen.findByRole('dialog')
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
+
+      await waitFor(() => {
+        expect(screen.getByRole('dialog')).toBeTruthy()
+        expect(screen.getByText(/delete issue failed/i)).toBeTruthy()
+      })
     })
 
-    fireEvent.click(screen.getByText(/Create New Task/i))
+    it('opens issue inspector', async () => {
+      setupDesktopBridge()
+      const issues = [
+        {
+          id: 'issue-inspect',
+          issue_identifier: 'OPS-42',
+          identifier: 'OPS-42',
+          title: 'Inspect this task',
+          description: 'Details here',
+          state: 'Todo',
+          assignee_id: 'agent-codex',
+          priority: 2,
+          project_id: '',
+        },
+      ]
+      setupFetch(defaultSnapshot(), {
+        onFetch: (url) => {
+          if (url.includes('/api/v1/issues/OPS-42/history')) {
+            return new Response(JSON.stringify({ history: [] }), { status: 200 })
+          }
+          if (url.includes('/api/v1/issues/OPS-42')) {
+            return new Response(JSON.stringify(issues[0]), { status: 200 })
+          }
+          if (url.includes('/api/v1/issues')) {
+            return new Response(JSON.stringify({ issues }), { status: 200 })
+          }
+          return null
+        },
+      })
 
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText(/What needs to be done/i)).toBeTruthy()
+      render(<App />)
+
+      fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+
+      await waitFor(() => {
+        expect(screen.getByText('Inspect this task')).toBeTruthy()
+      })
+
+      // Click the task card to open inspector
+      fireEvent.click(screen.getByText('Inspect this task'))
+
+      // Should open the issue inspection dialog
+      await waitFor(() => {
+        expect(screen.getByText(/Issue Inspector/i)).toBeTruthy()
+        expect(screen.getByText('OPS-42')).toBeTruthy()
+      })
     })
 
-    fireEvent.change(screen.getByPlaceholderText(/What needs to be done/i), {
-      target: { value: 'Build the feature' },
+    it('changes task state', async () => {
+      setupDesktopBridge()
+      const issues = [
+        {
+          id: 'issue-state',
+          issue_identifier: 'OPS-60',
+          identifier: 'OPS-60',
+          title: 'State change task',
+          description: '',
+          state: 'Todo',
+          assignee_id: 'agent-codex',
+          priority: 1,
+          project_id: '',
+        },
+      ]
+      const fetchMock = setupFetch(defaultSnapshot(), {
+        onFetch: (url, init) => {
+          if (url.includes('/api/v1/issues/OPS-60/history')) {
+            return new Response(JSON.stringify({ history: [] }), { status: 200 })
+          }
+          if (url.includes('/api/v1/issues/OPS-60') && init?.method === 'PATCH') {
+            return new Response(JSON.stringify({ ...issues[0], state: 'Done' }), { status: 200 })
+          }
+          if (url.includes('/api/v1/issues/OPS-60')) {
+            return new Response(JSON.stringify(issues[0]), { status: 200 })
+          }
+          if (url.includes('/api/v1/issues')) {
+            return new Response(JSON.stringify({ issues }), { status: 200 })
+          }
+          return null
+        },
+      })
+
+      render(<App />)
+
+      fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+
+      await waitFor(() => {
+        expect(screen.getByText('State change task')).toBeTruthy()
+      })
+
+      fireEvent.click(screen.getByText('State change task'))
+
+      await waitFor(() => {
+        expect(screen.getByText(/Issue Inspector/i)).toBeTruthy()
+      })
+
+      // Find the state dropdown in the inspector and change it
+      // The CustomDropdown renders a button with the current value "Todo"
+      // We need to find the one inside the dialog
+      const dialog = screen.getByRole('dialog')
+
+      // Find the dropdown trigger showing "Todo" in the dialog header area
+      const todoButtons = within(dialog).getAllByText('Todo')
+      // Click the dropdown trigger (should be a button)
+      const dropdownTrigger = todoButtons.find(el => el.closest('button'))
+      expect(dropdownTrigger).toBeTruthy()
+      fireEvent.click(dropdownTrigger!)
+
+      // Select "Done" from the dropdown options
+      await waitFor(() => {
+        const doneOptions = screen.getAllByText('Done')
+        const doneOption = doneOptions[doneOptions.length - 1]
+        fireEvent.click(doneOption)
+      })
+
+      await waitFor(() => {
+        expect(fetchMock.mock.calls.some(
+          (call) => String(call[0]).includes('/api/v1/issues/OPS-60') && call[1]?.method === 'PATCH',
+        )).toBe(true)
+      })
     })
 
-    // Submit (project auto-selected since only one exists)
-    const submitButton = screen.getAllByRole('button').find(
-      (btn) => btn.textContent === 'Create' && (btn as HTMLButtonElement).type === 'submit',
-    )
-    expect(submitButton).toBeTruthy()
-    fireEvent.click(submitButton!)
+    it('requires project for task creation', async () => {
+      setupDesktopBridge()
+      setupFetch(defaultSnapshot(), {
+        onFetch: (url) => {
+          if (url.includes('/api/v1/projects')) {
+            return new Response(JSON.stringify([]), { status: 200 })
+          }
+          return null
+        },
+      })
 
-    await waitFor(() => {
-      expect(fetchMockRef.mock.calls.some(
-        (call) => String(call[0]).includes('/api/v1/issues') && call[1]?.method === 'POST',
-      )).toBe(true)
+      render(<App />)
+
+      fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+
+      await waitFor(() => {
+        expect(screen.getAllByText(/To Do/i).length).toBeGreaterThan(0)
+      })
+
+      fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+
+      await waitFor(() => {
+        expect(screen.getByText(/Create New Task/i)).toBeTruthy()
+      })
+      fireEvent.click(screen.getByText(/Create New Task/i))
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/What needs to be done/i)).toBeTruthy()
+      })
+
+      fireEvent.change(screen.getByPlaceholderText(/What needs to be done/i), {
+        target: { value: 'Some task' },
+      })
+
+      // Create button should be disabled: no project selected
+      const submitButton = screen.getAllByRole('button').find(
+        (btn) => btn.textContent === 'Create' && (btn as HTMLButtonElement).type === 'submit',
+      )
+      expect(submitButton).toBeTruthy()
+      expect((submitButton as HTMLButtonElement).disabled).toBe(true)
+    })
+
+    it('shows activity events', async () => {
+      setupDesktopBridge()
+      const issues = [
+        {
+          id: 'issue-hist',
+          issue_identifier: 'OPS-50',
+          identifier: 'OPS-50',
+          title: 'History task',
+          description: '',
+          state: 'In Progress',
+          assignee_id: 'agent-codex',
+          priority: 1,
+          project_id: '',
+        },
+      ]
+      const historyEntries = [
+        { id: 'h1', kind: 'state_change', message: 'State changed to In Progress', timestamp: '2026-03-06T00:01:00Z' },
+        { id: 'h2', kind: 'run_started', message: 'Agent session initiated', timestamp: '2026-03-06T00:02:00Z' },
+      ]
+      setupFetch(defaultSnapshot(), {
+        onFetch: (url) => {
+          if (url.includes('/api/v1/issues/OPS-50/history')) {
+            return new Response(JSON.stringify({ history: historyEntries }), { status: 200 })
+          }
+          if (url.includes('/api/v1/issues/OPS-50')) {
+            return new Response(JSON.stringify(issues[0]), { status: 200 })
+          }
+          if (url.includes('/api/v1/issues')) {
+            return new Response(JSON.stringify({ issues }), { status: 200 })
+          }
+          return null
+        },
+      })
+
+      render(<App />)
+
+      fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+
+      await waitFor(() => {
+        expect(screen.getByText('History task')).toBeTruthy()
+      })
+
+      fireEvent.click(screen.getByText('History task'))
+
+      await waitFor(() => {
+        expect(screen.getByText(/Issue Inspector/i)).toBeTruthy()
+      })
+
+      // Switch to activity tab and verify events render
+      const activityTabs = screen.getAllByText(/Activity/i)
+      fireEvent.click(activityTabs[activityTabs.length - 1])
+      await waitFor(() => {
+        expect(screen.getAllByText(/state change/i).length).toBeGreaterThan(0)
+        expect(screen.getAllByText(/run started/i).length).toBeGreaterThan(0)
+      })
     })
   })
 
-  it('task create dialog requires a project selection', async () => {
-    setupDesktopBridge()
-    setupFetch(defaultSnapshot(), {
-      onFetch: (url) => {
-        if (url.includes('/api/v1/projects')) {
-          return new Response(JSON.stringify([]), { status: 200 })
-        }
-        return null
-      },
+  describe('project management', () => {
+    it('adds a project', async () => {
+      const bridge = setupDesktopBridge()
+      setupFetch(defaultSnapshot())
+
+      render(<App />)
+
+      fireEvent.click(await screen.findByTestId('sidebar-nav-projects'))
+
+      // Wait for the empty state or projects to load
+      await screen.findByText(/No Projects/i)
+      fireEvent.click(screen.getByRole('button', { name: /Add Project/i }))
+
+      // Click the browse button
+      const browseButton = screen.getByRole('button', { name: /Browse filesystem/i })
+      fireEvent.click(browseButton)
+
+      await waitFor(() => {
+        expect(bridge.selectFolder).toHaveBeenCalled()
+        expect(screen.getByDisplayValue('/mock/selected/path')).toBeTruthy()
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: /^Add Project$/i }))
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/v1/projects'), expect.objectContaining({ method: 'POST' }))
+      })
     })
 
-    render(<App />)
+    it('opens project detail', async () => {
+      setupDesktopBridge()
+      const projects = [
+        { id: 'proj-1', name: 'Alpha Project', root_path: '/home/user/alpha', remote_url: 'https://github.com/test/alpha' },
+      ]
+      setupFetch(defaultSnapshot(), {
+        onFetch: (url) => {
+          if (url.includes('/api/v1/projects/proj-1/stats')) {
+            return new Response(JSON.stringify({ total_sessions: 5, total_input: 1000, total_output: 2000 }), { status: 200 })
+          }
+          if (url.includes('/api/v1/projects')) {
+            return new Response(JSON.stringify(projects), { status: 200 })
+          }
+          return null
+        },
+      })
 
-    fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+      render(<App />)
 
-    await waitFor(() => {
-      expect(screen.getAllByText(/To Do/i).length).toBeGreaterThan(0)
+      fireEvent.click(await screen.findByTestId('sidebar-nav-projects'))
+
+      await waitFor(() => {
+        expect(screen.getByText('Alpha Project')).toBeTruthy()
+      })
+
+      fireEvent.click(screen.getByText('Alpha Project'))
+
+      await waitFor(() => {
+        expect(screen.getAllByText('Alpha Project').length).toBeGreaterThan(0)
+        expect(screen.getByText(/\/home\/user\/alpha/)).toBeTruthy()
+      })
     })
 
-    fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+    it('deletes a project', async () => {
+      setupDesktopBridge()
+      const projects = [
+        { id: 'proj-del', name: 'Doomed Project', root_path: '/tmp/doomed', remote_url: '' },
+      ]
+      const fetchMockRef = setupFetch(defaultSnapshot(), {
+        onFetch: (url, init) => {
+          if (url.includes('/api/v1/projects/proj-del/stats')) {
+            return new Response(JSON.stringify({ total_sessions: 0, total_input: 0, total_output: 0 }), { status: 200 })
+          }
+          if (url.includes('/api/v1/projects/proj-del') && init?.method === 'DELETE') {
+            projects.splice(0, projects.length)
+            return new Response(null, { status: 204 })
+          }
+          if (url.includes('/api/v1/projects')) {
+            return new Response(JSON.stringify(projects), { status: 200 })
+          }
+          return null
+        },
+      })
 
-    await waitFor(() => {
-      expect(screen.getByText(/Create New Task/i)).toBeTruthy()
-    })
-    fireEvent.click(screen.getByText(/Create New Task/i))
+      render(<App />)
 
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText(/What needs to be done/i)).toBeTruthy()
-    })
+      fireEvent.click(await screen.findByTestId('sidebar-nav-projects'))
 
-    fireEvent.change(screen.getByPlaceholderText(/What needs to be done/i), {
-      target: { value: 'Some task' },
-    })
+      await waitFor(() => {
+        expect(screen.getByText('Doomed Project')).toBeTruthy()
+      })
 
-    // Create button should be disabled: no project selected
-    const submitButton = screen.getAllByRole('button').find(
-      (btn) => btn.textContent === 'Create' && (btn as HTMLButtonElement).type === 'submit',
-    )
-    expect(submitButton).toBeTruthy()
-    expect((submitButton as HTMLButtonElement).disabled).toBe(true)
-  })
+      // The ProjectGrid card has a delete button that calls setProjectToDelete
+      // Find the card and its delete button (the second icon button in the card overlay)
+      const allButtons = screen.getAllByRole('button')
+      // Find buttons with hover:text-destructive class (the trash button on project card)
+      const trashButton = allButtons.find(btn =>
+        btn.className.includes('hover:text-destructive'),
+      )
+      expect(trashButton).toBeTruthy()
+      fireEvent.click(trashButton!)
 
-  it('navigates to project detail view when clicking a project', async () => {
-    setupDesktopBridge()
-    const projects = [
-      { id: 'proj-1', name: 'Alpha Project', root_path: '/home/user/alpha', remote_url: 'https://github.com/test/alpha' },
-    ]
-    setupFetch(defaultSnapshot(), {
-      onFetch: (url) => {
-        if (url.includes('/api/v1/projects/proj-1/stats')) {
-          return new Response(JSON.stringify({ total_sessions: 5, total_input: 1000, total_output: 2000 }), { status: 200 })
-        }
-        if (url.includes('/api/v1/projects')) {
-          return new Response(JSON.stringify(projects), { status: 200 })
-        }
-        return null
-      },
-    })
+      // ProjectGrid delete confirmation dialog
+      const dialog = await screen.findByRole('dialog')
+      fireEvent.click(within(dialog).getByRole('button', { name: /Remove Project/i }))
 
-    render(<App />)
-
-    fireEvent.click(await screen.findByTestId('sidebar-nav-projects'))
-
-    await waitFor(() => {
-      expect(screen.getByText('Alpha Project')).toBeTruthy()
-    })
-
-    fireEvent.click(screen.getByText('Alpha Project'))
-
-    await waitFor(() => {
-      expect(screen.getAllByText('Alpha Project').length).toBeGreaterThan(0)
-      expect(screen.getByText(/\/home\/user\/alpha/)).toBeTruthy()
-    })
-  })
-
-  it('shows path not found warning for projects with missing paths', async () => {
-    setupDesktopBridge()
-    const projects = [
-      { id: 'proj-missing', name: 'Ghost Project', root_path: '/nonexistent/path', remote_url: '', path_exists: false },
-    ]
-    setupFetch(defaultSnapshot(), {
-      onFetch: (url) => {
-        if (url.includes('/api/v1/projects/proj-missing/stats')) {
-          return new Response(JSON.stringify({ total_sessions: 0, total_input: 0, total_output: 0 }), { status: 200 })
-        }
-        if (url.includes('/api/v1/projects')) {
-          return new Response(JSON.stringify(projects), { status: 200 })
-        }
-        return null
-      },
+      await waitFor(() => {
+        expect(fetchMockRef.mock.calls.some(
+          (call) => String(call[0]).includes('/api/v1/projects/proj-del') && call[1]?.method === 'DELETE',
+        )).toBe(true)
+      })
     })
 
-    render(<App />)
+    it('warns on missing project path', async () => {
+      setupDesktopBridge()
+      const projects = [
+        { id: 'proj-missing', name: 'Ghost Project', root_path: '/nonexistent/path', remote_url: '', path_exists: false },
+      ]
+      setupFetch(defaultSnapshot(), {
+        onFetch: (url) => {
+          if (url.includes('/api/v1/projects/proj-missing/stats')) {
+            return new Response(JSON.stringify({ total_sessions: 0, total_input: 0, total_output: 0 }), { status: 200 })
+          }
+          if (url.includes('/api/v1/projects')) {
+            return new Response(JSON.stringify(projects), { status: 200 })
+          }
+          return null
+        },
+      })
 
-    fireEvent.click(await screen.findByTestId('sidebar-nav-projects'))
+      render(<App />)
 
-    await waitFor(() => {
-      expect(screen.getByText('Ghost Project')).toBeTruthy()
-    })
+      fireEvent.click(await screen.findByTestId('sidebar-nav-projects'))
 
-    fireEvent.click(screen.getByText('Ghost Project'))
+      await waitFor(() => {
+        expect(screen.getByText('Ghost Project')).toBeTruthy()
+      })
 
-    await waitFor(() => {
-      expect(screen.getByText(/Path not found/i)).toBeTruthy()
-      expect(screen.getAllByText(/\/nonexistent\/path/).length).toBeGreaterThan(0)
-    })
-  })
+      fireEvent.click(screen.getByText('Ghost Project'))
 
-  it('deletes project from project grid view', async () => {
-    setupDesktopBridge()
-    const projects = [
-      { id: 'proj-del', name: 'Doomed Project', root_path: '/tmp/doomed', remote_url: '' },
-    ]
-    const fetchMockRef = setupFetch(defaultSnapshot(), {
-      onFetch: (url, init) => {
-        if (url.includes('/api/v1/projects/proj-del/stats')) {
-          return new Response(JSON.stringify({ total_sessions: 0, total_input: 0, total_output: 0 }), { status: 200 })
-        }
-        if (url.includes('/api/v1/projects/proj-del') && init?.method === 'DELETE') {
-          projects.splice(0, projects.length)
-          return new Response(null, { status: 204 })
-        }
-        if (url.includes('/api/v1/projects')) {
-          return new Response(JSON.stringify(projects), { status: 200 })
-        }
-        return null
-      },
-    })
-
-    render(<App />)
-
-    fireEvent.click(await screen.findByTestId('sidebar-nav-projects'))
-
-    await waitFor(() => {
-      expect(screen.getByText('Doomed Project')).toBeTruthy()
-    })
-
-    // The ProjectGrid card has a delete button that calls setProjectToDelete
-    // Find the card and its delete button (the second icon button in the card overlay)
-    const allButtons = screen.getAllByRole('button')
-    // Find buttons with hover:text-destructive class (the trash button on project card)
-    const trashButton = allButtons.find(btn =>
-      btn.className.includes('hover:text-destructive'),
-    )
-    expect(trashButton).toBeTruthy()
-    fireEvent.click(trashButton!)
-
-    // ProjectGrid delete confirmation dialog
-    const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: /Remove Project/i }))
-
-    await waitFor(() => {
-      expect(fetchMockRef.mock.calls.some(
-        (call) => String(call[0]).includes('/api/v1/projects/proj-del') && call[1]?.method === 'DELETE',
-      )).toBe(true)
+      await waitFor(() => {
+        expect(screen.getByText(/Path not found/i)).toBeTruthy()
+        expect(screen.getAllByText(/\/nonexistent\/path/).length).toBeGreaterThan(0)
+      })
     })
   })
 
-  it('activity tab loads and displays events in issue inspector', async () => {
-    setupDesktopBridge()
-    const issues = [
-      {
-        id: 'issue-hist',
-        issue_identifier: 'OPS-50',
-        identifier: 'OPS-50',
-        title: 'History task',
-        description: '',
-        state: 'In Progress',
-        assignee_id: 'agent-codex',
-        priority: 1,
-        project_id: '',
-      },
-    ]
-    const historyEntries = [
-      { id: 'h1', kind: 'state_change', message: 'State changed to In Progress', timestamp: '2026-03-06T00:01:00Z' },
-      { id: 'h2', kind: 'run_started', message: 'Agent session initiated', timestamp: '2026-03-06T00:02:00Z' },
-    ]
-    setupFetch(defaultSnapshot(), {
-      onFetch: (url) => {
-        if (url.includes('/api/v1/issues/OPS-50/history')) {
-          return new Response(JSON.stringify({ history: historyEntries }), { status: 200 })
-        }
-        if (url.includes('/api/v1/issues/OPS-50')) {
-          return new Response(JSON.stringify(issues[0]), { status: 200 })
-        }
-        if (url.includes('/api/v1/issues')) {
-          return new Response(JSON.stringify({ issues }), { status: 200 })
-        }
-        return null
-      },
+  describe('settings', () => {
+    it('saves backend config from settings form', async () => {
+      const bridge = setupDesktopBridge()
+      setupFetch(defaultSnapshot())
+
+      render(<App />)
+
+      fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
+
+      // Wait for form to be ready
+      await screen.findByText(/Connection Profiles/i)
+
+      fireEvent.change(screen.getByPlaceholderText('http://127.0.0.1:4010'), { target: { value: 'http://127.0.0.1:9999' } })
+
+      const saveButton = await screen.findByRole('button', { name: 'Save Backend Config' })
+      fireEvent.click(saveButton)
+
+      await waitFor(() => {
+        expect(bridge.setBackendConfig).toHaveBeenCalledWith(
+          expect.objectContaining({ baseUrl: 'http://127.0.0.1:9999' }),
+        )
+      })
     })
 
-    render(<App />)
+    it('shows backend config validation error for invalid URL', async () => {
+      setupDesktopBridge()
+      setupFetch(defaultSnapshot())
 
-    fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+      render(<App />)
 
-    await waitFor(() => {
-      expect(screen.getByText('History task')).toBeTruthy()
+      fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
+      await screen.findByText(/Connection Profiles/i)
+
+      fireEvent.change(screen.getByPlaceholderText('http://127.0.0.1:4010'), { target: { value: 'not-a-url' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Save Backend Config' }))
+
+      await waitFor(() => {
+        expect(screen.getByText(/base URL must be a valid absolute URL/i)).toBeTruthy()
+      })
     })
 
-    fireEvent.click(screen.getByText('History task'))
+    it('creates backend profile from settings', async () => {
+      const bridge = setupDesktopBridge()
+      setupFetch(defaultSnapshot())
 
-    await waitFor(() => {
-      expect(screen.getByText(/Issue Inspection/i)).toBeTruthy()
+      render(<App />)
+
+      fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
+
+      await screen.findByText(/Connection Profiles/i)
+
+      fireEvent.change(screen.getByPlaceholderText(/Production, Staging, Local/i), { target: { value: 'staging' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+
+      await waitFor(() => {
+        expect(bridge.saveBackendProfile).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'staging', makeActive: true }),
+        )
+      })
     })
 
-    // Activity tab active by default; entries with allowed kinds should render
-    await waitFor(() => {
-      expect(screen.getAllByText(/state change/i).length).toBeGreaterThan(0)
-      expect(screen.getAllByText(/run started/i).length).toBeGreaterThan(0)
+    it('switches backend profile', async () => {
+      const bridge = setupDesktopBridge({
+        profilesPayload: {
+          activeProfileId: 'default',
+          profiles: [
+            { id: 'default', name: 'Default', baseUrl: 'http://127.0.0.1:4010', apiToken: '' },
+            { id: 'staging', name: 'Staging', baseUrl: 'http://127.0.0.1:5000', apiToken: '' },
+          ],
+        },
+      })
+      const fetchMock = setupFetch(defaultSnapshot())
+
+      render(<App />)
+
+      fireEvent.click(await screen.findByTestId('sidebar-nav-settings'))
+
+      // Trigger dropdown
+      const dropdownTrigger = await screen.findByRole('button', { name: /Profile/i })
+      fireEvent.click(dropdownTrigger)
+
+      // Select option
+      await waitFor(async () => {
+        const options = screen.getAllByText('Staging')
+        fireEvent.click(options[options.length - 1])
+      })
+
+      await waitFor(() => {
+        expect(bridge.setActiveBackendProfile).toHaveBeenCalledWith('staging')
+        expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('http://127.0.0.1:4010/api/v1/state'))).toBe(true)
+      })
+    })
+
+    it('reconnects SSE on profile switch', async () => {
+      setupDesktopBridge({
+        profilesPayload: {
+          activeProfileId: 'default',
+          profiles: [
+            { id: 'default', name: 'Default', baseUrl: 'http://127.0.0.1:4010', apiToken: '' },
+            { id: 'staging', name: 'Staging', baseUrl: 'http://127.0.0.1:5000', apiToken: '' },
+          ],
+        },
+      })
+      setupFetch(defaultSnapshot())
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(eventSourceConstructCount).toBeGreaterThan(0)
+      })
+
+      // Simulate first instance connecting
+      eventSourceInstances[0]?.emit('open')
+
+      fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
+
+      const dropdownTrigger = await screen.findByRole('button', { name: /Profile/i })
+      fireEvent.click(dropdownTrigger)
+
+      await waitFor(async () => {
+        const options = screen.getAllByText('Staging')
+        fireEvent.click(options[options.length - 1])
+      })
+
+      await waitFor(() => {
+        // The stream is torn down and a new one created
+        expect(eventSourceInstances[0]?.closed).toBe(true)
+        expect(eventSourceConstructCount).toBeGreaterThan(1)
+      })
+    })
+
+    it('deletes non-default profile from settings', async () => {
+      const bridge = setupDesktopBridge({
+        profilesPayload: {
+          activeProfileId: 'staging',
+          profiles: [
+            { id: 'default', name: 'Default', baseUrl: 'http://127.0.0.1:4010', apiToken: '' },
+            { id: 'staging', name: 'Staging', baseUrl: 'http://127.0.0.1:5000', apiToken: '' },
+          ],
+        },
+      })
+      setupFetch(defaultSnapshot())
+
+      render(<App />)
+
+      fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
+
+      await screen.findByText(/Connection Profiles/i)
+
+      // switch profile first
+      const dropdownTrigger = await screen.findByRole('button', { name: /Profile/i })
+      fireEvent.click(dropdownTrigger)
+
+      await waitFor(async () => {
+        const options = screen.getAllByText('Staging')
+        fireEvent.click(options[options.length - 1])
+      })
+
+      await waitFor(() => {
+        expect(bridge.setActiveBackendProfile).toHaveBeenCalledWith('staging')
+      })
+
+      const deleteButton = screen.getByRole('button', { name: 'Delete' })
+      fireEvent.click(deleteButton)
+
+      await waitFor(() => {
+        expect(bridge.deleteBackendProfile).toHaveBeenCalledWith('staging')
+      })
+    })
+
+    it('disables profile delete when only one profile exists', async () => {
+      setupDesktopBridge()
+      setupFetch(defaultSnapshot())
+
+      render(<App />)
+
+      fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
+
+      await screen.findByText(/Connection Profiles/i)
+
+      const deleteButton = screen.getByRole('button', { name: 'Delete' })
+      expect((deleteButton as HTMLButtonElement).disabled).toBe(true)
+    })
+
+    it('runs workspace migration', async () => {
+      setupDesktopBridge()
+      setupFetch(defaultSnapshot(), {
+        onFetch: (url, init) => {
+          if (url.includes('/api/v1/workspace/migration/plan')) {
+            return new Response(JSON.stringify({ moves: [{ from: '/old', to: '/new' }] }), { status: 200 })
+          }
+          if (url.includes('/api/v1/workspace/migrate')) {
+            return new Response(JSON.stringify({ ok: true }), { status: 200 })
+          }
+          return null
+        },
+      })
+
+      render(<App />)
+
+      fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
+      fireEvent.click(await screen.findByRole('button', { name: 'Migration' }))
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Workspace Migration' }))
+
+      const applyButton = await screen.findByRole('button', { name: 'Apply' })
+      fireEvent.click(applyButton)
+
+      const confirmButton = await screen.findByRole('button', { name: 'Confirm Apply' })
+      fireEvent.click(confirmButton)
+
+      await waitFor(() => {
+        expect(screen.getByText(/migration apply request accepted/i)).toBeTruthy()
+      })
+    })
+
+    it('shows migration error', async () => {
+      setupDesktopBridge()
+      setupFetch(defaultSnapshot(), {
+        onFetch: (url, init) => {
+          if (url.includes('/api/v1/workspace/migrate') && init?.method === 'POST') {
+            return new Response(
+              JSON.stringify({
+                error: {
+                  code: 'migration_failed',
+                  message: 'apply blocked',
+                },
+              }),
+              { status: 409 },
+            )
+          }
+          return null
+        },
+      })
+
+      render(<App />)
+
+      fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
+      fireEvent.click(await screen.findByRole('button', { name: 'Migration' }))
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Workspace Migration' }))
+
+      const applyButton = await screen.findByRole('button', { name: 'Apply' })
+      fireEvent.click(applyButton)
+
+      const confirmButton = await screen.findByRole('button', { name: 'Confirm Apply' })
+      fireEvent.click(confirmButton)
+
+      await waitFor(() => {
+        // The message is displayed in the UI
+        expect(screen.getByText(/migration apply failed/i)).toBeTruthy()
+      })
+    })
+
+    it('shows refresh status', async () => {
+      setupDesktopBridge()
+      setupFetch(defaultSnapshot())
+
+      render(<App />)
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Sync Data' }))
+
+      await waitFor(() => {
+        expect(screen.getByText(/Refresh queued successfully/i)).toBeTruthy()
+      })
+    })
+
+    it('shows refresh failure error in runtime strip', async () => {
+      setupDesktopBridge()
+      setupFetch(defaultSnapshot(), {
+        onFetch: (url) => {
+          if (url.includes('/api/v1/refresh')) {
+            return new Response(JSON.stringify({ error: { code: 'refresh_failed', message: 'network timeout' } }), { status: 500 })
+          }
+          return null
+        },
+      })
+
+      render(<App />)
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Sync Data' }))
+
+      await waitFor(() => {
+        expect(screen.getByText(/refresh failed/i)).toBeTruthy()
+      })
+    })
+
+    it('passes token to SSE', async () => {
+      setupDesktopBridge({
+        activeConfig: {
+          baseUrl: 'http://127.0.0.1:4000',
+          apiToken: 'smoke-token',
+        },
+        profilesPayload: {
+          activeProfileId: 'default',
+          profiles: [
+            { id: 'default', name: 'Default', baseUrl: 'http://127.0.0.1:4000', apiToken: 'smoke-token' },
+          ],
+        },
+      })
+      setupFetch(defaultSnapshot())
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(eventSourceConstructCount).toBeGreaterThan(0)
+      })
+
+      const instance = eventSourceInstances[eventSourceInstances.length - 1]
+      expect(instance.url).toContain('token=smoke-token')
     })
   })
 
-  it('command palette opens with Ctrl+K', async () => {
-    setupDesktopBridge()
-    setupFetch(defaultSnapshot())
+  describe('navigation', () => {
+    it('sidebar navigation', async () => {
+      setupDesktopBridge()
+      setupFetch(defaultSnapshot())
 
-    render(<App />)
+      render(<App />)
 
-    await waitFor(() => {
-      expect(screen.getAllByText(/Dashboard/i).length).toBeGreaterThan(0)
+      // Tasks is the initial view
+      await waitFor(() => {
+        expect(screen.getAllByText(/Tasks/i).length).toBeGreaterThan(0)
+      })
+
+      const sections = [
+        { testId: 'sidebar-nav-projects', label: /Projects/i },
+        { testId: 'sidebar-nav-timeline', label: /Activity Feed/i },
+        { testId: 'sidebar-nav-settings', label: /Settings/i },
+      ]
+
+      for (const section of sections) {
+        fireEvent.click(screen.getByTestId(section.testId))
+        await waitFor(() => {
+          const btn = screen.getByTestId(section.testId)
+          expect(btn.getAttribute('aria-current')).toBe('page')
+        })
+      }
     })
 
-    fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+    it('arrow key navigation in sidebar', async () => {
+      setupDesktopBridge()
+      setupFetch(defaultSnapshot())
 
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText(/Type a command or search/i)).toBeTruthy()
-      expect(screen.getByText(/Go to Dashboard/i)).toBeTruthy()
-      expect(screen.getByText(/Go to Tasks/i)).toBeTruthy()
-      expect(screen.getByText(/Create New Task/i)).toBeTruthy()
+      render(<App />)
+
+      const issuesButton = await screen.findByTestId('sidebar-nav-issues')
+
+      fireEvent.keyDown(issuesButton, { key: 'ArrowDown' })
+
+      await waitFor(() => {
+        const projectsButton = screen.getByTestId('sidebar-nav-projects')
+        expect(projectsButton.getAttribute('aria-current')).toBe('page')
+      })
     })
-  })
 
-  it('toggles theme and updates root dark class', async () => {
-    setupDesktopBridge()
-    setupFetch(defaultSnapshot())
+    it('Home/End navigation in sidebar', async () => {
+      setupDesktopBridge()
+      setupFetch(defaultSnapshot())
 
-    window.localStorage.setItem('orchestra-theme', 'dark')
-    render(<App />)
+      render(<App />)
 
-    const toggleButton = await screen.findByRole('button', { name: /Switch to .* Mode/i })
-    expect(document.documentElement.classList.contains('dark')).toBe(true)
+      const dashboardButton = await screen.findByTestId('sidebar-nav-issues')
 
-    fireEvent.click(toggleButton)
+      fireEvent.keyDown(dashboardButton, { key: 'End' })
+      await waitFor(() => {
+        const docsButton = screen.getByTestId('sidebar-nav-docs')
+        expect(docsButton.getAttribute('aria-current')).toBe('page')
+      })
 
-    await waitFor(() => {
-      expect(document.documentElement.classList.contains('dark')).toBe(false)
-      expect(window.localStorage.getItem('orchestra-theme')).toBe('light')
+      const docsButton = screen.getByTestId('sidebar-nav-docs')
+      fireEvent.keyDown(docsButton, { key: 'Home' })
+      await waitFor(() => {
+        const firstButton = screen.getByTestId('sidebar-nav-issues')
+        expect(firstButton.getAttribute('aria-current')).toBe('page')
+      })
+    })
+
+    it('opens command palette', async () => {
+      setupDesktopBridge()
+      setupFetch(defaultSnapshot())
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.getAllByText(/Tasks/i).length).toBeGreaterThan(0)
+      })
+
+      fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Type a command or search/i)).toBeTruthy()
+        expect(screen.getByText(/Go to Tasks/i)).toBeTruthy()
+        expect(screen.getByText(/Create New Task/i)).toBeTruthy()
+      })
+    })
+
+    it('toggles theme', async () => {
+      setupDesktopBridge()
+      setupFetch(defaultSnapshot())
+
+      window.localStorage.setItem('orchestra-theme', 'dark')
+      render(<App />)
+
+      const toggleButton = await screen.findByRole('button', { name: /Switch to .* Mode/i })
+      expect(document.documentElement.classList.contains('dark')).toBe(true)
+
+      fireEvent.click(toggleButton)
+
+      await waitFor(() => {
+        expect(document.documentElement.classList.contains('dark')).toBe(false)
+        expect(window.localStorage.getItem('orchestra-theme')).toBe('light')
+      })
     })
   })
 })

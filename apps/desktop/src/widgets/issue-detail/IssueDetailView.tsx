@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle2, FileText, History, Loader2, Terminal } from 'lucide-react'
+import { CheckCircle2, FileText, History, Info, Loader2, Terminal } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Prism } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -46,11 +46,15 @@ export function IssueDetailView({
   const issueId = (typed.id as string) || (typed.issue_id as string) || ''
   const title = (typed.title as string) || 'No Title'
   const description = (typed.description as string) || ''
+  const projectId = (typed.project_id as string) || ''
+  const projectName = (typed.project_name as string) || ''
   const provider = (typed.provider as string) || ''
 
   const [localState, setLocalState] = useState((typed.state as string) || 'Todo')
   const [localAssignee, setLocalAssignee] = useState((typed.assignee_id as string) || '')
-  const [bottomTab, setBottomTab] = useState<'activity' | 'output' | 'changes'>('activity')
+  const [localTitle, setLocalTitle] = useState(title)
+  const [localDescription, setLocalDescription] = useState(description)
+  const [bottomTab, setBottomTab] = useState<'details' | 'plan' | 'activity' | 'output' | 'changes'>('details')
 
   const [issueHistory, setIssueHistory] = useState<IssueHistoryEntry[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
@@ -60,23 +64,60 @@ export function IssueDetailView({
   const [diffLoading, setDiffLoading] = useState(false)
   const [activeDiffFile, setActiveDiffFile] = useState<string | null>(null)
 
+  // Only sync state/assignee from result (these are set by dropdowns, not typed input)
+  // Title and description are user-editable text - only set on initial load, not on re-fetches
+  const resultId = (typed.id as string) || (typed.issue_id as string) || ''
   useEffect(() => {
     setLocalState((typed.state as string) || 'Todo')
     setLocalAssignee((typed.assignee_id as string) || '')
-  }, [result])
+    setLocalTitle((typed.title as string) || 'No Title')
+    setLocalDescription((typed.description as string) || '')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resultId])
 
-  // Extract operational plan from agent messages in history (agent outputs `- [ ]` / `- [x]` items)
+  // Extract operational plan from agent messages in history.
+  // Agent messages get chunked across multiple events, so we concatenate
+  // consecutive message events and find the best plan from the combined text.
   const planItems: PlanItem[] = (() => {
-    // First try extracting from history (agent messages contain the plan)
-    for (const entry of [...issueHistory].reverse()) {
-      if (!entry.message) continue
-      const items = extractPlanFromText(entry.message)
-      if (items.length > 0) return items
+    // 1. Concatenate consecutive message events into blocks, then scan each block
+    const messageEvents = issueHistory.filter(e => e.kind === 'message' && e.message)
+    if (messageEvents.length > 0) {
+      // Build blocks of consecutive messages (same provider = likely one response split across events)
+      const blocks: string[] = []
+      let current = ''
+      let lastProvider = ''
+      for (const entry of messageEvents) {
+        if (entry.provider !== lastProvider && current) {
+          blocks.push(current)
+          current = ''
+        }
+        current += (current ? '\n' : '') + entry.message
+        lastProvider = entry.provider || ''
+      }
+      if (current) blocks.push(current)
+
+      // Scan blocks newest-first for the most complete plan
+      let bestItems: PlanItem[] = []
+      for (const block of blocks.reverse()) {
+        const items = extractPlanFromText(block)
+        if (items.length > bestItems.length) {
+          bestItems = items
+        }
+      }
+      if (bestItems.length > 0) return bestItems
+
+      // Also try each individual message (some agents send complete plans in one message)
+      for (const entry of [...messageEvents].reverse()) {
+        const items = extractPlanFromText(entry.message!)
+        if (items.length > 0) return items
+      }
     }
-    // Fallback to timeline events
+
+    // 2. Fallback to timeline events
     const fromTimeline = extractOperationalPlanItems(timeline, issueId, identifier, description)
     if (fromTimeline.length > 0) return fromTimeline
-    // Final fallback: parse description
+
+    // 3. Final fallback: parse description
     return extractPlanFromText(description)
   })()
   const completedCount = planItems.filter(i => i.done).length
@@ -147,9 +188,11 @@ export function IssueDetailView({
   const stateDot = localState === 'Done' ? 'bg-primary' : localState === 'In Progress' ? 'bg-amber-500 animate-pulse' : 'bg-muted-foreground/40'
 
   const tabItems = [
-    { id: 'activity' as const, label: 'Activity', icon: History, count: issueHistory.length },
-    { id: 'output' as const, label: 'Output', icon: Terminal },
-    { id: 'changes' as const, label: 'Changes', icon: FileText, count: diffFiles.length },
+    { id: 'details' as const, label: 'Details', icon: Info, count: undefined },
+    { id: 'plan' as const, label: 'Plan', icon: CheckCircle2, count: planItems.length > 0 ? planItems.length : undefined },
+    { id: 'activity' as const, label: 'Activity', icon: History, count: undefined },
+    { id: 'output' as const, label: 'Output', icon: Terminal, count: undefined },
+    { id: 'changes' as const, label: 'Changes', icon: FileText, count: diffFiles.length > 0 ? diffFiles.length : undefined },
   ]
 
   return (
@@ -157,24 +200,12 @@ export function IssueDetailView({
       {/* ── Header ── */}
       <div className="flex items-center justify-between gap-4 px-2 py-3 border-b border-border/40 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${stateDot}`} />
           <Badge variant="outline" className="shrink-0 font-mono text-[11px] px-2 py-0.5 bg-primary/5 text-primary border-primary/20">
             {identifier}
           </Badge>
-          <h2 className="text-base font-bold truncate">{title}</h2>
+          <h2 className="text-base font-bold truncate">{localTitle}</h2>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <CustomDropdown
-            className="w-28"
-            value={localState}
-            options={[
-              { label: 'Todo', value: 'Todo', icon: <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" /> },
-              { label: 'In Progress', value: 'In Progress', icon: <div className="h-1.5 w-1.5 rounded-full bg-amber-500" /> },
-              { label: 'Done', value: 'Done', icon: <div className="h-1.5 w-1.5 rounded-full bg-primary" /> },
-            ]}
-            onChange={handleStateChange}
-          />
-          <AgentSelector value={localAssignee} agents={availableAgents} onChange={handleAssigneeChange} />
+        <div className="flex items-center gap-2 shrink-0 mr-8">
           {isRunning && onStopSession && (
             <button
               className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-colors"
@@ -187,53 +218,18 @@ export function IssueDetailView({
               Stop
             </button>
           )}
-        </div>
-      </div>
-
-      {/* ── Operational Plan ── */}
-      <div className="px-2 py-4 shrink-0">
-        <div className="bg-card/60 border border-border/30 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/60 flex items-center gap-2">
-              <CheckCircle2 size={12} className="text-primary/60" />
-              Operational Plan
-            </h3>
-            {planItems.length > 0 && (
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-16 bg-muted/30 rounded-full overflow-hidden">
-                  <div className="h-full bg-primary rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(var(--primary),0.3)]" style={{ width: `${(completedCount / planItems.length) * 100}%` }} />
-                </div>
-                <span className="text-[10px] font-mono text-muted-foreground/40">{completedCount}/{planItems.length}</span>
-              </div>
-            )}
-          </div>
-
-          {description && (
-            <p className="text-sm text-foreground/70 leading-relaxed mb-3">{description}</p>
-          )}
-
-          {planItems.length > 0 ? (
-            <div className="space-y-1.5 max-h-[200px] overflow-auto custom-scrollbar">
-              {planItems.map((item, idx) => (
-                <div key={idx} className="flex items-start gap-2.5 py-1">
-                  <div className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors ${item.done ? 'bg-primary border-primary text-primary-foreground' : 'border-border/50'}`}>
-                    {item.done && <CheckCircle2 size={10} />}
-                  </div>
-                  <span className={`text-sm leading-snug ${item.done ? 'text-muted-foreground/40 line-through' : 'text-foreground/90'}`}>{item.text}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex items-center justify-center gap-3 text-muted-foreground/30 border-2 border-dashed border-border/30 rounded-lg py-6">
-              {isRunning ? (
-                <><Loader2 size={12} className="animate-spin text-primary/40" /><span className="text-xs">Agent working — plan updates as steps are identified...</span></>
-              ) : localState === 'Todo' ? (
-                <span className="text-xs">Assign an agent and set to "In Progress" to begin.</span>
-              ) : (
-                <span className="text-xs">No plan steps recorded.</span>
-              )}
-            </div>
-          )}
+          <CustomDropdown
+            className="w-28"
+            value={localState}
+            options={[
+              { label: 'Backlog', value: 'Backlog', icon: <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/20" /> },
+              { label: 'Todo', value: 'Todo', icon: <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" /> },
+              { label: 'In Progress', value: 'In Progress', icon: <div className="h-1.5 w-1.5 rounded-full bg-amber-500" /> },
+              { label: 'Review', value: 'Review', icon: <div className="h-1.5 w-1.5 rounded-full bg-blue-500" /> },
+              { label: 'Done', value: 'Done', icon: <div className="h-1.5 w-1.5 rounded-full bg-primary" /> },
+            ]}
+            onChange={handleStateChange}
+          />
         </div>
       </div>
 
@@ -262,6 +258,96 @@ export function IssueDetailView({
 
       {/* ── Tab content (fills remaining space) ── */}
       <div className="flex-1 min-h-0 overflow-auto custom-scrollbar">
+
+        {/* Details */}
+        {bottomTab === 'details' && (
+          <div className="h-full flex">
+            {/* Main content - editable */}
+            <div className="flex-1 p-8 flex flex-col">
+              <input
+                className="w-full bg-transparent text-xl font-bold text-foreground outline-none focus:outline-none placeholder:text-muted-foreground/20 mb-1"
+                value={localTitle}
+                onChange={e => setLocalTitle(e.target.value)}
+                onBlur={() => { if (localTitle !== title && onUpdate) void onUpdate({ title: localTitle }) }}
+                placeholder="Task title..."
+              />
+              <div className="w-12 h-0.5 bg-primary/30 rounded-full mb-4" />
+              <textarea
+                className="w-full flex-1 bg-transparent text-sm text-foreground/60 outline-none focus:outline-none placeholder:text-muted-foreground/15 leading-relaxed resize-none transition-colors"
+                value={localDescription}
+                onChange={e => setLocalDescription(e.target.value)}
+                onBlur={() => { if (localDescription !== description && onUpdate) void onUpdate({ description: localDescription }) }}
+                placeholder="Describe what this task should accomplish..."
+              />
+            </div>
+
+            {/* Sidebar properties */}
+            <div className="w-56 border-l border-border/20 shrink-0 bg-muted/5">
+              {[
+                { label: 'Agent', content: (
+                  <AgentSelector value={localAssignee} agents={availableAgents} onChange={handleAssigneeChange} direction="down" />
+                )},
+                { label: 'Project', content: (
+                  <div className="flex items-center gap-2">
+                    <div className="h-5 w-5 rounded bg-primary/10 flex items-center justify-center shrink-0">
+                      <FileText size={10} className="text-primary/60" />
+                    </div>
+                    <span className="text-xs font-medium text-foreground/60 truncate">{projectName || 'Unlinked'}</span>
+                  </div>
+                )},
+                { label: 'ID', content: (
+                  <span className="font-mono text-xs text-primary/60">{identifier}</span>
+                )},
+                { label: 'Created', content: (
+                  <span className="text-xs text-muted-foreground/40">
+                    {(typed.created_at as string) ? new Date(typed.created_at as string).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                  </span>
+                )},
+              ].map(({ label, content }) => (
+                <div key={label} className="px-4 py-3 border-b border-border/10">
+                  <label className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground/30 mb-1.5 block">{label}</label>
+                  {content}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Plan */}
+        {bottomTab === 'plan' && (
+          <div className="h-full p-4">
+            {planItems.length > 0 ? (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 flex-1 min-w-[120px] bg-muted/30 rounded-full overflow-hidden">
+                      <div className="h-full bg-primary rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(var(--primary),0.3)]" style={{ width: `${(completedCount / planItems.length) * 100}%` }} />
+                    </div>
+                    <span className="text-[10px] font-mono text-muted-foreground/40 shrink-0">{completedCount}/{planItems.length} complete</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  {planItems.map((item, idx) => (
+                    <div key={idx} className={`flex items-start gap-3 py-2 px-3 rounded-lg ${item.done ? 'bg-primary/5' : 'hover:bg-muted/10'} transition-colors`}>
+                      <div className={`mt-0.5 h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${item.done ? 'bg-primary border-primary text-primary-foreground' : 'border-border/50'}`}>
+                        {item.done && <CheckCircle2 size={12} />}
+                      </div>
+                      <span className={`text-sm leading-relaxed ${item.done ? 'text-muted-foreground/40 line-through' : 'text-foreground'}`}>{item.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground/20 gap-3">
+                <CheckCircle2 size={36} />
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em]">
+                  {isRunning ? 'Waiting for agent to create plan...' : localState === 'Todo' ? 'Plan will appear when agent starts' : 'No plan recorded'}
+                </p>
+                {isRunning && <Loader2 size={14} className="animate-spin text-primary/30" />}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Activity */}
         {bottomTab === 'activity' && (

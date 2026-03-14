@@ -84,16 +84,16 @@ const ProjectListRow: React.FC<ProjectCardProps> = ({ project, stats, loading, o
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, stats, loading, onClick, onDelete }) => {
     if (loading) {
         return (
-            <Card className="h-44 bg-muted/50 border border-border/50 animate-pulse rounded-2xl">
-                <CardHeader className="pb-2">
-                    <Skeleton className="h-4 w-3/4 mb-1" />
+            <Card className="h-56 bg-muted/50 border border-border/50 animate-pulse rounded-2xl">
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-3/4 mb-1" />
                     <Skeleton className="h-3 w-1/2" />
                 </CardHeader>
-                <CardContent className="space-y-3 pt-3 border-t border-border/40">
+                <CardContent className="space-y-3 pt-4 border-t border-border/40">
                     <Skeleton className="h-2 w-full" />
                     <div className="grid grid-cols-2 gap-2">
-                        <Skeleton className="h-3 w-full" />
-                        <Skeleton className="h-3 w-full" />
+                        <Skeleton className="h-8 w-full rounded-lg" />
+                        <Skeleton className="h-8 w-full rounded-lg" />
                     </div>
                 </CardContent>
             </Card>
@@ -102,30 +102,17 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, stats, loading, onCl
     return (
         <Card
             onClick={() => onClick(project.id)}
-            className="group relative overflow-hidden bg-card/40 backdrop-blur-md border border-border/50 transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl hover:shadow-primary/10 cursor-pointer h-44 flex flex-col justify-between shadow-lg hover:border-primary/30 rounded-2xl"
+            className="group relative overflow-hidden bg-card/60 border border-border/50 transition-[border-color,box-shadow,background-color] duration-300 hover:shadow-2xl hover:shadow-primary/10 cursor-pointer h-56 flex flex-col justify-between shadow-lg hover:border-primary/30 rounded-2xl"
         >
             {/* Animated primary bar */}
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary/50 via-primary to-transparent opacity-30 transition-opacity group-hover:opacity-100" />
 
-            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10 translate-y-1 group-hover:translate-y-0 flex gap-1">
-                <AppTooltip content="Project Settings">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 bg-background/80 backdrop-blur border border-border/50 text-muted-foreground hover:text-foreground shadow-sm"
-                        onClick={(e) => {
-                            e.stopPropagation()
-                            // Logic for settings could go here
-                        }}
-                    >
-                        <Globe size={12} />
-                    </Button>
-                </AppTooltip>
+            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10 translate-y-1 group-hover:translate-y-0">
                 <AppTooltip content="Remove from workspace">
                     <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 w-7 p-0 bg-background/80 backdrop-blur border border-border/50 text-muted-foreground hover:text-destructive shadow-sm"
+                        className="h-7 w-7 p-0 bg-background/90 border border-border/50 text-muted-foreground hover:text-destructive shadow-sm"
                         onClick={(e) => {
                             e.stopPropagation()
                             onDelete?.(project)
@@ -136,35 +123,35 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, stats, loading, onCl
                 </AppTooltip>
             </div>
 
-            <CardHeader className="pb-2 text-left space-y-1">
+            <CardHeader className="pb-3 pt-4 text-left space-y-1.5">
                 <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-500 shadow-inner group-hover:shadow-primary/20">
-                        <Folder className="w-4 h-4" strokeWidth={2.5} />
+                    <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-500 shadow-inner group-hover:shadow-primary/20">
+                        <Folder className="w-5 h-5" strokeWidth={2.5} />
                     </div>
-                    <CardTitle className="text-sm font-black tracking-tight group-hover:text-primary transition-colors text-left truncate">{project.name}</CardTitle>
+                    <CardTitle className="text-base font-black tracking-tight group-hover:text-primary transition-colors text-left truncate">{project.name}</CardTitle>
                 </div>
-                <CardDescription className="text-[9px] text-muted-foreground/60 truncate font-mono ml-11 text-left">{project.root_path}</CardDescription>
+                <CardDescription className="text-[10px] text-muted-foreground/70 truncate font-mono ml-12 text-left">{project.root_path}</CardDescription>
             </CardHeader>
 
             {stats && (
-                <CardContent className="space-y-3 mt-auto pt-3 border-t border-border/40 flex-1 text-left bg-muted/5 group-hover:bg-muted/10 transition-colors">
-                    <div className="grid grid-cols-2 gap-4 text-left">
-                        <div className="flex items-center gap-2 group/stat">
-                            <div className="p-1 rounded bg-background border border-border/50 text-primary/70 group-hover/stat:text-primary transition-colors shadow-sm">
-                                <History size={10} strokeWidth={3} />
+                <CardContent className="space-y-4 mt-auto pt-4 border-t border-border/40 flex-1 text-left bg-muted/5 group-hover:bg-muted/10 transition-colors">
+                    <div className="grid grid-cols-2 gap-3 text-left">
+                        <div className="flex items-center gap-2.5 group/stat rounded-lg border border-border/40 bg-background/50 px-2.5 py-2">
+                            <div className="p-1.5 rounded bg-background border border-border/50 text-primary/70 group-hover/stat:text-primary transition-colors shadow-sm">
+                                <History size={11} strokeWidth={3} />
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[10px] font-black tabular-nums leading-none">{stats.total_sessions}</span>
-                                <span className="text-[7px] uppercase font-bold text-muted-foreground/40 tracking-wider">Sessions</span>
+                                <span className="text-xs font-black tabular-nums leading-none">{stats.total_sessions}</span>
+                                <span className="text-[8px] uppercase font-bold text-muted-foreground/50 tracking-wider">Sessions</span>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2 group/stat">
-                            <div className="p-1 rounded bg-background border border-border/50 text-primary/70 group-hover/stat:text-primary transition-colors shadow-sm">
-                                <Zap size={10} strokeWidth={3} />
+                        <div className="flex items-center gap-2.5 group/stat rounded-lg border border-border/40 bg-background/50 px-2.5 py-2">
+                            <div className="p-1.5 rounded bg-background border border-border/50 text-primary/70 group-hover/stat:text-primary transition-colors shadow-sm">
+                                <Zap size={11} strokeWidth={3} />
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[10px] font-black tabular-nums leading-none">{((stats.total_input + stats.total_output) / 1000).toFixed(1)}k</span>
-                                <span className="text-[7px] uppercase font-bold text-muted-foreground/40 tracking-wider">Tokens</span>
+                                <span className="text-xs font-black tabular-nums leading-none">{((stats.total_input + stats.total_output) / 1000).toFixed(1)}k</span>
+                                <span className="text-[8px] uppercase font-bold text-muted-foreground/50 tracking-wider">Tokens</span>
                             </div>
                         </div>
                     </div>
@@ -296,7 +283,7 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
                 ) : (
                     <div className="flex-1 flex flex-col justify-between">
                         {viewMode === 'grid' ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
                                 {currentItems.map((project) => (
                                     <ProjectCard
                                         key={project.id}

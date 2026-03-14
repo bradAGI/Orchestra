@@ -137,7 +137,10 @@ export function extractPlanFromText(text: string): PlanItem[] {
 function parsePlanItemsFromText(text: string): PlanItem[] {
   if (!text) return []
 
-  const lines = text.split('\n')
+  // Strip code blocks (``` ... ```) so we don't parse example checkboxes from templates
+  const stripped = text.replace(/```[\s\S]*?```/g, '')
+
+  const lines = stripped.split('\n')
   const checkboxItems = lines
     .map((line) => line.match(/^\s*[-*+]\s*\[\s*([xX ])\s*\]\s+(.+)$/))
     .filter((match): match is RegExpMatchArray => !!match)
@@ -145,19 +148,13 @@ function parsePlanItemsFromText(text: string): PlanItem[] {
       done: match[1].toLowerCase() === 'x',
       text: match[2].trim(),
     }))
-    .filter((item) => item.text.length > 0)
+    .filter((item) => item.text.length > 0 && item.text !== 'step one' && item.text !== 'step two' && item.text !== 'step three')
 
   if (checkboxItems.length > 0) {
     return checkboxItems
   }
 
-  const listItems = lines
-    .map((line) => line.match(/^\s*(?:[-*+]\s+|\d+\.\s+)(.+)$/))
-    .filter((match): match is RegExpMatchArray => !!match)
-    .map((match) => match[1].trim())
-    .filter((item) => item.length > 0 && item.length < 220)
-
-  return listItems.map((textLine) => ({ text: textLine, done: false }))
+  return []
 }
 
 function collectCandidateMessages(timeline: TimelineItem[], issueId: string, issueIdentifier: string): string[] {

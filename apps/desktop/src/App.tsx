@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, Database, FolderTree, Gauge, History, LayoutDashboard, RefreshCcw, Settings2, ShieldCheck, Ticket, Cpu, Zap, FileText, Terminal } from 'lucide-react'
+import { Activity, Database, FolderTree, History, ListTodo, RefreshCcw, Settings2, Cpu, Zap, FileText, Terminal } from 'lucide-react'
 import {
   IssueDetailView,
   CreateTaskDialog,
   CreateProjectDialog,
-  DashboardOverview,
-  MetricCard,
   SettingsCard,
 } from '@/components/app-shell/panels'
 import {
@@ -43,6 +41,7 @@ import {
   deleteIssue,
   fetchSessionDetail,
   fetchMCPTools,
+  fetchProjectGitHubIssues,
   type IssueCreatePayload,
   type IssueUpdatePayload,
   type IssueListItem,
@@ -93,6 +92,7 @@ export default function App() {
   const [snapshot, setSnapshot] = useState<SnapshotPayload | null>(null)
   const [timeline, setTimeline] = useState<TimelineItem[]>([])
   const [boardIssues, setBoardIssues] = useState<IssueListItem[]>([])
+  const [githubBacklogIssues, setGithubBacklogIssues] = useState<IssueListItem[]>([])
   const [loadingConfig, setLoadingConfig] = useState(false)
   const [savingConfig, setSavingConfig] = useState(false)
   const [profilesPending, setProfilesPending] = useState(false)
@@ -122,9 +122,9 @@ export default function App() {
   const [inspectDialogOpen, setInspectDialogOpen] = useState(false)
   const [sessionInspectDialogOpen, setSessionInspectDialogOpen] = useState(false)
   const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false)
-  const [createTaskInitialState, setCreateTaskInitialState] = useState('Todo')
+  const [createTaskInitialState, setCreateTaskInitialState] = useState('Backlog')
   const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false)
-  const [activeSection, setActiveSection] = useState<SectionID>('dashboard')
+  const [activeSection, setActiveSection] = useState<SectionID>('issues')
   const [activePeriod, setActivePeriod] = useState<'Today' | 'Week' | 'Month'>('Week')
   const [paletteOpen, setPaletteOpen] = useState(false)
 
@@ -302,8 +302,9 @@ export default function App() {
     // Section-specific data loading with global loading state
     const loadRequiredData = async () => {
       // Always fetch projects if we have none yet
-      const needsProjects = projects.length === 0 || activeSection === 'projects' || activeSection === 'dashboard'
-      const needsWarehouse = activeSection === 'warehouse' || activeSection === 'dashboard'
+      // Always load projects - needed for task inspector project name resolution
+      const needsProjects = true
+      const needsWarehouse = activeSection === 'warehouse'
 
       if (!needsProjects && !needsWarehouse) return
 
@@ -347,6 +348,51 @@ export default function App() {
       mounted = false
     }
   }, [config, activeSection])
+
+  // Fetch GitHub issues for connected projects and merge into backlog
+  useEffect(() => {
+    if (!config || projects.length === 0) return
+    let mounted = true
+    const connectedProjects = projects.filter(p => p.github_token)
+    if (connectedProjects.length === 0) {
+      setGithubBacklogIssues([])
+      return
+    }
+
+    Promise.all(
+      connectedProjects.map(async (p) => {
+        try {
+          const ghIssues = await fetchProjectGitHubIssues(config, p.id)
+          return ghIssues.map(gh => ({
+            id: `github-${gh.number}`,
+            issue_id: `github-${gh.number}`,
+            identifier: `GH-${gh.number}`,
+            issue_identifier: `GH-${gh.number}`,
+            title: gh.title,
+            description: gh.body,
+            state: 'Backlog',
+            project_id: p.id,
+            url: gh.html_url,
+          } as IssueListItem))
+        } catch {
+          return [] as IssueListItem[]
+        }
+      })
+    ).then(results => {
+      if (!mounted) return
+      const all = results.flat()
+      // Deduplicate against local issues by title
+      const localTitles = new Set(boardIssues.map(i => i.title))
+      setGithubBacklogIssues(all.filter(gh => !localTitles.has(gh.title)))
+    })
+
+    return () => { mounted = false }
+  }, [config, projects, boardIssues])
+
+  // Merged board: local issues + GitHub backlog
+  const allBoardIssues = useMemo(() => [...boardIssues, ...githubBacklogIssues], [boardIssues, githubBacklogIssues])
+  const allBoardIssuesRef = useRef(allBoardIssues)
+  allBoardIssuesRef.current = allBoardIssues
 
   const handleAgentConfigSave = async (nextAgentConfig: { commands: Record<string, string>; agent_provider: string }) => {
     if (!config) return
@@ -567,6 +613,33 @@ export default function App() {
   const handleIssueUpdate = async (identifier: string, updates: IssueUpdatePayload) => {
     if (!config) return
     try {
+      // If this is a GitHub backlog issue being edited, promote it to a local task first
+      if (identifier.startsWith('GH-')) {
+        const ghIssue = allBoardIssuesRef.current.find(i =>
+          i.identifier === identifier || i.issue_identifier === identifier
+        )
+        if (ghIssue) {
+          const newIssue = await createIssue(config, {
+            title: (updates as Record<string, unknown>).title as string || ghIssue.title || '',
+            description: (updates as Record<string, unknown>).description as string || ghIssue.description || '',
+            state: (updates as Record<string, unknown>).state as string || 'Backlog',
+            assignee_id: (updates as Record<string, unknown>).assignee_id as string || '',
+            project_id: ghIssue.project_id || '',
+            provider: (updates as Record<string, unknown>).provider as string || '',
+          })
+          setStatusMessage(`GitHub issue ${identifier} promoted to local task.`)
+          const updatedIssues = await fetchIssues(config)
+          setBoardIssues(updatedIssues)
+          await handleRefresh()
+          // Open the new local issue in the inspector
+          if (newIssue?.identifier) {
+            setIssueLookupId(newIssue.identifier)
+            await executeIssueLookup(newIssue.identifier)
+          }
+          return
+        }
+      }
+
       await updateIssue(config, identifier, updates)
 
       // Instantly update the board issues for snappy drag-and-drop
@@ -662,7 +735,26 @@ export default function App() {
 
   const handleInspectIssueFromList = async (issueIdentifier: string) => {
     setIssueLookupId(issueIdentifier)
+    setIssueLookupError('')
+    setIssueLookupPending(false)
     setInspectDialogOpen(true)
+
+    // For GitHub backlog issues, populate directly from cached data instead of API
+    if (issueIdentifier.startsWith('GH-')) {
+      const ghIssue = allBoardIssuesRef.current.find(i =>
+        i.identifier === issueIdentifier ||
+        i.issue_identifier === issueIdentifier ||
+        i.id === issueIdentifier
+      )
+      if (ghIssue) {
+        setIssueLookupResult({
+          ...ghIssue,
+          project_name: projects.find(p => p.id === ghIssue.project_id)?.name || '',
+        } as IssueDetailResult)
+        return
+      }
+    }
+
     await executeIssueLookup(issueIdentifier)
   }
 
@@ -910,33 +1002,9 @@ export default function App() {
           onTogglePolling: handleTogglePolling,
         }}
       >
-        <div className="mt-4 grid min-w-0 grid-cols-12 gap-3 flex-1">
-              {sectionVisibility.showDashboard ? (
-                <>
-                  <section className="col-span-12 h-fit">
-                    <DashboardOverview
-                      projects={projects}
-                      issues={boardIssues}
-                      stats={projectStats}
-                      snapshot={snapshot}
-                      warehouseStats={warehouseStats}
-                      onCreateTask={() => setCreateTaskDialogOpen(true)}
-                      onJumpToTerminal={handleJumpToTerminal}
-                      onProjectClick={(id) => {
-                        setSelectedProjectID(id || null)
-                        setActiveSection('projects')
-                      }}
-                    />
-                  </section>
-
-                  <section className="col-span-12 flex flex-col min-h-[450px]">
-                    <TimelineCard timeline={timeline.slice(0, 15)} />
-                  </section>
-                </>
-              ) : null}
-
+        <div className="mt-4 flex flex-col flex-1 min-w-0 min-h-0 h-full">
               {sectionVisibility.showProjects ? (
-                <section className="col-span-12 flex flex-col flex-1">
+                <section className="flex-1 flex flex-col min-h-0">
                   {selectedProjectID && projects.find(p => p.id === selectedProjectID) ? (
                     <ProjectDetailView
                       project={projects.find(p => p.id === selectedProjectID)!}
@@ -950,6 +1018,8 @@ export default function App() {
                       onInspectIssue={handleInspectIssueFromList}
                       onJumpToTerminal={handleJumpToTerminal}
                       onIssueUpdate={handleIssueUpdate}
+                      onIssueDelete={handleIssueDelete}
+                      onStopSession={handleStopSession}
                       onCreateIssue={handleCreateIssue}
                       onDeleteProject={handleDeleteProject}
                       onRefreshProjects={refreshProjectsAndStats}
@@ -968,13 +1038,13 @@ export default function App() {
               ) : null}
 
               {sectionVisibility.showAgents ? (
-                <section className="col-span-12 flex flex-col flex-1">
+                <section className="flex-1 flex flex-col min-h-0">
                   <AgentsDashboard config={config} snapshot={snapshot} />
                 </section>
               ) : null}
 
               {sectionVisibility.showWarehouse ? (
-                <section className="col-span-12 flex flex-col">
+                <section className="flex-1 flex flex-col min-h-0">
                   <AnalyticsDashboard
                     stats={warehouseStats}
                     loading={dataLoading}
@@ -985,11 +1055,11 @@ export default function App() {
               ) : null}
 
               {sectionVisibility.showIssueBoard ? (
-                <section className="col-span-12 flex flex-col min-h-[600px]">
+                <section className="flex-1 flex flex-col min-h-0">
                   <KanbanBoard
                     loadingState={loadingState}
                     snapshot={snapshot}
-                    boardIssues={boardIssues}
+                    boardIssues={allBoardIssues}
                     projects={projects}
                     availableAgents={availableAgents}
                     onInspectIssue={handleInspectIssueFromList}
@@ -1003,19 +1073,19 @@ export default function App() {
               ) : null}
 
               {sectionVisibility.showTimeline ? (
-                <section className="col-span-12 flex flex-col">
+                <section className="flex-1 flex flex-col min-h-0">
                   <TimelineCard timeline={timeline} />
                 </section>
               ) : null}
 
               {sectionVisibility.showDocs ? (
-                <section className="col-span-12 flex flex-col flex-1">
+                <section className="flex-1 flex flex-col min-h-0">
                   <DocsDashboard config={config} />
                 </section>
               ) : null}
 
               {sectionVisibility.showConsole && config ? (
-                <section className="col-span-12 flex flex-col flex-1 min-h-[600px] border border-border rounded-xl overflow-hidden shadow-2xl">
+                <section className="flex-1 flex flex-col min-h-0 border border-border rounded-xl overflow-hidden shadow-2xl">
                   <TerminalMultiplexer
                     activeTerminals={openTerminals}
                     baseUrl={config.baseUrl}
@@ -1027,7 +1097,7 @@ export default function App() {
               ) : null}
 
               {sectionVisibility.showSettings ? (
-                <section className="col-span-12 flex flex-col">
+                <section className="flex-1 flex flex-col min-h-0">
                   <SettingsCard
                     loadingConfig={loadingConfig}
                     savingConfig={savingConfig}
@@ -1057,11 +1127,11 @@ export default function App() {
 
       <Dialog open={inspectDialogOpen} onOpenChange={setInspectDialogOpen}>
         <DialogContent className="max-w-[98vw] w-[98vw] h-[96vh] max-h-[96vh] overflow-hidden flex flex-col p-4">
-          <DialogHeader className="shrink-0">
-            <DialogTitle>Issue Inspection</DialogTitle>
-            <DialogDescription>View detailed status and diagnostics for this issue.</DialogDescription>
+          <DialogHeader className="sr-only">
+            <DialogTitle>Issue Inspector</DialogTitle>
+            <DialogDescription>Task details</DialogDescription>
           </DialogHeader>
-          <div className="flex-1 min-h-0 mt-2">
+          <div className="flex-1 min-h-0">
             {issueLookupPending ? (
               <div className="space-y-4">
                 <Skeleton className="h-8 w-[200px]" />
@@ -1073,7 +1143,10 @@ export default function App() {
               </div>
             ) : (issueLookupResult && typeof issueLookupResult === 'object') ? (
               <IssueDetailView
-                result={issueLookupResult}
+                result={{
+                  ...issueLookupResult,
+                  project_name: projects.find(p => p.id === (issueLookupResult as Record<string, unknown>).project_id)?.name || '',
+                }}
                 config={config}
                 timeline={timeline}
                 availableAgents={availableAgents}
@@ -1152,16 +1225,10 @@ export default function App() {
 
           <Command.Group heading="Navigation" className="px-2 py-1 text-xs font-semibold text-muted-foreground">
             <Command.Item
-              onSelect={() => { setActiveSection('dashboard'); setPaletteOpen(false) }}
-              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
-            >
-              <LayoutDashboard className="h-4 w-4" /> Go to Dashboard
-            </Command.Item>
-            <Command.Item
               onSelect={() => { setActiveSection('issues'); setPaletteOpen(false) }}
               className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
             >
-              <Ticket className="h-4 w-4" /> Go to Tasks
+              <ListTodo className="h-4 w-4" /> Go to Tasks
             </Command.Item>
             <Command.Item
               onSelect={() => { setActiveSection('projects'); setPaletteOpen(false) }}
@@ -1179,10 +1246,10 @@ export default function App() {
 
           <Command.Group heading="Actions" className="px-2 py-1 mt-2 text-xs font-semibold text-muted-foreground border-t border-border/40">
             <Command.Item
-              onSelect={() => { handleCreateIssue('Todo'); setPaletteOpen(false) }}
+              onSelect={() => { handleCreateIssue('Backlog'); setPaletteOpen(false) }}
               className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
             >
-              <Ticket className="h-4 w-4" /> Create New Task
+              <ListTodo className="h-4 w-4" /> Create New Task
             </Command.Item>
             <Command.Item
               onSelect={() => { setTheme(theme === 'dark' ? 'light' : 'dark'); setPaletteOpen(false) }}

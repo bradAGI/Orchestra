@@ -116,14 +116,14 @@ function CustomDropdownImpl<T extends DropdownValue>(
 
 export const CustomDropdown = forwardRef(CustomDropdownImpl) as CustomDropdownComponent
 
-export function AgentSelector({ value, agents, onChange }: { value: string; agents: string[]; onChange: (a: string) => void }) {
+export function AgentSelector({ value, agents, onChange, direction = 'up' }: { value: string; agents: string[]; onChange: (a: string) => void; direction?: 'up' | 'down' }) {
   const normalizedValue = value.startsWith('agent-') ? value.replace('agent-', '') : value
 
   return (
     <CustomDropdown
       className="bg-transparent border-none hover:bg-muted/20 !h-7 !px-2 rounded-md transition-colors shadow-none"
       value={normalizedValue || 'Unassigned'}
-      direction="up"
+      direction={direction}
       options={agents.map((a) => ({ label: a, value: a, icon: getAgentIcon(a) }))}
       onChange={(v) => onChange(`agent-${v}`)}
       triggerContent={

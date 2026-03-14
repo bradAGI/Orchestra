@@ -36,7 +36,7 @@ describe('extractOperationalPlanItems', () => {
     ])
   })
 
-  it('parses numbered lists when no checkboxes are present', () => {
+  it('returns empty for numbered lists without checkboxes', () => {
     const timeline: TimelineItem[] = [
       runEvent(
         'issue-1',
@@ -47,29 +47,14 @@ describe('extractOperationalPlanItems', () => {
     ]
 
     const items = extractOperationalPlanItems(timeline, 'issue-1', 'OPS-1', '')
-
-    expect(items).toEqual([
-      { text: 'Analyze task details', done: false },
-      { text: 'Implement changes', done: false },
-      { text: 'Run validation', done: false },
-    ])
+    expect(items).toEqual([])
   })
 
-  it('falls back to description list when timeline has no plan', () => {
+  it('returns empty when no checkbox items found', () => {
     const timeline: TimelineItem[] = [runEvent('issue-1', 'OPS-1', 'tool_call', 'using Read tool')]
 
-    const items = extractOperationalPlanItems(
-      timeline,
-      'issue-1',
-      'OPS-1',
-      'Task details:\n- review architecture\n- update workflow\n- verify UI',
-    )
-
-    expect(items).toEqual([
-      { text: 'review architecture', done: false },
-      { text: 'update workflow', done: false },
-      { text: 'verify UI', done: false },
-    ])
+    const items = extractOperationalPlanItems(timeline, 'issue-1', 'OPS-1', 'Just a plain description')
+    expect(items).toEqual([])
   })
 
   it('ignores plan events from other issues', () => {

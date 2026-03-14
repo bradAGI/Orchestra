@@ -44,10 +44,10 @@ export function AppShell({
         <OverlayScrollbarsComponent
           element="main"
           options={osOptions}
-          className="min-w-0 flex-1 bg-gradient-to-b from-background via-background to-muted/30 h-full"
+          className="min-w-0 flex-1 bg-gradient-to-b from-background via-background to-muted/30 h-full flex flex-col"
         >
           <div
-            className="px-6 pb-6 pt-4 lg:px-8 w-full max-w-[1800px] mx-auto flex flex-col min-h-full transition-all duration-500 origin-top-left"
+            className="px-6 pb-6 pt-4 lg:px-8 w-full max-w-[1800px] mx-auto flex flex-col h-full min-h-0 transition-all duration-500 origin-top-left overflow-hidden"
             style={{ zoom }}
           >
             <TopBar {...topBarProps} />

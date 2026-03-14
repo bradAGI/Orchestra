@@ -646,3 +646,22 @@ export async function deleteMCPServer(config: BackendConfig, id: string): Promis
     method: 'DELETE',
   })
 }
+
+export type GitHubIssue = {
+  number: number
+  title: string
+  body: string
+  state: string
+  html_url: string
+  labels: { name: string }[]
+}
+
+export async function fetchProjectGitHubIssues(config: BackendConfig, projectId: string): Promise<GitHubIssue[]> {
+  return requestJSON<GitHubIssue[]>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/issues`)
+}
+
+export async function disconnectProjectGitHub(config: BackendConfig, projectId: string): Promise<void> {
+  await requestJSON<void>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/disconnect`, {
+    method: 'POST',
+  })
+}

@@ -66,8 +66,10 @@ export function KanbanBoard({
   const handleCreateClick = (columnId: string) => {
     if (!onCreateIssue) return
     const stateMap: Record<string, string> = {
+      backlog: 'Backlog',
       todo: 'Todo',
       progress: 'In Progress',
+      review: 'Review',
       done: 'Done',
     }
     onCreateIssue(stateMap[columnId] || 'Todo')
@@ -81,7 +83,7 @@ export function KanbanBoard({
   const [deleteTaskPending, setDeleteTaskPending] = useState(false)
   const [deleteTaskError, setDeleteTaskError] = useState('')
   const [isDraggingOver, setIsDraggingOver] = useState<string | null>(null)
-  const [columnOrder, setColumnOrder] = useState<string[]>(['todo', 'progress', 'done'])
+  const [columnOrder, setColumnOrder] = useState<string[]>(['backlog', 'todo', 'progress', 'review', 'done'])
   const [draggingColumnId, setDraggingColumnId] = useState<string | null>(null)
 
   const osOptions = useMemo(() => ({
@@ -143,8 +145,10 @@ export function KanbanBoard({
     if (!issueIdentifier || !onIssueUpdate) return
 
     const stateMap: Record<string, string> = {
+      backlog: 'Backlog',
       todo: 'Todo',
       progress: 'In Progress',
+      review: 'Review',
       done: 'Done',
     }
 
@@ -194,13 +198,17 @@ export function KanbanBoard({
     return stateMatch && projectMatch
   }
 
+  const backlogItems = enrichedIssues.filter((i) => i.state === 'Backlog').filter(filterItem)
   const todoItems = enrichedIssues.filter((i) => i.state === 'Todo').filter(filterItem)
   const inProgressItems = enrichedIssues.filter((i) => i.state === 'In Progress').filter(filterItem)
+  const reviewItems = enrichedIssues.filter((i) => i.state === 'Review').filter(filterItem)
   const doneItemsList = enrichedIssues.filter((i) => i.state === 'Done').filter(filterItem)
 
   const columns = [
+    { id: 'backlog', title: 'Backlog', items: backlogItems, icon: <div className="h-2 w-2 rounded-full border-2 border-muted-foreground/40" /> },
     { id: 'todo', title: 'To Do', items: todoItems, icon: <div className="h-2 w-2 rounded-full border-2 border-muted-foreground" /> },
     { id: 'progress', title: 'In Progress', items: inProgressItems, icon: <div className="h-2 w-2 rounded-full border-2 border-amber-500 bg-amber-500" /> },
+    { id: 'review', title: 'Review', items: reviewItems, icon: <div className="h-2 w-2 rounded-full border-2 border-blue-500 bg-blue-500" /> },
     { id: 'done', title: 'Done', items: doneItemsList, icon: <div className="h-2 w-2 rounded-full bg-primary" /> },
   ]
 
@@ -217,8 +225,8 @@ export function KanbanBoard({
           <Skeleton className="h-8 w-40 rounded-md" />
           <Skeleton className="h-8 w-40 rounded-md" />
         </div>
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-hidden">
-          {['todo', 'progress', 'done'].map((column) => (
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-4 overflow-hidden">
+          {['backlog', 'todo', 'progress', 'review', 'done'].map((column) => (
             <div key={column} className="flex flex-col min-h-0 space-y-4">
               <div className="flex items-center justify-between px-2 shrink-0">
                 <div className="flex items-center gap-2">
@@ -314,7 +322,7 @@ export function KanbanBoard({
       </div>
 
       {viewMode === 'board' ? (
-        <div className="flex-1 grid grid-cols-1 gap-6 lg:grid-cols-3 min-h-0">
+        <div className="flex-1 grid grid-cols-1 gap-4 lg:grid-cols-5 min-h-0">
           {orderedColumns.map((column) => (
             <div
               key={column.id}
@@ -333,17 +341,19 @@ export function KanbanBoard({
                   <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{column.title}</h3>
                   <span className="text-[11px] font-medium text-muted-foreground/50">{column.items.length}</span>
                 </div>
-                <AppTooltip content={`Create Task in ${column.title}`}>
-                  <button
-                    className="grid h-6 w-6 place-items-center rounded-md border border-dashed border-muted-foreground/30 text-muted-foreground/50 hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleCreateClick(column.id)
-                    }}
-                  >
-                    <Plus className="h-3 w-3" />
-                  </button>
-                </AppTooltip>
+                {column.id !== 'done' && column.id !== 'review' && (
+                  <AppTooltip content={`Create Task in ${column.title}`}>
+                    <button
+                      className="grid h-6 w-6 place-items-center rounded-md border border-dashed border-muted-foreground/30 text-muted-foreground/50 hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleCreateClick(column.id)
+                      }}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </button>
+                  </AppTooltip>
+                )}
               </div>
 
               <OverlayScrollbarsComponent
@@ -354,9 +364,20 @@ export function KanbanBoard({
                 {loadingState ? (
                   Array.from({ length: 3 }).map((_, idx) => <Skeleton key={idx} className="h-28 w-full rounded-lg" />)
                 ) : column.items.length === 0 ? (
-                  <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
-                    <p className="text-[10px] uppercase tracking-widest text-muted-foreground/30">{column.title}</p>
-                  </div>
+                  column.id !== 'done' && column.id !== 'review' ? (
+                    <button
+                      type="button"
+                      className="w-full h-full min-h-[200px] flex flex-col items-center justify-center cursor-pointer hover:bg-primary/5 rounded-lg transition-colors group/empty"
+                      onClick={() => handleCreateClick(column.id)}
+                    >
+                      <Plus className="h-5 w-5 text-muted-foreground/20 group-hover/empty:text-primary/40 transition-colors mb-2" />
+                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground/20 group-hover/empty:text-muted-foreground/40 transition-colors">Click to add task</p>
+                    </button>
+                  ) : (
+                    <div className="w-full h-full min-h-[200px] flex items-center justify-center">
+                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground/15">No completed tasks</p>
+                    </div>
+                  )
                 ) : (
                   column.items.map((item) => {
                     return (
@@ -428,8 +449,8 @@ export function KanbanBoard({
                         <p className="mt-1.5 line-clamp-2 text-[12px] font-bold leading-[1.4] text-foreground/90 group-hover:text-foreground transition-colors">
                           {item.title || item.description || item.last_message || item.error || 'No message'}
                         </p>
-                        <div className="mt-3 flex items-center justify-between border-t border-border/40 pt-2.5">
-                          <div data-no-drag="true">
+                        <div className="mt-3 flex items-center justify-between border-t border-border/40 pt-2.5 overflow-hidden">
+                          <div data-no-drag="true" className="min-w-0">
                             <AgentSelector
                               value={item.assignee_id || ''}
                               agents={availableAgents}

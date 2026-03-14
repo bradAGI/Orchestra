@@ -124,6 +124,8 @@ func NewRouterWithPubSub(
 	protected.Post("/api/v1/projects/{project_id}/git/commit", server.PostGitCommit)
 	protected.Post("/api/v1/projects/{project_id}/git/push", server.PostGitPush)
 	protected.Post("/api/v1/projects/{project_id}/git/pull", server.PostGitPull)
+	protected.Post("/api/v1/projects/{project_id}/github/disconnect", server.HandleGitHubDisconnect)
+	protected.Get("/api/v1/projects/{project_id}/github/issues", server.GetProjectGitHubIssues)
 	protected.Get("/api/v1/sessions", server.GetSessions)
 	protected.Get("/api/v1/sessions/{session_id}", server.GetSessionDetail)
 	protected.Post("/api/v1/issues/{issue_identifier}/pr", server.CreateGitHubPR)

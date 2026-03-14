@@ -4,25 +4,18 @@ import {
   FileText,
   FolderTree,
   History,
-  LayoutDashboard,
+  ListTodo,
   Settings2,
   Terminal,
-  Ticket,
 } from 'lucide-react'
 import type { SidebarItem } from '@/components/app-shell/types'
 
 export const sidebarItems: SidebarItem[] = [
   {
-    id: 'dashboard',
-    label: 'Dashboard',
-    description: 'Live runtime overview',
-    icon: LayoutDashboard,
-  },
-  {
     id: 'issues',
     label: 'Tasks',
     description: 'Task board and inspector',
-    icon: Ticket,
+    icon: ListTodo,
   },
   {
     id: 'projects',
@@ -139,5 +132,5 @@ export function getSectionVisibility(activeSection: SectionID): SectionVisibilit
 }
 
 export function getCurrentSectionMeta(activeSection: SectionID): { label: string; title: string } {
-  return sectionMeta[activeSection] ?? sectionMeta.dashboard
+  return sectionMeta[activeSection] ?? sectionMeta.issues
 }

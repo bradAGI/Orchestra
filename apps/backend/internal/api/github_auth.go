@@ -2,11 +2,13 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os/exec"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/go-github/v69/github"
 	"golang.org/x/oauth2"
 	githuboauth "golang.org/x/oauth2/github"
@@ -108,4 +110,33 @@ func (s *Server) HandleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 func (s *Server) updateProjectGitHubToken(ctx context.Context, projectID, token string) error {
 	_, err := s.db.ExecContext(ctx, "UPDATE projects SET github_token = ? WHERE id = ?", token, projectID)
 	return err
+}
+
+func (s *Server) HandleGitHubDisconnect(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	if projectID == "" {
+		writeJSONError(w, http.StatusBadRequest, "missing_project_id", "project_id is required")
+		return
+	}
+
+	result, err := s.db.ExecContext(r.Context(), "UPDATE projects SET github_token = '' WHERE id = ?", projectID)
+	if err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Msg("failed to disconnect github")
+		writeJSONError(w, http.StatusInternalServerError, "disconnect_failed", "failed to disconnect github")
+		return
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "disconnect_failed", "failed to confirm disconnect")
+		return
+	}
+	if rowsAffected == 0 {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
 }

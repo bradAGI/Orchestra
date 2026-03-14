@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/orchestra/orchestra/apps/backend/internal/utils/git"
+	"github.com/orchestra/orchestra/apps/backend/internal/utils/github"
 	"github.com/orchestra/orchestra/apps/backend/internal/workspace"
 )
 
@@ -640,4 +641,31 @@ func (s *Server) GetProjectGitDiff(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.Write(out)
+}
+
+func (s *Server) GetProjectGitHubIssues(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
+		// No GitHub connection - return empty array
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]any{})
+		return
+	}
+
+	issues, err := github.ListIssues(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken)
+	if err != nil {
+		s.logger.Warn().Err(err).Str("project_id", projectID).Msg("failed to fetch github issues")
+		writeJSONError(w, http.StatusBadGateway, "github_fetch_failed", "failed to fetch issues from GitHub")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(issues)
 }

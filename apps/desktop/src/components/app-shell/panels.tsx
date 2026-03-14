@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Ansi from 'ansi-to-react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import { Activity, AlertCircle, AlertTriangle, AppWindow, Bot, Check, CheckCircle2, ChevronDown, Circle, CircleDashed, Cpu, FileText, Folder, FolderTree, GitBranch, Loader2, ListChecks, MoreHorizontal, ShieldCheck, SignalHigh, SignalLow, SignalMedium, Square, Terminal, User, Users, Wrench, Clock, Search, LayoutDashboard, ListTodo, History, Ticket, Database, Settings2, Sun, Moon, Download, RefreshCcw, Info, BarChart3, Zap, Layout, Rows, Play, ChevronRight, File, ExternalLink, Plus, Trash2, Keyboard, X, TrendingUp, Code, Layers } from 'lucide-react'
+import { Activity, AlertCircle, AlertTriangle, AppWindow, Bot, Check, CheckCircle2, ChevronDown, Circle, CircleDashed, Cpu, Eye, EyeOff, FileText, Folder, FolderTree, GitBranch, Loader2, ListChecks, MoreHorizontal, ShieldCheck, SignalHigh, SignalLow, SignalMedium, Square, Terminal, User, Users, Globe, Wrench, Clock, Search, LayoutDashboard, ListTodo, History, Ticket, Database, Settings2, Sun, Moon, Download, RefreshCcw, Info, BarChart3, Zap, Layout, Rows, Play, ChevronRight, File, ExternalLink, Plus, Trash2, Keyboard, X, TrendingUp, Code, Layers } from 'lucide-react'
 import * as Tooltip from '@radix-ui/react-tooltip'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -38,7 +38,7 @@ import {
 } from '@/lib/orchestra-client'
 import type { SnapshotPayload, Project, ProjectStats, GlobalStats } from '@/lib/orchestra-types'
 import { usePlatform } from '@/hooks/use-platform'
-import { AgentSelector, CustomDropdown, ProjectSelector } from '@/components/app-shell/shared/controls'
+import { AgentSelector, CustomDropdown, ProjectSelector, getAgentIcon } from '@/components/app-shell/shared/controls'
 
 type BackendProfile = {
   id: string
@@ -90,204 +90,125 @@ export function DashboardOverview({
           ?.map((running) => issues.find((issue) => (issue.id === running.issue_id || issue.issue_id === running.issue_id))?.project_id)
           .filter(Boolean)
       )
-
-      const activeA = activeProjectIds.has(a.id) ? 1 : 0
-      const activeB = activeProjectIds.has(b.id) ? 1 : 0
       
-      if (activeA !== activeB) return activeB - activeA
+      const aActive = activeProjectIds.has(a.id)
+      const bActive = activeProjectIds.has(b.id)
+      if (aActive && !bActive) return -1
+      if (!aActive && bActive) return 1
 
-      // 2. Check last active date
-      const lastA = stats[a.id]?.last_active ? new Date(stats[a.id].last_active).getTime() : 0
-      const lastB = stats[b.id]?.last_active ? new Date(stats[b.id].last_active).getTime() : 0
-      
-      if (lastA !== lastB) return lastB - lastA
-
-      // 3. Fallback to total sessions
-      const sA = stats[a.id]?.total_sessions ?? 0
-      const sB = stats[b.id]?.total_sessions ?? 0
-      return sB - sA
-    }).slice(0, 6)
-  }, [projects, issues, stats, snapshot])
-
-  const displayProjects = sortedProjects
+      // 2. Next by priority stats
+      const aStats = stats[a.id]
+      const bStats = stats[b.id]
+      if (aStats && bStats) {
+        if (aStats.total_sessions > bStats.total_sessions) return -1
+        if (aStats.total_sessions < bStats.total_sessions) return 1
+      }
+      return a.name.localeCompare(b.name)
+    })
+  }, [projects, stats, snapshot, issues])
 
   return (
-    <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 min-h-0">
-      {/* Workspace Activity (Left) */}
-      <div className="lg:col-span-2 flex flex-col min-h-[420px]">
-        <Card className="bg-card/40 backdrop-blur-xl border-border/40 shadow-2xl shadow-primary/5 flex-1 flex flex-col min-h-0 transition-all duration-500 hover:shadow-primary/10">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 px-4 pt-4 shrink-0">
-            <div className="space-y-1">
-              <CardTitle className="text-sm font-black uppercase tracking-[0.1em] flex items-center gap-2 text-foreground/90">
-                <FolderTree size={16} className="text-primary" />
-                Active Workspaces
-              </CardTitle>
-              <CardDescription className="text-[10px] font-medium text-muted-foreground/60">Cross-repository agent coordination hub</CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <AppTooltip content="Open all workspaces">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 rounded-xl px-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all"
-                  onClick={() => onProjectClick('')}
-                >
-                  Explore All
-                </Button>
-              </AppTooltip>
-            </div>
-          </CardHeader>
-          <CardContent className="flex-1 min-h-0 px-3 pb-4">
-            <div className="space-y-1.5 h-full overflow-auto custom-scrollbar">
-              {displayProjects.length === 0 ? (
-                <div className="py-12 text-center border-2 border-dashed border-border/40 rounded-2xl bg-muted/10">
-                  <Folder size={32} className="mx-auto mb-3 opacity-10" strokeWidth={1} />
-                  <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">No active workspaces discovered</p>
-                </div>
-              ) : displayProjects.map((p) => {
-                const runningIssue = snapshot?.running?.find(r => issues.find(i => i.id === r.issue_id)?.project_id === p.id)
-                const isActive = !!runningIssue
-                return (
-                  <div key={p.id} className="relative group">
-                    <button
-                      onClick={() => onProjectClick(p.id)}
-                      className={`flex w-full items-center justify-between rounded-xl border px-3 py-3 transition-all duration-300 shadow-sm ${
-                        isActive 
-                          ? 'border-primary/30 bg-primary/5 hover:bg-primary/10 shadow-lg shadow-primary/5' 
-                          : 'border-border/40 bg-muted/20 hover:bg-muted/40 hover:border-border/60 hover:-translate-y-0.5'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className={`rounded-xl p-2.5 transition-all duration-500 ${
-                          isActive 
-                            ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/40 rotate-0' 
-                            : 'bg-background border border-border/50 text-muted-foreground group-hover:text-primary group-hover:border-primary/20 -rotate-3 group-hover:rotate-0'
-                        }`}>
-                          <Folder size={18} strokeWidth={2.5} />
-                        </div>
-                        <div className="text-left min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-black tracking-tight group-hover:text-primary transition-colors truncate">{p.name}</p>
-                            {isActive && (
-                              <Badge className="h-3.5 px-1 bg-primary text-primary-foreground text-[7px] font-black uppercase animate-pulse">Running</Badge>
-                            )}
-                          </div>
-                          <p className="text-[10px] text-muted-foreground/50 font-mono truncate">{p.root_path}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2.5 shrink-0 pl-3 border-l border-border/30">
-                        {isActive && onJumpToTerminal && (
-                          <AppTooltip content="Jump to Terminal">
-                            <Button
-                              variant="secondary"
-                              size="icon"
-                              className="h-7 w-7 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 border border-primary/40"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                onJumpToTerminal(runningIssue.issue_identifier)
-                              }}
-                            >
-                              <Terminal size={12} strokeWidth={3} />
-                            </Button>
-                          </AppTooltip>
-                        )}
-                        <div className="min-w-[86px] rounded-xl border border-border/50 bg-background/80 px-2.5 py-1.5 text-right shadow-sm transition-colors group-hover:border-primary/25 group-hover:bg-primary/[0.04]">
-                          <span className="block text-[7px] font-black uppercase tracking-[0.18em] text-muted-foreground/55">Sessions</span>
-                          <div className="mt-1 flex items-baseline justify-end gap-1">
-                            <span className="text-sm font-black tabular-nums leading-none text-foreground/90">{stats[p.id]?.total_sessions || 0}</span>
-                            <span className="text-[8px] font-bold uppercase tracking-wider text-muted-foreground/45">total</span>
-                          </div>
-                        </div>
-                        <ChevronRight size={16} className={`transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/20 group-hover:text-primary/40 group-hover:translate-x-0.5'}`} />
-                      </div>
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex items-center justify-between mb-4 shrink-0">
+        <div>
+          <h2 className="text-2xl font-black tracking-tighter">Operations Hub</h2>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Fleet Monitoring & Command</p>
+        </div>
+        <div className="flex gap-2">
+          {onCreateTask && (
+            <Button 
+              size="sm" 
+              onClick={onCreateTask}
+              className="h-8 px-4 bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 font-bold uppercase tracking-widest text-[10px]"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              New Task
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Fleet Distribution (Right) */}
-      <div className="flex flex-col">
-        <Card className="bg-card/40 backdrop-blur-xl border-border/40 shadow-2xl flex-1 flex flex-col min-h-0 overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-            <Cpu size={120} />
-          </div>
-          <CardHeader className="pb-4 shrink-0 relative z-10">
-            <CardTitle className="text-sm font-bold flex items-center gap-2 text-foreground/90">
-              <Cpu size={16} className="text-amber-500/70" />
-              Agent Distribution
-            </CardTitle>
-            <CardDescription className="text-[11px]">Provider workload across historical sessions</CardDescription>
-          </CardHeader>
-          <CardContent className="flex-1 min-h-0 relative z-10">
-            {!warehouseStats || !warehouseStats.provider_usage || Object.entries(warehouseStats.provider_usage).length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center py-12 opacity-20 grayscale">
-                <Activity size={48} className="mb-4" />
-                <p className="text-[10px] font-black uppercase tracking-[0.2em]">Telemetry Pending</p>
-              </div>
-            ) : (() => {
-              const providerColors: Record<string, { dot: string; bar: string }> = {
-                claude: { dot: 'bg-orange-500', bar: 'bg-gradient-to-r from-orange-600/50 to-orange-400/50' },
-                codex: { dot: 'bg-emerald-500', bar: 'bg-gradient-to-r from-emerald-600/50 to-emerald-400/50' },
-                gemini: { dot: 'bg-blue-500', bar: 'bg-gradient-to-r from-blue-600/50 to-blue-400/50' },
-                opencode: { dot: 'bg-violet-500', bar: 'bg-gradient-to-r from-violet-600/50 to-violet-400/50' },
-                anthropic: {
-                  dot: 'bg-emerald-500 dark:bg-blue-500',
-                  bar: 'bg-gradient-to-r from-emerald-600/50 to-emerald-400/50 dark:from-blue-600/50 dark:to-blue-400/50',
-                },
-                openai: {
-                  dot: 'bg-blue-500 dark:bg-emerald-500',
-                  bar: 'bg-gradient-to-r from-blue-600/50 to-blue-400/50 dark:from-emerald-600/50 dark:to-emerald-400/50',
-                },
-              }
-              const defaultColor = { dot: 'bg-primary', bar: 'bg-gradient-to-r from-primary/60 to-primary/30' }
-              const formatTokens = (t: number) => t >= 1_000_000 ? `${(t / 1_000_000).toFixed(1)}M` : t >= 1_000 ? `${(t / 1_000).toFixed(1)}K` : String(t)
-              const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
-              const maxTokens = Math.max(1, ...Object.values(warehouseStats.provider_usage))
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-6">
+          <MetricCard
+            title="Active Agents"
+            value={snapshot?.running?.length.toString() || '0'}
+            hint={`${snapshot?.counts?.running || 0} tasks currently executing across fleet`}
+            icon={<Cpu className="h-4 w-4" />}
+          />
+          <MetricCard
+            title="Total Throughput"
+            value={warehouseStats?.total_tokens?.toString() || '0'}
+            hint="Cumulative tasks finalized since epoch"
+            icon={<BarChart3 className="h-4 w-4" />}
+          />
+          <MetricCard
+            title="Project Load"
+            value={projects.length.toString()}
+            hint="Repositories managed by this control plane"
+            icon={<FolderTree className="h-4 w-4" />}
+          />
+        </div>
 
-              // Show all known providers, even those with 0 tokens
-              const allProviders = ['claude', 'codex', 'gemini', 'opencode', 'anthropic', 'openai']
-              const entries = allProviders.map(name => [name, warehouseStats.provider_usage[name] ?? 0] as const)
-
-              return (
-                <div className="space-y-4">
-                  {entries.map(([name, tokens]) => {
-                    const percentage = tokens > 0 ? Math.max(5, (tokens / maxTokens) * 100) : 0
-                    const colors = providerColors[name] ?? defaultColor
-                    return (
-                      <div key={name} className="space-y-2 group/bar">
-                        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
-                          <span className="flex items-center gap-2">
-                            <div className={`h-1.5 w-1.5 rounded-full ${colors.dot} shadow-[0_0_8px_rgba(var(--primary),0.4)]`} />
-                            {capitalize(name)}
-                          </span>
-                          <span className="text-muted-foreground group-hover/bar:text-primary transition-colors">
-                            {tokens > 0 ? formatTokens(tokens) : <span className="text-muted-foreground/30">no data</span>}
-                          </span>
-                        </div>
-                        <div className="h-1.5 w-full bg-muted/30 rounded-full overflow-hidden border border-border/10">
-                          <div
-                            className={`h-full transition-all duration-1000 ease-out shadow-lg ${colors.bar}`}
-                            style={{ width: `${percentage}%` }}
-                          />
-                        </div>
+        <div className="grid grid-cols-12 gap-6">
+          <div className="col-span-12 lg:col-span-8 space-y-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Layout className="h-4 w-4 text-primary" />
+              <h3 className="text-xs font-black uppercase tracking-widest">Active Projects</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {sortedProjects.map((project) => (
+                <div 
+                  key={project.id} 
+                  onClick={() => onProjectClick(project.id)}
+                  className="group relative p-6 rounded-3xl border border-border/60 bg-card hover:border-primary/40 hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500 cursor-pointer overflow-hidden"
+                >
+                  <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                      <ChevronRight className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-2xl bg-muted/50 flex items-center justify-center text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-500">
+                        <Folder className="h-5 w-5" />
                       </div>
-                    )
-                  })}
+                      <div>
+                        <h4 className="font-black tracking-tight text-lg">{project.name}</h4>
+                        <p className="text-[10px] text-muted-foreground font-medium truncate max-w-[150px]">{project.root_path}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2 pt-2">
+                      <div className="p-3 rounded-2xl bg-muted/30 border border-border/20">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">In Progress</p>
+                        <p className="text-xl font-black tabular-nums">{stats[project.id]?.total_sessions || 0}</p>
+                      </div>
+                      <div className="p-3 rounded-2xl bg-muted/30 border border-border/20">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">Completed</p>
+                        <p className="text-xl font-black tabular-nums">{((stats[project.id]?.total_input || 0) + (stats[project.id]?.total_output || 0)).toLocaleString()}</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )
-            })()}
-          </CardContent>
-        </Card>
+              ))}
+            </div>
+          </div>
+
+          <div className="col-span-12 lg:col-span-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Zap className="h-4 w-4 text-primary" />
+              <h3 className="text-xs font-black uppercase tracking-widest">Runtime Events</h3>
+            </div>
+            <div className="h-full min-h-[400px]">
+              <div className="text-center text-muted-foreground/30 py-8 text-xs">Events will appear here</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
 }
-
-export { TimelineCard } from '@widgets/timeline/TimelineCard'
 
 export function SettingsCard({
   loadingConfig,
@@ -343,153 +264,147 @@ export function SettingsCard({
   ] as const
 
   return (
-    <Card className="border bg-card shadow-lg dark:bg-card flex flex-col h-full overflow-hidden">
-      <CardHeader className="border-b border-border/40 pb-0 shrink-0">
-        <CardTitle className="mb-2">System Settings</CardTitle>
-        <CardDescription className="mb-4 text-xs font-medium">Configure orchestrator runtime and security parameters.</CardDescription>
+    <Card className="group relative overflow-hidden border border-border/60 bg-gradient-to-br from-card via-card/98 to-muted/5 shadow-2xl shadow-primary/5 transition-all duration-500 flex flex-col flex-1">
+      {/* Decorative premium elements */}
+      <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-primary/5 blur-3xl transition-all duration-1000 group-hover:bg-primary/10" />
+      
+      <CardHeader className="relative border-b border-border/40 pb-0 shrink-0 bg-muted/5 pt-4">
+        <div className="flex items-center justify-between mb-4 px-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-primary/10 p-2 text-primary shadow-inner">
+              <Settings2 className="h-4 w-4" />
+            </div>
+            <div>
+              <CardTitle className="text-xl font-black tracking-tighter">System Settings</CardTitle>
+              <CardDescription className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50">
+                Fleet Configuration
+              </CardDescription>
+            </div>
+          </div>
+        </div>
 
-        <div className="flex gap-1">
+        <div className="flex gap-1 px-2">
           {tabs.map((tab) => (
             <AppTooltip key={tab.id} content={tab.tooltip}>
               <button
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === tab.id
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
+                className={`relative flex items-center gap-2 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all duration-300 rounded-t-lg ${activeTab === tab.id
+                  ? 'text-primary bg-background'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
                   }`}
               >
                 {tab.icon}
                 {tab.label}
+                {activeTab === tab.id && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full" />
+                )}
               </button>
             </AppTooltip>
           ))}
         </div>
       </CardHeader>
-      <CardContent className="pt-6 flex-1 min-h-0 overflow-y-auto custom-scrollbar">
-        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+
+      <CardContent className="relative pt-6 flex-1 min-h-0 overflow-y-auto custom-scrollbar bg-background/30 backdrop-blur-sm px-6 flex flex-col">
+        <div className="w-full flex-1 flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-400">
           {activeTab === 'backend' && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                <Database className="h-3.5 w-3.5" />
-                Connection Profiles
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-border/40 bg-card p-6 shadow-sm transition-all hover:shadow-md">
+                <BackendConfigForm
+                  loadingConfig={loadingConfig}
+                  savingConfig={savingConfig}
+                  profilesPending={profilesPending}
+                  config={config}
+                  backendProfiles={backendProfiles}
+                  activeProfileId={activeProfileId}
+                  onSaveBackendConfig={onSaveBackendConfig}
+                  onSetActiveProfile={onSetActiveProfile}
+                  onCreateProfile={onCreateProfile}
+                  onDeleteProfile={onDeleteProfile}
+                  disabled={loadingConfig || savingConfig || profilesPending}
+                />
               </div>
-              <BackendConfigForm
-                loadingConfig={loadingConfig}
-                savingConfig={savingConfig}
-                profilesPending={profilesPending}
-                config={config}
-                backendProfiles={backendProfiles}
-                activeProfileId={activeProfileId}
-                onSaveBackendConfig={onSaveBackendConfig}
-                onSetActiveProfile={onSetActiveProfile}
-                onCreateProfile={onCreateProfile}
-                onDeleteProfile={onDeleteProfile}
-                disabled={loadingConfig || savingConfig || profilesPending}
-              />
             </div>
           )}
 
           {activeTab === 'agents' && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                <Zap className="h-3.5 w-3.5" />
-                Fleet Configuration
-              </div>
+            <div className="space-y-6 flex-1 flex flex-col">
               {agentConfig ? (
-                <AgentConfigForm
-                  agentConfig={agentConfig}
-                  onSave={onSaveAgentConfig}
-                  disabled={savingConfig || loadingConfig}
-                />
+                <div className="rounded-2xl border border-border/40 bg-card p-6 shadow-sm transition-all hover:shadow-md">
+                  <AgentConfigForm
+                    agentConfig={agentConfig}
+                    onSave={onSaveAgentConfig}
+                    disabled={savingConfig || loadingConfig}
+                  />
+                </div>
               ) : (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-12 text-center text-muted-foreground">
-                  <Activity className="h-8 w-8 mb-2 opacity-20" />
-                  <p className="text-xs italic uppercase tracking-wider">No agent configuration loaded from active profile.</p>
+                <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/60 bg-muted/5 py-16 text-center text-muted-foreground">
+                  <Activity className="h-8 w-8 opacity-20 mb-3" />
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em]">No agent configuration loaded</p>
                 </div>
               )}
             </div>
           )}
 
           {activeTab === 'migration' && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                <RefreshCcw className="h-3.5 w-3.5" />
-                Workspace Transfer
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Migrate issue workspaces between filesystem targets. This tool will recursively copy git state and artifacts.
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <WorkspaceMigrationDialog
-                  migrationPending={migrationPending}
-                  config={config}
-                  migrationFrom={migrationFrom}
-                  migrationTo={migrationTo}
-                  migrationPlan={migrationPlan}
-                  onMigrationFromChange={onMigrationFromChange}
-                  onMigrationToChange={onMigrationToChange}
-                  onMigrationPlan={onMigrationPlan}
-                  onMigrationApply={onMigrationApply}
-                />
+            <div className="space-y-6 flex-1 flex flex-col">
+              <div className="rounded-2xl border border-border/40 bg-card p-6 shadow-sm transition-all hover:shadow-md">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-primary/80">
+                    <RefreshCcw className="h-4 w-4" />
+                    <h3 className="text-xs font-black uppercase tracking-wider">Workspace Transfer</h3>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed bg-muted/20 p-3 rounded-xl border border-border/20 italic">
+                    Relocate issue workspaces across filesystem targets. This tool recursively copies git state, artifacts, and logs.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <WorkspaceMigrationDialog
+                      migrationPending={migrationPending}
+                      config={config}
+                      migrationFrom={migrationFrom}
+                      migrationTo={migrationTo}
+                      migrationPlan={migrationPlan}
+                      onMigrationFromChange={onMigrationFromChange}
+                      onMigrationToChange={onMigrationToChange}
+                      onMigrationPlan={onMigrationPlan}
+                      onMigrationApply={onMigrationApply}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
           {activeTab === 'shortcuts' && (
-            <div className="space-y-6">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                <Keyboard className="h-3.5 w-3.5" />
-                Keyboard Command Mapping
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Global shortcuts for rapid navigation and fleet management.
-              </p>
-              
-              <div className="grid gap-3">
-                <div className="flex items-center justify-between p-4 rounded-xl border border-border/20 bg-muted/10">
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold">Command Palette</p>
-                    <p className="text-[10px] text-muted-foreground">Search and navigate instantly across the platform.</p>
+            <div className="space-y-6 pb-6 flex-1 flex flex-col">
+              <div className="grid gap-3 sm:grid-cols-2">
+                {[
+                  { label: 'Command Palette', desc: 'Search and navigate instantly', keys: [isMac ? '⌘' : 'Ctrl', 'K'] },
+                  { label: 'Refresh Tracker', desc: 'Full state synchronization', keys: [isMac ? '⌘' : 'Ctrl', 'R'] },
+                  { label: 'Toggle Sidebar', desc: 'Collapse/expand navigation', keys: [isMac ? '⌘' : 'Ctrl', '/'] },
+                  { label: 'Quick Switch', desc: 'Back to operations overview', keys: [isMac ? '⌥' : 'Alt', '1'] },
+                ].map((s, idx) => (
+                  <div key={idx} className="group/item flex items-center justify-between p-4 rounded-xl border border-border/40 bg-card shadow-sm transition-all hover:border-primary/20">
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-black tracking-tight">{s.label}</p>
+                      <p className="text-[10px] text-muted-foreground leading-tight">{s.desc}</p>
+                    </div>
+                    <div className="flex gap-1">
+                      {s.keys.map(k => (
+                        <kbd key={k} className="flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-lg bg-muted border border-border/60 text-[9px] font-black font-mono shadow-sm">
+                          {k}
+                        </kbd>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex gap-1.5">
-                    <kbd className="px-2 py-1 rounded bg-muted border border-border text-[10px] font-mono">{isMac ? '⌘' : 'Ctrl'}</kbd>
-                    <kbd className="px-2 py-1 rounded bg-muted border border-border text-[10px] font-mono">K</kbd>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-4 rounded-xl border border-border/20 bg-muted/10">
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold">Refresh Tracker</p>
-                    <p className="text-[10px] text-muted-foreground">Manually trigger a full state synchronization.</p>
-                  </div>                   <div className="flex gap-1.5">
-                    <kbd className="px-2 py-1 rounded bg-muted border border-border text-[10px] font-mono">{isMac ? '⌘' : 'Ctrl'}</kbd>
-                    <kbd className="px-2 py-1 rounded bg-muted border border-border text-[10px] font-mono">R</kbd>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-4 rounded-xl border border-border/20 bg-muted/10">
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold">Toggle Sidebar</p>
-                    <p className="text-[10px] text-muted-foreground">Collapse or expand the primary navigation rail.</p>
-                  </div>                   <div className="flex gap-1.5">
-                    <kbd className="px-2 py-1 rounded bg-muted border border-border text-[10px] font-mono">{isMac ? '⌘' : 'Ctrl'}</kbd>
-                    <kbd className="px-2 py-1 rounded bg-muted border border-border text-[10px] font-mono">/</kbd>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-4 rounded-xl border border-border/20 bg-muted/10">
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold">Quick Switch (Dashboard)</p>
-                    <p className="text-[10px] text-muted-foreground">Jump back to the operations overview.</p>
-                  </div>                   <div className="flex gap-1.5">
-                    <kbd className="px-2 py-1 rounded bg-muted border border-border text-[10px] font-mono">{isMac ? '⌥' : 'Alt'}</kbd>
-                    <kbd className="px-2 py-1 rounded bg-muted border border-border text-[10px] font-mono">1</kbd>
-                  </div>
-                </div>
+                ))}
               </div>
 
-              <div className="pt-4 border-t border-border">
-                <p className="text-[10px] text-muted-foreground italic">Note: Custom shortcut remapping is currently in development and will be available in v1.1.0.</p>
+              <div className="p-4 rounded-xl border border-dashed border-border/60 bg-muted/5 flex gap-3 items-start">
+                <Info className="h-3.5 w-3.5 text-primary/60 shrink-0 mt-0.5" />
+                <p className="text-[10px] text-muted-foreground italic leading-relaxed">
+                  Custom shortcut remapping is currently in development and will be available in v1.1.0. 
+                  This will include per-agent command overrides.
+                </p>
               </div>
             </div>
           )}
@@ -516,44 +431,65 @@ function AgentConfigForm({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <label className="text-xs text-muted-foreground">Primary Provider</label>
-        <CustomDropdown
-          className="w-64"
-          value={provider}
-          options={Object.keys(commands).map((p) => ({ label: p, value: p, icon: <Activity className="h-3 w-3" /> }))}
-          onChange={setProvider}
-          disabled={disabled}
-          placeholder="Select provider..."
-        />
+    <div className="space-y-6">
+      <div className="grid gap-6 sm:grid-cols-2">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-foreground/80">Default Runner</h4>
+          </div>
+          <div className="p-4 rounded-xl bg-muted/20 border border-border/40">
+            <CustomDropdown
+              className="w-full"
+              value={provider}
+              options={Object.keys(commands).map((p) => ({ label: p, value: p, icon: getAgentIcon(p) }))}
+              onChange={setProvider}
+              disabled={disabled}
+              placeholder="Select provider..."
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center p-4 rounded-xl bg-primary/5 border border-primary/10">
+          <p className="text-[10px] text-muted-foreground leading-relaxed italic">
+            Select the primary agent provider for new task executions. This can be overridden per-task.
+          </p>
+        </div>
       </div>
 
       <div className="space-y-3">
-        <label className="text-xs text-muted-foreground">Agent Commands</label>
-        {Object.keys(commands).length === 0 ? (
-          <p className="text-[10px] text-muted-foreground/50">No agent runners configured in backend.</p>
-        ) : Object.keys(commands).map((p) => (
-          <div key={p} className="space-y-1">
-            <span className="text-[10px] font-bold uppercase text-muted-foreground/60">{p}</span>
-            <input
-              className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm font-mono"
-              value={commands[p]}
-              onChange={(e) => handleCommandChange(p, e.target.value)}
-              placeholder={`command for ${p}...`}
-              disabled={disabled}
-            />
-          </div>
-        ))}
+        <div className="flex items-center gap-2">
+          <Terminal className="h-3.5 w-3.5 text-primary" />
+          <h4 className="text-[10px] font-black uppercase tracking-widest text-foreground/80">Runner Executables</h4>
+        </div>
+        <div className="grid gap-2">
+          {Object.keys(commands).length === 0 ? (
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 p-4 border border-dashed rounded-xl">No runners configured.</p>
+          ) : Object.keys(commands).map((p) => (
+            <div key={p} className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 border border-border/40 transition-all hover:bg-muted/30">
+              <span className="min-w-[100px] text-[10px] font-black uppercase tracking-widest text-primary/70">{p}</span>
+              <input
+                className="h-9 flex-1 rounded-lg border border-border/60 bg-background px-3 text-xs font-mono focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                value={commands[p]}
+                onChange={(e) => handleCommandChange(p, e.target.value)}
+                placeholder="Executable path or command..."
+                disabled={disabled}
+              />
+            </div>
+          ))}
+        </div>
       </div>
 
-      <Button
-        size="sm"
-        onClick={() => void onSave({ agent_provider: provider, commands })}
-        disabled={disabled || !provider}
-      >
-        Update Agent Configuration
-      </Button>
+      <div className="flex justify-end pt-4 border-t border-border/40">
+        <Button
+          size="sm"
+          onClick={() => void onSave({ agent_provider: provider, commands })}
+          disabled={disabled || !provider}
+          className="px-6 font-black uppercase tracking-widest text-[9px] h-9 rounded-lg"
+        >
+          {disabled ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Update Agent Configuration'}
+        </Button>
+      </div>
     </div>
   )
 }
@@ -841,6 +777,7 @@ function BackendConfigForm({
   const [baseUrl, setBaseUrl] = useState('')
   const [apiToken, setApiToken] = useState('')
   const [newProfileName, setNewProfileName] = useState('')
+  const [showToken, setShowToken] = useState(false)
 
   useEffect(() => {
     setBaseUrl(config?.baseUrl ?? '')
@@ -853,96 +790,165 @@ function BackendConfigForm({
   }
 
   return (
-    <div className="space-y-2">
-      <label className="block text-xs text-muted-foreground">
-        Profile
-        <div className="mt-1 flex gap-2">
-          <CustomDropdown
-            className="w-64"
-            value={activeProfileId}
-            options={backendProfiles.map((p) => ({ label: p.name, value: p.id, icon: <ShieldCheck className="h-3 w-3" /> }))}
-            onChange={(val) => void onSetActiveProfile(val)}
-            disabled={disabled || backendProfiles.length === 0}
-          />
-          <AppTooltip content="Delete this profile">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-full border bg-muted/50 px-4 text-foreground hover:bg-accent dark:text-foreground dark:hover:bg-accent"
-              disabled={disabled || backendProfiles.length <= 1 || activeProfileId === ''}
-              onClick={() => {
-                if (activeProfileId !== '') {
-                  void onDeleteProfile(activeProfileId)
-                }
-              }}
-            >
-              Delete
-            </Button>
-          </AppTooltip>
+    <div className="flex h-full min-h-0 flex-col gap-6">
+      <div className="flex items-center justify-between pb-2 border-b border-border/20">
+        <div className="flex items-center gap-2">
+          <Database className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-black uppercase tracking-wider">Connection Profiles</h3>
         </div>
-      </label>
-      <label className="block text-xs text-muted-foreground">
-        New Profile Name
-        <div className="mt-1 flex gap-2">
-          <input
-            className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
-            value={newProfileName}
-            onChange={(event) => setNewProfileName(event.target.value)}
-            placeholder="Production, Staging, Local..."
-            disabled={disabled}
-          />
+      </div>
+
+      <div className="grid flex-1 content-start gap-6 sm:grid-cols-2">
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Users className="h-3.5 w-3.5 text-primary" />
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-foreground/80">Profile Management</h4>
+          </div>
+          
+          <div className="space-y-4 p-4 rounded-xl bg-muted/20 border border-border/40">
+            <label className="space-y-1.5 block">
+              <span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground px-1">Active Profile</span>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <CustomDropdown
+                    className="w-full"
+                    value={activeProfileId}
+                    options={backendProfiles.map((p) => ({ label: p.name, value: p.id, icon: <ShieldCheck className="h-3 w-3" /> }))}
+                    onChange={(val) => void onSetActiveProfile(val)}
+                    disabled={disabled || backendProfiles.length === 0}
+                  />
+                  {profilesPending && (
+                    <div className="absolute right-8 top-1/2 -translate-y-1/2">
+                      <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                    </div>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label="Delete"
+                  className="h-9 px-3 rounded-lg border-destructive/20 bg-destructive/5 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all"
+                  disabled={disabled || backendProfiles.length <= 1 || activeProfileId === ''}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    if (activeProfileId !== '') {
+                      void onDeleteProfile(activeProfileId)
+                    }
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </label>
+
+            <label className="space-y-1.5 block pt-2 border-t border-border/20">
+              <span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground px-1">New Profile</span>
+              <div className="flex gap-2">
+                <input
+                  className="h-9 flex-1 rounded-lg border border-border bg-background px-3 text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+                  value={newProfileName}
+                  onChange={(event) => setNewProfileName(event.target.value)}
+                  placeholder="Production, Staging, Local..."
+                  disabled={disabled}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label="Create"
+                  className="h-9 px-3 rounded-lg bg-primary/5 border-primary/20 text-primary hover:bg-primary hover:text-primary-foreground"
+                  disabled={disabled || newProfileName.trim() === ''}
+                  onClick={() => {
+                    void onCreateProfile(newProfileName.trim())
+                    setNewProfileName('')
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <SignalHigh className="h-3.5 w-3.5 text-primary" />
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-foreground/80">Connection Parameters</h4>
+          </div>
+
+          <div className="space-y-4 p-4 rounded-xl bg-muted/20 border border-border/40">
+            <label className="space-y-1.5 block">
+              <span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground px-1">Endpoint URL</span>
+              <div className="relative">
+                <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40">
+                  <Globe className="h-3 w-3" />
+                </div>
+                <input
+                  className="h-9 w-full rounded-lg border border-border bg-background pl-8 pr-3 text-xs font-mono focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+                  value={baseUrl}
+                  onChange={(event) => setBaseUrl(event.target.value)}
+                  placeholder="http://127.0.0.1:4010"
+                  disabled={disabled}
+                />
+              </div>
+            </label>
+
+            <label className="space-y-1.5 block">
+              <span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground px-1">Access Token</span>
+              <div className="relative group/token">
+                <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40 group-focus-within/token:text-primary/60 transition-colors">
+                  <ShieldCheck className="h-3 w-3" />
+                </div>
+                <input
+                  type={showToken ? 'text' : 'password'}
+                  className="h-9 w-full rounded-lg border border-border bg-background pl-8 pr-9 text-xs font-mono focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+                  value={apiToken}
+                  onChange={(event) => setApiToken(event.target.value)}
+                  placeholder="Bearer token (optional)"
+                  disabled={disabled}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowToken(!showToken)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-all"
+                  title={showToken ? 'Hide token' : 'Reveal token'}
+                >
+                  {showToken ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                </button>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between pt-4 border-t border-border/20">
+        <div className="flex items-center gap-3">
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="h-9 rounded-full border bg-muted/50 px-4 text-foreground hover:bg-accent dark:text-foreground dark:hover:bg-accent"
-            disabled={disabled || newProfileName.trim() === ''}
-            onClick={() => {
-              void onCreateProfile(newProfileName.trim())
-              setNewProfileName('')
-            }}
+            className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 hover:text-foreground h-9 px-4"
+            onClick={syncFromConfig}
+            disabled={disabled}
           >
-            Create
+            <RefreshCcw className="h-3 w-3 mr-2" />
+            Revert
           </Button>
+          <div className="hidden sm:flex items-center gap-2 text-primary/40 px-3 border-l border-border/20">
+            <Info className="h-3 w-3" />
+            <span className="text-[9px] font-medium italic">Base URL changes trigger reconnect.</span>
+          </div>
         </div>
-      </label>
-      <label className="block text-xs text-muted-foreground">
-        Base URL
-        <input
-          className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-          value={baseUrl}
-          onChange={(event) => setBaseUrl(event.target.value)}
-          placeholder="http://127.0.0.1:4010"
-          disabled={disabled}
-        />
-      </label>
-      <label className="block text-xs text-muted-foreground">
-        API Token
-        <input
-          className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-          value={apiToken}
-          onChange={(event) => setApiToken(event.target.value)}
-          placeholder="optional bearer token"
-          disabled={disabled}
-        />
-      </label>
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-9 rounded-full border bg-muted/50 px-4 text-foreground hover:bg-accent dark:text-foreground dark:hover:bg-accent"
-          onClick={syncFromConfig}
-          disabled={disabled}
+        <Button 
+          onClick={() => void onSaveBackendConfig({ baseUrl: baseUrl.trim(), apiToken: apiToken.trim() })} 
+          disabled={disabled || baseUrl.trim() === ''}
+          className="px-6 shadow-lg shadow-primary/20 font-black uppercase tracking-widest text-[9px] h-9 rounded-lg"
         >
-          Reset
-        </Button>
-        <Button onClick={() => void onSaveBackendConfig({ baseUrl: baseUrl.trim(), apiToken: apiToken.trim() })} disabled={disabled || baseUrl.trim() === ''}>
-          {savingConfig ? 'Saving...' : 'Save Backend Config'}
+          {savingConfig ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save Backend Config'}
         </Button>
       </div>
-      <p className="text-xs text-muted-foreground">Updates the preload-stored backend target used by runtime state/SSE requests.</p>
     </div>
   )
 }
+
 
 function WorkspaceMigrationDialog({
   migrationPending,
