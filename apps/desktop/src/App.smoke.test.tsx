@@ -728,7 +728,7 @@ describe('App smoke render', () => {
     })
   })
 
-  it('shows polling mode status when bearer token is configured and does not open EventSource', async () => {
+  it('passes bearer token as query param to EventSource when configured', async () => {
     setupDesktopBridge({
       activeConfig: {
         baseUrl: 'http://127.0.0.1:4000',
@@ -746,10 +746,11 @@ describe('App smoke render', () => {
     render(<App />)
 
     await waitFor(() => {
-      expect(screen.getByText(/Polling/i)).toBeTruthy()
+      expect(eventSourceConstructCount).toBeGreaterThan(0)
     })
 
-    expect(eventSourceConstructCount).toBe(0)
+    const instance = eventSourceInstances[eventSourceInstances.length - 1]
+    expect(instance.url).toContain('token=smoke-token')
   })
 
   it('supports keyboard navigation in sidebar with ArrowDown', async () => {

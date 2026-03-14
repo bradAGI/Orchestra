@@ -132,6 +132,20 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
         }
     }
 
+    const handleDeleteMCPServer = async (name: string) => {
+        if (!config) return
+        const server = mcpServers.find(s => s.name === name)
+        if (!server?.id) return
+        if (!window.confirm(`Delete MCP server "${name}"?`)) return
+        try {
+            await deleteMCPServer(config, server.id)
+            await loadData()
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err)
+            setError(message || 'Failed to delete MCP server')
+        }
+    }
+
     const handleCreateMCPServer = async () => {
         if (!config || !newMcpName || !newMcpCommand) return
         setCreating(true)
@@ -315,7 +329,16 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                                 <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
                                                 <span className="text-xs font-black uppercase tracking-wider">{name}</span>
                                             </div>
-                                            <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 text-[8px] font-black">{tools.length} TOOLS</Badge>
+                                            <div className="flex items-center gap-1.5">
+                                                <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 text-[8px] font-black">{tools.length} TOOLS</Badge>
+                                                <button
+                                                    onClick={() => handleDeleteMCPServer(name)}
+                                                    className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground/30 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                                                    title="Delete server"
+                                                >
+                                                    <Trash2 size={10} />
+                                                </button>
+                                            </div>
                                         </div>
                                         <code className="block p-2 bg-muted/30 rounded border border-border/20 text-[9px] font-mono text-muted-foreground truncate">{cmd}</code>
                                         <div className="flex flex-wrap gap-1.5 pt-2">

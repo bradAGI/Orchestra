@@ -17,11 +17,17 @@ func requireBearerToken(token string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
 			expected := "Bearer " + token
-			if authHeader != expected {
-				writeJSONError(w, http.StatusUnauthorized, "unauthorized", "missing or invalid bearer token")
+			if authHeader == expected {
+				next.ServeHTTP(w, r)
 				return
 			}
-			next.ServeHTTP(w, r)
+			// Fallback: accept token via query parameter (needed for SSE/EventSource
+			// which cannot set Authorization headers).
+			if qToken := r.URL.Query().Get("token"); qToken == token {
+				next.ServeHTTP(w, r)
+				return
+			}
+			writeJSONError(w, http.StatusUnauthorized, "unauthorized", "missing or invalid bearer token")
 		})
 	}
 }

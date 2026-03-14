@@ -166,11 +166,14 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     }
 
     useEffect(() => {
+        // Clear errors and stale data when switching tabs
+        setTabError(null)
+
         if (!config || !project.id) return
+        if (activeTab === 'overview' || activeTab === 'tasks' || activeTab === 'terminal') return
 
         const loadTabData = async () => {
             setLoadingTab(true)
-            setTabError(null)
             try {
                 if (activeTab === 'files') {
                     const tree = await fetchProjectTree(config, project.id)

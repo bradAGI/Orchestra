@@ -42,19 +42,19 @@ const snapshot = normalizeSnapshotPayload({
 })
 
 describe('startRuntimeSync', () => {
-  it('uses polling when bearer token is set', async () => {
+  it('passes bearer token as query param when SSE is used', async () => {
     vi.useFakeTimers()
 
     const fetchSnapshot = vi.fn().mockResolvedValue(snapshot)
-    const statusMessages: string[] = []
     const createdSources: FakeEventSource[] = []
+    const createdUrls: string[] = []
 
     const sync = startRuntimeSync(
       { ...baseConfig, apiToken: 'secret' },
       {
         onSnapshot: () => {},
         onTimelineEvent: () => {},
-        onStatus: (message) => statusMessages.push(message),
+        onStatus: () => {},
         onError: () => {},
       },
       {
@@ -64,6 +64,7 @@ describe('startRuntimeSync', () => {
         createEventSource: (url) => {
           const source = new FakeEventSource()
           createdSources.push(source)
+          createdUrls.push(url)
           return source
         },
         setIntervalFn: (cb, ms) => setInterval(cb, ms) as unknown as number,
@@ -74,11 +75,9 @@ describe('startRuntimeSync', () => {
     )
 
     await vi.runOnlyPendingTimersAsync()
-    await vi.advanceTimersByTimeAsync(2000)
 
-    expect(createdSources).toHaveLength(0)
-    expect(fetchSnapshot).toHaveBeenCalled()
-    expect(statusMessages.some((message) => message.includes('SSE disabled while bearer token is set'))).toBe(true)
+    expect(createdSources).toHaveLength(1)
+    expect(createdUrls[0]).toContain('token=secret')
 
     sync.stop()
     vi.useRealTimers()

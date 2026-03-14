@@ -131,6 +131,24 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config }) => {
         }
     }
 
+    const filterTree = (items: DocItem[], query: string): DocItem[] => {
+        if (!query) return items
+        const lowerQuery = query.toLowerCase()
+        return items.reduce<DocItem[]>((acc, item) => {
+            if (item.is_folder) {
+                const filteredChildren = item.children ? filterTree(item.children, query) : []
+                if (filteredChildren.length > 0) {
+                    acc.push({ ...item, children: filteredChildren })
+                }
+            } else if (item.name.toLowerCase().includes(lowerQuery)) {
+                acc.push(item)
+            }
+            return acc
+        }, [])
+    }
+
+    const filteredDocs = useMemo(() => filterTree(docs, searchQuery), [docs, searchQuery])
+
     const renderTree = (items: DocItem[], level = 0) => {
         return items.sort((a, b) => {
             if (a.is_folder && !b.is_folder) return -1
@@ -239,7 +257,7 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config }) => {
                         <div className="p-3 space-y-1">
                             {loading && docs.length === 0 ? (
                                 [1, 2, 3, 4, 5, 6, 7].map(i => <Skeleton key={i} className="h-8 w-full mb-1 rounded-lg bg-muted/30" />)
-                            ) : renderTree(docs)}
+                            ) : renderTree(filteredDocs)}
                         </div>
                     </OverlayScrollbarsComponent>
                 </div>

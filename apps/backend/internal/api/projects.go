@@ -329,7 +329,32 @@ func (s *Server) DeleteProject(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) RefreshProject(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
+	projectID := chi.URLParam(r, "project_id")
+	if projectID == "" {
+		writeJSONError(w, http.StatusBadRequest, "invalid_request", "project_id is required")
+		return
+	}
+
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	// Re-scan git remote URL
+	_, remoteURL, err := git.ProjectInfo(r.Context(), project.RootPath)
+	if err != nil {
+		s.logger.Warn().Err(err).Str("project_id", projectID).Msg("could not refresh git info for project")
+	}
+
+	// Update GitHub info if detected
+	if owner, repo, ok := git.ParseGitHubRemote(remoteURL); ok {
+		s.logger.Info().Str("project_id", projectID).Str("owner", owner).Str("repo", repo).Msg("refreshed github repo info")
+		_ = s.db.UpdateProjectGitHubInfo(r.Context(), projectID, owner, repo)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 type FileNode struct {
@@ -343,10 +368,10 @@ func (s *Server) GetProjectFileContent(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "project_id")
 	filePath := r.URL.Query().Get("path")
 
-	s.logger.Info().
+	s.logger.Debug().
 		Str("project_id", projectID).
 		Str("file_path", filePath).
-		Msg("DEBUG: Handling file content request")
+		Msg("handling file content request")
 
 	project, err := s.db.GetProjectByID(r.Context(), projectID)
 	if err != nil {
@@ -505,7 +530,7 @@ func (s *Server) GetProjectGitStatus(w http.ResponseWriter, r *http.Request) {
 			Str("output", string(out)).
 			Msg("git status failed")
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]interface{}{})
+		json.NewEncoder(w).Encode([]any{})
 		return
 	}
 
@@ -529,7 +554,7 @@ func (s *Server) GetProjectGitStats(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "project_id")
 	project, err := s.db.GetProjectByID(r.Context(), projectID)
 	if err != nil {
-		s.logger.Error().Str("project_id", projectID).Err(err).Msg("DEBUG: Project not found in DB for git stats")
+		s.logger.Debug().Str("project_id", projectID).Err(err).Msg("project not found in DB for git stats")
 		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
 		return
 	}
@@ -537,9 +562,9 @@ func (s *Server) GetProjectGitStats(w http.ResponseWriter, r *http.Request) {
 	// Check if .git exists manually first
 	gitDir := filepath.Join(project.RootPath, ".git")
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-		s.logger.Warn().Str("path", gitDir).Msg("DEBUG: .git directory DOES NOT EXIST at root_path")
+		s.logger.Debug().Str("path", gitDir).Msg(".git directory does not exist at root_path")
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]interface{}{})
+		json.NewEncoder(w).Encode([]any{})
 		return
 	}
 
@@ -551,9 +576,9 @@ func (s *Server) GetProjectGitStats(w http.ResponseWriter, r *http.Request) {
 			Err(err).
 			Str("project_id", projectID).
 			Str("output", string(out)).
-			Msg("DEBUG: Git log command failed")
+			Msg("git log command failed")
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]interface{}{})
+		json.NewEncoder(w).Encode([]any{})
 		return
 	}
 
@@ -575,10 +600,10 @@ func (s *Server) GetProjectGitStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s.logger.Info().
+	s.logger.Debug().
 		Str("project_id", projectID).
 		Int("history_count", len(history)).
-		Msg("DEBUG: Returning git history to UI")
+		Msg("returning git history to UI")
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(history)

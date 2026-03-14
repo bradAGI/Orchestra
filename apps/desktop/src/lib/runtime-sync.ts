@@ -81,12 +81,6 @@ export function startRuntimeSync(config: BackendConfig, handlers: RuntimeSyncHan
   }
 
   const attachStream = () => {
-    if (config.apiToken && config.apiToken.trim() !== '') {
-      handlers.onStatus('SSE disabled while bearer token is set (polling mode)')
-      startPolling()
-      return
-    }
-
     if (!config.baseUrl || config.baseUrl.trim() === '') {
       handlers.onError('SSE disabled: invalid base URL.')
       startPolling()
@@ -94,7 +88,11 @@ export function startRuntimeSync(config: BackendConfig, handlers: RuntimeSyncHan
     }
 
     try {
-      stream = deps.createEventSource(new URL('/api/v1/events', config.baseUrl).toString())
+      const sseUrl = new URL('/api/v1/events', config.baseUrl)
+      if (config.apiToken && config.apiToken.trim() !== '') {
+        sseUrl.searchParams.set('token', config.apiToken.trim())
+      }
+      stream = deps.createEventSource(sseUrl.toString())
     } catch (e) {
       handlers.onError(`SSE disabled: failed to create EventSource: ${e instanceof Error ? e.message : 'unknown error'}`)
       startPolling()

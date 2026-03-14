@@ -422,12 +422,21 @@ func (s *Server) PatchIssue(w http.ResponseWriter, r *http.Request) {
 func (s *Server) GetIssueHistory(w http.ResponseWriter, r *http.Request) {
 	identifier := chi.URLParam(r, "issue_identifier")
 	runtime, ok := s.orchestrator.LookupIssue(identifier)
-	if !ok {
-		writeJSONError(w, http.StatusNotFound, "issue_not_found", "issue not found")
-		return
+
+	var issueID string
+	if ok {
+		issueID = runtime.IssueID
+	} else {
+		// Issue not running; try to find it via search
+		issues, err := s.orchestrator.SearchIssues(r.Context(), identifier)
+		if err != nil || len(issues) == 0 {
+			writeJSONError(w, http.StatusNotFound, "issue_not_found", "issue not found")
+			return
+		}
+		issueID = issues[0].ID
 	}
 
-	history, err := s.orchestrator.GetHistory(r.Context(), runtime.IssueID)
+	history, err := s.orchestrator.GetHistory(r.Context(), issueID)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "history_failed", err.Error())
 		return

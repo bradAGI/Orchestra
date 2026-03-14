@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 	session_uuid TEXT NOT NULL,
 	provider TEXT NOT NULL,
 	branch TEXT,
+	issue_id TEXT,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (project_id) REFERENCES projects(id)
 );
