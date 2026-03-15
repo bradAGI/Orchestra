@@ -36,8 +36,8 @@ export const sidebarItems: SidebarItem[] = [
   },
   {
     id: 'warehouse',
-    label: 'Warehouse',
-    description: 'Token analytics and archives',
+    label: 'Analytics',
+    description: 'Token usage and session archives',
     icon: Database,
   },
   {
@@ -99,7 +99,7 @@ const sectionMeta: Record<SectionID, { label: string; title: string }> = {
   issues: { label: 'Tracker', title: 'Tasks' },
   projects: { label: 'Workspace', title: 'Projects' },
   agents: { label: 'Compute', title: 'Agents' },
-  warehouse: { label: 'Analytics', title: 'Warehouse' },
+  warehouse: { label: 'Analytics', title: 'Analytics' },
   settings: { label: 'System', title: 'Settings' },
   docs: { label: 'Knowledge', title: 'Documentation' },
   console: { label: 'Runtime', title: 'Live Console' },
