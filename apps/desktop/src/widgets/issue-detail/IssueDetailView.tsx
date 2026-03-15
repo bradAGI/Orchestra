@@ -193,8 +193,13 @@ export function IssueDetailView({
   const isRunning = snapshot?.running?.some(r => r.issue_id === issueId || r.issue_identifier === identifier) ?? false
 
   // Fetch history on mount + poll while running (for live operational plan updates)
+  // Skip fetching when in Backlog/Todo — no agent data to show
   useEffect(() => {
     if (!config || !identifier) return
+    if (localState === 'Backlog' || localState === 'Todo') {
+      setIssueHistory([])
+      return
+    }
     setHistoryLoading(true)
     fetchIssueHistory(config, identifier)
       .then(setIssueHistory)
@@ -209,7 +214,7 @@ export function IssueDetailView({
         .catch(() => {})
     }, 5000)
     return () => clearInterval(interval)
-  }, [config, identifier, isRunning])
+  }, [config, identifier, isRunning, localState])
 
   // Fetch tab-specific data
   useEffect(() => {
