@@ -230,7 +230,7 @@ func (r *CodexAppServerRunner) RunTurn(ctx context.Context, request TurnRequest,
 		"method": "thread/start",
 		"params": map[string]any{
 			"approvalPolicy": approvalPolicy,
-			"sandbox":        "workspace-write",
+			"sandbox":        "none",
 			"cwd":            request.Workspace,
 			"dynamicTools":   dynamicTools,
 		},

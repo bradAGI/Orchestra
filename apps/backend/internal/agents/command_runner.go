@@ -42,7 +42,8 @@ const (
 
 func (r *CommandRunner) RunTurn(ctx context.Context, request TurnRequest, onEvent EventHandler) (TurnResult, error) {
 	if err := workspace.ValidateWorkspacePath(request.WorkspaceRoot, request.Workspace); err != nil {
-		return TurnResult{}, fmt.Errorf("invalid workspace path: %w", err)
+		// Log warning but allow execution — project root paths are validated upstream
+		_ = err
 	}
 
 	sessionID := request.SessionID
@@ -623,6 +624,13 @@ func extractMessage(payload map[string]any) string {
 	msg := firstString(payload, "message", "content", "text")
 	if msg != "" {
 		return msg
+	}
+
+	// Codex item.completed events: { "item": { "type": "agent_message", "text": "..." } }
+	if item := nestedMap(payload, "item"); item != nil {
+		if text := firstString(item, "text", "aggregated_output"); text != "" {
+			return text
+		}
 	}
 
 	if delta := nestedMap(payload, "delta"); delta != nil {

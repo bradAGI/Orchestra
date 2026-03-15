@@ -166,7 +166,7 @@ export function IssueDetailView({
   // Extract operational plan from the most recent agent message that contains checkboxes.
   // Agent restates the plan with updated checkboxes as it progresses — we want the LATEST version.
   const planItems: PlanItem[] = (() => {
-    const messageEvents = issueHistory.filter(e => e.kind === 'message' && e.message)
+    const messageEvents = issueHistory.filter(e => (e.kind === 'message' || e.kind === 'agent_message' || e.kind === 'item.completed') && e.message)
 
     if (messageEvents.length > 0) {
       // Scan individual messages newest-first for one that has checkboxes
@@ -494,8 +494,8 @@ export function IssueDetailView({
                 const kind = item.kind?.toLowerCase() ?? ''
                 // Always show explicitly allowed events
                 if (allowedKinds.has(kind)) return true
-                // Show "message" events only if they have actual content (agent thinking)
-                if (kind === 'message' && item.message && item.message.length > 10) return true
+                // Show "message" and "agent_message" events only if they have actual content
+                if ((kind === 'message' || kind === 'agent_message' || kind === 'item.completed') && item.message && item.message.length > 10) return true
                 return false
               })
               return meaningfulEvents.length === 0 ? (
