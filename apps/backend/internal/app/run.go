@@ -567,13 +567,9 @@ func processExecutionTick(
 			}
 		}
 
-		// Write to unfirehose/1.0 JSONL
-		if ufLogger != nil && event.Message != "" {
-			_ = ufLogger.LogAssistantMessage(sessionID, event.Message, "", activeProviderName, &unfirehose.Usage{
-				InputTokens:  event.Usage.InputTokens,
-				OutputTokens: event.Usage.OutputTokens,
-				TotalTokens:  event.Usage.TotalTokens,
-			})
+		// Write to unfirehose/1.0 JSONL — extract structured content from events
+		if ufLogger != nil {
+			logEventToUnfirehose(ufLogger, sessionID, activeProviderName, event)
 		}
 
 		// Log to stdout for TUI visibility
@@ -1034,6 +1030,216 @@ func publishRefreshRetryLifecycleEvents(pubsub *observability.PubSub, before orc
 
 func retryLifecycleKey(entry orchestrator.RetryEntry) string {
 	return strings.TrimSpace(entry.IssueID) + "|" + fmt.Sprintf("%d", entry.Attempt) + "|" + strings.TrimSpace(entry.Error)
+}
+
+// logEventToUnfirehose extracts structured content from agent events and writes
+// proper unfirehose/1.0 messages — text, tool calls, tool results, metrics.
+func logEventToUnfirehose(ufLogger *unfirehose.Logger, sessionID, provider string, event agents.Event) {
+	raw := event.Raw
+	if raw == nil && event.Message == "" {
+		return
+	}
+
+	kind := event.Kind
+
+	// Claude result event — final output with full usage
+	if kind == "result" || (raw != nil && firstStr(raw, "type") == "result") {
+		resultText := firstStr(raw, "result")
+		model := firstStr(raw, "model")
+		stopReason := firstStr(raw, "stop_reason", "stopReason")
+		costStr := ""
+		if cost, ok := raw["total_cost_usd"].(float64); ok && cost > 0 {
+			costStr = fmt.Sprintf("%.6f", cost)
+		}
+
+		// Extract usage from the result
+		u := extractUnfirehoseUsage(raw)
+
+		if resultText != "" {
+			msg := map[string]any{
+				"sessionId": sessionID,
+				"role":      "assistant",
+				"content":   []unfirehose.ContentBlock{unfirehose.TextBlock(resultText)},
+				"provider":  provider,
+				"usage":     u,
+			}
+			if model != "" {
+				msg["model"] = model
+			}
+			if stopReason != "" {
+				msg["stopReason"] = stopReason
+			}
+			_ = ufLogger.LogMessage(msg)
+		}
+
+		// Log cost as a DataPoint metric
+		if costStr != "" {
+			if cost, ok := raw["total_cost_usd"].(float64); ok {
+				_ = ufLogger.LogDataPoint(sessionID, "agent.cost.usd", "count", cost,
+					map[string]string{"provider": provider, "session": sessionID},
+					0, "dollar")
+			}
+		}
+
+		// Log token usage as DataPoint
+		if u != nil && (u.InputTokens > 0 || u.OutputTokens > 0) {
+			_ = ufLogger.LogDataPoint(sessionID, "agent.tokens.input", "count", u.InputTokens,
+				map[string]string{"provider": provider}, 0, "token")
+			_ = ufLogger.LogDataPoint(sessionID, "agent.tokens.output", "count", u.OutputTokens,
+				map[string]string{"provider": provider}, 0, "token")
+		}
+		return
+	}
+
+	// Content block events — text deltas from streaming
+	if kind == "content_block_delta" || kind == "content_block_start" {
+		if delta := nestedAny(raw, "delta"); delta != nil {
+			if text := firstStr(delta, "text"); text != "" {
+				_ = ufLogger.LogMessage(map[string]any{
+					"sessionId": sessionID,
+					"role":      "assistant",
+					"content":   []unfirehose.ContentBlock{unfirehose.TextBlock(text)},
+					"provider":  provider,
+				})
+				return
+			}
+		}
+		// Tool use start
+		if cb := nestedAny(raw, "content_block"); cb != nil {
+			if firstStr(cb, "type") == "tool_use" {
+				toolName := firstStr(cb, "name")
+				toolID := firstStr(cb, "id")
+				if toolName != "" {
+					_ = ufLogger.LogToolCall(sessionID, toolID, toolName, cb["input"])
+					return
+				}
+			}
+		}
+	}
+
+	// Tool result events
+	if kind == "tool_result" || (raw != nil && firstStr(raw, "type") == "tool_result") {
+		toolID := firstStr(raw, "tool_use_id", "toolCallId")
+		toolName := firstStr(raw, "name", "toolName")
+		output := firstStr(raw, "output", "content")
+		isErr := false
+		if v, ok := raw["is_error"].(bool); ok {
+			isErr = v
+		}
+		if toolID != "" {
+			_ = ufLogger.LogToolResult(sessionID, toolID, toolName, output, isErr)
+			return
+		}
+	}
+
+	// System/progress events
+	if kind == "system" || strings.HasPrefix(kind, "run_") || kind == "hook_started" || kind == "hook_completed" {
+		if event.Message != "" {
+			_ = ufLogger.LogSystem(sessionID, kind, map[string]any{"durationMs": event.Usage.TotalTokens})
+		}
+		return
+	}
+
+	// Fallback: if there's a message, log it as assistant text
+	if event.Message != "" {
+		_ = ufLogger.LogAssistantMessage(sessionID, event.Message, "", provider, &unfirehose.Usage{
+			InputTokens:  event.Usage.InputTokens,
+			OutputTokens: event.Usage.OutputTokens,
+			TotalTokens:  event.Usage.TotalTokens,
+		})
+	}
+}
+
+// extractUnfirehoseUsage pulls token usage from claude's result payload.
+func extractUnfirehoseUsage(raw map[string]any) *unfirehose.Usage {
+	u := &unfirehose.Usage{}
+
+	// Try nested usage object first, then top-level
+	for _, node := range []map[string]any{nestedAny(raw, "usage"), raw} {
+		if node == nil {
+			continue
+		}
+		if v := intVal(node, "input_tokens", "inputTokens"); v > 0 {
+			u.InputTokens = v
+		}
+		if v := intVal(node, "output_tokens", "outputTokens"); v > 0 {
+			u.OutputTokens = v
+		}
+		if v := intVal(node, "cache_read_input_tokens", "cacheReadInputTokens"); v > 0 {
+			if u.InputTokenDetails == nil {
+				u.InputTokenDetails = &unfirehose.InputTokenDetail{}
+			}
+			u.InputTokenDetails.CacheReadTokens = v
+		}
+		if v := intVal(node, "cache_creation_input_tokens", "cacheCreationInputTokens"); v > 0 {
+			if u.InputTokenDetails == nil {
+				u.InputTokenDetails = &unfirehose.InputTokenDetail{}
+			}
+			u.InputTokenDetails.CacheWriteTokens = v
+		}
+		if u.InputTokens > 0 || u.OutputTokens > 0 {
+			u.TotalTokens = u.InputTokens + u.OutputTokens
+			return u
+		}
+	}
+
+	// Try modelUsage
+	if mu, ok := raw["modelUsage"].(map[string]any); ok {
+		for _, modelData := range mu {
+			if md, ok := modelData.(map[string]any); ok {
+				u.InputTokens = intVal(md, "inputTokens")
+				u.OutputTokens = intVal(md, "outputTokens")
+				if cr := intVal(md, "cacheReadInputTokens"); cr > 0 {
+					if u.InputTokenDetails == nil {
+						u.InputTokenDetails = &unfirehose.InputTokenDetail{}
+					}
+					u.InputTokenDetails.CacheReadTokens = cr
+				}
+				if cw := intVal(md, "cacheCreationInputTokens"); cw > 0 {
+					if u.InputTokenDetails == nil {
+						u.InputTokenDetails = &unfirehose.InputTokenDetail{}
+					}
+					u.InputTokenDetails.CacheWriteTokens = cw
+				}
+				u.TotalTokens = u.InputTokens + u.OutputTokens
+				return u
+			}
+		}
+	}
+
+	return nil
+}
+
+func nestedAny(m map[string]any, key string) map[string]any {
+	if v, ok := m[key]; ok {
+		if sub, ok := v.(map[string]any); ok {
+			return sub
+		}
+	}
+	return nil
+}
+
+func firstStr(m map[string]any, keys ...string) string {
+	for _, k := range keys {
+		if v, ok := m[k].(string); ok && v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func intVal(m map[string]any, keys ...string) int64 {
+	for _, k := range keys {
+		switch v := m[k].(type) {
+		case float64:
+			return int64(v)
+		case int64:
+			return v
+		case int:
+			return int64(v)
+		}
+	}
+	return 0
 }
 
 func classifyRefreshRetryCause(message string) string {

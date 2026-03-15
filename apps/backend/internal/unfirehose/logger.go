@@ -552,7 +552,7 @@ func defaultOutputDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(u.HomeDir, ".unfirehose", "canonical", "orchestra")
+	dir := filepath.Join(u.HomeDir, ".orchestra", "unfirehose")
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", err
 	}
