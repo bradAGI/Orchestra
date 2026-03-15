@@ -202,11 +202,16 @@ func (r *UnsandboxRunner) buildBootstrapScript(request TurnRequest) string {
 		}
 	}
 
-	// Ensure ~/.local/bin is in PATH (golden image ships with claude pre-installed)
-	parts = append(parts,
-		`export PATH="$HOME/.local/bin:$PATH"`,
-		`grep -q ".local/bin" ~/.bashrc 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc`,
-	)
+	// Install claude CLI if the command references it
+	if strings.Contains(r.command, "claude") {
+		parts = append(parts,
+			`export PATH="$HOME/.local/bin:$PATH"`,
+			"if ! command -v claude >/dev/null 2>&1; then",
+			"  curl -fsSL https://claude.ai/install.sh | bash 2>&1",
+			"fi",
+			`grep -q ".local/bin" ~/.bashrc 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc`,
+		)
+	}
 
 	if len(parts) <= 2 {
 		return "" // nothing to bootstrap
