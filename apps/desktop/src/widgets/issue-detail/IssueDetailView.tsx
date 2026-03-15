@@ -280,12 +280,12 @@ export function IssueDetailView({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-4 px-5 h-14 border-b border-border/40 shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <Badge variant="outline" className="shrink-0 font-mono text-[11px] px-2.5 py-1 bg-primary/5 text-primary border-primary/20">
+      <div className="flex items-center justify-between gap-6 px-6 h-16 border-b border-border/30 shrink-0 bg-card/50">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="shrink-0 font-mono text-[10px] font-black tracking-wider text-primary bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/15">
             {identifier}
-          </Badge>
-          <h2 className="text-base font-bold truncate">{localTitle}</h2>
+          </div>
+          <h2 className="text-[15px] font-bold truncate leading-tight">{localTitle}</h2>
         </div>
         <div className="flex items-center gap-2 shrink-0 mr-8">
           {isRunning && onStopSession && (
