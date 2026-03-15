@@ -132,14 +132,27 @@ export function ChangesList({
         <div className="flex gap-2 mt-2">
           <button
             onClick={() => handleCommit(false)}
-            disabled={!commitMsg.trim() || staged.length === 0 || loading}
+            disabled={!commitMsg.trim() || loading}
             className="flex-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
           >
             Commit
           </button>
           <button
-            onClick={() => handleCommit(true)}
-            disabled={!commitMsg.trim() || staged.length === 0 || loading}
+            onClick={async () => {
+              setLoading(true)
+              setFeedback(null)
+              try {
+                await gitPush(config, projectId)
+                setFeedback({ type: 'success', msg: 'Pushed to remote' })
+                setTimeout(() => setFeedback(null), 3000)
+              } catch (err: any) {
+                setFeedback({ type: 'error', msg: err?.message || 'Push failed' })
+                setTimeout(() => setFeedback(null), 5000)
+              } finally {
+                setLoading(false)
+              }
+            }}
+            disabled={loading}
             className="flex items-center justify-center gap-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
           >
             <Send size={10} />

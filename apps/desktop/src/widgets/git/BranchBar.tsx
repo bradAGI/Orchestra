@@ -98,16 +98,15 @@ export function BranchBar({
   }
 
   return (
-    <div className="flex items-center gap-1.5 px-3 py-2.5 border-b border-border/40 overflow-x-auto shrink-0 bg-card/30 relative">
+    <div className="flex items-center gap-1.5 px-3 py-2.5 border-b border-border/40 shrink-0 bg-card/30 relative">
       {error && (
         <div className="absolute top-full left-0 right-0 z-10 px-3 py-1.5 bg-red-500/10 border-b border-red-500/20 text-[10px] text-red-400">{error}</div>
       )}
       <div className="flex items-center gap-1 mr-1 shrink-0">
         <GitBranch size={14} className="text-primary/60" />
-        <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40">Branches</span>
       </div>
 
-      <div className="flex items-center gap-1 flex-1 overflow-x-auto">
+      <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto scrollbar-none">
         {branches.map((branch) => (
           <button
             key={branch}
