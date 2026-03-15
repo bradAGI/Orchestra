@@ -375,60 +375,92 @@ export function IssueDetailView({
             </div>
 
             {/* Sidebar properties */}
-            <div className="w-72 border-l border-border/20 shrink-0 bg-card/30 overflow-y-auto">
-              <div className="p-5 space-y-5">
-                {/* Agent */}
-                <div className="rounded-xl border border-border/30 bg-muted/5 p-4">
-                  <label className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50 mb-2 block">Agent</label>
+            <div className="w-80 border-l border-border/10 shrink-0 overflow-y-auto">
+              <div className="p-6 space-y-6">
+                {/* Agent — prominent */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="h-1.5 w-1.5 rounded-full bg-primary/60" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">Assigned Agent</span>
+                  </div>
                   <AgentSelector value={localAssignee} agents={availableAgents} onChange={handleAssigneeChange} direction="down" />
                 </div>
 
-                {/* Project */}
-                <div className="rounded-xl border border-border/30 bg-muted/5 p-4">
-                  <label className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50 mb-2 block">Project</label>
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <FileText size={14} className="text-primary/60" />
+                <div className="h-px bg-gradient-to-r from-transparent via-border/30 to-transparent" />
+
+                {/* Project — with icon */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500/60" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">Project</span>
+                  </div>
+                  <div className="flex items-center gap-3 rounded-lg bg-muted/10 px-3 py-2.5 border border-border/10">
+                    <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shrink-0 shadow-inner">
+                      <FileText size={16} className="text-primary/70" />
                     </div>
-                    <span className="text-sm font-semibold text-foreground/70 truncate">{projectName || 'Unlinked'}</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-foreground/80 truncate">{projectName || 'Unlinked'}</p>
+                      <p className="text-[10px] text-muted-foreground/30 font-mono truncate">{projectId.slice(0, 8)}</p>
+                    </div>
                   </div>
                 </div>
 
-                {/* ID & Created */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-border/30 bg-muted/5 p-4">
-                    <label className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50 mb-2 block">ID</label>
-                    <span className="font-mono text-sm font-bold text-primary/70">{identifier}</span>
+                <div className="h-px bg-gradient-to-r from-transparent via-border/30 to-transparent" />
+
+                {/* Metadata row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="h-1.5 w-1.5 rounded-full bg-violet-500/60" />
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">ID</span>
+                    </div>
+                    <span className="font-mono text-base font-black text-primary/80">{identifier}</span>
                   </div>
-                  <div className="rounded-xl border border-border/30 bg-muted/5 p-4">
-                    <label className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50 mb-2 block">Created</label>
-                    <span className="text-sm text-foreground/50">
-                      {(typed.created_at as string) ? new Date(typed.created_at as string).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '—'}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="h-1.5 w-1.5 rounded-full bg-amber-500/60" />
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">Created</span>
+                    </div>
+                    <span className="text-sm font-medium text-foreground/50">
+                      {(typed.created_at as string) ? new Date(typed.created_at as string).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                     </span>
                   </div>
                 </div>
 
-                {/* GitHub */}
+                {/* GitHub link */}
                 {typed.url && typeof typed.url === 'string' && (typed.url as string).includes('github.com') && (
-                  <div className="rounded-xl border border-border/30 bg-muted/5 p-4">
-                    <label className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50 mb-2 block">GitHub</label>
-                    <button
-                      onClick={() => {
-                        const bridge = window.orchestraDesktop
-                        if (bridge && typeof bridge.openExternal === 'function') {
-                          void bridge.openExternal(typed.url as string)
-                        } else {
-                          window.open(typed.url as string, '_blank')
-                        }
-                      }}
-                      className="text-sm text-primary/70 hover:text-primary flex items-center gap-2 transition-colors cursor-pointer text-left group"
-                    >
-                      <div className="h-8 w-8 rounded-lg bg-muted/20 flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
-                        <Github size={14} className="text-muted-foreground/50 group-hover:text-primary transition-colors" />
+                  <>
+                    <div className="h-px bg-gradient-to-r from-transparent via-border/30 to-transparent" />
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">GitHub Issue</span>
                       </div>
-                      <span className="truncate">{(typed.url as string).replace('https://github.com/', '')}</span>
-                    </button>
-                  </div>
+                      <button
+                        onClick={() => {
+                          const bridge = window.orchestraDesktop
+                          if (bridge && typeof bridge.openExternal === 'function') {
+                            void bridge.openExternal(typed.url as string)
+                          } else {
+                            window.open(typed.url as string, '_blank')
+                          }
+                        }}
+                        className="w-full flex items-center gap-3 rounded-lg bg-muted/10 px-3 py-2.5 border border-border/10 hover:border-primary/20 hover:bg-primary/5 transition-all cursor-pointer group"
+                      >
+                        <div className="h-9 w-9 rounded-lg bg-muted/20 flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
+                          <Github size={16} className="text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                        </div>
+                        <div className="min-w-0 text-left">
+                          <p className="text-sm font-medium text-foreground/60 group-hover:text-primary truncate transition-colors">
+                            {(typed.url as string).split('/').pop() ? `#${(typed.url as string).split('/').pop()}` : 'View Issue'}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground/25 truncate">
+                            {(typed.url as string).replace('https://github.com/', '').replace(/\/issues\/\d+$/, '')}
+                          </p>
+                        </div>
+                      </button>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
