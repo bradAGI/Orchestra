@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Ansi from 'ansi-to-react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import { Activity, AlertCircle, AlertTriangle, AppWindow, Bell, Bot, Check, CheckCircle2, ChevronDown, Circle, CircleDashed, Cpu, Eye, EyeOff, FileText, Folder, FolderTree, GitBranch, Loader2, ListChecks, MoreHorizontal, ShieldCheck, SignalHigh, SignalLow, SignalMedium, Square, Terminal, User, Users, Globe, Wrench, Clock, Search, LayoutDashboard, ListTodo, History, Ticket, Database, Settings2, Sun, Moon, Download, RefreshCcw, Info, BarChart3, Zap, Layout, Rows, Play, ChevronRight, File, ExternalLink, Plus, Trash2, Keyboard, X, TrendingUp, Code, Layers, Mic, Volume2, VolumeX } from 'lucide-react'
+import { Activity, AlertCircle, AlertTriangle, AppWindow, Bell, Bot, Check, CheckCircle2, ChevronDown, Circle, CircleDashed, Cpu, Eye, EyeOff, FileText, Folder, FolderTree, GitBranch, Github, Loader2, ListChecks, MoreHorizontal, ShieldCheck, SignalHigh, SignalLow, SignalMedium, Square, Terminal, User, Users, Globe, Wrench, Clock, Search, LayoutDashboard, ListTodo, History, Ticket, Database, Settings2, Sun, Moon, Download, RefreshCcw, Info, BarChart3, Zap, Layout, Rows, Play, ChevronRight, File, ExternalLink, Plus, Trash2, Keyboard, X, TrendingUp, Code, Layers, Mic, Volume2, VolumeX } from 'lucide-react'
 import * as Tooltip from '@radix-ui/react-tooltip'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -295,6 +295,20 @@ export function SettingsCard({
               </CardDescription>
             </div>
           </div>
+          <button
+            onClick={() => {
+              const bridge = (window as any).orchestraDesktop
+              if (bridge && typeof bridge.openExternal === 'function') {
+                void bridge.openExternal('https://github.com/Traves-Theberge/Orchestra')
+              } else {
+                window.open('https://github.com/Traves-Theberge/Orchestra', '_blank')
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold text-muted-foreground/50 hover:text-foreground border border-border/20 hover:border-border/40 transition-all"
+          >
+            <Github size={14} />
+            Repo
+          </button>
         </div>
 
         <div className="flex gap-1 px-2">
@@ -416,13 +430,6 @@ export function SettingsCard({
                 ))}
               </div>
 
-              <div className="p-4 rounded-xl border border-dashed border-border/60 bg-muted/5 flex gap-3 items-start">
-                <Info className="h-3.5 w-3.5 text-primary/60 shrink-0 mt-0.5" />
-                <p className="text-[10px] text-muted-foreground italic leading-relaxed">
-                  Custom shortcut remapping is currently in development and will be available in v1.1.0. 
-                  This will include per-agent command overrides.
-                </p>
-              </div>
             </div>
           )}
 

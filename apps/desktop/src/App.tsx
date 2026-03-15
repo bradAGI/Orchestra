@@ -141,6 +141,22 @@ export default function App() {
         e.preventDefault()
         setPaletteOpen((open) => !open)
       }
+      if (e.key === 'r' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        void handleRefresh()
+      }
+      if (e.key === '/' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setSidebarCollapsed((v) => !v)
+      }
+      if (e.key === '1' && e.altKey) {
+        e.preventDefault()
+        setActiveSection('dashboard')
+      }
+      if (e.key === '2' && e.altKey) {
+        e.preventDefault()
+        setActiveSection('projects')
+      }
     }
     document.addEventListener('keydown', down)
     return () => document.removeEventListener('keydown', down)
