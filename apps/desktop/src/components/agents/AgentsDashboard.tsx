@@ -259,6 +259,50 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
         )
     }, [configs, selectedAgent])
 
+    // Parse MCP servers from provider config files
+    const providerMcpServers = useMemo(() => {
+        if (!selectedAgent) return [] as { name: string; command: string; source: string }[]
+        const results: { name: string; command: string; source: string }[] = []
+
+        for (const cfg of configs) {
+            if (!cfg.content || !cfg.name.toLowerCase().includes(selectedAgent)) continue
+            try {
+                // Try JSON parse (Claude, Gemini, OpenCode)
+                const parsed = JSON.parse(cfg.content)
+
+                // Claude: mcpServers in .claude.json
+                if (parsed.mcpServers && typeof parsed.mcpServers === 'object') {
+                    for (const [name, val] of Object.entries(parsed.mcpServers)) {
+                        const server = val as Record<string, unknown>
+                        results.push({ name, command: (server.command as string) || (server.url as string) || 'configured', source: cfg.path })
+                    }
+                }
+                // OpenCode: mcp section
+                if (parsed.mcp && typeof parsed.mcp === 'object') {
+                    for (const [name, val] of Object.entries(parsed.mcp)) {
+                        const server = val as Record<string, unknown>
+                        const cmd = Array.isArray(server.command) ? (server.command as string[]).join(' ') : (server.command as string) || (server.url as string) || 'configured'
+                        results.push({ name, command: cmd, source: cfg.path })
+                    }
+                }
+                // Gemini: mcpServers
+                if (parsed.mcpServers && typeof parsed.mcpServers === 'object' && !parsed.mcp) {
+                    for (const [name, val] of Object.entries(parsed.mcpServers)) {
+                        const server = val as Record<string, unknown>
+                        results.push({ name, command: (server.command as string) || (server.url as string) || 'configured', source: cfg.path })
+                    }
+                }
+            } catch {
+                // Try TOML-style parsing for Codex (basic: [mcp_servers.name])
+                const tomlMatches = cfg.content.matchAll(/\[mcp_servers\.(\w+)\]\s*\n\s*command\s*=\s*"([^"]+)"/g)
+                for (const match of tomlMatches) {
+                    results.push({ name: match[1], command: match[2], source: cfg.path })
+                }
+            }
+        }
+        return results
+    }, [configs, selectedAgent])
+
     const hasCoreConfig = (provider: Provider) =>
         configs.some(c => c.category === 'core' && c.name.toLowerCase().includes(provider))
 
@@ -428,7 +472,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                 </Button>
                             </div>
 
-                            {Object.keys(snapshot?.mcp_servers || {}).length === 0 ? (
+                            {providerMcpServers.length === 0 && Object.keys(snapshot?.mcp_servers || {}).length === 0 ? (
                                 <div className="py-6 text-center">
                                     <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/20">
                                         No MCP servers configured
@@ -436,17 +480,31 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                 </div>
                             ) : (
                                 <div className="divide-y divide-border/15">
+                                    {/* Provider-specific MCP servers */}
+                                    {providerMcpServers.map(server => (
+                                        <div key={server.name} className="flex items-center gap-3 py-2.5">
+                                            <div className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                                <span className="text-xs font-bold tracking-wider">{server.name}</span>
+                                                <p className="text-[9px] font-mono text-muted-foreground/40 truncate">{server.command}</p>
+                                            </div>
+                                            <Badge variant="outline" className="text-[8px] font-bold uppercase shrink-0 text-emerald-500/60 border-emerald-500/20">
+                                                {selectedAgent}
+                                            </Badge>
+                                        </div>
+                                    ))}
+                                    {/* Orchestra MCP servers */}
                                     {Object.entries(snapshot?.mcp_servers || {}).map(([name, cmd]) => {
                                         const tools = mcpTools.filter(t => t.name.startsWith(name + '_'))
                                         return (
                                             <div key={name} className="flex items-center gap-3 py-2.5 group">
                                                 <div className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />
                                                 <div className="flex-1 min-w-0">
-                                                    <span className="text-xs font-bold uppercase tracking-wider">{name}</span>
+                                                    <span className="text-xs font-bold tracking-wider">{name}</span>
                                                     <p className="text-[9px] font-mono text-muted-foreground/40 truncate">{cmd}</p>
                                                 </div>
                                                 <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 text-[8px] font-bold shrink-0">
-                                                    {tools.length} TOOLS
+                                                    {tools.length} tools
                                                 </Badge>
                                                 <button
                                                     onClick={() => handleDeleteMCPServer(name)}
