@@ -421,18 +421,40 @@ export default function App() {
             const issueIdentifier = (envelope.data.issue_identifier as string) || ''
             if (issueId && issueIdentifier) {
               setBoardIssues((prev) => {
-                if (prev.find((i) => i.issue_id === issueId)) {
-                  return prev
+                const existing = prev.find((i) => i.issue_id === issueId)
+                if (existing) {
+                  return prev.map((i) => i.issue_id === issueId ? { ...i, state: 'Review' } : i)
                 }
                 return [
                   ...prev,
                   {
                     issue_id: issueId,
                     issue_identifier: issueIdentifier,
-                    state: 'Done',
+                    state: 'Review',
                   },
                 ]
               })
+              // Play notification sound
+              try {
+                const ctx = new AudioContext()
+                const osc = ctx.createOscillator()
+                const gain = ctx.createGain()
+                osc.connect(gain)
+                gain.connect(ctx.destination)
+                osc.frequency.setValueAtTime(880, ctx.currentTime)
+                osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1)
+                osc.frequency.setValueAtTime(1320, ctx.currentTime + 0.2)
+                gain.gain.setValueAtTime(0.3, ctx.currentTime)
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4)
+                osc.start(ctx.currentTime)
+                osc.stop(ctx.currentTime + 0.4)
+              } catch { /* ignore audio errors */ }
+              // Show browser notification
+              if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Agent Completed', { body: `${issueIdentifier} has been moved to Review.`, icon: '/favicon.ico' })
+              } else if ('Notification' in window && Notification.permission !== 'denied') {
+                void Notification.requestPermission()
+              }
             }
           }
         },

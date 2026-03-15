@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -29,6 +30,7 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/tools"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
 	trackergithub "github.com/orchestra/orchestra/apps/backend/internal/tracker/github"
+	ghutil "github.com/orchestra/orchestra/apps/backend/internal/utils/github"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker/memory"
 	trackersqlite "github.com/orchestra/orchestra/apps/backend/internal/tracker/sqlite"
 	"github.com/orchestra/orchestra/apps/backend/internal/workspace"
@@ -561,6 +563,32 @@ func processExecutionTick(
 
 	runAfterHook()
 
+	// Post completion comment to GitHub issue if linked
+	if entry.ProjectID != "" && warehouseDB != nil {
+		go func() {
+			project, projErr := warehouseDB.GetProjectByID(context.Background(), entry.ProjectID)
+			if projErr != nil || project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
+				return
+			}
+			// Extract issue number from the issue URL or identifier
+			issue, fetchErr := service.FetchIssueByID(context.Background(), entry.IssueID)
+			if fetchErr != nil || issue == nil || issue.URL == "" {
+				return
+			}
+			issueNumber := extractGitHubIssueNumber(issue.URL)
+			if issueNumber <= 0 {
+				return
+			}
+			// Build summary from the last agent message
+			summary := fmt.Sprintf("## Agent Run Completed\n\n**Agent**: %s\n**Issue**: %s\n**Status**: Moved to Review\n\nThe agent has completed its work on this task. Please review the changes.", activeProviderName, entry.IssueIdentifier)
+			if err := ghutil.PostIssueComment(context.Background(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, issueNumber, summary); err != nil {
+				logger.Warn().Err(err).Str("issue_id", entry.IssueID).Msg("failed to post GitHub comment")
+			} else {
+				logger.Info().Str("issue_id", entry.IssueID).Int("github_issue", issueNumber).Msg("posted completion comment to GitHub")
+			}
+		}()
+	}
+
 	logger.Info().Str("issue_id", entry.IssueID).Str("session_id", result.SessionID).Msg("agent run completed — issue moved to Review")
 	publishSnapshot(pubsub, service)
 }
@@ -572,6 +600,22 @@ func buildExecutionPrompt(issueIdentifier string, title string, description stri
 	}
 	prompt += fmt.Sprintf("\n## Instructions\n\n1. First, write an **Operational Plan** using markdown checkboxes:\n   - [ ] step one\n   - [ ] step two\n\n2. Work through each step. After completing a step, restate the plan with that item checked.\n\n3. Use the tools available to implement the changes.\n\n4. When all steps are complete, verify your work and restate the final plan with all items checked.\n\nAttempt: %d", attempt)
 	return prompt
+}
+
+func extractGitHubIssueNumber(url string) int {
+	// Extract issue number from URL like https://github.com/owner/repo/issues/18
+	parts := strings.Split(strings.TrimRight(url, "/"), "/")
+	if len(parts) < 2 {
+		return 0
+	}
+	if parts[len(parts)-2] != "issues" {
+		return 0
+	}
+	n, err := strconv.Atoi(parts[len(parts)-1])
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 func cleanupTerminalWorkspaces(service *orchestrator.Service, trackerClient tracker.Client, workspaceService workspace.Service, hooks workspace.Hooks, logger zerolog.Logger) {
