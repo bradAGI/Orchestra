@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/user"
