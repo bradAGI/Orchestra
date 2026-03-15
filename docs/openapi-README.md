@@ -16,7 +16,7 @@ The backend API is documented in an OpenAPI 3.1 specification:
 | GET | `/api/v1/events` | SSE event stream |
 | POST | `/api/v1/refresh` | Trigger tracker refresh |
 | GET | `/api/v1/telemetry/health` | Telemetry watcher health |
-| GET | `/api/v1/warehouse/stats` | Warehouse statistics |
+| GET | `/api/v1/warehouse/stats` | Analytics statistics |
 
 ### Issues
 

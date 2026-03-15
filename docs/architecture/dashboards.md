@@ -23,7 +23,7 @@ A dedicated IDE for managing agent configurations.
 - **Pro Editor**: Features JSON validation, auto-formatting, and Markdown previews.
 - **Scope Context**: Allows operators to switch between editing Global defaults and Project-specific overrides.
 
-## 📊 Analytics Warehouse (`AnalyticsDashboard`)
+## 📊 Analytics Dashboard (`AnalyticsDashboard`)
 
 A historical archive and metrics viewer.
 - **Recharts Integration**: Uses `recharts` to render a stacked area chart showing token burn trajectories over time (Input vs. Output tokens).

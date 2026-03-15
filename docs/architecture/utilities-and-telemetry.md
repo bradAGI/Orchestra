@@ -7,7 +7,7 @@ The Orchestra backend relies on a suite of utilities to ensure that all data flo
 While the `CommandRunner` intercepts live streams during active turns, the `watcher.go` service acts as an asynchronous background sweeper. It periodically scans the host machine's home directory (e.g., `~/.claude/logs`, `~/.codex/sessions`) to ingest historical data.
 
 ### Key Features:
-- **Log Aggregation**: Reads `.jsonl` and `.log` files produced directly by the agent CLIs, ingesting them into the Orchestra SQLite Warehouse.
+- **Log Aggregation**: Reads `.jsonl` and `.log` files produced directly by the agent CLIs, ingesting them into the Orchestra SQLite database.
 - **Offset Tracking**: Remembers how many bytes it has read from each file (`ingest_offsets` table) to ensure it only processes new data on subsequent sweeps.
 - **PII Sanitization**: Before any log line is saved, it runs through `sanitizePII`. This function uses regular expressions to detect and redact:
   - Email addresses

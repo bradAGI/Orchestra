@@ -33,12 +33,12 @@ Current state of Symphony's planned features.
 - [x] File tree browsing and content viewing
 - [x] Project detail view with Commits, Issues, PRs sub-tabs
 
-### Telemetry & Warehouse
+### Telemetry & Analytics
 - [x] Unified session telemetry from all 4 providers
 - [x] Claude JSON, Codex logs, Gemini JSON stream, OpenCode SQLite ingestion
 - [x] Token analytics and cost tracking
 - [x] Telemetry health endpoint
-- [x] Warehouse statistics
+- [x] Analytics statistics
 
 ### Terminal & Observability
 - [x] Terminal multiplexer (up to 16 tiled PTY sessions)

@@ -11,7 +11,7 @@ Orchestra is an orchestration platform for managing AI coding agents. It coordin
 - **Issue Inspector** -- Details, Plan, Activity, Output, and Changes tabs for deep visibility into each task
 - **Agent Lifecycle** -- Backlog → Todo → In Progress (agent runs) → Review (human approval) → Done
 - **TUI Dashboard** -- Terminal-based control surface for starting/stopping services (`make dash`)
-- **Telemetry & Warehouse** -- Ingests session data from all 4 providers; token analytics and cost tracking
+- **Telemetry & Analytics** -- Ingests session data from all 4 providers; token usage analytics and cost tracking
 
 ## Tech Stack
 

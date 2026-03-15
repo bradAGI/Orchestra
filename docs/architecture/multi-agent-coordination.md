@@ -37,4 +37,4 @@ Multi-agent coordination is made possible by the **Tool & MCP Layer**. Regardles
 
 ---
 
-> **Tip**: You can monitor which agent is currently "owning" an issue by looking at the **Issue Inspector** on the Kanban board or the **Session Details** in the Warehouse.
+> **Tip**: You can monitor which agent is currently "owning" an issue by looking at the **Issue Inspector** on the Kanban board or the **Session Details** in Analytics.
