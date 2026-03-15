@@ -176,11 +176,8 @@ async function stopManagedBackend() {
   managedBackendState = null
 }
 
-app.disableHardwareAcceleration()
-app.commandLine.appendSwitch('disable-gpu')
-app.commandLine.appendSwitch('use-angle', 'swiftshader')
-app.commandLine.appendSwitch('in-process-gpu')
-app.commandLine.appendSwitch('disable-gpu-sandbox')
+// GPU enabled for WebGPU (Transformers.js Whisper inference)
+app.commandLine.appendSwitch('enable-features', 'Vulkan,WebGPU')
 
 function createDefaultProfile() {
   const managed = managedBackendState?.config

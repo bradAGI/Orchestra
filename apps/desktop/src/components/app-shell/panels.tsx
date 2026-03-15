@@ -788,6 +788,7 @@ export function CreateTaskDialog({
   const [recording, setRecording] = useState(false)
   const [whisperStatus, setWhisperStatus] = useState<WhisperStatus>({ state: 'idle' })
   const transcriptionCancelledRef = useRef(false)
+  const activeFieldRef = useRef<'title' | 'description'>('description')
 
   useEffect(() => {
     if (open) {
@@ -870,7 +871,11 @@ export function CreateTaskDialog({
       if (pcm.length === 0 || transcriptionCancelledRef.current) return
       const text = await client.transcribe(pcm)
       if (!transcriptionCancelledRef.current && text.trim()) {
-        setDescription((prev) => (prev.trim() ? `${prev.trimEnd()}\n${text.trim()}` : text.trim()))
+        if (activeFieldRef.current === 'title') {
+          setTitle((prev) => (prev.trim() ? `${prev.trimEnd()} ${text.trim()}` : text.trim()))
+        } else {
+          setDescription((prev) => (prev.trim() ? `${prev.trimEnd()}\n${text.trim()}` : text.trim()))
+        }
       }
     } catch (error) {
       if (!transcriptionCancelledRef.current) {
@@ -895,6 +900,7 @@ export function CreateTaskDialog({
               placeholder="What needs to be done?"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              onFocus={() => { activeFieldRef.current = 'title' }}
               required
             />
             <textarea
@@ -902,6 +908,7 @@ export function CreateTaskDialog({
               placeholder="Describe the task for the agent..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              onFocus={() => { activeFieldRef.current = 'description' }}
             />
           </div>
 

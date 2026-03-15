@@ -3,7 +3,7 @@
 import { pipeline, type AutomaticSpeechRecognitionPipeline } from '@huggingface/transformers'
 import type { WhisperWorkerRequest, WhisperWorkerResponse } from './whisper-types'
 
-const MODEL_ID = 'onnx-community/whisper-small'
+const MODEL_ID = 'onnx-community/whisper-tiny'
 
 let transcriber: AutomaticSpeechRecognitionPipeline | null = null
 
@@ -11,15 +11,30 @@ function post(msg: WhisperWorkerResponse): void {
   self.postMessage(msg)
 }
 
+async function detectDevice(): Promise<'webgpu' | 'wasm'> {
+  try {
+    const gpu = (navigator as unknown as { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu
+    if (gpu) {
+      const adapter = await gpu.requestAdapter()
+      if (adapter) return 'webgpu'
+    }
+  } catch {
+    // WebGPU not available
+  }
+  return 'wasm'
+}
+
 async function ensurePipeline(): Promise<AutomaticSpeechRecognitionPipeline> {
   if (transcriber) return transcriber
 
   post({ type: 'status', status: 'loading', progress: 0 })
 
+  const device = await detectDevice()
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   transcriber = (await (pipeline as any)('automatic-speech-recognition', MODEL_ID, {
-    dtype: 'q8',
-    device: 'wasm',
+    dtype: device === 'webgpu' ? 'fp32' : 'q8',
+    device,
     progress_callback: (progress: Record<string, unknown>) => {
       if (typeof progress.progress === 'number') {
         post({ type: 'status', status: 'loading', progress: Math.round(progress.progress) })
