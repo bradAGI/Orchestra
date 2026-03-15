@@ -56,9 +56,16 @@ func CurrentBranch(ctx context.Context, dir string) (string, error) {
 	return strings.TrimSpace(stdout.String()), nil
 }
 
-// Commit creates a new commit with the given message
+// Commit creates a new commit with the given message.
+// Stages all changes first (git add -A) then commits.
 func Commit(ctx context.Context, dir, message string) error {
-	cmd := exec.CommandContext(ctx, "git", "commit", "-am", message)
+	// Stage all changes first
+	addCmd := exec.CommandContext(ctx, "git", "add", "-A")
+	addCmd.Dir = dir
+	if err := addCmd.Run(); err != nil {
+		return fmt.Errorf("git add failed: %v", err)
+	}
+	cmd := exec.CommandContext(ctx, "git", "commit", "-m", message)
 	cmd.Dir = dir
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

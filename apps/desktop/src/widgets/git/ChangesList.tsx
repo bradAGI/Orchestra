@@ -63,6 +63,7 @@ export function ChangesList({
 }) {
   const [commitMsg, setCommitMsg] = useState('')
   const [loading, setLoading] = useState(false)
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const { staged, unstaged } = classifyFiles(status)
 
   async function handleStage(files: string[]) {
@@ -92,15 +93,21 @@ export function ChangesList({
   async function handleCommit(andPush: boolean) {
     if (!commitMsg.trim() || loading) return
     setLoading(true)
+    setFeedback(null)
     try {
       await gitCommit(config, projectId, commitMsg.trim())
       if (andPush) {
         await gitPush(config, projectId)
+        setFeedback({ type: 'success', msg: 'Committed and pushed' })
+      } else {
+        setFeedback({ type: 'success', msg: 'Committed' })
       }
       setCommitMsg('')
       onRefresh()
-    } catch (err) {
-      console.error('commit failed', err)
+      setTimeout(() => setFeedback(null), 3000)
+    } catch (err: any) {
+      setFeedback({ type: 'error', msg: err?.message || 'Commit failed' })
+      setTimeout(() => setFeedback(null), 5000)
     } finally {
       setLoading(false)
     }
@@ -110,6 +117,11 @@ export function ChangesList({
     <div className="flex flex-col h-full overflow-hidden">
       {/* Commit section — always visible at top */}
       <div className="border-b border-border/40 p-3 shrink-0 bg-card/50">
+        {feedback && (
+          <div className={`mb-2 px-3 py-1.5 rounded-lg text-[10px] font-bold ${feedback.type === 'success' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+            {feedback.msg}
+          </div>
+        )}
         <textarea
           value={commitMsg}
           onChange={(e) => setCommitMsg(e.target.value)}

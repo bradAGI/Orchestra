@@ -20,6 +20,7 @@ export function BranchBar({
   const [newName, setNewName] = useState('')
   const [stashOpen, setStashOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const stashRef = useRef<HTMLDivElement>(null)
 
@@ -40,11 +41,13 @@ export function BranchBar({
   async function handleCheckout(branch: string) {
     if (branch === currentBranch || loading) return
     setLoading(true)
+    setError('')
     try {
       await gitCheckout(config, projectId, branch)
       onBranchChange()
-    } catch (err) {
-      console.error('checkout failed', err)
+    } catch (err: any) {
+      setError(err?.message || 'Checkout failed')
+      setTimeout(() => setError(''), 4000)
     } finally {
       setLoading(false)
     }
@@ -54,13 +57,15 @@ export function BranchBar({
     const name = newName.trim()
     if (!name || loading) return
     setLoading(true)
+    setError('')
     try {
       await gitCreateBranch(config, projectId, name)
       setCreating(false)
       setNewName('')
       onBranchChange()
-    } catch (err) {
-      console.error('create branch failed', err)
+    } catch (err: any) {
+      setError(err?.message || 'Create branch failed')
+      setTimeout(() => setError(''), 4000)
     } finally {
       setLoading(false)
     }
@@ -93,7 +98,10 @@ export function BranchBar({
   }
 
   return (
-    <div className="flex items-center gap-1.5 px-3 py-2.5 border-b border-border/40 overflow-x-auto shrink-0 bg-card/30">
+    <div className="flex items-center gap-1.5 px-3 py-2.5 border-b border-border/40 overflow-x-auto shrink-0 bg-card/30 relative">
+      {error && (
+        <div className="absolute top-full left-0 right-0 z-10 px-3 py-1.5 bg-red-500/10 border-b border-red-500/20 text-[10px] text-red-400">{error}</div>
+      )}
       <div className="flex items-center gap-1 mr-1 shrink-0">
         <GitBranch size={14} className="text-primary/60" />
         <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40">Branches</span>
