@@ -98,15 +98,13 @@ export function BranchBar({
   }
 
   return (
-    <div className="flex items-center gap-1.5 px-3 py-2.5 shrink-0 relative">
+    <div className="flex items-center gap-1.5 px-3 py-2 shrink-0 relative h-10">
       {error && (
         <div className="absolute top-full left-0 right-0 z-10 px-3 py-1.5 bg-red-500/10 border-b border-red-500/20 text-[10px] text-red-400">{error}</div>
       )}
-      <div className="flex items-center gap-1 mr-1 shrink-0">
-        <GitBranch size={14} className="text-primary/60" />
-      </div>
+      <GitBranch size={12} className="text-primary/60 shrink-0" />
 
-      <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto scrollbar-none">
+      <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
         {branches.map((branch) => (
           <button
             key={branch}
@@ -149,7 +147,7 @@ export function BranchBar({
         )}
       </div>
 
-      <div className="ml-2 relative shrink-0" ref={stashRef}>
+      <div className="ml-1 relative shrink-0" ref={stashRef}>
         <button
           onClick={() => setStashOpen((v) => !v)}
           disabled={loading}
