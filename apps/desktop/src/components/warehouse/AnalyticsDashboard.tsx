@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
     Database,
     TrendingUp,
@@ -11,6 +11,7 @@ import {
     DollarSign,
 } from 'lucide-react'
 import type { GlobalStats, SessionSummary } from '@/lib/orchestra-types'
+import { fetchProviderModel, type BackendConfig } from '@/lib/orchestra-client'
 import { Badge } from '@/components/ui/badge'
 import {
     Area,
@@ -36,16 +37,49 @@ import {
 } from '@/components/ui/chart'
 
 // ---------------------------------------------------------------------------
-// Provider pricing: harness -> default model
+// Model pricing lookup — maps model IDs/names to per-1M-token pricing
 // ---------------------------------------------------------------------------
-const PROVIDER_PRICING: Record<
-    string,
-    { name: string; model: string; input: number; output: number; color: string }
-> = {
-    claude: { name: 'Claude', model: 'Sonnet 4.6', input: 3.0, output: 15.0, color: 'hsl(var(--chart-1))' },
-    codex: { name: 'Codex', model: 'GPT-5.4', input: 2.5, output: 15.0, color: 'hsl(var(--chart-2))' },
-    gemini: { name: 'Gemini', model: '2.5 Pro', input: 1.25, output: 10.0, color: 'hsl(var(--chart-3))' },
-    opencode: { name: 'OpenCode', model: 'Configurable', input: 2.5, output: 10.0, color: 'hsl(var(--chart-4))' },
+const MODEL_PRICING: Record<string, { label: string; input: number; output: number }> = {
+    // Claude
+    'claude-opus-4-6':       { label: 'Opus 4.6',       input: 5.0,   output: 25.0 },
+    'claude-sonnet-4-6':     { label: 'Sonnet 4.6',     input: 3.0,   output: 15.0 },
+    'claude-haiku-4-5':      { label: 'Haiku 4.5',      input: 1.0,   output: 5.0 },
+    'claude-3-5-sonnet':     { label: 'Sonnet 3.5',     input: 3.0,   output: 15.0 },
+    'claude-3-opus':         { label: 'Opus 3',         input: 15.0,  output: 75.0 },
+    // OpenAI / Codex
+    'gpt-5.4':               { label: 'GPT-5.4',        input: 2.5,   output: 15.0 },
+    'gpt-5.3-codex':         { label: 'GPT-5.3 Codex',  input: 3.0,   output: 15.0 },
+    'gpt-5.1-codex':         { label: 'GPT-5.1 Codex',  input: 1.25,  output: 10.0 },
+    'gpt-5.1-codex-mini':    { label: 'GPT-5.1 Mini',   input: 0.25,  output: 2.0 },
+    'gpt-4o':                { label: 'GPT-4o',         input: 2.5,   output: 10.0 },
+    'gpt-4o-mini':           { label: 'GPT-4o Mini',    input: 0.15,  output: 0.60 },
+    'o3':                    { label: 'o3',             input: 0.40,  output: 1.60 },
+    'o1':                    { label: 'o1',             input: 15.0,  output: 60.0 },
+    // Gemini
+    'gemini-2.5-pro':        { label: '2.5 Pro',        input: 1.25,  output: 10.0 },
+    'gemini-2.5-flash':      { label: '2.5 Flash',      input: 0.30,  output: 2.50 },
+    'gemini-2.0-flash':      { label: '2.0 Flash',      input: 0.10,  output: 0.40 },
+    'gemini-3-flash':        { label: '3 Flash',        input: 0.50,  output: 3.0 },
+    'gemini-3.1-pro':        { label: '3.1 Pro',        input: 2.0,   output: 12.0 },
+}
+
+// Fallback defaults when we can't read the harness config
+const PROVIDER_DEFAULTS: Record<string, { name: string; model: string; input: number; output: number; color: string }> = {
+    claude:   { name: 'Claude',   model: 'claude-sonnet-4-6', input: 3.0,  output: 15.0, color: 'hsl(var(--chart-1))' },
+    codex:    { name: 'Codex',    model: 'gpt-5.4',           input: 2.5,  output: 15.0, color: 'hsl(var(--chart-2))' },
+    gemini:   { name: 'Gemini',   model: 'gemini-2.5-pro',    input: 1.25, output: 10.0, color: 'hsl(var(--chart-3))' },
+    opencode: { name: 'OpenCode', model: 'gpt-4o',            input: 2.5,  output: 10.0, color: 'hsl(var(--chart-4))' },
+}
+
+function resolveModelPricing(modelId: string): { label: string; input: number; output: number } | null {
+    const normalized = modelId.toLowerCase().trim()
+    // Direct match
+    if (MODEL_PRICING[normalized]) return MODEL_PRICING[normalized]
+    // Partial match (e.g. "sonnet-4-6" matches "claude-sonnet-4-6")
+    for (const [key, value] of Object.entries(MODEL_PRICING)) {
+        if (normalized.includes(key) || key.includes(normalized)) return value
+    }
+    return null
 }
 
 const CHART_COLORS = [
@@ -56,24 +90,33 @@ const CHART_COLORS = [
     'hsl(var(--chart-5))',
 ]
 
-function getProviderPricing(provider?: string) {
+type ResolvedProvider = { name: string; model: string; label: string; input: number; output: number; color: string }
+
+function getProviderPricing(provider: string | undefined, liveModels: Record<string, string>): ResolvedProvider {
     const key = provider?.toLowerCase() || ''
-    return PROVIDER_PRICING[key] || { name: provider || 'Unknown', model: 'Default', input: 2.5, output: 10.0, color: 'hsl(var(--chart-5))' }
+    const defaults = PROVIDER_DEFAULTS[key] || { name: provider || 'Unknown', model: 'unknown', input: 2.5, output: 10.0, color: 'hsl(var(--chart-5))' }
+    const liveModel = liveModels[key]
+    if (liveModel) {
+        const pricing = resolveModelPricing(liveModel)
+        if (pricing) return { name: defaults.name, model: liveModel, ...pricing, color: defaults.color }
+    }
+    const fallback = resolveModelPricing(defaults.model)
+    return { name: defaults.name, model: defaults.model, label: fallback?.label || defaults.model, input: fallback?.input || defaults.input, output: fallback?.output || defaults.output, color: defaults.color }
 }
 
-function calculateCost(tokens: number, type: 'input' | 'output', provider?: string): number {
-    const p = getProviderPricing(provider)
+function calculateCost(tokens: number, type: 'input' | 'output', provider: string | undefined, liveModels: Record<string, string>): number {
+    const p = getProviderPricing(provider, liveModels)
     const rate = type === 'input' ? p.input : p.output
     return (tokens / 1_000_000) * rate
 }
 
-function calculateWeightedCost(inputTokens: number, outputTokens: number, providerUsage: Record<string, number>, totalTokens: number): number {
+function calculateWeightedCost(inputTokens: number, outputTokens: number, providerUsage: Record<string, number>, totalTokens: number, liveModels: Record<string, string>): number {
     let cost = 0
     for (const [provider, tokens] of Object.entries(providerUsage)) {
         const fraction = totalTokens > 0 ? tokens / totalTokens : 0
         const providerInput = inputTokens * fraction
         const providerOutput = outputTokens * fraction
-        cost += calculateCost(providerInput, 'input', provider) + calculateCost(providerOutput, 'output', provider)
+        cost += calculateCost(providerInput, 'input', provider, liveModels) + calculateCost(providerOutput, 'output', provider, liveModels)
     }
     return cost
 }
@@ -111,6 +154,7 @@ const projectChartConfig = {
 interface AnalyticsDashboardProps {
     stats: GlobalStats | null
     loading: boolean
+    config: BackendConfig | null
     onInspectSession?: (sessionId: string) => void
     onCloneSession?: (session: SessionSummary) => void
 }
@@ -118,39 +162,64 @@ interface AnalyticsDashboardProps {
 export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     stats,
     loading,
+    config,
     onInspectSession,
     onCloneSession,
 }) => {
+    // -----------------------------------------------------------------------
+    // Fetch live model config from each harness
+    // -----------------------------------------------------------------------
+    const [liveModels, setLiveModels] = useState<Record<string, string>>({})
+
+    useEffect(() => {
+        if (!config) return
+        const providers = ['claude', 'codex', 'gemini', 'opencode']
+        void Promise.allSettled(
+            providers.map(async (p) => {
+                const result = await fetchProviderModel(config, p)
+                return { provider: p, model: result.model }
+            }),
+        ).then((results) => {
+            const models: Record<string, string> = {}
+            for (const r of results) {
+                if (r.status === 'fulfilled' && r.value.model) {
+                    models[r.value.provider] = r.value.model
+                }
+            }
+            setLiveModels(models)
+        })
+    }, [config])
+
     // -----------------------------------------------------------------------
     // Derived data
     // -----------------------------------------------------------------------
 
     const totalSpend = useMemo(() => {
         if (!stats) return 0
-        return calculateWeightedCost(stats.total_input, stats.total_output, stats.provider_usage, stats.total_tokens)
-    }, [stats])
+        return calculateWeightedCost(stats.total_input, stats.total_output, stats.provider_usage || {}, stats.total_tokens, liveModels)
+    }, [stats, liveModels])
 
     const inputCost = useMemo(() => {
         if (!stats) return 0
         let cost = 0
         const total = stats.total_tokens || 1
-        for (const [provider, tokens] of Object.entries(stats.provider_usage)) {
+        for (const [provider, tokens] of Object.entries(stats.provider_usage || {})) {
             const fraction = tokens / total
-            cost += calculateCost(stats.total_input * fraction, 'input', provider)
+            cost += calculateCost(stats.total_input * fraction, 'input', provider, liveModels)
         }
         return cost
-    }, [stats])
+    }, [stats, liveModels])
 
     const outputCost = useMemo(() => {
         if (!stats) return 0
         let cost = 0
         const total = stats.total_tokens || 1
-        for (const [provider, tokens] of Object.entries(stats.provider_usage)) {
+        for (const [provider, tokens] of Object.entries(stats.provider_usage || {})) {
             const fraction = tokens / total
-            cost += calculateCost(stats.total_output * fraction, 'output', provider)
+            cost += calculateCost(stats.total_output * fraction, 'output', provider, liveModels)
         }
         return cost
-    }, [stats])
+    }, [stats, liveModels])
 
     // Per-provider cost breakdown
     const providerCostData = useMemo(() => {
@@ -158,19 +227,19 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         const total = stats.total_tokens || 1
         return Object.entries(stats.provider_usage).map(([provider, tokens]) => {
             const fraction = tokens / total
-            const iCost = calculateCost(stats.total_input * fraction, 'input', provider)
-            const oCost = calculateCost(stats.total_output * fraction, 'output', provider)
-            const pricing = getProviderPricing(provider)
+            const iCost = calculateCost(stats.total_input * fraction, 'input', provider, liveModels)
+            const oCost = calculateCost(stats.total_output * fraction, 'output', provider, liveModels)
+            const pricing = getProviderPricing(provider, liveModels)
             return {
                 provider,
-                name: pricing.name,
+                name: `${pricing.name} (${pricing.label})`,
                 inputCost: parseFloat(iCost.toFixed(4)),
                 outputCost: parseFloat(oCost.toFixed(4)),
                 total: parseFloat((iCost + oCost).toFixed(4)),
                 fill: pricing.color,
             }
         }).sort((a, b) => b.total - a.total)
-    }, [stats])
+    }, [stats, liveModels])
 
     // Per-project token usage (top 5 + Other)
     const projectTokenData = useMemo(() => {
@@ -203,7 +272,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             if (!dateMap.has(date)) dateMap.set(date, {})
             const bucket = dateMap.get(date)!
             const provider = s.provider?.toLowerCase() || 'other'
-            const cost = calculateCost(s.total_input, 'input', provider) + calculateCost(s.total_output, 'output', provider)
+            const cost = calculateCost(s.total_input, 'input', provider, liveModels) + calculateCost(s.total_output, 'output', provider, liveModels)
             bucket[provider] = (bucket[provider] || 0) + cost
         }
         return [...dateMap.entries()].map(([date, costs]) => ({
@@ -213,7 +282,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             gemini: parseFloat((costs.gemini || 0).toFixed(4)),
             opencode: parseFloat((costs.opencode || 0).toFixed(4)),
         }))
-    }, [stats?.recent_sessions])
+    }, [stats?.recent_sessions, liveModels])
 
     // Session metrics: tokens per session per day (input vs output trend lines)
     const tokenTrendData = useMemo(() => {
@@ -678,10 +747,10 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                         </thead>
                         <tbody className="divide-y divide-border/20">
                             {stats.recent_sessions?.map((session: SessionSummary) => {
-                                const pricing = getProviderPricing(session.provider)
+                                const pricing = getProviderPricing(session.provider, liveModels)
                                 const sessionCost =
-                                    calculateCost(session.total_input, 'input', session.provider) +
-                                    calculateCost(session.total_output, 'output', session.provider)
+                                    calculateCost(session.total_input, 'input', session.provider, liveModels) +
+                                    calculateCost(session.total_output, 'output', session.provider, liveModels)
                                 return (
                                     <tr key={session.id} className="hover:bg-primary/[0.03] transition-all group/row">
                                         <td className="px-5 py-4">

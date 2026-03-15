@@ -1213,6 +1213,7 @@ export default function App() {
                   <AnalyticsDashboard
                     stats={warehouseStats}
                     loading={dataLoading}
+                    config={config}
                     onInspectSession={handleInspectSession}
                     onCloneSession={handleCloneSession}
                   />
