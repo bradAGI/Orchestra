@@ -75,8 +75,17 @@ func (s *Server) TerminalWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Send data to client
+	// Send data to client — filter JSON noise for agent sessions
+	isAgentSession := strings.HasPrefix(sessionID, "issue-")
 	handlerID := session.AddHandler(func(data []byte) {
+		if isAgentSession {
+			// Filter agent stream-json output to show only human-readable content
+			filtered := filterAgentOutput(data)
+			if len(filtered) == 0 {
+				return
+			}
+			data = filtered
+		}
 		err := conn.WriteMessage(websocket.BinaryMessage, data)
 		if err != nil {
 			// Don't log as error, it just means client disconnected
@@ -159,4 +168,108 @@ func (s *Server) allowWebSocketOrigin(r *http.Request) bool {
 	}
 	ip := net.ParseIP(originHost)
 	return ip != nil && ip.IsLoopback()
+}
+
+// filterAgentOutput transforms raw agent stream-json into human-readable terminal output.
+// Extracts agent messages, tool calls, and results from JSON lines.
+// Non-JSON lines (like shell prompts) pass through unchanged.
+func filterAgentOutput(data []byte) []byte {
+	raw := string(data)
+	lines := strings.Split(raw, "\n")
+	var out []string
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+
+		// Non-JSON lines pass through (shell prompts, ANSI output)
+		if !strings.HasPrefix(trimmed, "{") {
+			out = append(out, line)
+			continue
+		}
+
+		// Parse JSON and extract human-readable content
+		var obj map[string]any
+		if err := json.Unmarshal([]byte(trimmed), &obj); err != nil {
+			out = append(out, line)
+			continue
+		}
+
+		eventType, _ := obj["type"].(string)
+
+		switch eventType {
+		case "assistant":
+			// Claude: extract text from message.content[]
+			if msg, ok := obj["message"].(map[string]any); ok {
+				if content, ok := msg["content"].([]any); ok {
+					for _, block := range content {
+						if b, ok := block.(map[string]any); ok {
+							if b["type"] == "text" {
+								if text, ok := b["text"].(string); ok && strings.TrimSpace(text) != "" {
+									out = append(out, "\033[32m"+text+"\033[0m")
+								}
+							} else if b["type"] == "tool_use" {
+								name, _ := b["name"].(string)
+								out = append(out, "\033[33m[tool] "+name+"\033[0m")
+							}
+						}
+					}
+				}
+			}
+		case "user":
+			// Claude: tool results
+			if msg, ok := obj["message"].(map[string]any); ok {
+				if content, ok := msg["content"].([]any); ok {
+					for _, block := range content {
+						if b, ok := block.(map[string]any); ok {
+							if b["type"] == "tool_result" {
+								text, _ := b["content"].(string)
+								if len(text) > 200 {
+									text = text[:200] + "..."
+								}
+								if text != "" {
+									out = append(out, "\033[90m"+text+"\033[0m")
+								}
+							}
+						}
+					}
+				}
+			}
+		case "result":
+			if result, ok := obj["result"].(string); ok && result != "" {
+				out = append(out, "\033[36m"+result+"\033[0m")
+			}
+		case "item.completed":
+			// Codex: extract text from item
+			if item, ok := obj["item"].(map[string]any); ok {
+				if text, ok := item["text"].(string); ok && strings.TrimSpace(text) != "" {
+					itemType, _ := item["type"].(string)
+					if itemType == "agent_message" {
+						out = append(out, "\033[32m"+text+"\033[0m")
+					} else if itemType == "reasoning" {
+						out = append(out, "\033[35m"+text+"\033[0m")
+					}
+				}
+			}
+		case "message":
+			// Gemini: extract content
+			if role, _ := obj["role"].(string); role == "assistant" {
+				if content, ok := obj["content"].(string); ok && strings.TrimSpace(content) != "" {
+					out = append(out, "\033[32m"+content+"\033[0m")
+				}
+			}
+		// Skip noise: system, rate_limit_event, init hooks, etc.
+		case "system", "rate_limit_event":
+			// silently drop
+		default:
+			// Drop unknown JSON events
+		}
+	}
+
+	if len(out) == 0 {
+		return nil
+	}
+	return []byte(strings.Join(out, "\n") + "\n")
 }
