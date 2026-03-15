@@ -9,7 +9,7 @@ Orchestra is an orchestration platform for managing AI coding agents. It coordin
 - **Multi-Agent Management** -- Configure and dispatch Claude, Codex, Gemini, and OpenCode with per-provider settings for instructions, permissions, model, hooks, MCP servers, skills, and sub-agents
 - **Project Management** -- Git-integrated project views with Commits, Issues, and PRs sub-tabs
 - **Issue Inspector** -- Details, Plan, Activity, Output, and Changes tabs for deep visibility into each task
-- **Agent Lifecycle** -- Todo → In Progress (agent runs) → Review (human approval) → Done
+- **Agent Lifecycle** -- Backlog → Todo → In Progress (agent runs) → Review (human approval) → Done
 - **TUI Dashboard** -- Terminal-based control surface for starting/stopping services (`make dash`)
 - **Telemetry & Warehouse** -- Ingests session data from all 4 providers; token analytics and cost tracking
 
