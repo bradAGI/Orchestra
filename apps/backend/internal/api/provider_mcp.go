@@ -14,11 +14,13 @@ import (
 
 // ProviderMCPServer represents an MCP server entry in a provider's config.
 type ProviderMCPServer struct {
-	Name    string   `json:"name"`
-	Command string   `json:"command"`
-	Args    []string `json:"args,omitempty"`
-	URL     string   `json:"url,omitempty"`
-	Enabled bool     `json:"enabled"`
+	Name    string            `json:"name"`
+	Command string            `json:"command"`
+	Args    []string          `json:"args,omitempty"`
+	URL     string            `json:"url,omitempty"`
+	Env     map[string]string `json:"env,omitempty"`
+	Type    string            `json:"type,omitempty"`
+	Enabled bool              `json:"enabled"`
 }
 
 // GetProviderMCPServers reads MCP servers from a provider's native config file.
@@ -64,22 +66,25 @@ func (s *Server) AddProviderMCPServer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Name    string   `json:"name"`
-		Command string   `json:"command"`
-		Args    []string `json:"args,omitempty"`
+		Name    string            `json:"name"`
+		Command string            `json:"command"`
+		Args    []string          `json:"args,omitempty"`
+		URL     string            `json:"url,omitempty"`
+		Env     map[string]string `json:"env,omitempty"`
+		Type    string            `json:"type,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
 		return
 	}
-	if req.Name == "" || req.Command == "" {
-		writeJSONError(w, http.StatusBadRequest, "invalid_request", "name and command are required")
+	if req.Name == "" || (req.Command == "" && req.URL == "") {
+		writeJSONError(w, http.StatusBadRequest, "invalid_request", "name and command (or url) are required")
 		return
 	}
 
 	switch provider {
 	case "claude":
-		err = addClaudeMCP(homeDir, req.Name, req.Command, req.Args)
+		err = addClaudeMCPFull(homeDir, req.Name, req.Command, req.Args, req.URL, req.Env, req.Type)
 	case "codex":
 		err = addCodexMCP(homeDir, req.Name, req.Command)
 	case "opencode":
@@ -183,13 +188,21 @@ func readClaudeMCP(home string) []ProviderMCPServer {
 		}
 		cmd, _ := server["command"].(string)
 		url, _ := server["url"].(string)
+		typ, _ := server["type"].(string)
 		var args []string
 		if argsRaw, ok := server["args"].([]any); ok {
 			for _, a := range argsRaw {
 				args = append(args, fmt.Sprintf("%v", a))
 			}
 		}
-		servers = append(servers, ProviderMCPServer{Name: name, Command: cmd, Args: args, URL: url, Enabled: true})
+		var env map[string]string
+		if envRaw, ok := server["env"].(map[string]any); ok {
+			env = make(map[string]string, len(envRaw))
+			for k, v := range envRaw {
+				env[k] = fmt.Sprintf("%v", v)
+			}
+		}
+		servers = append(servers, ProviderMCPServer{Name: name, Command: cmd, Args: args, URL: url, Env: env, Type: typ, Enabled: true})
 	}
 	return servers
 }
@@ -206,6 +219,44 @@ func addClaudeMCP(home, name, command string, args []string) error {
 	entry := map[string]any{"command": command}
 	if len(args) > 0 {
 		entry["args"] = args
+	}
+	// Default type based on whether command or url is set
+	if command != "" {
+		entry["type"] = "stdio"
+	}
+	mcpServers[name] = entry
+	cfg["mcpServers"] = mcpServers
+	return writeClaudeConfig(home, cfg)
+}
+
+func addClaudeMCPFull(home, name, command string, args []string, url string, env map[string]string, typ string) error {
+	cfg, err := readClaudeConfig(home)
+	if err != nil {
+		return err
+	}
+	mcpServers, ok := cfg["mcpServers"].(map[string]any)
+	if !ok {
+		mcpServers = map[string]any{}
+	}
+	entry := map[string]any{}
+	if command != "" {
+		entry["command"] = command
+	}
+	if len(args) > 0 {
+		entry["args"] = args
+	}
+	if url != "" {
+		entry["url"] = url
+	}
+	if len(env) > 0 {
+		entry["env"] = env
+	}
+	if typ != "" {
+		entry["type"] = typ
+	} else if command != "" {
+		entry["type"] = "stdio"
+	} else if url != "" {
+		entry["type"] = "http"
 	}
 	mcpServers[name] = entry
 	cfg["mcpServers"] = mcpServers

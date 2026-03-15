@@ -746,6 +746,8 @@ export type ProviderMCPServer = {
     command: string
     args?: string[]
     url?: string
+    env?: Record<string, string>
+    type?: string  // "stdio" | "http"
     enabled: boolean
 }
 
@@ -769,6 +771,7 @@ export type ProviderPermissions = {
     approval_mode: string
     allow: string[]
     deny: string[]
+    ask: string[]
     sandbox?: string
 }
 
@@ -780,8 +783,10 @@ export type ProviderModelConfig = {
 
 export type ProviderHook = {
     event: string
-    command: string
     matcher?: string
+    type: string
+    command: string
+    timeout?: number
 }
 
 export async function fetchProviderPermissions(config: BackendConfig, provider: string): Promise<ProviderPermissions> {

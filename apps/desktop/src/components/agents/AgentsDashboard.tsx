@@ -110,9 +110,10 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
     const [createType, setCreateType] = useState<'skill' | 'agent'>('skill')
 
     /* ---------- permissions state ---------- */
-    const [permissions, setPermissions] = useState<ProviderPermissions>({ approval_mode: 'interactive', allow: [], deny: [] })
+    const [permissions, setPermissions] = useState<ProviderPermissions>({ approval_mode: 'default', allow: [], deny: [], ask: [] })
     const [newAllowRule, setNewAllowRule] = useState('')
     const [newDenyRule, setNewDenyRule] = useState('')
+    const [newAskRule, setNewAskRule] = useState('')
     const [savingPermissions, setSavingPermissions] = useState(false)
 
     /* ---------- model config state ---------- */
@@ -387,7 +388,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
             setHooks(hks)
         } catch {
             // defaults on error
-            setPermissions({ approval_mode: 'interactive', allow: [], deny: [] })
+            setPermissions({ approval_mode: 'default', allow: [], deny: [], ask: [] })
             setModelConfig({ model: '', effort: '', temperature: null })
             setHooks([])
         }
@@ -628,10 +629,21 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                     onChange={e => setPermissions(p => ({ ...p, approval_mode: e.target.value }))}
                                     className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs font-medium focus:ring-2 focus:ring-primary/20 outline-none"
                                 >
-                                    <option value="interactive">Interactive</option>
-                                    <option value="auto-edit">Auto-edit</option>
-                                    <option value="full-auto">Full-auto</option>
-                                    <option value="suggest">Suggest</option>
+                                    {selectedAgent === 'claude' ? (
+                                        <>
+                                            <option value="default">Default (interactive)</option>
+                                            <option value="acceptEdits">Accept Edits</option>
+                                            <option value="bypassPermissions">Bypass Permissions</option>
+                                            <option value="plan">Plan</option>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <option value="interactive">Interactive</option>
+                                            <option value="auto-edit">Auto-edit</option>
+                                            <option value="full-auto">Full-auto</option>
+                                            <option value="suggest">Suggest</option>
+                                        </>
+                                    )}
                                 </select>
                             </div>
 
@@ -732,6 +744,57 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                     </Button>
                                 </div>
                             </div>
+
+                            {/* Ask (Claude only) */}
+                            {selectedAgent === 'claude' && (
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Ask</label>
+                                    </div>
+                                    {permissions.ask.length === 0 && (
+                                        <p className="text-[10px] text-muted-foreground/20">No ask rules configured</p>
+                                    )}
+                                    {permissions.ask.map((rule, i) => (
+                                        <div key={i} className="flex items-center gap-2 group">
+                                            <span className="flex-1 text-xs font-mono bg-muted/10 rounded px-2 py-1 border border-border/20">{rule}</span>
+                                            <button
+                                                onClick={() => setPermissions(p => ({ ...p, ask: p.ask.filter((_, idx) => idx !== i) }))}
+                                                className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground/20 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100 shrink-0"
+                                            >
+                                                <X size={10} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            className="h-8 flex-1 rounded-lg border border-border bg-background px-3 text-xs font-mono focus:ring-2 focus:ring-primary/20 outline-none"
+                                            value={newAskRule}
+                                            onChange={e => setNewAskRule(e.target.value)}
+                                            placeholder="e.g. WebFetch, Bash(curl *)"
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter' && newAskRule.trim()) {
+                                                    setPermissions(p => ({ ...p, ask: [...p.ask, newAskRule.trim()] }))
+                                                    setNewAskRule('')
+                                                }
+                                            }}
+                                        />
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-8 rounded-lg text-[9px] font-bold uppercase"
+                                            disabled={!newAskRule.trim()}
+                                            onClick={() => {
+                                                if (newAskRule.trim()) {
+                                                    setPermissions(p => ({ ...p, ask: [...p.ask, newAskRule.trim()] }))
+                                                    setNewAskRule('')
+                                                }
+                                            }}
+                                        >
+                                            <Plus size={10} className="mr-1" /> Add
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Sandbox (Codex only) */}
                             {selectedAgent === 'codex' && (
@@ -917,7 +980,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                                 disabled={!newHookEvent || !newHookCommand.trim()}
                                                 onClick={() => {
                                                     if (newHookEvent && newHookCommand.trim()) {
-                                                        setHooks(h => [...h, { event: newHookEvent, command: newHookCommand.trim(), matcher: newHookMatcher.trim() || undefined }])
+                                                        setHooks(h => [...h, { event: newHookEvent, command: newHookCommand.trim(), matcher: newHookMatcher.trim() || undefined, type: 'command' }])
                                                         setNewHookEvent('')
                                                         setNewHookCommand('')
                                                         setNewHookMatcher('')

@@ -21,6 +21,7 @@ type ProviderPermissions struct {
 	ApprovalMode string   `json:"approval_mode"`
 	Allow        []string `json:"allow"`
 	Deny         []string `json:"deny"`
+	Ask          []string `json:"ask"`
 	Sandbox      string   `json:"sandbox,omitempty"`
 }
 
@@ -34,8 +35,10 @@ type ProviderModelConfig struct {
 // ProviderHook is a single hook entry.
 type ProviderHook struct {
 	Event   string `json:"event"`
-	Command string `json:"command"`
 	Matcher string `json:"matcher,omitempty"`
+	Type    string `json:"type"`
+	Command string `json:"command"`
+	Timeout int    `json:"timeout,omitempty"`
 }
 
 /* ================================================================== */
@@ -287,22 +290,23 @@ func writeClaudeSettings(home string, cfg map[string]any) error {
 	return os.WriteFile(claudeSettingsPath(home), data, 0644)
 }
 
-// Permissions: settings.json → permissions { allow: [], deny: [] }
+// Permissions: settings.json → permissions { allow: [], deny: [], ask: [] }, permissionMode
 func readClaudePermissions(home string) ProviderPermissions {
 	cfg, err := readClaudeSettings(home)
 	if err != nil {
-		return ProviderPermissions{ApprovalMode: "interactive", Allow: []string{}, Deny: []string{}}
+		return ProviderPermissions{ApprovalMode: "default", Allow: []string{}, Deny: []string{}, Ask: []string{}}
 	}
 	perms, _ := cfg["permissions"].(map[string]any)
 	allow := toStringSlice(perms["allow"])
 	deny := toStringSlice(perms["deny"])
+	ask := toStringSlice(perms["ask"])
 
-	mode := "interactive"
-	if m, ok := cfg["approvalMode"].(string); ok {
+	mode := "default"
+	if m, ok := cfg["permissionMode"].(string); ok {
 		mode = m
 	}
 
-	return ProviderPermissions{ApprovalMode: mode, Allow: allow, Deny: deny}
+	return ProviderPermissions{ApprovalMode: mode, Allow: allow, Deny: deny, Ask: ask}
 }
 
 func writeClaudePermissions(home string, perms ProviderPermissions) error {
@@ -313,27 +317,25 @@ func writeClaudePermissions(home string, perms ProviderPermissions) error {
 	permObj := map[string]any{
 		"allow": perms.Allow,
 		"deny":  perms.Deny,
+		"ask":   perms.Ask,
 	}
 	cfg["permissions"] = permObj
 	if perms.ApprovalMode != "" {
-		cfg["approvalMode"] = perms.ApprovalMode
+		cfg["permissionMode"] = perms.ApprovalMode
 	}
+	// Clean up old field name if present
+	delete(cfg, "approvalMode")
 	return writeClaudeSettings(home, cfg)
 }
 
-// Model: settings.json → model, effortLevel, temperatureOverride
+// Model: settings.json → model (effortLevel and temperatureOverride are read if present but not written if empty)
 func readClaudeModel(home string) ProviderModelConfig {
 	cfg, err := readClaudeSettings(home)
 	if err != nil {
 		return ProviderModelConfig{}
 	}
 	model, _ := cfg["model"].(string)
-	effort, _ := cfg["effortLevel"].(string)
-	var temp *float64
-	if t, ok := cfg["temperatureOverride"].(float64); ok {
-		temp = &t
-	}
-	return ProviderModelConfig{Model: model, Effort: effort, Temperature: temp}
+	return ProviderModelConfig{Model: model}
 }
 
 func writeClaudeModel(home string, model ProviderModelConfig) error {
@@ -346,20 +348,12 @@ func writeClaudeModel(home string, model ProviderModelConfig) error {
 	} else {
 		delete(cfg, "model")
 	}
-	if model.Effort != "" {
-		cfg["effortLevel"] = model.Effort
-	} else {
-		delete(cfg, "effortLevel")
-	}
-	if model.Temperature != nil {
-		cfg["temperatureOverride"] = *model.Temperature
-	} else {
-		delete(cfg, "temperatureOverride")
-	}
 	return writeClaudeSettings(home, cfg)
 }
 
-// Hooks: settings.json → hooks { <event>: [ { command: ..., matcher: ... } ] }
+// Hooks: settings.json → hooks { <event>: [ { matcher: "...", hooks: [ { type, command, timeout } ] } ] }
+// The real Claude hooks format nests hooks inside matcher groups.
+// We flatten into our ProviderHook array on read, and rebuild the nested structure on write.
 func readClaudeHooks(home string) []ProviderHook {
 	cfg, err := readClaudeSettings(home)
 	if err != nil {
@@ -371,18 +365,39 @@ func readClaudeHooks(home string) []ProviderHook {
 	}
 	var hooks []ProviderHook
 	for event, val := range hooksObj {
-		entries, ok := val.([]any)
+		matcherGroups, ok := val.([]any)
 		if !ok {
 			continue
 		}
-		for _, e := range entries {
-			entry, ok := e.(map[string]any)
+		for _, mg := range matcherGroups {
+			group, ok := mg.(map[string]any)
 			if !ok {
 				continue
 			}
-			cmd, _ := entry["command"].(string)
-			matcher, _ := entry["matcher"].(string)
-			hooks = append(hooks, ProviderHook{Event: event, Command: cmd, Matcher: matcher})
+			matcher, _ := group["matcher"].(string)
+			innerHooks, ok := group["hooks"].([]any)
+			if !ok {
+				continue
+			}
+			for _, ih := range innerHooks {
+				hookEntry, ok := ih.(map[string]any)
+				if !ok {
+					continue
+				}
+				cmd, _ := hookEntry["command"].(string)
+				typ, _ := hookEntry["type"].(string)
+				timeout := 0
+				if t, ok := hookEntry["timeout"].(float64); ok {
+					timeout = int(t)
+				}
+				hooks = append(hooks, ProviderHook{
+					Event:   event,
+					Matcher: matcher,
+					Type:    typ,
+					Command: cmd,
+					Timeout: timeout,
+				})
+			}
 		}
 	}
 	return hooks
@@ -393,15 +408,66 @@ func writeClaudeHooks(home string, hooks []ProviderHook) error {
 	if err != nil {
 		return err
 	}
-	hooksObj := map[string]any{}
+
+	// Group hooks by event, then by matcher to rebuild the nested structure.
+	// event → matcher → []hookEntry
+	type hookEntry struct {
+		Type    string
+		Command string
+		Timeout int
+	}
+	type matcherGroup struct {
+		Matcher string
+		Hooks   []hookEntry
+	}
+
+	eventGroups := map[string][]matcherGroup{}
 	for _, h := range hooks {
-		entry := map[string]any{"command": h.Command}
-		if h.Matcher != "" {
-			entry["matcher"] = h.Matcher
+		event := h.Event
+		matcher := h.Matcher
+		entry := hookEntry{Type: h.Type, Command: h.Command, Timeout: h.Timeout}
+		if entry.Type == "" {
+			entry.Type = "command"
 		}
-		arr, _ := hooksObj[h.Event].([]any)
-		arr = append(arr, entry)
-		hooksObj[h.Event] = arr
+
+		groups := eventGroups[event]
+		found := false
+		for i, g := range groups {
+			if g.Matcher == matcher {
+				groups[i].Hooks = append(groups[i].Hooks, entry)
+				found = true
+				break
+			}
+		}
+		if !found {
+			groups = append(groups, matcherGroup{Matcher: matcher, Hooks: []hookEntry{entry}})
+		}
+		eventGroups[event] = groups
+	}
+
+	hooksObj := map[string]any{}
+	for event, groups := range eventGroups {
+		var arr []any
+		for _, g := range groups {
+			groupObj := map[string]any{}
+			if g.Matcher != "" {
+				groupObj["matcher"] = g.Matcher
+			}
+			var innerArr []any
+			for _, he := range g.Hooks {
+				innerObj := map[string]any{
+					"type":    he.Type,
+					"command": he.Command,
+				}
+				if he.Timeout > 0 {
+					innerObj["timeout"] = he.Timeout
+				}
+				innerArr = append(innerArr, innerObj)
+			}
+			groupObj["hooks"] = innerArr
+			arr = append(arr, groupObj)
+		}
+		hooksObj[event] = arr
 	}
 	cfg["hooks"] = hooksObj
 	return writeClaudeSettings(home, cfg)
@@ -415,7 +481,7 @@ func writeClaudeHooks(home string, hooks []ProviderHook) error {
 func readCodexPermissions(home string) ProviderPermissions {
 	data, err := os.ReadFile(codexConfigPath(home))
 	if err != nil {
-		return ProviderPermissions{ApprovalMode: "suggest", Allow: []string{}, Deny: []string{}}
+		return ProviderPermissions{ApprovalMode: "suggest", Allow: []string{}, Deny: []string{}, Ask: []string{}}
 	}
 	content := string(data)
 
@@ -425,7 +491,7 @@ func readCodexPermissions(home string) ProviderPermissions {
 	}
 	sandbox := extractTOMLString(content, "sandbox_policy")
 
-	return ProviderPermissions{ApprovalMode: mode, Allow: []string{}, Deny: []string{}, Sandbox: sandbox}
+	return ProviderPermissions{ApprovalMode: mode, Allow: []string{}, Deny: []string{}, Ask: []string{}, Sandbox: sandbox}
 }
 
 func writeCodexPermissions(home string, perms ProviderPermissions) error {
@@ -516,7 +582,7 @@ func writeCodexHooks(home string, hooks []ProviderHook) error {
 func readGeminiPermissions(home string) ProviderPermissions {
 	cfg, err := readGeminiConfig(home)
 	if err != nil {
-		return ProviderPermissions{ApprovalMode: "interactive", Allow: []string{}, Deny: []string{}}
+		return ProviderPermissions{ApprovalMode: "interactive", Allow: []string{}, Deny: []string{}, Ask: []string{}}
 	}
 
 	mode := "interactive"
@@ -531,7 +597,7 @@ func readGeminiPermissions(home string) ProviderPermissions {
 		allow = toStringSlice(tools["allowed"])
 	}
 
-	return ProviderPermissions{ApprovalMode: mode, Allow: allow, Deny: []string{}}
+	return ProviderPermissions{ApprovalMode: mode, Allow: allow, Deny: []string{}, Ask: []string{}}
 }
 
 func writeGeminiPermissions(home string, perms ProviderPermissions) error {
@@ -647,11 +713,11 @@ func writeGeminiHooks(home string, hooks []ProviderHook) error {
 func readOpenCodePermissions(home string) ProviderPermissions {
 	cfg, err := readOpenCodeConfig(home)
 	if err != nil {
-		return ProviderPermissions{ApprovalMode: "interactive", Allow: []string{}, Deny: []string{}}
+		return ProviderPermissions{ApprovalMode: "interactive", Allow: []string{}, Deny: []string{}, Ask: []string{}}
 	}
 	permObj, _ := cfg["permission"].(map[string]any)
 	if permObj == nil {
-		return ProviderPermissions{ApprovalMode: "interactive", Allow: []string{}, Deny: []string{}}
+		return ProviderPermissions{ApprovalMode: "interactive", Allow: []string{}, Deny: []string{}, Ask: []string{}}
 	}
 	mode, _ := permObj["mode"].(string)
 	if mode == "" {
@@ -659,7 +725,7 @@ func readOpenCodePermissions(home string) ProviderPermissions {
 	}
 	allow := toStringSlice(permObj["allow"])
 	deny := toStringSlice(permObj["deny"])
-	return ProviderPermissions{ApprovalMode: mode, Allow: allow, Deny: deny}
+	return ProviderPermissions{ApprovalMode: mode, Allow: allow, Deny: deny, Ask: []string{}}
 }
 
 func writeOpenCodePermissions(home string, perms ProviderPermissions) error {
