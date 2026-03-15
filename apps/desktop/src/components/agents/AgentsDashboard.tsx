@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import {
     Save, Plus, Loader2, Trash2,
-    ArrowLeft, AlertCircle, Folder,
+    ArrowLeft, AlertCircle, Folder, X,
 } from 'lucide-react'
 import type { AgentConfig, BackendConfig, Project, SnapshotPayload } from '@/lib/orchestra-types'
 import { Button } from '@/components/ui/button'
@@ -18,9 +18,18 @@ import {
     fetchProviderMCPServers,
     addProviderMCPServer,
     deleteProviderMCPServer,
+    fetchProviderPermissions,
+    updateProviderPermissions,
+    fetchProviderModel,
+    updateProviderModel,
+    fetchProviderHooks,
+    updateProviderHooks,
     type MCPServer,
     type MCPTool,
     type ProviderMCPServer,
+    type ProviderPermissions,
+    type ProviderModelConfig,
+    type ProviderHook,
 } from '@/lib/orchestra-client'
 import {
     Dialog,
@@ -99,6 +108,23 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
     const [newSkillContent, setNewSkillContent] = useState('')
 
     const [createType, setCreateType] = useState<'skill' | 'agent'>('skill')
+
+    /* ---------- permissions state ---------- */
+    const [permissions, setPermissions] = useState<ProviderPermissions>({ approval_mode: 'interactive', allow: [], deny: [] })
+    const [newAllowRule, setNewAllowRule] = useState('')
+    const [newDenyRule, setNewDenyRule] = useState('')
+    const [savingPermissions, setSavingPermissions] = useState(false)
+
+    /* ---------- model config state ---------- */
+    const [modelConfig, setModelConfig] = useState<ProviderModelConfig>({ model: '', effort: '', temperature: null })
+    const [savingModel, setSavingModel] = useState(false)
+
+    /* ---------- hooks state ---------- */
+    const [hooks, setHooks] = useState<ProviderHook[]>([])
+    const [newHookEvent, setNewHookEvent] = useState('')
+    const [newHookCommand, setNewHookCommand] = useState('')
+    const [newHookMatcher, setNewHookMatcher] = useState('')
+    const [savingHooks, setSavingHooks] = useState(false)
 
     /* ---------- mcp state ---------- */
     const [mcpDialogOpen, setMcpDialogOpen] = useState(false)
@@ -347,6 +373,83 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
         reloadProviderMcp()
     }, [reloadProviderMcp])
 
+    /* ---------- load permissions, model, hooks on agent change ---------- */
+    const reloadProviderConfig = React.useCallback(async () => {
+        if (!config || !selectedAgent) return
+        try {
+            const [perms, model, hks] = await Promise.all([
+                fetchProviderPermissions(config, selectedAgent),
+                fetchProviderModel(config, selectedAgent),
+                fetchProviderHooks(config, selectedAgent),
+            ])
+            setPermissions(perms)
+            setModelConfig(model)
+            setHooks(hks)
+        } catch {
+            // defaults on error
+            setPermissions({ approval_mode: 'interactive', allow: [], deny: [] })
+            setModelConfig({ model: '', effort: '', temperature: null })
+            setHooks([])
+        }
+    }, [config, selectedAgent])
+
+    useEffect(() => {
+        reloadProviderConfig()
+    }, [reloadProviderConfig])
+
+    /* ---------- permissions save ---------- */
+    const handleSavePermissions = async () => {
+        if (!config || !selectedAgent) return
+        setSavingPermissions(true)
+        try {
+            await updateProviderPermissions(config, selectedAgent, permissions)
+            setError('')
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err)
+            setError(message || 'Failed to save permissions')
+        } finally {
+            setSavingPermissions(false)
+        }
+    }
+
+    /* ---------- model save ---------- */
+    const handleSaveModel = async () => {
+        if (!config || !selectedAgent) return
+        setSavingModel(true)
+        try {
+            await updateProviderModel(config, selectedAgent, modelConfig)
+            setError('')
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err)
+            setError(message || 'Failed to save model config')
+        } finally {
+            setSavingModel(false)
+        }
+    }
+
+    /* ---------- hooks save ---------- */
+    const handleSaveHooks = async () => {
+        if (!config || !selectedAgent) return
+        setSavingHooks(true)
+        try {
+            await updateProviderHooks(config, selectedAgent, hooks)
+            setError('')
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err)
+            setError(message || 'Failed to save hooks')
+        } finally {
+            setSavingHooks(false)
+        }
+    }
+
+    /* ---------- hook events per provider ---------- */
+    const hookEventsForProvider: Record<string, string[]> = {
+        claude: ['SessionStart', 'SessionEnd', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PermissionRequest', 'Notification', 'Stop', 'SubagentStop', 'PreCompact'],
+        codex: ['notify'],
+        gemini: ['SessionStart', 'SessionEnd', 'BeforeAgent', 'AfterAgent', 'BeforeModel', 'AfterModel', 'BeforeToolSelection'],
+        opencode: [],
+    }
+
     const hasCoreConfig = (provider: Provider) =>
         configs.some(c => c.category === 'core' && c.name.toLowerCase().includes(provider))
 
@@ -497,7 +600,339 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                             />
                         </div>
 
-                        {/* ---- Section 2: MCP Servers ---- */}
+                        {/* ---- Section 2: Permissions ---- */}
+                        <div className="border border-border/20 rounded-xl p-5 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Permissions</label>
+                                    <p className="text-xs text-muted-foreground/50 mt-0.5">
+                                        Control what {selectedAgent} is allowed to do
+                                    </p>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    onClick={handleSavePermissions}
+                                    disabled={savingPermissions}
+                                    className="h-7 bg-primary text-primary-foreground font-bold uppercase text-[10px] px-4 rounded-lg"
+                                >
+                                    {savingPermissions ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <Save size={12} className="mr-1.5" />}
+                                    Save
+                                </Button>
+                            </div>
+
+                            {/* Approval Mode */}
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Approval Mode</label>
+                                <select
+                                    value={permissions.approval_mode}
+                                    onChange={e => setPermissions(p => ({ ...p, approval_mode: e.target.value }))}
+                                    className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs font-medium focus:ring-2 focus:ring-primary/20 outline-none"
+                                >
+                                    <option value="interactive">Interactive</option>
+                                    <option value="auto-edit">Auto-edit</option>
+                                    <option value="full-auto">Full-auto</option>
+                                    <option value="suggest">Suggest</option>
+                                </select>
+                            </div>
+
+                            {/* Allowed */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Allowed</label>
+                                </div>
+                                {permissions.allow.length === 0 && (
+                                    <p className="text-[10px] text-muted-foreground/20">No allow rules configured</p>
+                                )}
+                                {permissions.allow.map((rule, i) => (
+                                    <div key={i} className="flex items-center gap-2 group">
+                                        <span className="flex-1 text-xs font-mono bg-muted/10 rounded px-2 py-1 border border-border/20">{rule}</span>
+                                        <button
+                                            onClick={() => setPermissions(p => ({ ...p, allow: p.allow.filter((_, idx) => idx !== i) }))}
+                                            className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground/20 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100 shrink-0"
+                                        >
+                                            <X size={10} />
+                                        </button>
+                                    </div>
+                                ))}
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        className="h-8 flex-1 rounded-lg border border-border bg-background px-3 text-xs font-mono focus:ring-2 focus:ring-primary/20 outline-none"
+                                        value={newAllowRule}
+                                        onChange={e => setNewAllowRule(e.target.value)}
+                                        placeholder="e.g. Read, Bash(git *)"
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter' && newAllowRule.trim()) {
+                                                setPermissions(p => ({ ...p, allow: [...p.allow, newAllowRule.trim()] }))
+                                                setNewAllowRule('')
+                                            }
+                                        }}
+                                    />
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 rounded-lg text-[9px] font-bold uppercase"
+                                        disabled={!newAllowRule.trim()}
+                                        onClick={() => {
+                                            if (newAllowRule.trim()) {
+                                                setPermissions(p => ({ ...p, allow: [...p.allow, newAllowRule.trim()] }))
+                                                setNewAllowRule('')
+                                            }
+                                        }}
+                                    >
+                                        <Plus size={10} className="mr-1" /> Add
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Denied */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Denied</label>
+                                </div>
+                                {permissions.deny.length === 0 && (
+                                    <p className="text-[10px] text-muted-foreground/20">No deny rules configured</p>
+                                )}
+                                {permissions.deny.map((rule, i) => (
+                                    <div key={i} className="flex items-center gap-2 group">
+                                        <span className="flex-1 text-xs font-mono bg-muted/10 rounded px-2 py-1 border border-border/20">{rule}</span>
+                                        <button
+                                            onClick={() => setPermissions(p => ({ ...p, deny: p.deny.filter((_, idx) => idx !== i) }))}
+                                            className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground/20 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100 shrink-0"
+                                        >
+                                            <X size={10} />
+                                        </button>
+                                    </div>
+                                ))}
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        className="h-8 flex-1 rounded-lg border border-border bg-background px-3 text-xs font-mono focus:ring-2 focus:ring-primary/20 outline-none"
+                                        value={newDenyRule}
+                                        onChange={e => setNewDenyRule(e.target.value)}
+                                        placeholder="e.g. Bash(rm -rf *)"
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter' && newDenyRule.trim()) {
+                                                setPermissions(p => ({ ...p, deny: [...p.deny, newDenyRule.trim()] }))
+                                                setNewDenyRule('')
+                                            }
+                                        }}
+                                    />
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 rounded-lg text-[9px] font-bold uppercase"
+                                        disabled={!newDenyRule.trim()}
+                                        onClick={() => {
+                                            if (newDenyRule.trim()) {
+                                                setPermissions(p => ({ ...p, deny: [...p.deny, newDenyRule.trim()] }))
+                                                setNewDenyRule('')
+                                            }
+                                        }}
+                                    >
+                                        <Plus size={10} className="mr-1" /> Add
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Sandbox (Codex only) */}
+                            {selectedAgent === 'codex' && (
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Sandbox</label>
+                                    <select
+                                        value={permissions.sandbox || ''}
+                                        onChange={e => setPermissions(p => ({ ...p, sandbox: e.target.value }))}
+                                        className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs font-medium focus:ring-2 focus:ring-primary/20 outline-none"
+                                    >
+                                        <option value="">None</option>
+                                        <option value="workspace-write">Workspace Write</option>
+                                        <option value="workspace-read">Workspace Read</option>
+                                        <option value="none">Disabled</option>
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ---- Section 3: Model ---- */}
+                        <div className="border border-border/20 rounded-xl p-5 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Model</label>
+                                    <p className="text-xs text-muted-foreground/50 mt-0.5">
+                                        Configure which model {selectedAgent} uses
+                                    </p>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    onClick={handleSaveModel}
+                                    disabled={savingModel}
+                                    className="h-7 bg-primary text-primary-foreground font-bold uppercase text-[10px] px-4 rounded-lg"
+                                >
+                                    {savingModel ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <Save size={12} className="mr-1.5" />}
+                                    Save
+                                </Button>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Model</label>
+                                <input
+                                    className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs font-mono focus:ring-2 focus:ring-primary/20 outline-none"
+                                    value={modelConfig.model}
+                                    onChange={e => setModelConfig(m => ({ ...m, model: e.target.value }))}
+                                    placeholder="e.g. claude-sonnet-4-6"
+                                />
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Effort</label>
+                                <div className="flex gap-2">
+                                    {['low', 'medium', 'high', 'max'].map(level => (
+                                        <button
+                                            key={level}
+                                            type="button"
+                                            onClick={() => setModelConfig(m => ({ ...m, effort: level }))}
+                                            className={`flex-1 h-8 rounded-lg text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                                                modelConfig.effort === level
+                                                    ? 'bg-primary text-primary-foreground border-primary'
+                                                    : 'bg-background border-border/30 text-muted-foreground/50 hover:border-primary/30 hover:text-foreground'
+                                            }`}
+                                        >
+                                            {level}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Temperature</label>
+                                <input
+                                    className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs font-mono focus:ring-2 focus:ring-primary/20 outline-none"
+                                    type="number"
+                                    step="0.1"
+                                    min="0"
+                                    max="2"
+                                    value={modelConfig.temperature ?? ''}
+                                    onChange={e => {
+                                        const val = e.target.value
+                                        setModelConfig(m => ({ ...m, temperature: val === '' ? null : parseFloat(val) }))
+                                    }}
+                                    placeholder="Default"
+                                />
+                            </div>
+                        </div>
+
+                        {/* ---- Section 4: Hooks ---- */}
+                        <div className="border border-border/20 rounded-xl p-5 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Hooks</label>
+                                    <p className="text-xs text-muted-foreground/50 mt-0.5">
+                                        Commands that run on lifecycle events
+                                    </p>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    onClick={handleSaveHooks}
+                                    disabled={savingHooks}
+                                    className="h-7 bg-primary text-primary-foreground font-bold uppercase text-[10px] px-4 rounded-lg"
+                                >
+                                    {savingHooks ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <Save size={12} className="mr-1.5" />}
+                                    Save
+                                </Button>
+                            </div>
+
+                            {hooks.length === 0 && (hookEventsForProvider[selectedAgent]?.length ?? 0) === 0 ? (
+                                <div className="py-4 text-center">
+                                    <p className="text-[10px] text-muted-foreground/20">
+                                        This provider uses a plugin-based system and does not support hooks.
+                                    </p>
+                                </div>
+                            ) : (
+                                <>
+                                    {hooks.length === 0 ? (
+                                        <div className="py-4 text-center">
+                                            <p className="text-[10px] text-muted-foreground/20">
+                                                No hooks configured
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="divide-y divide-border/15">
+                                            {hooks.map((hook, i) => (
+                                                <div key={i} className="flex items-center gap-3 py-2.5 group">
+                                                    <div className="flex-1 min-w-0">
+                                                        <span className="text-xs font-bold tracking-wider">{hook.event}</span>
+                                                        {hook.matcher && (
+                                                            <span className="text-[9px] text-muted-foreground/40 ml-1">[{hook.matcher}]</span>
+                                                        )}
+                                                        <p className="text-[9px] font-mono text-muted-foreground/40 truncate">{hook.command}</p>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => setHooks(h => h.filter((_, idx) => idx !== i))}
+                                                        className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground/20 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100 shrink-0"
+                                                    >
+                                                        <X size={10} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {(hookEventsForProvider[selectedAgent]?.length ?? 0) > 0 && (
+                                        <div className="flex items-end gap-2 pt-2 border-t border-border/10">
+                                            <div className="flex-1 space-y-1.5">
+                                                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Event</label>
+                                                <select
+                                                    value={newHookEvent}
+                                                    onChange={e => setNewHookEvent(e.target.value)}
+                                                    className="h-8 w-full rounded-lg border border-border bg-background px-2 text-xs font-medium focus:ring-2 focus:ring-primary/20 outline-none"
+                                                >
+                                                    <option value="">Select event...</option>
+                                                    {(hookEventsForProvider[selectedAgent] || []).map(ev => (
+                                                        <option key={ev} value={ev}>{ev}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="flex-1 space-y-1.5">
+                                                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Command</label>
+                                                <input
+                                                    className="h-8 w-full rounded-lg border border-border bg-background px-2 text-xs font-mono focus:ring-2 focus:ring-primary/20 outline-none"
+                                                    value={newHookCommand}
+                                                    onChange={e => setNewHookCommand(e.target.value)}
+                                                    placeholder="bash /path/to/hook.sh"
+                                                />
+                                            </div>
+                                            {selectedAgent === 'claude' && (
+                                                <div className="w-24 space-y-1.5">
+                                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Matcher</label>
+                                                    <input
+                                                        className="h-8 w-full rounded-lg border border-border bg-background px-2 text-xs font-mono focus:ring-2 focus:ring-primary/20 outline-none"
+                                                        value={newHookMatcher}
+                                                        onChange={e => setNewHookMatcher(e.target.value)}
+                                                        placeholder="Bash"
+                                                    />
+                                                </div>
+                                            )}
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-8 rounded-lg text-[9px] font-bold uppercase shrink-0"
+                                                disabled={!newHookEvent || !newHookCommand.trim()}
+                                                onClick={() => {
+                                                    if (newHookEvent && newHookCommand.trim()) {
+                                                        setHooks(h => [...h, { event: newHookEvent, command: newHookCommand.trim(), matcher: newHookMatcher.trim() || undefined }])
+                                                        setNewHookEvent('')
+                                                        setNewHookCommand('')
+                                                        setNewHookMatcher('')
+                                                    }
+                                                }}
+                                            >
+                                                <Plus size={10} className="mr-1" /> Add
+                                            </Button>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+
+                        {/* ---- Section 5: MCP Servers ---- */}
                         <div className="border border-border/20 rounded-xl p-5 space-y-4">
                             <div className="flex items-center justify-between">
                                 <div>
@@ -568,7 +1003,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                             )}
                         </div>
 
-                        {/* ---- Section 3: Skills ---- */}
+                        {/* ---- Section 6: Skills ---- */}
                         <div className="border border-border/20 rounded-xl p-5 space-y-4">
                             <div className="flex items-center justify-between">
                                 <div>
@@ -633,7 +1068,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                             )}
                         </div>
 
-                        {/* ---- Section 4: Sub-agents ---- */}
+                        {/* ---- Section 7: Sub-agents ---- */}
                         <div className="border border-border/20 rounded-xl p-5 space-y-4">
                             <div className="flex items-center justify-between">
                                 <div>

@@ -765,6 +765,61 @@ export async function deleteProviderMCPServer(config: BackendConfig, provider: s
     await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/mcp/${encodeURIComponent(name)}`, { method: 'DELETE' })
 }
 
+export type ProviderPermissions = {
+    approval_mode: string
+    allow: string[]
+    deny: string[]
+    sandbox?: string
+}
+
+export type ProviderModelConfig = {
+    model: string
+    effort: string
+    temperature: number | null
+}
+
+export type ProviderHook = {
+    event: string
+    command: string
+    matcher?: string
+}
+
+export async function fetchProviderPermissions(config: BackendConfig, provider: string): Promise<ProviderPermissions> {
+    return requestJSON<ProviderPermissions>(config, `/api/v1/agents/${encodeURIComponent(provider)}/permissions`)
+}
+
+export async function updateProviderPermissions(config: BackendConfig, provider: string, perms: ProviderPermissions): Promise<void> {
+    await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/permissions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(perms),
+    })
+}
+
+export async function fetchProviderModel(config: BackendConfig, provider: string): Promise<ProviderModelConfig> {
+    return requestJSON<ProviderModelConfig>(config, `/api/v1/agents/${encodeURIComponent(provider)}/model`)
+}
+
+export async function updateProviderModel(config: BackendConfig, provider: string, model: ProviderModelConfig): Promise<void> {
+    await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/model`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(model),
+    })
+}
+
+export async function fetchProviderHooks(config: BackendConfig, provider: string): Promise<ProviderHook[]> {
+    return requestJSON<ProviderHook[]>(config, `/api/v1/agents/${encodeURIComponent(provider)}/hooks`)
+}
+
+export async function updateProviderHooks(config: BackendConfig, provider: string, hooks: ProviderHook[]): Promise<void> {
+    await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/hooks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(hooks),
+    })
+}
+
 export async function fetchSTTHealth(config: BackendConfig): Promise<STTHealth> {
   return requestJSON<STTHealth>(config, '/api/v1/stt/health')
 }
