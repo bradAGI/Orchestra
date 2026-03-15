@@ -146,20 +146,23 @@ func (db *DB) GetUnifiedHistory(ctx context.Context, issueID string) ([]map[stri
 		
 		UNION ALL
 		
-		SELECT 
+		SELECT
 			'agent' as source,
 			e.id,
 			s.provider,
 			e.kind,
-			e.message,
+			SUBSTR(e.message, 1, 500) as message,
 			e.input_tokens,
 			e.output_tokens,
 			e.timestamp
 		FROM events e
 		JOIN sessions s ON e.session_id = s.id
 		WHERE s.issue_id = ?
-		
+		AND e.kind NOT IN ('pty', 'stderr', 'system', 'rate_limit_event', 'item.started')
+		AND (e.message IS NOT NULL AND e.message != '' AND LENGTH(e.message) > 5)
+
 		ORDER BY timestamp ASC
+		LIMIT 500
 	`
 
 	rows, err := db.QueryContext(ctx, query, issueID, issueID)
