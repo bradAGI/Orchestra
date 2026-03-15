@@ -1,6 +1,6 @@
-# Symphony
+# Orchestra
 
-Symphony is an orchestration platform for managing AI coding agents. It coordinates multiple agent providers (Claude, Codex, Gemini, OpenCode) through a 5-column Kanban workflow with bidirectional GitHub sync, giving you a single control surface for autonomous engineering work.
+Orchestra is an orchestration platform for managing AI coding agents. It coordinates multiple agent providers (Claude, Codex, Gemini, OpenCode) through a 5-column Kanban workflow with bidirectional GitHub sync, giving you a single control surface for autonomous engineering work.
 
 ## Key Features
 
