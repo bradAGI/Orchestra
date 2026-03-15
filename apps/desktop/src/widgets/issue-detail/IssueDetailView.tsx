@@ -375,7 +375,7 @@ export function IssueDetailView({
             </div>
 
             {/* Sidebar properties */}
-            <div className="w-80 border-l border-border/10 shrink-0 overflow-y-auto">
+            <div className="w-80 border-l border-border/10 shrink-0 overflow-y-auto bg-gradient-to-b from-primary/[0.03] via-transparent to-violet-500/[0.03]">
               <div className="p-6 space-y-6">
                 {/* Agent — prominent */}
                 <div>
