@@ -23,15 +23,18 @@ The UI is designed for professional operators who need to monitor multiple sessi
 - **SSE Live Sync**: The UI never requires manual refreshes for operational data. State is synchronized via a persistent EventSource stream from the backend.
 - **Micro-Typography**: Carefully tuned font sizes and line heights ensure text remains readable even at high densities.
 
-## 🧭 Key Views
+## Key Views
 
-### 1. Operations Surface
-Combines the **Queue** and **Activity Feed**. It uses an asynchronous rendering pattern to ensure that massive log streams don't block the main UI thread.
+### 1. Task Board (Kanban)
+A 5-column drag-and-drop board (Backlog, Todo, In Progress, Review, Done) with an integrated Issue Inspector for deep task visibility.
 
-### 2. Knowledge Base (Wiki)
+### 2. Activity Feed
+A real-time, chronological stream of system events. It uses an asynchronous rendering pattern to ensure that massive log streams don't block the main UI thread.
+
+### 3. Knowledge Base (Wiki)
 An integrated Markdown renderer powered by **`react-markdown`**. It features nested navigation, search, and interactive **D3.js** system diagrams.
 
-### 3. Agent Control Plane
+### 4. Agent Control Plane
 A direct mapping of the filesystem to the UI. It includes a custom **JSON Validator** and **Formatter** to ensure configuration integrity.
 
 ---

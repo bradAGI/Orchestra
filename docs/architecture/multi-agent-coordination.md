@@ -32,9 +32,9 @@ If an issue fails repeatedly (exceeds 3 retry attempts) with a specific model:
 
 Multi-agent coordination is made possible by the **Tool & MCP Layer**. Regardless of which model is running, Orchestra injects a standardized `tools.json` into the workspace.
 
-- **Unified Schema**: Both Claude and Gemini receive the same tool definitions for `update_issue` and `linear_query`.
+- **Unified Schema**: Both Claude and Gemini receive the same tool definitions for `update_issue` and `tracker_query`.
 - **Protocol Proxy**: The backend handles the specific prompting requirements for each model, ensuring they can all call the same Go-backed tools without provider-specific logic in the core orchestrator.
 
 ---
 
-> **Tip**: You can monitor which agent is currently "owning" an issue by looking at the **Operations Queue** on the Dashboard or the **Session Details** in the Warehouse.
+> **Tip**: You can monitor which agent is currently "owning" an issue by looking at the **Issue Inspector** on the Kanban board or the **Session Details** in the Warehouse.

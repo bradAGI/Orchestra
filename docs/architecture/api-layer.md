@@ -19,13 +19,13 @@ The `NewRouter` function mounts several critical middleware components:
 - `GET /api/v1/state`: Returns the `SnapshotPayload` representing the real-time operational state of the orchestrator (running tasks, retry queues, metrics).
 - `GET /api/v1/events`: Establishes a Server-Sent Events (SSE) connection for live telemetry.
 - `GET /api/v1/search`: Performs a global search across issues, projects, and history.
-- `POST /api/v1/refresh`: Triggers a manual synchronization with the issue tracker (Linear).
+- `POST /api/v1/refresh`: Triggers a manual synchronization with the issue tracker.
 
 ### Issue Management
 - `GET /api/v1/issues`: Lists current tracker issues.
 - `POST /api/v1/issues`: Manually injects a new task into the orchestrator.
 - `GET /api/v1/issues/{issue_identifier}`: Retrieves deep context for a specific issue.
-- `PATCH /api/v1/issues/{issue_identifier}`: Updates issue metadata (state, assignee, priority).
+- `PATCH /api/v1/issues/{issue_identifier}`: Updates issue metadata (state, assignee, provider).
 - `DELETE /api/v1/issues/{issue_identifier}`: Removes an issue and its local data.
 - `GET /api/v1/issues/{issue_identifier}/logs`: Streams live session logs.
 - `GET /api/v1/issues/{issue_identifier}/history`: Returns the chronological audit trail of all lifecycle events.

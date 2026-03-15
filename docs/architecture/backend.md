@@ -6,7 +6,7 @@ The Orchestra backend is a high-performance control plane written in **Go**. It 
 
 ### 1. `orchestrator`
 The "brain" of the system.
-- **State Machine**: Manages the transitions of issues through the standard pipeline (`Todo` -> `Running` -> `Completed`).
+- **State Machine**: Manages the transitions of issues through the standard pipeline (`Backlog` -> `Todo` -> `In Progress` -> `Review` -> `Done`).
 - **Turn Manager**: Handles the lifecycle of a single agent turn, including timeout enforcement and cancellation.
 - **SSE Publisher**: Broadcasts real-time events to the desktop application.
 

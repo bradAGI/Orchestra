@@ -58,14 +58,13 @@ const [historyLoading, setHistoryLoading] = useState(false)
 
 ### Event Categories
 - **Agent Actions**: Session start, stop, restart events
-- **Issue Changes**: State transitions, priority updates, assignee changes
+- **Issue Changes**: State transitions, assignee changes
 - **User Interactions**: Manual edits, comments, approvals
 - **System Events**: Error handling, resource allocation, background tasks
 
 ### Responsive Design
-- **Mobile Optimized**: Timeline adapts to smaller screens
 - **Expandable Events**: Click to view detailed event information
-- **Filter Options**: Search and filter events by type or date range
+- **Adaptive Layout**: Timeline adapts to available panel width
 
 ## 🔧 API Integration
 

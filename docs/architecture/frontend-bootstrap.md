@@ -27,4 +27,4 @@ Once past the boundaries, `App.tsx` serves as the primary controller for the int
 1.  **State Initialization**: It establishes the initial connection to the Electron IPC bridge (`window.orchestraDesktop`) to fetch the backend URL and API tokens.
 2.  **Theme Management**: It observes the `theme` state and injects the `.dark` class directly onto the document root.
 3.  **Layout Routing**: Orchestra does not use a traditional router (like `react-router`). Instead, it uses a state-driven approach (`activeSection`). The `sectionVisibility` object strictly dictates which dashboard or view is rendered in the main content area, keeping the app snappy and avoiding complex route-matching overhead.
-4.  **Global Actions**: It holds the top-level handler functions for critical actions like `handleRefresh`, `handleSaveAgentConfig`, and `handleInspectIssueFromList`, passing them down to child components as props.
+4.  **Global Actions**: It holds the top-level handler functions for critical actions like `handleRefresh` and `handleInspectIssueFromList`, passing them down to child components as props.

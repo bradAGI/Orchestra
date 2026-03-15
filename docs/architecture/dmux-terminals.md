@@ -38,7 +38,7 @@ The desktop application uses `xterm.js` for high-performance rendering and `reac
 `GET /api/v1/terminal/{session_id}?project_id={project_id}`
 
 **Parameters:**
-- `session_id`: Unique identifier for the session (e.g., `issue-OPS-123` or `project-1`).
+- `session_id`: Unique identifier for the session (e.g., `issue-FETCH-1` or `project-1`).
 - `project_id` (Optional): The ID of the project to set as the working directory for new sessions.
 
 **Messages:**

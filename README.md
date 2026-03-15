@@ -88,7 +88,7 @@ Configure the backend connection in **Settings** if needed (default: `http://127
 # Backend
 cd apps/backend && go test -race ./...
 
-# Desktop (59+ tests)
+# Desktop (63+ tests)
 cd apps/desktop && npx vitest run
 ```
 

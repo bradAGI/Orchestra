@@ -8,7 +8,7 @@ When an agent begins a task, it never works directly on the host machine's prima
 
 ### The Provisioning Lifecycle (`service.go`)
 
-1. **Path Resolution**: The `WorkspacePath` function generates a unique directory path based on the `WorkspaceRoot` configuration and the specific `issueIdentifier` (e.g., `~/.orchestra/workspaces/OPS-123`).
+1. **Path Resolution**: The `WorkspacePath` function generates a unique directory path based on the `WorkspaceRoot` configuration and the specific `issueIdentifier` (e.g., `~/.orchestra/workspaces/FETCH-1`).
 2. **State Validation**: `EnsureIssueWorkspace` checks if the path exists. If it exists but isn't a directory, or if it's stale, it aggressively cleans it up.
 3. **Directory Creation**: A fresh directory is created with `0o755` permissions.
 4. **Safety Markers**: The system places a hidden `.orchestra` marker file in the workspace root. **Path Guard** mechanisms enforce that destructive operations (like deleting a workspace) will immediately fail if this marker is missing, preventing accidental deletion of user data outside the sandbox.

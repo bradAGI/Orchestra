@@ -10,7 +10,7 @@ The layout is split into a persistent sidebar and a dynamic main content area to
 
 The sidebar is the primary routing mechanism for the application.
 
-- **State-Driven Routing**: Instead of URL-based routing, the sidebar updates the global `activeSection` state. This triggers `App.tsx` to conditionally render different sub-dashboards (e.g., `showDashboard`, `showIssues`).
+- **State-Driven Routing**: Instead of URL-based routing, the sidebar updates the global `activeSection` state. This triggers `App.tsx` to conditionally render different views (e.g., `showIssueBoard`, `showProjects`, `showAgents`).
 - **Collapsible Design**: Designed for high-density environments, the sidebar can collapse from 240px down to a minimal 68px icon-only rail.
 - **Keyboard Accessibility**: Fully accessible via keyboard. Users can navigate the list using `ArrowUp`/`ArrowDown` and trigger sections with `Enter`.
 
@@ -20,7 +20,7 @@ The Top Bar acts as the global contextual header and control surface.
 
 - **Dynamic Context**: It receives `sectionLabel` and `sectionTitle` from the parent shell to reflect the currently active view.
 - **Connection Telemetry**: It hosts the "Live / Polling" connection status indicator, letting the operator know if Server-Sent Events (SSE) are currently active or if the app has fallen back to standard HTTP polling.
-- **Global Search**: Features an integrated search bar that allows operators to find specific issues by identifier (`OPS-123`) across the entire workspace.
+- **Global Search**: Features an integrated search bar that allows operators to find specific issues by identifier (e.g., `FETCH-1`) across the entire workspace.
 - **Feedback Surface**: It handles transient global notifications (e.g., "Workspace Syncing" or "Connection Failed") directly in the header to avoid blocking modal dialogs.
 
 ## 📏 Layout Philosophy

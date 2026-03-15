@@ -21,13 +21,14 @@ type Config struct {
 	Port                     int
 	WorkspaceRoot            string
 	APIToken                 string
+	WorkflowFile             string
 	AgentProvider            string
 	AgentCommands            map[string]string
 	AgentMaxTurns            int
-	LinearEndpoint          string
-	LinearToken             string
-	LinearProject           string
-	LinearWorkerAssigneeIDs []string
+	TrackerType              string
+	TrackerEndpoint          string
+	TrackerToken             string
+	TrackerWorkerAssigneeIDs []string
 	ActiveStates             []string
 	TerminalStates           []string
 	MaxConcurrent            int
@@ -36,6 +37,10 @@ type Config struct {
 	ProjectRoots             []string
 	GitHubClientID           string
 	GitHubClientSecret       string
+	MCPServers               map[string]string
+	TelemetryProviders       []string
+	TelemetryRetentionDays   int
+	TelemetryStoreRawPayload bool
 }
 ```
 
@@ -47,7 +52,7 @@ The `Load()` function acts as the central initialization phase before the orches
 - **Fallback Chains**: If an environment variable is missing, it falls back to the `workflowOverrides` (parsed from `WORKFLOW.md`), and finally to default constants.
 - **Port Validation**: Ensures the provided port is a valid integer between 1 and 65535.
 - **State Normalization**: Parses comma-separated lists of states (e.g., `Todo,In Progress`) into strongly typed arrays.
-- **Concurrency Maps**: Parses complex key-value concurrency limits (e.g., `Running:5,Review:2`) into the `MaxConcurrentByState` map.
+- **Concurrency Maps**: Parses complex key-value concurrency limits (e.g., `In Progress:5,Review:2`) into the `MaxConcurrentByState` map.
 
 ### Agent Command Defaults
 If no commands are provided, the loader initializes the `AgentCommands` map with tested defaults for supported CLIs:

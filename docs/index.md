@@ -1,8 +1,8 @@
 # Platform Overview
 
-Welcome to the **Orchestra Knowledge Base**. This is a deep-dive wiki into the architecture, usage, and future roadmap of the Agentic Orchestration Platform.
+Welcome to the **Symphony Knowledge Base**. This is a deep-dive wiki into the architecture, usage, and future roadmap of the Agentic Orchestration Platform.
 
-Orchestra transforms autonomous coding into a managed, observable, and repeatable engineering process.
+Symphony transforms autonomous coding into a managed, observable, and repeatable engineering process.
 
 ---
 
@@ -17,11 +17,11 @@ Explore how the platform is built and how data flows through the system.
 - **[Frontend Design](/architecture/frontend)**: Electron and high-density UI patterns.
 - **[API Layer](/architecture/api-layer)**: REST endpoints and middleware.
 
-## 🧭 Using Orchestra
+## Using Symphony
 
 Guides for getting the most out of the platform.
 
-- **[Getting Started](/usage/getting-started)**: Your first 5 minutes with Orchestra.
+- **[Getting Started](/usage/getting-started)**: Your first 5 minutes with Symphony.
 - **[Core Concepts](/usage/core-concepts)**: Workspaces, Turns, and Sessions.
 - **[Issue Activity & History](/usage/issue-activity)**: Track complete audit trails and event timelines.
 - **[Mission Control](/usage/mission-control)**: **NEW** - Real-time terminal intervention and PR planning.

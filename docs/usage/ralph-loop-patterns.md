@@ -1,8 +1,8 @@
 # Ralph Loop Design Patterns
 
-The **Ralph Loop** is the core reasoning and state-persistence pattern used by Orchestra agents. It treats the issue tracker (Linear/GitHub) as a "high-latency global brain" while the Go workers handle "low-latency local execution."
+The **Ralph Loop** is the core reasoning and state-persistence pattern used by Orchestra agents. It treats the issue tracker (GitHub) as a "high-latency global brain" while the Go workers handle "low-latency local execution."
 
-By using Linear comments as a **Draft Pad**, agents can maintain state across backend restarts, worker crashes, or handoffs between different model providers (e.g., Claude to Gemini).
+By using the issue tracker comments as a **Draft Pad**, agents can maintain state across backend restarts, worker crashes, or handoffs between different model providers (e.g., Claude to Gemini).
 
 ## 🧠 Core Concept: The Draft Pad
 
@@ -11,7 +11,7 @@ In a Ralph Loop, the agent does not start with a "blank slate" on every turn. In
 1.  **Read**: Load the current issue description and latest comments.
 2.  **Think**: Parse the "Draft Pad" from the comments to understand previous progress.
 3.  **Act**: Execute tools (Shell, ReadFile, etc.) to make progress.
-4.  **Write**: Use the `update_issue` tool to persist the updated plan and "Draft Pad" back to Linear before the turn ends.
+4.  **Write**: Use the `update_issue` tool to persist the updated plan and "Draft Pad" back to the issue tracker before the turn ends.
 
 ## 🛠️ Recommended Prompt Patterns
 
@@ -55,4 +55,4 @@ When using **Parallel Multi-Agent** mode, both agents will read the same Draft P
 
 ---
 
-> **Tip**: Use the **Interactive Plan Checklist** in the Orchestra Desktop app to monitor the agent's Ralph Loop progress without having to switch tabs to Linear.
+> **Tip**: Use the **Interactive Plan Checklist** in the Orchestra Desktop app to monitor the agent's Ralph Loop progress without having to switch tabs to the issue tracker.
