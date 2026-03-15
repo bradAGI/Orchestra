@@ -127,6 +127,15 @@ func (s *Session) RemoveHandler(id int) {
 	delete(s.Handlers, id)
 }
 
+func (m *Manager) CloseSession(id string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if s, ok := m.sessions[id]; ok {
+		s.Close()
+		delete(m.sessions, id)
+	}
+}
+
 func (s *Session) Write(data []byte) (int, error) {
 	return s.PTY.Write(data)
 }

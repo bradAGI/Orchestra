@@ -102,6 +102,7 @@ func TestProcessExecutionTickPublishesSuccessLifecycleEvents(t *testing.T) {
 		workspace.Hooks{},
 		pubsub,
 		nil,
+		nil,
 		zerolog.Nop(),
 	)
 
@@ -160,6 +161,7 @@ func TestProcessExecutionTickPublishesFailureAndRetryLifecycleEvents(t *testing.
 		nil,
 		workspace.Hooks{},
 		pubsub,
+		nil,
 		nil,
 		zerolog.Nop(),
 	)
@@ -236,6 +238,7 @@ func TestProcessExecutionTickDoesNotPublishRetryWhenAttemptExceedsMax(t *testing
 		nil,
 		workspace.Hooks{},
 		pubsub,
+		nil,
 		nil,
 		zerolog.Nop(),
 	)
@@ -376,6 +379,7 @@ func TestProcessExecutionTickPreservesRateLimitsFromMixedNestedEnvelope(t *testi
 		workspace.Hooks{},
 		nil,
 		nil,
+		nil,
 		zerolog.Nop(),
 	)
 
@@ -419,6 +423,7 @@ func TestProcessExecutionTickSkipsBeforeRunHookAfterFirstTurn(t *testing.T) {
 		hooks,
 		nil,
 		nil,
+		nil,
 		zerolog.Nop(),
 	)
 
@@ -459,6 +464,7 @@ func TestProcessExecutionTickPublishesBeforeRunHookFailureCause(t *testing.T) {
 		nil,
 		workspace.Hooks{BeforeRun: "exit 14"},
 		pubsub,
+		nil,
 		nil,
 		zerolog.Nop(),
 	)

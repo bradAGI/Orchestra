@@ -112,7 +112,7 @@ func Run(logger zerolog.Logger) error {
 	}, logger)
 
 	toolExecutor := tools.NewLinearToolExecutor(trackerClient)
-	go startExecutionWorker(orchestratorService, agentRegistry, provider, cfg.AgentProvider, cfg.WorkspaceRoot, cfg.WorkflowFile, cfg.AgentMaxTurns, toolExecutor.Execute, tools.TrackerToolSpecs(), cfg.WorkspaceHooks, pubsub, warehouseDB, logger)
+	go startExecutionWorker(orchestratorService, agentRegistry, provider, cfg.AgentProvider, cfg.WorkspaceRoot, cfg.WorkflowFile, cfg.AgentMaxTurns, toolExecutor.Execute, tools.TrackerToolSpecs(), cfg.WorkspaceHooks, pubsub, warehouseDB, termManager, logger)
 
 	logger.Info().Str("addr", addr).Str("service_id", runtime.ServiceOrchestrator).Msg("starting orchestrad")
 
@@ -169,6 +169,7 @@ func startExecutionWorker(
 	workspaceHooks workspace.Hooks,
 	pubsub *observability.PubSub,
 	warehouseDB *db.DB,
+	termManager *terminal.Manager,
 	logger zerolog.Logger,
 ) {
 	workspaceService := workspace.Service{Root: workspaceRoot}
@@ -176,7 +177,7 @@ func startExecutionWorker(
 	defer ticker.Stop()
 
 	for range ticker.C {
-		processExecutionTick(service, workspaceService, registry, provider, providerName, workspaceRoot, workflowFile, agentMaxTurns, toolExecutor, toolSpecs, workspaceHooks, pubsub, warehouseDB, logger)
+		processExecutionTick(service, workspaceService, registry, provider, providerName, workspaceRoot, workflowFile, agentMaxTurns, toolExecutor, toolSpecs, workspaceHooks, pubsub, warehouseDB, termManager, logger)
 	}
 }
 
@@ -194,6 +195,7 @@ func processExecutionTick(
 	workspaceHooks workspace.Hooks,
 	pubsub *observability.PubSub,
 	warehouseDB *db.DB,
+	termManager *terminal.Manager,
 	logger zerolog.Logger,
 ) {
 	entry, ok := service.ClaimNextRunnable()
@@ -605,6 +607,13 @@ func processExecutionTick(
 	}
 
 	service.RecordRunSuccess(entry.IssueID, activeProviderName)
+
+	// Close the agent's terminal session now that it's done
+	if termManager != nil {
+		terminalID := fmt.Sprintf("issue-%s", entry.IssueIdentifier)
+		termManager.CloseSession(terminalID)
+		logger.Info().Str("terminal_id", terminalID).Msg("closed agent terminal session")
+	}
 
 	// Move issue to Review on successful completion
 	if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"state": "Review"}); err != nil {
