@@ -91,7 +91,7 @@ function DescriptionEditor({ value, onChange, onBlur, theme }: {
         prose-a:text-primary prose-a:no-underline hover:prose-a:underline
         prose-strong:text-foreground/80 prose-strong:font-bold
         prose-code:text-[12px] prose-code:font-mono prose-code:bg-muted/40 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:border prose-code:border-border/20 prose-code:before:content-none prose-code:after:content-none
-        prose-pre:bg-[#0d1117] prose-pre:border prose-pre:border-border/20 prose-pre:rounded-lg
+        prose-pre:bg-card dark:bg-card prose-pre:border prose-pre:border-border/20 prose-pre:rounded-lg
         prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-li:text-foreground/60
         prose-li:marker:text-muted-foreground/30
         prose-blockquote:border-l-primary/30 prose-blockquote:text-muted-foreground/50 prose-blockquote:italic prose-blockquote:not-italic prose-blockquote:font-normal
@@ -280,14 +280,16 @@ export function IssueDetailView({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-6 px-6 h-16 border-b border-border/30 shrink-0 bg-card/50">
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="shrink-0 font-mono text-[10px] font-black tracking-wider text-primary bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/15">
-            {identifier}
+      <div className="shrink-0 border-b border-border/30 bg-gradient-to-r from-card via-card to-muted/10">
+        <div className="flex items-center gap-5 px-8 py-5 pr-14">
+          <div className="shrink-0 h-10 w-10 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center">
+            <span className="text-[11px] font-black font-mono text-primary">{identifier.split('-')[1] || identifier}</span>
           </div>
-          <h2 className="text-[15px] font-bold truncate leading-tight">{localTitle}</h2>
-        </div>
-        <div className="flex items-center gap-2 shrink-0 mr-8">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-bold truncate">{localTitle}</h2>
+            <p className="text-[11px] text-muted-foreground/40 font-mono">{identifier}</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
           {isRunning && onStopSession && (
             <button
               className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-colors"
@@ -312,6 +314,7 @@ export function IssueDetailView({
               Reopen
             </button>
           )}
+          </div>
         </div>
       </div>
 
@@ -515,7 +518,7 @@ export function IssueDetailView({
 
         {/* Output */}
         {bottomTab === 'output' && (
-          <div className="h-full bg-[#0a0a0b]">
+          <div className="h-full bg-background">
             {logsLoading ? (
               <div className="h-full flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary/30" /></div>
             ) : logs && !logs.includes('# No logs available') ? (
@@ -636,72 +639,66 @@ export function IssueDetailView({
 
                     if (entry.kind === 'session') {
                       return (
-                        <div key={entry.idx} className="relative flex items-center gap-2.5 px-4 py-1.5">
-                          <div className="absolute inset-x-4 top-1/2 h-px bg-border/10" />
-                          <span className="relative z-10 text-[9px] font-bold uppercase tracking-[0.2em] text-primary/50 bg-[#0a0a0b] pr-2.5 flex items-center gap-1.5">
-                            <Zap size={8} className="text-primary/40" />
-                            Session
-                          </span>
-                          {entry.label && <span className="relative z-10 text-[8px] font-mono text-muted-foreground/25 bg-[#0a0a0b] px-1.5 py-0.5 rounded border border-border/10">{entry.label}</span>}
-                          <span className="relative z-10 text-[8px] font-mono text-muted-foreground/15 ml-auto bg-[#0a0a0b] pl-2">{entry.ts}</span>
+                        <div key={entry.idx} className="flex items-center gap-3 px-5 py-3 bg-primary/5 border-b border-primary/10">
+                          <Zap size={14} className="text-primary shrink-0" />
+                          <span className="text-xs font-bold uppercase tracking-widest text-primary">Session Started</span>
+                          {entry.label && <span className="text-[10px] font-mono text-primary/50 bg-primary/10 px-2 py-0.5 rounded">{entry.label}</span>}
+                          <span className="text-[10px] font-mono text-muted-foreground/40 ml-auto">{entry.ts}</span>
                         </div>
                       )
                     }
                     if (entry.kind === 'lifecycle') {
                       return (
-                        <div key={entry.idx} className="relative flex items-center gap-2 px-4 py-1">
-                          <div className="absolute inset-x-4 top-1/2 h-px bg-border/5" />
-                          <span className="relative z-10 text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground/25 bg-[#0a0a0b] pr-2 flex items-center gap-1">
-                            <Play size={6} className="text-muted-foreground/20" />
-                            {entry.label}
-                          </span>
-                          {entry.content && <span className="relative z-10 text-[8px] text-muted-foreground/15 bg-[#0a0a0b] px-1">{entry.content}</span>}
-                          <span className="relative z-10 text-[8px] font-mono text-muted-foreground/10 ml-auto bg-[#0a0a0b] pl-2">{entry.ts}</span>
+                        <div key={entry.idx} className="flex items-center gap-2 px-5 py-2 border-b border-border/10">
+                          <Play size={10} className="text-muted-foreground/40 shrink-0" />
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">{entry.label}</span>
+                          {entry.content && <span className="text-[10px] text-muted-foreground/30">{entry.content}</span>}
+                          <span className="text-[10px] font-mono text-muted-foreground/30 ml-auto">{entry.ts}</span>
                         </div>
                       )
                     }
                     if (entry.kind === 'prompt') {
                       return (
-                        <div key={entry.idx} className="px-4 py-1.5 border-b border-border/5">
+                        <div key={entry.idx} className="px-5 py-2 border-b border-border/10 bg-muted/5">
                           <button onClick={toggleExpand} className="flex items-center gap-2 w-full text-left group">
-                            <ChevronRight size={10} className={`text-primary/30 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                            <span className="text-[9px] font-bold uppercase tracking-widest text-primary/30 group-hover:text-primary/50 transition-colors">System Prompt</span>
-                            <span className="text-[8px] font-mono text-muted-foreground/10 ml-auto">{entry.ts}</span>
+                            <ChevronRight size={12} className={`text-primary/50 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                            <span className="text-[11px] font-bold uppercase tracking-widest text-primary/50 group-hover:text-primary transition-colors">System Prompt</span>
+                            <span className="text-[10px] font-mono text-muted-foreground/30 ml-auto">{entry.ts}</span>
                           </button>
                           {isExpanded && (
-                            <p className="text-[10px] text-foreground/25 leading-relaxed mt-1.5 ml-5 max-h-40 overflow-auto custom-scrollbar whitespace-pre-wrap">{entry.content}</p>
+                            <p className="text-xs text-foreground/40 leading-relaxed mt-2 ml-6 max-h-40 overflow-auto custom-scrollbar whitespace-pre-wrap">{entry.content}</p>
                           )}
                         </div>
                       )
                     }
                     if (entry.kind === 'agent') {
                       return (
-                        <div key={entry.idx} className="px-4 py-3.5 border-b border-border/10 hover:bg-white/[0.01] transition-colors">
-                          <div className="flex items-start gap-2.5">
-                            <div className="h-5 w-5 rounded-md bg-emerald-500/10 grid place-items-center shrink-0 mt-0.5"><Bot size={10} className="text-emerald-500/70" /></div>
+                        <div key={entry.idx} className="px-5 py-4 border-b border-border/10 hover:bg-muted/5 transition-colors">
+                          <div className="flex items-start gap-3">
+                            <div className="h-6 w-6 rounded-lg bg-emerald-500/15 grid place-items-center shrink-0 mt-0.5"><Bot size={14} className="text-emerald-400" /></div>
                             <div className="flex-1 min-w-0">
-                              <div className="prose prose-invert prose-sm max-w-none prose-p:my-1 prose-p:text-foreground/70 prose-code:text-primary/60 prose-code:bg-muted/30 prose-code:px-1 prose-code:rounded prose-pre:bg-muted/20 prose-pre:border prose-pre:border-border/20 prose-li:text-foreground/60 prose-headings:text-foreground/80 prose-headings:text-sm">
+                              <div className="prose prose-invert prose-sm max-w-none text-[13px] leading-relaxed prose-p:my-1.5 prose-p:text-foreground/80 prose-code:text-primary prose-code:bg-primary/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[12px] prose-pre:bg-card prose-pre:border prose-pre:border-border/30 prose-li:text-foreground/70 prose-headings:text-foreground prose-headings:text-sm prose-strong:text-foreground">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.content}</ReactMarkdown>
                               </div>
                             </div>
-                            <span className="text-[8px] font-mono text-muted-foreground/15 shrink-0 mt-1">{entry.ts}</span>
+                            <span className="text-[10px] font-mono text-muted-foreground/30 shrink-0 mt-1">{entry.ts}</span>
                           </div>
                         </div>
                       )
                     }
                     if (entry.kind === 'thinking') {
                       return (
-                        <div key={entry.idx} className="px-4 py-1 border-b border-border/5">
+                        <div key={entry.idx} className="px-5 py-2 border-b border-border/10 bg-violet-500/[0.03]">
                           <button onClick={toggleExpand} className="flex items-center gap-2 w-full text-left group">
-                            <Brain size={10} className="text-violet-400/40" />
-                            <span className="text-[10px] text-violet-300/30 italic group-hover:text-violet-300/50 transition-colors">
+                            <Brain size={12} className="text-violet-400/60" />
+                            <span className="text-[11px] text-violet-300/50 italic group-hover:text-violet-300/80 transition-colors">
                               {isExpanded ? 'Thinking' : 'Thinking...'}
                             </span>
-                            <ChevronDown size={10} className={`text-violet-400/20 transition-transform ml-auto ${isExpanded ? 'rotate-180' : ''}`} />
-                            <span className="text-[8px] font-mono text-muted-foreground/10 shrink-0">{entry.ts}</span>
+                            <ChevronDown size={12} className={`text-violet-400/30 transition-transform ml-auto ${isExpanded ? 'rotate-180' : ''}`} />
+                            <span className="text-[10px] font-mono text-muted-foreground/25 shrink-0">{entry.ts}</span>
                           </button>
                           {isExpanded && (
-                            <p className="text-[10px] text-violet-200/25 leading-relaxed mt-1.5 ml-5 whitespace-pre-wrap max-h-60 overflow-auto custom-scrollbar">{entry.content.replace(/\*\*/g, '')}</p>
+                            <p className="text-xs text-violet-200/40 leading-relaxed mt-2 ml-6 whitespace-pre-wrap max-h-60 overflow-auto custom-scrollbar">{entry.content.replace(/\*\*/g, '')}</p>
                           )}
                         </div>
                       )
@@ -786,7 +783,7 @@ export function IssueDetailView({
                     </button>
                   ))}
                 </div>
-                <div className="flex-1 overflow-auto bg-[#0d1117]">
+                <div className="flex-1 overflow-auto bg-card dark:bg-card">
                   <pre className="p-4 text-[11px] font-mono leading-[1.7]">
                     {(diffFiles.find(f => f.path === activeDiffFile)?.content || '').split('\n').map((line, i) => {
                       let bg = 'transparent'

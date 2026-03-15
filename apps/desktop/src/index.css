@@ -14,6 +14,14 @@
   --border: 220 13% 87%;
   --popover: 0 0% 100%;
   --popover-foreground: 224 50% 10%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --secondary: 220 14% 96%;
+  --secondary-foreground: 224 50% 10%;
+  --accent: 220 14% 96%;
+  --accent-foreground: 224 50% 10%;
+  --ring: 230 44% 56%;
+  --input: 220 13% 87%;
   --chart-1: 230 60% 55%;
   --chart-2: 280 55% 55%;
   --chart-3: 200 70% 50%;
@@ -33,6 +41,14 @@
   --border: 160 10% 15%;
   --popover: 160 10% 9%;
   --popover-foreground: 160 20% 98%;
+  --destructive: 0 63% 45%;
+  --destructive-foreground: 0 0% 98%;
+  --secondary: 160 10% 12%;
+  --secondary-foreground: 160 20% 98%;
+  --accent: 160 10% 12%;
+  --accent-foreground: 160 20% 98%;
+  --ring: 161 72% 45%;
+  --input: 160 10% 15%;
   --chart-1: 161 72% 45%;
   --chart-2: 280 65% 60%;
   --chart-3: 200 80% 55%;
@@ -109,19 +125,19 @@ body {
   --tw-prose-bold: hsl(var(--foreground));
   --tw-prose-counters: hsl(var(--muted-foreground));
   --tw-prose-bullets: hsl(var(--primary) / 0.5);
-  --tw-prose-hr: border-white/5;
+  --tw-prose-hr: hsl(var(--border));
   --tw-prose-quotes: hsl(var(--foreground));
   --tw-prose-quote-borders: hsl(var(--primary));
   --tw-prose-captions: hsl(var(--muted-foreground));
   --tw-prose-code: hsl(var(--primary));
   --tw-prose-pre-code: hsl(var(--foreground) / 0.9);
   --tw-prose-pre-bg: transparent;
-  --tw-prose-th-borders: border-white/10;
-  --tw-prose-td-borders: border-white/5;
+  --tw-prose-th-borders: hsl(var(--border) / 0.6);
+  --tw-prose-td-borders: hsl(var(--border) / 0.4);
 }
 
 .prose-wiki h1 {
-  @apply text-4xl font-black tracking-tighter mb-10 pb-6 border-b border-white/10 text-foreground;
+  @apply text-4xl font-black tracking-tighter mb-10 pb-6 border-b border-border/40 text-foreground;
 }
 
 .prose-wiki h2 {

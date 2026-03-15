@@ -99,8 +99,8 @@ function buildSplitRows(hunks: Hunk[]): SplitRow[] {
 
 function lineStyle(type: 'add' | 'del' | 'ctx' | 'empty'): string {
   switch (type) {
-    case 'add': return 'bg-[#22c55e20] text-[#4ade80]'
-    case 'del': return 'bg-[#ef444420] text-[#f87171]'
+    case 'add': return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+    case 'del': return 'bg-red-500/10 text-red-600 dark:text-red-400'
     default: return ''
   }
 }

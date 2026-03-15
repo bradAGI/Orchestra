@@ -68,7 +68,7 @@ export function SidebarNav({
             </span>
             {!sidebarCollapsed ? (
               <div className="min-w-0">
-                <p className="truncate text-[9px] font-bold uppercase tracking-[0.15em] text-black dark:text-muted-foreground leading-none">Orchestra</p>
+                <p className="truncate text-[9px] font-bold uppercase tracking-[0.15em] text-foreground dark:text-muted-foreground leading-none">Orchestra</p>
               </div>
             ) : null}
           </div>
@@ -164,7 +164,7 @@ function AppMonogramIcon({ className }: { className?: string }) {
         transform="rotate(45 32 32)"
       />
       {/* Center point */}
-      <circle cx="32" cy="32" r="3" fill="white" fillOpacity="0.9" />
+      <circle cx="32" cy="32" r="3" fill="currentColor" fillOpacity="0.9" />
     </svg>
   )
 }

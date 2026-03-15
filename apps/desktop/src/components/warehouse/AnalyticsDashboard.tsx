@@ -311,11 +311,11 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             <div className="p-4 space-y-6 animate-pulse">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     {[1, 2, 3, 4].map((i) => (
-                        <div key={i} className="h-32 bg-background/40 rounded-xl border border-white/5" />
+                        <div key={i} className="h-32 bg-background/40 rounded-xl border border-border/30" />
                     ))}
                 </div>
-                <div className="h-64 bg-background/40 rounded-xl border border-white/5" />
-                <div className="h-64 bg-background/40 rounded-xl border border-white/5" />
+                <div className="h-64 bg-background/40 rounded-xl border border-border/30" />
+                <div className="h-64 bg-background/40 rounded-xl border border-border/30" />
             </div>
         )
     }
