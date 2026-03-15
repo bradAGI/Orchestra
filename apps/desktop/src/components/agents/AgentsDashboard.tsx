@@ -643,7 +643,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                             <option value="interactive">Interactive</option>
                                             <option value="auto-edit">Auto-edit</option>
                                             <option value="full-auto">Full-auto</option>
-                                            <option value="suggest">Suggest</option>
+                                            <option value="on-request">On-request</option>
                                         </>
                                     )}
                                 </select>

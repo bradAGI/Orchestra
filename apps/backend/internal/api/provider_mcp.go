@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -134,7 +133,7 @@ func (s *Server) AddProviderMCPServer(w http.ResponseWriter, r *http.Request) {
 	case "claude":
 		err = addClaudeMCPFull(homeDir, req.Name, req.Command, req.Args, req.URL, req.Env, req.Type)
 	case "codex":
-		err = addCodexMCP(homeDir, req.Name, req.Command)
+		err = addCodexMCP(homeDir, req.Name, req.Command, req.Args, req.URL, req.Env)
 	case "opencode":
 		err = addOpenCodeMCP(homeDir, req.Name, req.Command, req.Args)
 	case "gemini":
@@ -377,49 +376,99 @@ func codexConfigPath(home string) string {
 }
 
 func readCodexMCP(home string) []ProviderMCPServer {
-	data, err := os.ReadFile(codexConfigPath(home))
+	cfg, err := readCodexConfig(home)
 	if err != nil {
 		return nil
 	}
-	content := string(data)
-	re := regexp.MustCompile(`\[mcp_servers\.(\w+)\]\s*\n\s*command\s*=\s*"([^"]*)"`)
-	matches := re.FindAllStringSubmatch(content, -1)
+
+	mcpServers, ok := cfg["mcp_servers"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
 	var servers []ProviderMCPServer
-	for _, match := range matches {
-		servers = append(servers, ProviderMCPServer{Name: match[1], Command: match[2], Enabled: true})
+	for name, val := range mcpServers {
+		server, ok := val.(map[string]any)
+		if !ok {
+			continue
+		}
+		s := ProviderMCPServer{Name: name, Enabled: true}
+
+		if cmd, ok := server["command"].(string); ok {
+			s.Command = cmd
+		}
+		if url, ok := server["url"].(string); ok {
+			s.URL = url
+		}
+		if args, ok := server["args"].([]any); ok {
+			for _, a := range args {
+				s.Args = append(s.Args, fmt.Sprintf("%v", a))
+			}
+		}
+		if env, ok := server["env"].(map[string]any); ok {
+			s.Env = make(map[string]string)
+			for k, v := range env {
+				s.Env[k] = fmt.Sprintf("%v", v)
+			}
+		}
+		if enabled, ok := server["enabled"].(bool); ok {
+			s.Enabled = enabled
+		}
+		s.Type = "stdio"
+		if s.URL != "" {
+			s.Type = "http"
+		}
+		servers = append(servers, s)
 	}
 	return servers
 }
 
-func addCodexMCP(home, name, command string) error {
-	path := codexConfigPath(home)
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return err
+func addCodexMCP(home, name, command string, args []string, url string, env map[string]string) error {
+	cfg, err := readCodexConfig(home)
+	if err != nil {
+		cfg = map[string]any{}
 	}
-	data, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
-		return err
+
+	mcpServers, ok := cfg["mcp_servers"].(map[string]any)
+	if !ok {
+		mcpServers = map[string]any{}
 	}
-	content := string(data)
-	block := fmt.Sprintf("\n[mcp_servers.%s]\ncommand = \"%s\"\n", name, command)
-	content += block
-	return os.WriteFile(path, []byte(content), 0644)
+
+	server := map[string]any{}
+	if command != "" {
+		server["command"] = command
+	}
+	if len(args) > 0 {
+		server["args"] = args
+	}
+	if url != "" {
+		server["url"] = url
+	}
+	if len(env) > 0 {
+		server["env"] = env
+	}
+
+	mcpServers[name] = server
+	cfg["mcp_servers"] = mcpServers
+
+	return writeCodexConfig(home, cfg)
 }
 
 func deleteCodexMCP(home, name string) error {
-	path := codexConfigPath(home)
-	data, err := os.ReadFile(path)
+	cfg, err := readCodexConfig(home)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
 		return err
 	}
-	content := string(data)
-	// Remove the [mcp_servers.<name>] block including command line
-	re := regexp.MustCompile(`(?m)\n?\[mcp_servers\.` + regexp.QuoteMeta(name) + `\]\s*\n\s*command\s*=\s*"[^"]*"\s*\n?`)
-	content = re.ReplaceAllString(content, "\n")
-	return os.WriteFile(path, []byte(strings.TrimSpace(content)+"\n"), 0644)
+
+	mcpServers, ok := cfg["mcp_servers"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	delete(mcpServers, name)
+	cfg["mcp_servers"] = mcpServers
+
+	return writeCodexConfig(home, cfg)
 }
 
 /* ------------------------------------------------------------------ */

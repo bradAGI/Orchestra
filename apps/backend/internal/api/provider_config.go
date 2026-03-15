@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	toml "github.com/pelletier/go-toml/v2"
 )
 
 /* ================================================================== */
@@ -513,101 +513,124 @@ func writeClaudeHooks(home string, hooks []ProviderHook) error {
 /*  Codex: ~/.codex/config.toml                                        */
 /* ================================================================== */
 
-// Permissions: config.toml → approval_policy, sandbox_policy
-func readCodexPermissions(home string) ProviderPermissions {
+func readCodexConfig(home string) (map[string]any, error) {
 	data, err := os.ReadFile(codexConfigPath(home))
 	if err != nil {
-		return ProviderPermissions{ApprovalMode: "suggest", Allow: []string{}, Deny: []string{}, Ask: []string{}}
+		if os.IsNotExist(err) {
+			return map[string]any{}, nil
+		}
+		return nil, err
 	}
-	content := string(data)
+	var cfg map[string]any
+	if err := toml.Unmarshal(data, &cfg); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
 
-	mode := extractTOMLString(content, "approval_policy")
-	if mode == "" {
-		mode = "suggest"
+func writeCodexConfig(home string, cfg map[string]any) error {
+	path := codexConfigPath(home)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
 	}
-	sandbox := extractTOMLString(content, "sandbox_policy")
+	data, err := toml.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
+}
+
+// Permissions: config.toml → approval_policy, sandbox_mode
+func readCodexPermissions(home string) ProviderPermissions {
+	cfg, err := readCodexConfig(home)
+	if err != nil {
+		return ProviderPermissions{ApprovalMode: "on-request", Allow: []string{}, Deny: []string{}, Ask: []string{}}
+	}
+
+	mode, _ := cfg["approval_policy"].(string)
+	if mode == "" {
+		mode = "on-request"
+	}
+	sandbox, _ := cfg["sandbox_mode"].(string)
 
 	return ProviderPermissions{ApprovalMode: mode, Allow: []string{}, Deny: []string{}, Ask: []string{}, Sandbox: sandbox}
 }
 
 func writeCodexPermissions(home string, perms ProviderPermissions) error {
-	path := codexConfigPath(home)
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return err
+	cfg, err := readCodexConfig(home)
+	if err != nil {
+		cfg = map[string]any{}
 	}
-	data, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	content := string(data)
-	content = setTOMLString(content, "approval_policy", perms.ApprovalMode)
+	cfg["approval_policy"] = perms.ApprovalMode
 	if perms.Sandbox != "" {
-		content = setTOMLString(content, "sandbox_policy", perms.Sandbox)
+		cfg["sandbox_mode"] = perms.Sandbox
 	}
-	return os.WriteFile(path, []byte(content), 0644)
+	return writeCodexConfig(home, cfg)
 }
 
 // Model: config.toml → model, model_reasoning_effort
 func readCodexModel(home string) ProviderModelConfig {
-	data, err := os.ReadFile(codexConfigPath(home))
+	cfg, err := readCodexConfig(home)
 	if err != nil {
 		return ProviderModelConfig{}
 	}
-	content := string(data)
-	model := extractTOMLString(content, "model")
-	effort := extractTOMLString(content, "model_reasoning_effort")
+	model, _ := cfg["model"].(string)
+	effort, _ := cfg["model_reasoning_effort"].(string)
 	return ProviderModelConfig{Model: model, Effort: effort}
 }
 
 func writeCodexModel(home string, model ProviderModelConfig) error {
-	path := codexConfigPath(home)
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return err
+	cfg, err := readCodexConfig(home)
+	if err != nil {
+		cfg = map[string]any{}
 	}
-	data, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	content := string(data)
 	if model.Model != "" {
-		content = setTOMLString(content, "model", model.Model)
+		cfg["model"] = model.Model
 	}
 	if model.Effort != "" {
-		content = setTOMLString(content, "model_reasoning_effort", model.Effort)
+		cfg["model_reasoning_effort"] = model.Effort
 	}
-	return os.WriteFile(path, []byte(content), 0644)
+	return writeCodexConfig(home, cfg)
 }
 
-// Hooks: config.toml → notify (simple boolean/string)
+// Hooks: config.toml → notify (array of strings)
 func readCodexHooks(home string) []ProviderHook {
-	data, err := os.ReadFile(codexConfigPath(home))
+	cfg, err := readCodexConfig(home)
 	if err != nil {
 		return nil
 	}
-	content := string(data)
-	notify := extractTOMLString(content, "notify")
-	if notify == "" {
-		return nil
+	// notify is an array like ["command", "arg1", "arg2"]
+	if notify, ok := cfg["notify"].([]any); ok {
+		var parts []string
+		for _, n := range notify {
+			if s, ok := n.(string); ok {
+				parts = append(parts, s)
+			}
+		}
+		if len(parts) > 0 {
+			return []ProviderHook{{Event: "notify", Command: strings.Join(parts, " ")}}
+		}
 	}
-	return []ProviderHook{{Event: "notify", Command: notify}}
+	// Also handle legacy string value
+	if notify, ok := cfg["notify"].(string); ok && notify != "" {
+		return []ProviderHook{{Event: "notify", Command: notify}}
+	}
+	return nil
 }
 
 func writeCodexHooks(home string, hooks []ProviderHook) error {
-	path := codexConfigPath(home)
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return err
+	cfg, err := readCodexConfig(home)
+	if err != nil {
+		cfg = map[string]any{}
 	}
-	data, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	content := string(data)
 	for _, h := range hooks {
 		if h.Event == "notify" {
-			content = setTOMLString(content, "notify", h.Command)
+			// Store as array of strings
+			parts := strings.Fields(h.Command)
+			cfg["notify"] = parts
 		}
 	}
-	return os.WriteFile(path, []byte(content), 0644)
+	return writeCodexConfig(home, cfg)
 }
 
 /* ================================================================== */
@@ -807,29 +830,6 @@ func writeOpenCodeModel(home string, model ProviderModelConfig) error {
 	return writeOpenCodeConfig(home, cfg)
 }
 
-/* ================================================================== */
-/*  TOML helpers (simple key = "value" at top level)                   */
-/* ================================================================== */
-
-func extractTOMLString(content, key string) string {
-	re := regexp.MustCompile(`(?m)^\s*` + regexp.QuoteMeta(key) + `\s*=\s*"([^"]*)"`)
-	match := re.FindStringSubmatch(content)
-	if len(match) >= 2 {
-		return match[1]
-	}
-	return ""
-}
-
-func setTOMLString(content, key, value string) string {
-	re := regexp.MustCompile(`(?m)^\s*` + regexp.QuoteMeta(key) + `\s*=\s*"[^"]*"`)
-	replacement := fmt.Sprintf(`%s = "%s"`, key, value)
-	if re.MatchString(content) {
-		return re.ReplaceAllString(content, replacement)
-	}
-	// Insert before any [section] header, or at end
-	content = strings.TrimRight(content, "\n") + "\n" + replacement + "\n"
-	return content
-}
 
 /* ================================================================== */
 /*  Generic helpers                                                    */
