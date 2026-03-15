@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bot, Brain, CheckCircle2, ChevronRight, FileText, GitPullRequest, Github, History, Info, Loader2, Pencil, Play, Terminal, Wrench, X, Zap } from 'lucide-react'
+import { Bot, Brain, CheckCircle2, ChevronDown, ChevronRight, FileText, GitPullRequest, Github, History, Info, Loader2, Pencil, Play, Terminal, Wrench, X, Zap } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Prism } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -147,6 +147,7 @@ export function IssueDetailView({
   const [diffFiles, setDiffFiles] = useState<DiffFile[]>([])
   const [diffLoading, setDiffLoading] = useState(false)
   const [activeDiffFile, setActiveDiffFile] = useState<string | null>(null)
+  const [expandedOutputEntries, setExpandedOutputEntries] = useState<Set<number>>(new Set())
 
   // Only sync state/assignee from result (these are set by dropdowns, not typed input)
   // Title and description are user-editable text - only set on initial load, not on re-fetches
@@ -587,7 +588,7 @@ export function IssueDetailView({
 
         {/* Output */}
         {bottomTab === 'output' && (
-          <div className="h-full">
+          <div className="h-full bg-[#0a0a0b]">
             {logsLoading ? (
               <div className="h-full flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary/30" /></div>
             ) : logs && !logs.includes('# No logs available') ? (
@@ -698,85 +699,119 @@ export function IssueDetailView({
                   }
 
                   return parsed.map((entry) => {
+                    const isExpanded = expandedOutputEntries.has(entry.idx)
+                    const toggleExpand = () => setExpandedOutputEntries(prev => {
+                      const next = new Set(prev)
+                      if (next.has(entry.idx)) next.delete(entry.idx)
+                      else next.add(entry.idx)
+                      return next
+                    })
+
                     if (entry.kind === 'session') {
                       return (
-                        <div key={entry.idx} className="flex items-center gap-2.5 px-4 py-2.5 border-b border-border/10">
-                          <div className="h-5 w-5 rounded-md bg-primary/10 grid place-items-center shrink-0"><Zap size={10} className="text-primary" /></div>
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-primary/70">Session Started</span>
-                          {entry.label && <span className="text-[9px] font-mono text-muted-foreground/30 bg-muted/30 px-1.5 py-0.5 rounded">{entry.label}</span>}
-                          <span className="text-[9px] font-mono text-muted-foreground/20 ml-auto">{entry.ts}</span>
+                        <div key={entry.idx} className="relative flex items-center gap-2.5 px-4 py-1.5">
+                          <div className="absolute inset-x-4 top-1/2 h-px bg-border/10" />
+                          <span className="relative z-10 text-[9px] font-bold uppercase tracking-[0.2em] text-primary/50 bg-[#0a0a0b] pr-2.5 flex items-center gap-1.5">
+                            <Zap size={8} className="text-primary/40" />
+                            Session
+                          </span>
+                          {entry.label && <span className="relative z-10 text-[8px] font-mono text-muted-foreground/25 bg-[#0a0a0b] px-1.5 py-0.5 rounded border border-border/10">{entry.label}</span>}
+                          <span className="relative z-10 text-[8px] font-mono text-muted-foreground/15 ml-auto bg-[#0a0a0b] pl-2">{entry.ts}</span>
                         </div>
                       )
                     }
                     if (entry.kind === 'lifecycle') {
                       return (
-                        <div key={entry.idx} className="flex items-center gap-2.5 px-4 py-1.5 border-b border-border/5">
-                          <div className="h-4 w-4 rounded grid place-items-center shrink-0"><Play size={8} className="text-muted-foreground/30" /></div>
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40">{entry.label}</span>
-                          {entry.content && <span className="text-[9px] text-muted-foreground/25">{entry.content}</span>}
-                          <span className="text-[9px] font-mono text-muted-foreground/15 ml-auto">{entry.ts}</span>
+                        <div key={entry.idx} className="relative flex items-center gap-2 px-4 py-1">
+                          <div className="absolute inset-x-4 top-1/2 h-px bg-border/5" />
+                          <span className="relative z-10 text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground/25 bg-[#0a0a0b] pr-2 flex items-center gap-1">
+                            <Play size={6} className="text-muted-foreground/20" />
+                            {entry.label}
+                          </span>
+                          {entry.content && <span className="relative z-10 text-[8px] text-muted-foreground/15 bg-[#0a0a0b] px-1">{entry.content}</span>}
+                          <span className="relative z-10 text-[8px] font-mono text-muted-foreground/10 ml-auto bg-[#0a0a0b] pl-2">{entry.ts}</span>
                         </div>
                       )
                     }
                     if (entry.kind === 'prompt') {
                       return (
-                        <div key={entry.idx} className="px-4 py-3 border-b border-border/10 bg-primary/[0.03]">
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <div className="h-5 w-5 rounded-md bg-primary/10 grid place-items-center shrink-0"><ChevronRight size={10} className="text-primary/60" /></div>
-                            <span className="text-[9px] font-bold uppercase tracking-widest text-primary/50">System Prompt</span>
-                            <span className="text-[9px] font-mono text-muted-foreground/15 ml-auto">{entry.ts}</span>
-                          </div>
-                          <p className="text-[11px] text-foreground/30 leading-relaxed line-clamp-2 ml-7">{entry.content}</p>
+                        <div key={entry.idx} className="px-4 py-1.5 border-b border-border/5">
+                          <button onClick={toggleExpand} className="flex items-center gap-2 w-full text-left group">
+                            <ChevronRight size={10} className={`text-primary/30 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-primary/30 group-hover:text-primary/50 transition-colors">System Prompt</span>
+                            <span className="text-[8px] font-mono text-muted-foreground/10 ml-auto">{entry.ts}</span>
+                          </button>
+                          {isExpanded && (
+                            <p className="text-[10px] text-foreground/25 leading-relaxed mt-1.5 ml-5 max-h-40 overflow-auto custom-scrollbar whitespace-pre-wrap">{entry.content}</p>
+                          )}
                         </div>
                       )
                     }
                     if (entry.kind === 'agent') {
                       return (
-                        <div key={entry.idx} className="px-4 py-3 border-b border-border/10 hover:bg-muted/[0.03] transition-colors">
+                        <div key={entry.idx} className="px-4 py-3.5 border-b border-border/10 hover:bg-white/[0.01] transition-colors">
                           <div className="flex items-start gap-2.5">
                             <div className="h-5 w-5 rounded-md bg-emerald-500/10 grid place-items-center shrink-0 mt-0.5"><Bot size={10} className="text-emerald-500/70" /></div>
-                            <p className="text-[12px] text-foreground/70 leading-[1.6] whitespace-pre-wrap flex-1">{entry.content}</p>
-                            <span className="text-[9px] font-mono text-muted-foreground/15 shrink-0">{entry.ts}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="prose prose-invert prose-sm max-w-none prose-p:my-1 prose-p:text-foreground/70 prose-code:text-primary/60 prose-code:bg-muted/30 prose-code:px-1 prose-code:rounded prose-pre:bg-muted/20 prose-pre:border prose-pre:border-border/20 prose-li:text-foreground/60 prose-headings:text-foreground/80 prose-headings:text-sm">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.content}</ReactMarkdown>
+                              </div>
+                            </div>
+                            <span className="text-[8px] font-mono text-muted-foreground/15 shrink-0 mt-1">{entry.ts}</span>
                           </div>
                         </div>
                       )
                     }
                     if (entry.kind === 'thinking') {
                       return (
-                        <div key={entry.idx} className="flex items-center gap-2.5 px-4 py-2 border-b border-border/5 bg-violet-500/[0.03]">
-                          <div className="h-5 w-5 rounded-md bg-violet-500/10 grid place-items-center shrink-0"><Brain size={10} className="text-violet-400/70" /></div>
-                          <span className="text-[11px] text-violet-300/40 italic flex-1 truncate">{entry.content.replace(/\*\*/g, '')}</span>
-                          <span className="text-[9px] font-mono text-muted-foreground/15 shrink-0">{entry.ts}</span>
+                        <div key={entry.idx} className="px-4 py-1 border-b border-border/5">
+                          <button onClick={toggleExpand} className="flex items-center gap-2 w-full text-left group">
+                            <Brain size={10} className="text-violet-400/40" />
+                            <span className="text-[10px] text-violet-300/30 italic group-hover:text-violet-300/50 transition-colors">
+                              {isExpanded ? 'Thinking' : 'Thinking...'}
+                            </span>
+                            <ChevronDown size={10} className={`text-violet-400/20 transition-transform ml-auto ${isExpanded ? 'rotate-180' : ''}`} />
+                            <span className="text-[8px] font-mono text-muted-foreground/10 shrink-0">{entry.ts}</span>
+                          </button>
+                          {isExpanded && (
+                            <p className="text-[10px] text-violet-200/25 leading-relaxed mt-1.5 ml-5 whitespace-pre-wrap max-h-60 overflow-auto custom-scrollbar">{entry.content.replace(/\*\*/g, '')}</p>
+                          )}
                         </div>
                       )
                     }
                     if (entry.kind === 'tool') {
                       return (
-                        <div key={entry.idx} className="flex items-center gap-2.5 px-4 py-2 border-b border-border/5 bg-amber-500/[0.03]">
-                          <div className="h-5 w-5 rounded-md bg-amber-500/10 grid place-items-center shrink-0"><Wrench size={10} className="text-amber-500/70" /></div>
-                          <span className="text-[9px] font-bold uppercase tracking-wider text-amber-500/50 shrink-0">{entry.label}</span>
-                          <code className="text-[10px] font-mono text-muted-foreground/40 truncate flex-1">{entry.content}</code>
-                          <span className="text-[9px] font-mono text-muted-foreground/15 shrink-0">{entry.ts}</span>
+                        <div key={entry.idx} className="flex items-center gap-2 px-4 py-1 border-b border-border/[0.03]">
+                          <Wrench size={9} className="text-amber-500/40 shrink-0" />
+                          <span className="text-[9px] font-semibold text-amber-500/45 shrink-0">{entry.label}</span>
+                          <code className="text-[9px] font-mono text-muted-foreground/25 truncate flex-1">{entry.content}</code>
+                          <span className="text-[8px] font-mono text-muted-foreground/10 shrink-0">{entry.ts}</span>
                         </div>
                       )
                     }
                     if (entry.kind === 'result') {
                       const isError = entry.status === 'error'
                       return (
-                        <div key={entry.idx} className={`flex items-center gap-2.5 px-4 py-1.5 border-b border-border/5 ${isError ? 'bg-red-500/[0.03]' : 'bg-emerald-500/[0.02]'}`}>
-                          <div className={`h-4 w-4 rounded grid place-items-center shrink-0 ${isError ? 'bg-red-500/10' : 'bg-emerald-500/10'}`}>
-                            <CheckCircle2 size={8} className={isError ? 'text-red-400/60' : 'text-emerald-500/50'} />
-                          </div>
-                          <span className="text-[10px] text-muted-foreground/35 truncate flex-1">{entry.content}</span>
-                          <span className="text-[9px] font-mono text-muted-foreground/15 shrink-0">{entry.ts}</span>
+                        <div key={entry.idx} className="px-4 py-0.5 border-b border-border/[0.03]">
+                          <button onClick={toggleExpand} className="flex items-center gap-2 w-full text-left group">
+                            <CheckCircle2 size={8} className={isError ? 'text-red-400/40' : 'text-emerald-500/30'} />
+                            <span className={`text-[9px] truncate flex-1 ${isError ? 'text-red-400/35' : 'text-muted-foreground/25'} ${!isExpanded ? 'line-clamp-1' : ''}`}>
+                              {isExpanded ? '' : entry.content}
+                            </span>
+                            {entry.content.length > 60 && <ChevronDown size={8} className={`text-muted-foreground/15 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />}
+                            <span className="text-[8px] font-mono text-muted-foreground/10 shrink-0">{entry.ts}</span>
+                          </button>
+                          {isExpanded && (
+                            <pre className="text-[9px] text-muted-foreground/30 leading-relaxed mt-1 ml-5 whitespace-pre-wrap max-h-40 overflow-auto custom-scrollbar font-mono">{entry.content}</pre>
+                          )}
                         </div>
                       )
                     }
                     if (entry.kind === 'error') {
                       return (
-                        <div key={entry.idx} className="flex items-center gap-2.5 px-4 py-2 border-b border-border/5 bg-red-500/[0.04]">
-                          <div className="h-5 w-5 rounded-md bg-red-500/10 grid place-items-center shrink-0"><Zap size={10} className="text-red-400/70" /></div>
-                          <span className="text-[10px] font-mono text-red-400/60 flex-1">{entry.content}</span>
+                        <div key={entry.idx} className="flex items-center gap-2 px-4 py-1.5 border-b border-border/5 bg-red-500/[0.03]">
+                          <Zap size={9} className="text-red-400/50 shrink-0" />
+                          <span className="text-[10px] font-mono text-red-400/50 flex-1">{entry.content}</span>
                         </div>
                       )
                     }
