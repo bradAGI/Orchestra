@@ -31,6 +31,7 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/tools"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
 	trackergithub "github.com/orchestra/orchestra/apps/backend/internal/tracker/github"
+	gitutil "github.com/orchestra/orchestra/apps/backend/internal/utils/git"
 	ghutil "github.com/orchestra/orchestra/apps/backend/internal/utils/github"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker/memory"
 	trackersqlite "github.com/orchestra/orchestra/apps/backend/internal/tracker/sqlite"
@@ -333,6 +334,27 @@ func processExecutionTick(
 	}
 
 	if entry.TurnCount == 0 {
+		// Create a git branch for this task so changes don't collide with other agents
+		if workspacePath != "" && entry.ProjectID != "" {
+			branchName := strings.ToLower(strings.ReplaceAll(entry.IssueIdentifier, " ", "-"))
+			if branchErr := gitutil.CreateBranch(context.Background(), workspacePath, branchName); branchErr != nil {
+				// Branch may already exist — try checking it out instead
+				checkoutCmd := exec.Command("git", "checkout", branchName)
+				checkoutCmd.Dir = workspacePath
+				if checkoutErr := checkoutCmd.Run(); checkoutErr != nil {
+					logger.Warn().Err(branchErr).Str("branch", branchName).Msg("could not create or checkout branch; continuing on current branch")
+				} else {
+					logger.Info().Str("branch", branchName).Msg("checked out existing task branch")
+				}
+			} else {
+				logger.Info().Str("branch", branchName).Msg("created task branch")
+				// Store branch name on the issue
+				if _, updateErr := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"branch_name": branchName}); updateErr != nil {
+					logger.Warn().Err(updateErr).Msg("failed to store branch name on issue")
+				}
+			}
+		}
+
 		publishLifecycleEvent(pubsub, "hook_started", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "before_run"})
 		if res, err := workspaceService.RunBeforeRunHook(workspacePath, workspaceHooks); err != nil {
 			publishLifecycleEvent(pubsub, "hook_failed", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "before_run", "error": err.Error(), "output": res.Output})
