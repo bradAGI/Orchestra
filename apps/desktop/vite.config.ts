@@ -20,4 +20,10 @@ export default defineConfig({
       '@shared': path.resolve(__dirname, './src/shared'),
     },
   },
+  worker: {
+    format: 'es',
+  },
+  optimizeDeps: {
+    exclude: ['@huggingface/transformers'],
+  },
 })
