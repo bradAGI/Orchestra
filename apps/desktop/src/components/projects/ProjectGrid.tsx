@@ -102,9 +102,9 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, stats, loading, onCl
     return (
         <Card
             onClick={() => onClick(project.id)}
-            className="group relative overflow-hidden bg-card/60 border border-border/50 transition-[border-color,box-shadow,background-color] duration-300 hover:shadow-2xl hover:shadow-primary/10 cursor-pointer h-56 flex flex-col justify-between shadow-lg hover:border-primary/30 rounded-2xl"
+            className="group relative overflow-hidden bg-gradient-to-b from-card via-card to-muted/20 border border-border/50 transition-[border-color,box-shadow,background-color] duration-300 hover:shadow-2xl hover:shadow-primary/10 cursor-pointer h-56 flex flex-col justify-between shadow-lg hover:border-primary/30 rounded-2xl"
         >
-            {/* Animated primary bar */}
+            <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.04] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
             <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10 translate-y-1 group-hover:translate-y-0">
                 <AppTooltip content="Remove from workspace">

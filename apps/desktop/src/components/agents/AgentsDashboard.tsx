@@ -508,9 +508,10 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                         key={id}
                                         type="button"
                                         onClick={() => setSelectedAgent(id)}
-                                        className="bg-muted/10 border border-border/40 rounded-xl p-8 hover:border-primary/30 hover:bg-muted/20 transition-all cursor-pointer group flex flex-col items-center justify-center"
+                                        className="relative bg-gradient-to-b from-card via-card to-muted/20 border border-border/40 rounded-xl p-8 hover:border-primary/30 transition-all cursor-pointer group flex flex-col items-center justify-center overflow-hidden"
                                     >
-                                        <div className="flex flex-col items-center text-center gap-4 flex-1 justify-center">
+                                        <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-primary/[0.04] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                        <div className="flex flex-col items-center text-center gap-4 flex-1 justify-center relative">
                                             <div className="py-2">
                                                 {getAgentIcon(id, 32)}
                                             </div>

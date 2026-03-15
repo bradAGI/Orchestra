@@ -386,9 +386,10 @@ export function KanbanBoard({
                         key={item.issue_id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, getActionIssueRef(item))}
-                        className="group relative cursor-grab border border-border/60 bg-card p-3.5 mb-1.5 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 active:cursor-grabbing active:scale-[0.98] rounded-xl"
+                        className="group relative cursor-grab border border-border/60 bg-gradient-to-b from-card via-card to-muted/20 p-3.5 mb-1.5 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 active:cursor-grabbing active:scale-[0.98] rounded-xl overflow-hidden"
                         onClick={() => void onInspectIssue(getActionIssueRef(item))}
                       >
+                        <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                         <div className="flex items-start justify-between gap-2">
                           <span className="font-mono text-[11px] font-black uppercase tracking-tight text-primary/80 group-hover:text-primary transition-colors">
                             {item.issue_identifier}
