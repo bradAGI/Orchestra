@@ -90,24 +90,26 @@ export function GitTab({
 
   return (
     <div className="flex flex-col h-full overflow-hidden relative">
-      {/* Branch bar */}
-      <BranchBar
-        projectId={project.id}
-        config={config}
-        currentBranch={currentBranch}
-        branches={branches}
-        onBranchChange={loadAll}
-      />
-
-      {/* Refresh button */}
-      <button
-        onClick={loadAll}
-        disabled={refreshing}
-        className="absolute top-2 right-3 z-10 text-muted-foreground hover:text-foreground"
-        title="Refresh"
-      >
-        <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-      </button>
+      {/* Branch bar with refresh */}
+      <div className="flex items-center border-b border-border/40 shrink-0 bg-card/30">
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <BranchBar
+            projectId={project.id}
+            config={config}
+            currentBranch={currentBranch}
+            branches={branches}
+            onBranchChange={loadAll}
+          />
+        </div>
+        <button
+          onClick={loadAll}
+          disabled={refreshing}
+          className="shrink-0 px-3 py-2.5 text-muted-foreground/40 hover:text-foreground transition-colors"
+          title="Refresh"
+        >
+          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+        </button>
+      </div>
 
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden min-h-0">
