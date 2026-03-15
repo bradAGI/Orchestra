@@ -30,6 +30,7 @@
     "release:gate": "npm run parity:verify:twice && npm run release:readiness"
   },
   "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
     "@radix-ui/react-dialog": "^1.1.4",
     "@radix-ui/react-slot": "^1.1.1",
     "@radix-ui/react-tooltip": "^1.2.8",
@@ -65,8 +66,8 @@
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.1.2",
     "cross-env": "^7.0.3",
-    "electron-builder": "^24.13.3",
     "electron": "^33.2.1",
+    "electron-builder": "^24.13.3",
     "jsdom": "^25.0.1",
     "postcss": "^8.4.49",
     "react-grab": "^0.1.25",
