@@ -11,7 +11,7 @@ import { fetchIssueHistory, fetchIssueDiff, fetchIssueLogs, createProjectGitHubP
 import type { SnapshotPayload } from '@/lib/orchestra-types'
 import type { TimelineItem } from '@/components/app-shell/types'
 import { AgentSelector, CustomDropdown, getAgentIcon } from '@/components/app-shell/shared/controls'
-import type { IssueDetailResult, ToolSummary } from './types'
+import type { IssueDetailResult } from './types'
 import { extractOperationalPlanItems, extractPlanFromText, getEventIcon, parseDiff, type DiffFile, type PlanItem } from './IssueDetailUtils'
 
 function DescriptionEditor({ value, onChange, onBlur, theme }: {
@@ -104,30 +104,21 @@ export function IssueDetailView({
   result,
   onUpdate,
   onStopSession,
-  onJumpToTerminal,
-  onNavigate,
   config,
   snapshot,
   timeline = [],
   availableAgents = [],
-  allTools = [],
   theme,
 }: {
   result: IssueDetailResult | null
   onUpdate?: (updates: IssueUpdatePayload) => Promise<void>
   onStopSession?: (provider?: string) => Promise<void>
-  onJumpToTerminal?: (identifier: string) => void
-  onNavigate?: (section: string) => void
   config: BackendConfig | null
   snapshot: SnapshotPayload | null
   timeline?: TimelineItem[]
   availableAgents?: string[]
-  allTools?: ToolSummary[]
   theme?: 'light' | 'dark'
 }) {
-  void onJumpToTerminal
-  void onNavigate
-  void allTools
 
   const typed = (result ?? {})
   const identifier = (typed.identifier as string) || (typed.issue_identifier as string) || ''

@@ -106,6 +106,7 @@ export default function App() {
   const [loadingState, setLoadingState] = useState(true)
   const [usePolling, setUsePolling] = useState(false)
   const syncControls = useRef<{ startPolling: () => void; stopPolling: () => void } | null>(null)
+  const lastIssueFetchRef = useRef(0)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
@@ -370,14 +371,16 @@ export default function App() {
       } catch { return [] as IssueListItem[] }
     })).then(results => {
       if (!mounted) return
-      const all = results.flat()
-      const localTitles = new Set(boardIssues.map(i => i.title))
-      setGithubBacklogIssues(all.filter(gh => !localTitles.has(gh.title)))
+      setGithubBacklogIssues(results.flat())
     })
     return () => { mounted = false }
-  }, [config, projects, boardIssues])
+  }, [config, projects])
 
-  const allBoardIssues = useMemo(() => [...boardIssues, ...githubBacklogIssues], [boardIssues, githubBacklogIssues])
+  const allBoardIssues = useMemo(() => {
+    const localTitles = new Set(boardIssues.map(i => i.title))
+    const uniqueGh = githubBacklogIssues.filter(gh => !localTitles.has(gh.title))
+    return [...boardIssues, ...uniqueGh]
+  }, [boardIssues, githubBacklogIssues])
   const allBoardIssuesRef = useRef(allBoardIssues)
   allBoardIssuesRef.current = allBoardIssues
 
@@ -407,12 +410,12 @@ export default function App() {
           setSnapshot((previous) => applySnapshotUpdate(previous, next))
           setLoadingState(false)
           setErrorMessage('')
-          // Fetch board issues to populate the Kanban board persistence
-          fetchIssues(config)
-            .then(setBoardIssues)
-            .catch((err) => {
-              console.error('Failed to refresh board issues:', err)
-            })
+          // Fetch board issues to populate the Kanban board persistence (throttled)
+          const now = Date.now()
+          if (now - lastIssueFetchRef.current > 5000) {
+            lastIssueFetchRef.current = now
+            fetchIssues(config).then(setBoardIssues).catch(() => {})
+          }
         },
         onTimelineEvent: (eventType, envelope) => {
           setTimeline((previous) => appendTimelineEvent(previous, { type: envelope.type, at: envelope.timestamp, data: envelope.data }))
@@ -448,6 +451,7 @@ export default function App() {
                 gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4)
                 osc.start(ctx.currentTime)
                 osc.stop(ctx.currentTime + 0.4)
+                osc.onended = () => ctx.close()
               } catch { /* ignore audio errors */ }
               // Show browser notification
               if ('Notification' in window && Notification.permission === 'granted') {
@@ -1265,12 +1269,9 @@ export default function App() {
                 config={config}
                 timeline={timeline}
                 availableAgents={availableAgents}
-                allTools={allTools}
                 snapshot={snapshot}
                 onUpdate={(updates) => handleIssueUpdate(issueLookupId, updates)}
                 onStopSession={(p) => handleStopSession(issueLookupId, p)}
-                onJumpToTerminal={handleJumpToTerminal}
-                onNavigate={handleNavigate}
                 theme={theme}
                 />
 

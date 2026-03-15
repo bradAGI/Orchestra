@@ -167,9 +167,10 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
             .catch(() => setGithubIssues([]))
     }, [activeTab, gitSubTab, ghIssueFilter, config, project.id, project.github_token])
 
-    // Poll GitHub issues every 60s for the active project
+    // Poll GitHub issues every 60s only when viewing relevant tabs
     useEffect(() => {
         if (!config || !project.github_token) return
+        if (activeTab !== 'overview' && !(activeTab === 'git' && gitSubTab === 'issues')) return
         const interval = setInterval(() => {
             const state = (activeTab === 'git' && gitSubTab === 'issues') ? ghIssueFilter : 'open'
             fetchProjectGitHubIssues(config, project.id, state)

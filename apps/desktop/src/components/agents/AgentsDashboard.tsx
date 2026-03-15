@@ -48,11 +48,19 @@ const PROVIDER_DESCRIPTIONS: Record<Provider, string> = {
     opencode: 'Community-driven — flexible and extensible',
 }
 
-const instructionFiles: Record<Provider, { global: string; project: string; label: string }> = {
-    claude:   { global: '~/.claude/CLAUDE.md',           project: 'CLAUDE.md',  label: 'CLAUDE.md' },
-    codex:    { global: '~/.codex/AGENTS.md',            project: 'AGENTS.md',  label: 'AGENTS.md' },
-    gemini:   { global: '~/.gemini/GEMINI.md',           project: 'GEMINI.md',  label: 'GEMINI.md' },
-    opencode: { global: '~/.config/opencode/AGENTS.md',  project: 'AGENTS.md',  label: 'AGENTS.md' },
+function ConfigItemRow({ icon, color, name, preview, scope }: { icon: string; color: string; name: string; preview: string; scope: string }) {
+    return (
+        <div className="flex items-center gap-3 py-2.5">
+            <div className={`h-6 w-6 rounded bg-${color}-500/10 flex items-center justify-center shrink-0`}>
+                <span className={`text-[9px] font-bold text-${color}-500`}>{icon}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-foreground truncate">{name}</p>
+                <p className="text-[9px] text-muted-foreground/40 truncate">{preview || 'No content'}</p>
+            </div>
+            <Badge variant="outline" className="text-[8px] font-bold uppercase shrink-0">{scope}</Badge>
+        </div>
+    )
 }
 
 /* ------------------------------------------------------------------ */
@@ -551,18 +559,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                         const shortName = skill.name.includes('/') ? skill.name.split('/').slice(1).join('/') : skill.name
                                         const preview = skill.content.replace(/^---[\s\S]*?---\s*/, '').trim().slice(0, 80)
                                         return (
-                                            <div key={skill.path} className="flex items-center gap-3 py-2.5">
-                                                <div className="h-6 w-6 rounded bg-amber-500/10 flex items-center justify-center shrink-0">
-                                                    <span className="text-[9px] font-bold text-amber-500">S</span>
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-xs font-medium text-foreground truncate">{shortName}</p>
-                                                    <p className="text-[9px] text-muted-foreground/40 truncate">{preview || 'No content'}</p>
-                                                </div>
-                                                <Badge variant="outline" className="text-[8px] font-bold uppercase shrink-0">
-                                                    {skill.scope}
-                                                </Badge>
-                                            </div>
+                                            <ConfigItemRow key={skill.path} icon="S" color="amber" name={shortName} preview={preview} scope={skill.scope} />
                                         )
                                     })}
                                 </div>
@@ -600,18 +597,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                         const shortName = agent.name.includes('/') ? agent.name.split('/').slice(1).join('/') : agent.name
                                         const preview = agent.content.replace(/^---[\s\S]*?---\s*/, '').trim().slice(0, 80)
                                         return (
-                                            <div key={agent.path} className="flex items-center gap-3 py-2.5">
-                                                <div className="h-6 w-6 rounded bg-blue-500/10 flex items-center justify-center shrink-0">
-                                                    <span className="text-[9px] font-bold text-blue-500">A</span>
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-xs font-medium text-foreground truncate">{shortName}</p>
-                                                    <p className="text-[9px] text-muted-foreground/40 truncate">{preview || 'No content'}</p>
-                                                </div>
-                                                <Badge variant="outline" className="text-[8px] font-bold uppercase shrink-0">
-                                                    {agent.scope}
-                                                </Badge>
-                                            </div>
+                                            <ConfigItemRow key={agent.path} icon="A" color="blue" name={shortName} preview={preview} scope={agent.scope} />
                                         )
                                     })}
                                 </div>
