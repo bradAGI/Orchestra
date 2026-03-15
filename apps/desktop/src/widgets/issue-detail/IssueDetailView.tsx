@@ -860,14 +860,30 @@ export function IssueDetailView({
                   ))}
                 </div>
                 <div className="flex-1 overflow-auto bg-[#0d1117]">
-                  <Prism
-                    language="diff"
-                    style={oneDark}
-                    customStyle={{ margin: 0, padding: '1rem', background: 'transparent', fontSize: '11px', lineHeight: '1.6' }}
-                    showLineNumbers={false}
-                  >
-                    {diffFiles.find(f => f.path === activeDiffFile)?.content || ''}
-                  </Prism>
+                  <pre className="p-4 text-[11px] font-mono leading-[1.7]">
+                    {(diffFiles.find(f => f.path === activeDiffFile)?.content || '').split('\n').map((line, i) => {
+                      let bg = 'transparent'
+                      let color = '#8b949e'
+                      if (line.startsWith('+') && !line.startsWith('+++')) {
+                        bg = 'rgba(63, 185, 80, 0.08)'
+                        color = '#7ee787'
+                      } else if (line.startsWith('-') && !line.startsWith('---')) {
+                        bg = 'rgba(248, 81, 73, 0.08)'
+                        color = '#ff7b72'
+                      } else if (line.startsWith('@@')) {
+                        bg = 'rgba(56, 139, 253, 0.06)'
+                        color = '#79c0ff'
+                      } else if (line.startsWith('diff ') || line.startsWith('index ') || line.startsWith('---') || line.startsWith('+++')) {
+                        color = '#484f58'
+                      }
+                      return (
+                        <div key={i} style={{ background: bg }} className="px-3 -mx-4">
+                          <span className="inline-block w-8 text-right mr-3 select-none" style={{ color: '#484f58' }}>{i + 1}</span>
+                          <span style={{ color }}>{line}</span>
+                        </div>
+                      )
+                    })}
+                  </pre>
                 </div>
               </div>
             )}
