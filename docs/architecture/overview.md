@@ -1,33 +1,85 @@
-# System Overview
+# Architecture Overview
 
-Orchestra is split into three primary layers that work in concert to manage autonomous agents.
+Symphony is a three-layer system: a Go backend control plane, an Electron desktop app, and a Bubble Tea TUI.
 
-```diagram-architecture
+## System Layers
+
+```
+┌─────────────────────────────────┐
+│  Desktop App (Electron/React)   │  Operator UI: Kanban, Inspector, Agents, Projects
+├─────────────────────────────────┤
+│  TUI Dashboard (Bubble Tea)     │  Terminal control surface: start/stop services
+├─────────────────────────────────┤
+│  Backend (Go + chi + SQLite)    │  API server, orchestration, telemetry, GitHub sync
+└─────────────────────────────────┘
 ```
 
-## 1. The Control Plane (Go)
-The core logic resides in a high-performance Go backend. It is responsible for **State Orchestration**, **Workspace Provisioning**, and **Telemetry Aggregation**.
+## Backend: Go + chi + SQLite
 
-### Key Responsibilities:
-- **Session Lifecycle**: Tracks every agent turn from `claimed` to `completed`.
-- **Isolation**: Manages ephemeral filesystems where agents safely execute code.
-- **Provider Switching**: A unified interface for communicating with multiple AI providers.
+Entry point: `apps/backend/cmd/orchestrad/main.go`
 
-## 2. The Interactive Desktop (Electron)
-A high-density "command center" designed for human operators.
+The backend is a single Go binary (`orchestrad`) that:
+- Serves the HTTP/SSE/WebSocket API on port 4010
+- Manages agent lifecycle (provision workspace, dispatch agent, collect telemetry)
+- Stores all state in SQLite (`~/.orchestra/workspaces/.orchestra/warehouse.db`)
+- Syncs bidirectionally with GitHub (issues, PRs)
+- Watches for telemetry output from all 4 agent providers
 
-### Key Responsibilities:
-- **Observability**: Real-time log streaming and diff visualization.
-- **Intervention**: UI for humans to correct agent paths or approving actions.
-- **Configuration**: Direct UI-to-Filesystem mapping for system tuning.
+Key packages:
+- `internal/api/` -- chi router, all HTTP handlers
+- `internal/orchestrator/` -- core orchestration logic
+- `internal/db/` -- SQLite schema, migrations, queries
+- `internal/config/` -- environment-based configuration
+- `internal/terminal/` -- WebSocket PTY sessions
 
-## 3. The Agent Adapters
-Orchestra supports multiple state-of-the-art agent CLIs (Claude, Gemini, Codex, OpenCode). Each is treated as a pluggable component within the **Agent Registry**.
+## Frontend: React + TypeScript + Electron + Vite
 
-## 🔌 Model Context Protocol (MCP)
-Orchestra serves as an **MCP Host**. It can connect to external **MCP Servers** via JSON-RPC over `stdio`. 
+Entry point: `apps/desktop/src/main.tsx`
 
-When an agent turn begins, the orchestrator:
-1.  **Discovers Tools**: Polls all configured MCP servers for their available capabilities.
-2.  **Standardizes Specs**: Injects these external tools alongside built-in system tools into the agent's context.
-3.  **Proxies Calls**: When an agent calls an MCP tool, the Go backend transparently routes the request to the correct external server and returns the result.
+The desktop app provides:
+- **Kanban board** -- 5-column task management (Backlog, Todo, In Progress, Review, Done)
+- **Issue Inspector** -- Details, Plan, Activity, Output, Changes tabs
+- **Project views** -- Git integration with Commits, Issues, PRs sub-tabs
+- **Agent management** -- Per-provider config editing (instructions, permissions, model, hooks, MCP, skills, sub-agents)
+- **Terminal multiplexer** -- Up to 16 tiled PTY sessions
+- **Settings** -- Backend profiles, GitHub OAuth, theme
+
+## TUI: Bubble Tea
+
+Entry point: `apps/tui/main.go`
+
+A terminal dashboard for starting/stopping the backend and desktop services. Launched via `make dash`.
+
+## Key API Endpoints
+
+| Group | Endpoints |
+|---|---|
+| **Runtime** | `GET /api/v1/state`, `GET /api/v1/events` (SSE), `POST /api/v1/refresh` |
+| **Issues** | CRUD on `/api/v1/issues`, plus `/history`, `/logs`, `/diff`, `/artifacts` |
+| **Projects** | CRUD on `/api/v1/projects`, plus `/tree`, `/file`, `/git/*` |
+| **Agents** | `GET /api/v1/agents`, per-provider: `/permissions`, `/model`, `/hooks`, `/mcp` |
+| **GitHub** | `/github/login`, `/github/callback`, per-project: `/github/issues`, `/github/pulls`, `/git/branches` |
+| **Sessions** | `GET /api/v1/sessions`, `GET /api/v1/sessions/{id}` |
+| **MCP** | `/mcp/tools`, `/mcp/servers` (CRUD) |
+| **Telemetry** | `GET /api/v1/telemetry/health`, `GET /api/v1/warehouse/stats` |
+| **Terminal** | `GET /api/v1/terminal/{session_id}` (WebSocket) |
+
+Full spec: `docs/openapi.yaml` (also served at `GET /api/v1/openapi.yaml`)
+
+## Bidirectional GitHub Sync
+
+When a project is connected to GitHub:
+1. **Inbound** -- GitHub issues are fetched and added to the Backlog column
+2. **Outbound** -- Status changes, comments, and PR creation sync back to GitHub
+3. **Issue CRUD** -- Create, read, update GitHub issues directly from the desktop UI
+4. **Pull Requests** -- List, create, and view diffs for PRs
+
+## Telemetry Watcher
+
+The backend watches for telemetry output from all 4 agent providers:
+- **Claude** -- Session JSON files
+- **Codex** -- Session logs
+- **Gemini** -- JSON stream output
+- **OpenCode** -- SQLite session database
+
+Telemetry is ingested into the warehouse for unified analytics, token tracking, and cost estimation. Health status is available at `GET /api/v1/telemetry/health`.

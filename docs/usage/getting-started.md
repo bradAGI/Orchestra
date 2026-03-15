@@ -1,39 +1,75 @@
 # Getting Started
 
-Welcome to **Orchestra**. This guide will get you from zero to your first autonomous agent session in under 5 minutes.
+Get from zero to your first agent-managed task in under 5 minutes.
 
-## 1. Backend Initialization
+## Prerequisites
 
-Orchestra relies on a Go-based control plane. Ensure your backend is running and reachable.
+- **Go** 1.25+ (backend and TUI)
+- **Node.js** 20+ and npm (desktop app)
+- **Git**
+- At least one agent CLI installed: [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex](https://github.com/openai/codex), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or [OpenCode](https://github.com/opencode-ai/opencode)
 
-1.  Navigate to the **Settings** tab.
-2.  Verify the **API Endpoint** (default is usually `http://127.0.0.1:4010`).
-3.  Click **Test Connection** to ensure the desktop app can talk to the orchestrator.
+## 1. Start the TUI Dashboard
 
-## 2. Agent Authentication
+The fastest way to launch all services:
 
-To run agents like Claude or Gemini, you must provide your API tokens.
+```bash
+make dash
+```
 
-1.  Go to the **Agents** tab.
-2.  Select **Settings** -> **Agent Tokens**.
-3.  Enter your tokens for your preferred providers. These are **encrypted at rest** using your system's native secure storage (Keychain/SecretService).
+This starts the Bubble Tea dashboard, which manages the backend and provides a terminal control surface. Alternatively, start services manually:
 
-## 3. Discovering Tasks
+```bash
+# Terminal 1: backend
+cd apps/backend && go run ./cmd/orchestrad
 
-Orchestra syncs natively with Linear (with support for local test clients).
+# Terminal 2: desktop
+cd apps/desktop && npm ci && npm run dev
+```
 
-1.  Click the **Refresh** button in the Top Bar.
-2.  Newly discovered issues will appear in the **Tasks** (Kanban) board under the `Todo` column.
+## 2. Add a Project
 
-## 4. Your First Turn
+1. Open the desktop app and navigate to **Projects** in the sidebar.
+2. Click **Add Project** and select a local Git repository directory.
+3. Symphony registers the project and scans its Git state (branches, remotes).
 
-To start an autonomous session:
+## 3. Connect GitHub (Optional)
 
-1.  Open the **Tasks** tab.
-2.  Drag an issue from `Todo` to `In Progress`.
-3.  The orchestrator will automatically provision a workspace and dispatch the default agent.
-4.  Monitor the live logs in the **Live Console** (the multi-agent terminal dock) or by clicking the issue to open the **Inspector**.
+To enable bidirectional issue sync:
 
----
+1. Go to **Settings** and configure your GitHub OAuth credentials (`ORCHESTRA_GITHUB_CLIENT_ID` / `ORCHESTRA_GITHUB_CLIENT_SECRET`).
+2. Open your project and click **Connect GitHub**.
+3. Authenticate via the OAuth flow.
+4. GitHub issues automatically populate the **Backlog** column. Edits sync both ways.
 
-> **Tip**: Look for the **Terminal Icon** on active task cards to "Jump to Terminal" and take direct control of the agent's PTY session.
+## 4. Create a Task
+
+1. Open the **Tasks** (Kanban) board.
+2. Click **+ New Task** or let GitHub issues flow into Backlog automatically.
+3. Fill in the title, description, and optionally assign a project.
+
+## 5. Assign an Agent
+
+1. Drag the task from **Backlog** to **Todo**.
+2. Select an agent provider (Claude, Codex, Gemini, or OpenCode) if not using the default.
+3. Configure provider-specific settings in the **Agents** tab if needed (see [Agent Configuration](../agents/configuration.md)).
+
+## 6. Move Through the Lifecycle
+
+| Column | What happens |
+|---|---|
+| **Backlog** | Task exists but is not yet ready for work |
+| **Todo** | Task is queued and ready for an agent |
+| **In Progress** | Agent is actively working -- watch live in the Inspector or Terminal |
+| **Review** | Agent finished; human reviews output, diffs, and plan |
+| **Done** | Approved and complete |
+
+Drag a task from **Todo** to **In Progress** to dispatch the agent. Monitor progress in the **Issue Inspector** (Details, Plan, Activity, Output, Changes tabs).
+
+When the agent finishes, the task moves to **Review**. Inspect the changes, then drag to **Done** to approve -- or back to **Todo** to retry.
+
+## Next Steps
+
+- [Core Concepts](core-concepts.md) -- Understand the data model and workflow
+- [Agent Configuration](../agents/configuration.md) -- Tune per-provider settings
+- [Architecture Overview](../architecture/overview.md) -- How the system fits together

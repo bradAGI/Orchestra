@@ -1,38 +1,92 @@
 # Agent Configuration
 
-Orchestra provides a unified interface for tuning the technical parameters of your autonomous agents.
+Symphony provides per-provider configuration management through the **Agents** tab in the desktop UI. Each provider has seven configurable dimensions.
 
-## 🏗️ Configuration Hierarchy
+## Configuration Dimensions
 
-Settings are applied in the following order of precedence:
+| Dimension | What it controls |
+|---|---|
+| **Instructions** | Markdown file injected into the agent's system context |
+| **Permissions** | What the agent is allowed to do (file access, shell, network) |
+| **Model** | Which model/version the provider uses |
+| **Hooks** | Lifecycle callbacks (pre-run, post-run, on-error) |
+| **MCP Servers** | External tool servers available to the agent |
+| **Skills** | Capability modules injected at task start |
+| **Sub-agents** | Other agents this provider can delegate to |
 
-1.  **Project Overrides**: `WORKFLOW.md` or `.claude/settings.json` located in the issue's workspace.
-2.  **User Global Configs**: Standard CLI dotfiles in your home directory (e.g., `~/.claude.json`).
-3.  **Platform Defaults**: Default templates managed in the **Agents** tab.
+All configuration is written directly to the filesystem. Changes take effect on the next agent session.
 
-## 🤖 Supported Providers
+## Claude
 
-### Claude Code
-Configured via `.claude` or `~/.claude/settings.json`.
-- **Primary Model**: `claude-3-7-sonnet`
-- **Temperature**: `0.2` (Default for high reasoning)
-- **Max Tokens**: `4096`
+| Dimension | File / Location |
+|---|---|
+| Instructions | `CLAUDE.md` (project root) |
+| Permissions | `.claude/settings.json` → `permissions` |
+| Model | `.claude/settings.json` → `model` |
+| Hooks | `.claude/settings.json` → `hooks` |
+| MCP Servers | `.claude/settings.json` → `mcpServers` |
+| Skills | `.claude/settings.json` → `skills` |
+| Sub-agents | `.claude.json` → `subAgents` |
 
-### Gemini CLI
-Configured via `.gemini` or `~/.gemini/settings.json`.
-- **Primary Model**: `gemini-2.0-flash`
-- **Context Limit**: Optimized for massive codebase analysis.
-- **Output Format**: Uses `--output-format stream-json` for real-time telemetry and tool execution updates.
-- **Event Mapping**: Standardizes `init`, `message`, `tool_use`, and `result` events into the Orchestra Activity Feed.
+Example hooks structure:
+```json
+{
+  "hooks": {
+    "PreToolUse": [{ "matcher": "Bash", "command": "echo pre-hook" }],
+    "PostToolUse": [{ "matcher": "Bash", "command": "echo post-hook" }]
+  }
+}
+```
 
-## 🛠️ Global Control Plane
+## Codex
 
-Use the **Agents** tab to manage these files directly from the UI:
+| Dimension | File / Location |
+|---|---|
+| Instructions | `AGENTS.md` (project root) |
+| Permissions | `config.toml` → `approval_policy` (`suggest`, `auto-edit`, `full-auto`) |
+| Model | `config.toml` → `model` |
+| Hooks | `config.toml` → `hooks` |
+| MCP Servers | `config.toml` → `mcpServers` |
+| Sandbox | `config.toml` → `sandbox_mode` (`host`, `docker`, `remote`) |
+| Skills | `config.toml` → `skills` |
+| Sub-agents | `config.toml` → `subAgents` |
 
-- **JSON Validation**: The editor will highlight syntax errors before you save to prevent agent crashes.
-- **Auto-Formatting**: Click **Format JSON** to ensure your configurations remain clean and maintainable.
-- **Path Mapping**: The UI shows the absolute path of the file being edited (e.g., `/home/user/.claude.json`).
+## Gemini
 
----
+| Dimension | File / Location |
+|---|---|
+| Instructions | `GEMINI.md` (project root) |
+| Permissions | `settings.json` → `permissions` |
+| Model | `settings.json` → `model` |
+| Hooks | `settings.json` → `hooks` |
+| MCP Servers | `settings.json` → `mcpServers` |
+| Skills | `settings.json` → `skills` |
+| Sub-agents | `settings.json` → `subAgents` |
 
-> **System Note**: When you save a configuration in the UI, it is written directly to the filesystem. The changes take effect on the very next agent turn.
+## OpenCode
+
+| Dimension | File / Location |
+|---|---|
+| Instructions | `AGENTS.md` (project root) |
+| Permissions | `opencode.json` → `permission` |
+| Model | `opencode.json` → `model` |
+| Hooks | `opencode.json` → `hooks` |
+| MCP Servers | `opencode.json` → `mcp` |
+| Skills | `opencode.json` → `skills` |
+| Sub-agents | `opencode.json` → `subAgents` |
+
+## Configuration Hierarchy
+
+Settings are applied in order of precedence:
+
+1. **Project-level** -- Config files in the project/workspace directory
+2. **User-level** -- Global dotfiles in your home directory (e.g., `~/.claude.json`)
+3. **Platform defaults** -- Templates managed in the Agents tab
+
+## Editing in the UI
+
+The Agents tab provides:
+- **JSON validation** -- Syntax errors are highlighted before save
+- **Auto-formatting** -- Clean up JSON with one click
+- **Path display** -- Shows the absolute filesystem path being edited
+- **Live preview** -- See the resolved config that will be used on the next agent session
