@@ -225,6 +225,11 @@ func (r *CodexAppServerRunner) RunTurn(ctx context.Context, request TurnRequest,
 		dynamicTools = append(dynamicTools, spec)
 	}
 
+	writableRoots := []string{request.Workspace}
+	if request.WorkspaceRoot != "" && request.WorkspaceRoot != request.Workspace {
+		writableRoots = append(writableRoots, request.WorkspaceRoot)
+	}
+
 	if err := write(map[string]any{
 		"id":     2,
 		"method": "thread/start",
@@ -232,6 +237,7 @@ func (r *CodexAppServerRunner) RunTurn(ctx context.Context, request TurnRequest,
 			"approvalPolicy": approvalPolicy,
 			"sandbox":        "none",
 			"cwd":            request.Workspace,
+			"writableRoots":  writableRoots,
 			"dynamicTools":   dynamicTools,
 		},
 	}); err != nil {
