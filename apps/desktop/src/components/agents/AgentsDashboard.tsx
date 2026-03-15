@@ -83,6 +83,8 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
     const [newSkillName, setNewSkillName] = useState('')
     const [newSkillContent, setNewSkillContent] = useState('')
 
+    const [createType, setCreateType] = useState<'skill' | 'agent'>('skill')
+
     /* ---------- mcp state ---------- */
     const [mcpDialogOpen, setMcpDialogOpen] = useState(false)
     const [newMcpName, setNewMcpName] = useState('')
@@ -238,10 +240,21 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
     const isDirty = activeConfig != null && activeConfig.content !== editedContent
     const hasNewContent = !activeConfig && editedContent.trim().length > 0
 
-    const agentSkills = useMemo(() => {
+    // Skills: SKILL.md files — portable instruction sets (skills/<name>/SKILL.md)
+    const skills = useMemo(() => {
         if (!selectedAgent) return []
         return configs.filter(c =>
-            (c.category === 'skill' || c.path.includes('/agents/')) &&
+            c.category === 'skill' &&
+            !c.path.includes('/agents/') &&
+            c.name.toLowerCase().includes(selectedAgent.toLowerCase()),
+        )
+    }, [configs, selectedAgent])
+
+    // Sub-agents: agents/*.md files — isolated execution specialists
+    const subAgents = useMemo(() => {
+        if (!selectedAgent) return []
+        return configs.filter(c =>
+            c.path.includes('/agents/') &&
             c.name.toLowerCase().includes(selectedAgent.toLowerCase()),
         )
     }, [configs, selectedAgent])
@@ -449,44 +462,96 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                             )}
                         </div>
 
-                        {/* ---- Section 3: Sub-agents ---- */}
+                        {/* ---- Section 3: Skills ---- */}
                         <div className="border border-border/20 rounded-xl p-5 space-y-4">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Sub-agents</label>
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Skills</label>
                                     <p className="text-xs text-muted-foreground/50 mt-0.5">
-                                        Specialized behaviors for {selectedAgent}
+                                        Reusable instruction sets — portable across agents
                                     </p>
                                 </div>
                                 <Button
-                                    onClick={() => setSkillDialogOpen(true)}
+                                    onClick={() => { setCreateType('skill'); setSkillDialogOpen(true) }}
                                     size="sm"
                                     variant="outline"
                                     className="h-7 rounded-lg text-[9px] font-bold uppercase"
                                 >
-                                    <Plus size={12} className="mr-1" /> Create
+                                    <Plus size={12} className="mr-1" /> Add Skill
                                 </Button>
                             </div>
 
-                            {agentSkills.length === 0 ? (
-                                <div className="py-6 text-center">
-                                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/20">
-                                        No sub-agents configured. Create one to add specialized behaviors.
+                            {skills.length === 0 ? (
+                                <div className="py-4 text-center">
+                                    <p className="text-[10px] text-muted-foreground/20">
+                                        No skills configured. Skills are reusable knowledge packages (SKILL.md) that get injected into the agent's context.
                                     </p>
                                 </div>
                             ) : (
                                 <div className="divide-y divide-border/15">
-                                    {agentSkills.map(skill => {
+                                    {skills.map(skill => {
                                         const shortName = skill.name.includes('/') ? skill.name.split('/').slice(1).join('/') : skill.name
                                         const preview = skill.content.replace(/^---[\s\S]*?---\s*/, '').trim().slice(0, 80)
                                         return (
                                             <div key={skill.path} className="flex items-center gap-3 py-2.5">
+                                                <div className="h-6 w-6 rounded bg-amber-500/10 flex items-center justify-center shrink-0">
+                                                    <span className="text-[9px] font-bold text-amber-500">S</span>
+                                                </div>
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-xs font-medium text-foreground truncate">{shortName}</p>
                                                     <p className="text-[9px] text-muted-foreground/40 truncate">{preview || 'No content'}</p>
                                                 </div>
                                                 <Badge variant="outline" className="text-[8px] font-bold uppercase shrink-0">
                                                     {skill.scope}
+                                                </Badge>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ---- Section 4: Sub-agents ---- */}
+                        <div className="border border-border/20 rounded-xl p-5 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Sub-agents</label>
+                                    <p className="text-xs text-muted-foreground/50 mt-0.5">
+                                        Isolated workers with their own context, tools, and model
+                                    </p>
+                                </div>
+                                <Button
+                                    onClick={() => { setCreateType('agent'); setSkillDialogOpen(true) }}
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 rounded-lg text-[9px] font-bold uppercase"
+                                >
+                                    <Plus size={12} className="mr-1" /> Add Agent
+                                </Button>
+                            </div>
+
+                            {subAgents.length === 0 ? (
+                                <div className="py-4 text-center">
+                                    <p className="text-[10px] text-muted-foreground/20">
+                                        No sub-agents configured. Sub-agents run in isolated contexts with their own tools and model.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-border/15">
+                                    {subAgents.map(agent => {
+                                        const shortName = agent.name.includes('/') ? agent.name.split('/').slice(1).join('/') : agent.name
+                                        const preview = agent.content.replace(/^---[\s\S]*?---\s*/, '').trim().slice(0, 80)
+                                        return (
+                                            <div key={agent.path} className="flex items-center gap-3 py-2.5">
+                                                <div className="h-6 w-6 rounded bg-blue-500/10 flex items-center justify-center shrink-0">
+                                                    <span className="text-[9px] font-bold text-blue-500">A</span>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-medium text-foreground truncate">{shortName}</p>
+                                                    <p className="text-[9px] text-muted-foreground/40 truncate">{preview || 'No content'}</p>
+                                                </div>
+                                                <Badge variant="outline" className="text-[8px] font-bold uppercase shrink-0">
+                                                    {agent.scope}
                                                 </Badge>
                                             </div>
                                         )
@@ -532,13 +597,17 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                 </DialogContent>
             </Dialog>
 
-            {/* ---- Sub-agent / Skill Dialog ---- */}
+            {/* ---- Create Skill / Sub-agent Dialog ---- */}
             <Dialog open={skillDialogOpen} onOpenChange={setSkillDialogOpen}>
                 <DialogContent className="max-w-md bg-popover border-border shadow-2xl">
                     <DialogHeader>
-                        <DialogTitle className="text-lg font-bold">Create Sub-agent</DialogTitle>
+                        <DialogTitle className="text-lg font-bold">
+                            {createType === 'skill' ? 'Create Skill' : 'Create Sub-agent'}
+                        </DialogTitle>
                         <DialogDescription className="text-xs text-muted-foreground/60">
-                            Add a specialized behavior for {selectedAgent}
+                            {createType === 'skill'
+                                ? 'A reusable instruction set that gets injected into the agent\'s context'
+                                : 'An isolated worker with its own context window, tools, and model'}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4 space-y-4">
@@ -548,16 +617,18 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                 className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs font-medium focus:ring-2 focus:ring-primary/20 outline-none"
                                 value={newSkillName}
                                 onChange={e => setNewSkillName(e.target.value)}
-                                placeholder="e.g. code-review"
+                                placeholder={createType === 'skill' ? 'e.g. testing-guide' : 'e.g. code-reviewer'}
                             />
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Content</label>
                             <textarea
-                                className="w-full h-32 rounded-lg border border-border bg-background px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-primary/20 outline-none resize-none"
+                                className="w-full h-40 rounded-lg border border-border bg-background px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-primary/20 outline-none resize-none"
                                 value={newSkillContent}
                                 onChange={e => setNewSkillContent(e.target.value)}
-                                placeholder={"---\ndescription: A helpful agent\n---\n\nYour instructions here..."}
+                                placeholder={createType === 'skill'
+                                    ? "---\nname: testing-guide\ndescription: How to write tests for this project\n---\n\nAlways use vitest for testing.\nPlace tests next to source files.\nAim for 80% coverage."
+                                    : "---\nname: code-reviewer\ndescription: Reviews code for quality and security\ntools:\n  write: false\n  edit: false\n---\n\nYou are a code reviewer. Check for:\n- Security vulnerabilities\n- Performance issues\n- Missing error handling"}
                             />
                         </div>
                         <Button
@@ -566,7 +637,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                             className="w-full h-9 bg-primary text-primary-foreground font-bold uppercase text-[10px] tracking-widest rounded-lg shadow-lg shadow-primary/20"
                         >
                             {creating ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <Plus size={12} className="mr-1.5" />}
-                            Create Sub-agent
+                            {createType === 'skill' ? 'Create Skill' : 'Create Sub-agent'}
                         </Button>
                     </div>
                 </DialogContent>
