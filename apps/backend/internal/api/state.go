@@ -546,29 +546,46 @@ func (s *Server) GetIssueDiff(w http.ResponseWriter, r *http.Request) {
 		if searchErr == nil && len(issues) > 0 && issues[0].ProjectID != "" {
 			project, projErr := s.db.GetProjectByID(r.Context(), issues[0].ProjectID)
 			if projErr == nil && project.RootPath != "" && filepath.IsAbs(project.RootPath) {
-				// Get diff of tracked files
-				cmd := exec.CommandContext(r.Context(), "git", "diff", "HEAD")
-				cmd.Dir = project.RootPath
-				tracked, _ := cmd.CombinedOutput()
-
-				// Also get diff of untracked (new) files
-				cmd2 := exec.CommandContext(r.Context(), "git", "ls-files", "--others", "--exclude-standard")
-				cmd2.Dir = project.RootPath
-				untrackedList, _ := cmd2.Output()
+				// Determine the diff scope based on the issue's branch
+				branchName := issues[0].BranchName
 
 				var allDiff []byte
-				allDiff = append(allDiff, tracked...)
 
-				// For each untracked file, generate a diff-like output
+				if branchName != "" && branchName != "main" && branchName != "master" {
+					// Task has its own branch — diff against main to show only this task's changes
+					cmd := exec.CommandContext(r.Context(), "git", "diff", "main..."+branchName)
+					cmd.Dir = project.RootPath
+					if out, err := cmd.CombinedOutput(); err == nil {
+						allDiff = append(allDiff, out...)
+					}
+
+					// Also include any uncommitted changes on this branch
+					cmd2 := exec.CommandContext(r.Context(), "git", "diff", "HEAD")
+					cmd2.Dir = project.RootPath
+					if out2, _ := cmd2.CombinedOutput(); len(out2) > 0 {
+						allDiff = append(allDiff, out2...)
+					}
+				} else {
+					// No task branch — show uncommitted changes only
+					cmd := exec.CommandContext(r.Context(), "git", "diff", "HEAD")
+					cmd.Dir = project.RootPath
+					tracked, _ := cmd.CombinedOutput()
+					allDiff = append(allDiff, tracked...)
+				}
+
+				// Include untracked (new) files
+				cmd3 := exec.CommandContext(r.Context(), "git", "ls-files", "--others", "--exclude-standard")
+				cmd3.Dir = project.RootPath
+				untrackedList, _ := cmd3.Output()
 				for _, fname := range strings.Split(strings.TrimSpace(string(untrackedList)), "\n") {
 					fname = strings.TrimSpace(fname)
 					if fname == "" {
 						continue
 					}
-					cmd3 := exec.CommandContext(r.Context(), "git", "diff", "--no-index", "/dev/null", fname)
-					cmd3.Dir = project.RootPath
-					if out3, err := cmd3.CombinedOutput(); err != nil || len(out3) > 0 {
-						allDiff = append(allDiff, out3...)
+					cmd4 := exec.CommandContext(r.Context(), "git", "diff", "--no-index", "/dev/null", fname)
+					cmd4.Dir = project.RootPath
+					if out4, err := cmd4.CombinedOutput(); err != nil || len(out4) > 0 {
+						allDiff = append(allDiff, out4...)
 					}
 				}
 
