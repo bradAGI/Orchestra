@@ -380,6 +380,14 @@ func processExecutionTick(
 		renderedPrompt = buildExecutionPrompt(entry.IssueIdentifier, entry.Title, entry.Description, attempt)
 	}
 
+	// On subsequent turns, append prior turn context so agent knows what it already did
+	if attempt > 1 && warehouseDB != nil {
+		priorContext := buildPriorTurnContext(warehouseDB, entry.IssueID, entry.IssueIdentifier)
+		if priorContext != "" {
+			renderedPrompt += "\n\n" + priorContext
+		}
+	}
+
 	runCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	service.RegisterCancel(entry.IssueID, activeProviderName, cancel)
@@ -631,6 +639,48 @@ func buildExecutionPrompt(issueIdentifier string, title string, description stri
 	prompt += "\n\n## Instructions\n\n1. Write an **Operational Plan** using markdown checkboxes (`- [ ]` pending, `- [x]` done).\n\n2. Work through each step. After completing a step, restate the plan with updated checkboxes.\n\n3. Use all available tools to implement changes.\n\n4. Verify your work compiles/passes. Do NOT stop until all items are checked off."
 	prompt += fmt.Sprintf("\n\nAttempt: %d", attempt)
 	return prompt
+}
+
+func buildPriorTurnContext(warehouseDB *db.DB, issueID string, issueIdentifier string) string {
+	history, err := warehouseDB.GetUnifiedHistory(context.Background(), issueID)
+	if err != nil || len(history) == 0 {
+		return ""
+	}
+
+	var agentMessages []string
+	for _, h := range history {
+		kind, _ := h["kind"].(string)
+		msg, _ := h["message"].(string)
+		if msg == "" || len(msg) < 20 {
+			continue
+		}
+		// Only include agent messages (not PTY noise, not state changes)
+		if kind == "message" || kind == "agent_message" || kind == "item.completed" {
+			agentMessages = append(agentMessages, msg)
+		}
+	}
+
+	if len(agentMessages) == 0 {
+		return ""
+	}
+
+	// Take the last few messages to keep context manageable
+	maxMessages := 5
+	if len(agentMessages) > maxMessages {
+		agentMessages = agentMessages[len(agentMessages)-maxMessages:]
+	}
+
+	ctx := "## Prior Turn Context\n\nYou have already worked on this task in previous turns. Here is what you reported:\n\n"
+	for _, msg := range agentMessages {
+		// Truncate very long messages
+		if len(msg) > 500 {
+			msg = msg[:500] + "..."
+		}
+		ctx += "> " + strings.ReplaceAll(msg, "\n", "\n> ") + "\n\n"
+	}
+	ctx += "**Continue from where you left off. Do NOT restart from scratch. Check what files already exist before creating new ones.**\n"
+
+	return ctx
 }
 
 func extractGitHubIssueNumber(url string) int {
