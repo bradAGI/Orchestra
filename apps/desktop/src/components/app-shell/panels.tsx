@@ -605,6 +605,7 @@ export function CreateProjectDialog({
 export function CreateTaskDialog({
   open,
   onOpenChange,
+  config,
   initialState,
   availableAgents,
   allTools = [],
@@ -614,6 +615,7 @@ export function CreateTaskDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  config: BackendConfig | null
   initialState: string
   availableAgents: string[]
   allTools?: MCPTool[]
@@ -630,6 +632,13 @@ export function CreateTaskDialog({
   const [projectID, setProjectID] = useState(initialProjectID || (projects.length > 0 ? projects[0].id : ''))
   const [pending, setPending] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [sttReady, setSTTReady] = useState(false)
+  const [sttChecking, setSTTChecking] = useState(false)
+  const [recording, setRecording] = useState(false)
+  const [transcribing, setTranscribing] = useState(false)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const chunksRef = useRef<Blob[]>([])
 
   useEffect(() => {
     if (open) {
@@ -643,6 +652,46 @@ export function CreateTaskDialog({
       setSubmitError('')
     }
   }, [open, initialState, initialProjectID, availableAgents, projects])
+
+  useEffect(() => {
+    if (!open || !config) return
+    let cancelled = false
+    setSTTChecking(true)
+    void fetchSTTHealth(config)
+      .then((health) => {
+        if (!cancelled) {
+          setSTTReady(!!health.ready)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSTTReady(false)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setSTTChecking(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [open, config])
+
+  useEffect(() => {
+    if (!open) {
+      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+        recorderRef.current.stop()
+      }
+      streamRef.current?.getTracks().forEach((track) => track.stop())
+      recorderRef.current = null
+      streamRef.current = null
+      chunksRef.current = []
+      setRecording(false)
+      setTranscribing(false)
+    }
+  }, [open])
 
   const handleToggleTool = (name: string) => {
     setDisabledTools(prev => 
@@ -673,6 +722,63 @@ export function CreateTaskDialog({
       setSubmitError(message)
     } finally {
       setPending(false)
+    }
+  }
+
+  const stopRecording = () => {
+    if (!recording) return
+    recorderRef.current?.stop()
+    setRecording(false)
+  }
+
+  const startRecording = async () => {
+    if (!config || sttChecking || transcribing || recording) return
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      streamRef.current = stream
+      recorderRef.current = recorder
+      chunksRef.current = []
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunksRef.current.push(event.data)
+        }
+      }
+
+      recorder.onstop = () => {
+        const audioBlob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+        chunksRef.current = []
+        stream.getTracks().forEach((track) => track.stop())
+        streamRef.current = null
+        recorderRef.current = null
+
+        if (audioBlob.size === 0 || !config) return
+
+        setTranscribing(true)
+        void transcribeAudio(config, audioBlob)
+          .then((result) => {
+            const text = result.text?.trim() || ''
+            if (text) {
+              setDescription((prev) => (prev.trim() ? `${prev.trimEnd()}\n${text}` : text))
+            }
+          })
+          .catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : 'Speech transcription failed'
+            setSubmitError(message)
+          })
+          .finally(() => {
+            setTranscribing(false)
+          })
+      }
+
+      recorder.start()
+      setRecording(true)
+      setSubmitError('')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Microphone access failed'
+      setSubmitError(message)
+      setRecording(false)
     }
   }
 
@@ -726,6 +832,42 @@ export function CreateTaskDialog({
               />
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onPointerDown={(event) => {
+                  event.preventDefault()
+                  void startRecording()
+                }}
+                onPointerUp={(event) => {
+                  event.preventDefault()
+                  stopRecording()
+                }}
+                onPointerLeave={() => {
+                  stopRecording()
+                }}
+                onPointerCancel={() => {
+                  stopRecording()
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === ' ' || event.key === 'Enter') {
+                    event.preventDefault()
+                    void startRecording()
+                  }
+                }}
+                onKeyUp={(event) => {
+                  if (event.key === ' ' || event.key === 'Enter') {
+                    event.preventDefault()
+                    stopRecording()
+                  }
+                }}
+                disabled={!config || !sttReady || sttChecking || transcribing}
+                className={`h-7 px-3 text-[10px] font-bold uppercase tracking-widest touch-none ${recording ? 'text-red-400' : 'text-muted-foreground/50 hover:text-foreground'}`}
+              >
+                {recording ? <Square className="h-3 w-3 mr-1" /> : <Mic className="h-3 w-3 mr-1" />}
+                {transcribing ? 'Transcribing...' : recording ? 'Release to Stop' : 'Hold to Talk'}
+              </Button>
               <Button
                 type="button"
                 variant="ghost"
