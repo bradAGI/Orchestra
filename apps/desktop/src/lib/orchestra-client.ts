@@ -751,8 +751,9 @@ export type ProviderMCPServer = {
     enabled: boolean
 }
 
-export async function fetchProviderMCPServers(config: BackendConfig, provider: string): Promise<ProviderMCPServer[]> {
-    return requestJSON<ProviderMCPServer[]>(config, `/api/v1/agents/${encodeURIComponent(provider)}/mcp`)
+export async function fetchProviderMCPServers(config: BackendConfig, provider: string, projectId?: string): Promise<ProviderMCPServer[]> {
+    const params = projectId ? `?project_id=${encodeURIComponent(projectId)}` : ''
+    return requestJSON<ProviderMCPServer[]>(config, `/api/v1/agents/${encodeURIComponent(provider)}/mcp${params}`)
 }
 
 export async function addProviderMCPServer(config: BackendConfig, provider: string, server: { name: string; command: string; args?: string[] }): Promise<void> {
@@ -772,6 +773,8 @@ export type ProviderPermissions = {
     allow: string[]
     deny: string[]
     ask: string[]
+    allowed_tools?: string[]
+    enabled_plugins?: string[]
     sandbox?: string
 }
 
@@ -789,8 +792,9 @@ export type ProviderHook = {
     timeout?: number
 }
 
-export async function fetchProviderPermissions(config: BackendConfig, provider: string): Promise<ProviderPermissions> {
-    return requestJSON<ProviderPermissions>(config, `/api/v1/agents/${encodeURIComponent(provider)}/permissions`)
+export async function fetchProviderPermissions(config: BackendConfig, provider: string, projectId?: string): Promise<ProviderPermissions> {
+    const params = projectId ? `?project_id=${encodeURIComponent(projectId)}` : ''
+    return requestJSON<ProviderPermissions>(config, `/api/v1/agents/${encodeURIComponent(provider)}/permissions${params}`)
 }
 
 export async function updateProviderPermissions(config: BackendConfig, provider: string, perms: ProviderPermissions): Promise<void> {

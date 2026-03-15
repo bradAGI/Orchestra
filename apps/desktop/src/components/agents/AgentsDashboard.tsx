@@ -363,12 +363,13 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
             return
         }
         try {
-            const servers = await fetchProviderMCPServers(config, selectedAgent)
+            const projId = scope === 'project' ? selectedProjectID : undefined
+            const servers = await fetchProviderMCPServers(config, selectedAgent, projId)
             setProviderMcpServers(servers)
         } catch {
             setProviderMcpServers([])
         }
-    }, [config, selectedAgent])
+    }, [config, selectedAgent, scope, selectedProjectID])
 
     useEffect(() => {
         reloadProviderMcp()
@@ -378,8 +379,9 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
     const reloadProviderConfig = React.useCallback(async () => {
         if (!config || !selectedAgent) return
         try {
+            const projId = scope === 'project' ? selectedProjectID : undefined
             const [perms, model, hks] = await Promise.all([
-                fetchProviderPermissions(config, selectedAgent),
+                fetchProviderPermissions(config, selectedAgent, projId),
                 fetchProviderModel(config, selectedAgent),
                 fetchProviderHooks(config, selectedAgent),
             ])
@@ -392,7 +394,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
             setModelConfig({ model: '', effort: '', temperature: null })
             setHooks([])
         }
-    }, [config, selectedAgent])
+    }, [config, selectedAgent, scope, selectedProjectID])
 
     useEffect(() => {
         reloadProviderConfig()
@@ -810,6 +812,38 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                         <option value="workspace-read">Workspace Read</option>
                                         <option value="none">Disabled</option>
                                     </select>
+                                </div>
+                            )}
+
+                            {/* Allowed Tools (Claude only, project scope) */}
+                            {selectedAgent === 'claude' && scope === 'project' && permissions.allowed_tools && permissions.allowed_tools.length > 0 && (
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Project Allowed Tools</label>
+                                    <p className="text-[9px] text-muted-foreground/40">Managed by Claude Code permission dialogs</p>
+                                    <div className="space-y-1">
+                                        {permissions.allowed_tools.map((tool, i) => (
+                                            <div key={i} className="flex items-center gap-2">
+                                                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                                <span className="text-xs font-mono text-muted-foreground">{tool}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Enabled Plugins (Claude only) */}
+                            {selectedAgent === 'claude' && permissions.enabled_plugins && permissions.enabled_plugins.length > 0 && (
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Plugins</label>
+                                    <p className="text-[9px] text-muted-foreground/40">Enabled in Claude Code settings</p>
+                                    <div className="space-y-1">
+                                        {permissions.enabled_plugins.map((plugin, i) => (
+                                            <div key={i} className="flex items-center gap-2">
+                                                <div className="h-1.5 w-1.5 rounded-full bg-violet-500 shrink-0" />
+                                                <span className="text-xs font-mono text-muted-foreground">{plugin}</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
                         </div>

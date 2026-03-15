@@ -52,6 +52,54 @@ func (s *Server) GetProviderMCPServers(w http.ResponseWriter, r *http.Request) {
 		servers = []ProviderMCPServer{}
 	}
 
+	// Merge project-scoped MCP servers for Claude
+	projectID := r.URL.Query().Get("project_id")
+	if projectID != "" && provider == "claude" && s.db != nil {
+		project, err := s.db.GetProjectByID(r.Context(), projectID)
+		if err == nil && project.RootPath != "" {
+			cfg, cfgErr := readClaudeConfig(homeDir)
+			if cfgErr == nil {
+				// Track disabled .mcp.json servers for this project
+				disabledMcpjson := map[string]bool{}
+
+				// Read project MCP from ~/.claude.json -> projects.<path>.mcpServers
+				if projects, ok := cfg["projects"].(map[string]any); ok {
+					if projCfg, ok := projects[project.RootPath].(map[string]any); ok {
+						if projMcp, ok := projCfg["mcpServers"].(map[string]any); ok {
+							servers = mergeClaudeMCPServers(servers, projMcp)
+						}
+						// Read disabledMcpjsonServers
+						if disabled, ok := projCfg["disabledMcpjsonServers"].([]any); ok {
+							for _, d := range disabled {
+								if name, ok := d.(string); ok {
+									disabledMcpjson[name] = true
+								}
+							}
+						}
+					}
+				}
+
+				// Also read .mcp.json from project root
+				mcpJsonPath := filepath.Join(project.RootPath, ".mcp.json")
+				if mcpData, readErr := os.ReadFile(mcpJsonPath); readErr == nil {
+					var mcpJson map[string]any
+					if json.Unmarshal(mcpData, &mcpJson) == nil {
+						if mcpServers, ok := mcpJson["mcpServers"].(map[string]any); ok {
+							// Mark disabled servers before merging
+							for name := range disabledMcpjson {
+								if srv, ok := mcpServers[name].(map[string]any); ok {
+									srv["_disabled"] = true
+									mcpServers[name] = srv
+								}
+							}
+							servers = mergeClaudeMCPServers(servers, mcpServers)
+						}
+					}
+				}
+			}
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(servers)
 }
@@ -169,6 +217,49 @@ func writeClaudeConfig(home string, cfg map[string]any) error {
 		return err
 	}
 	return os.WriteFile(claudeConfigPath(home), data, 0644)
+}
+
+// mergeClaudeMCPServers merges additional MCP server entries into an existing list.
+// If a server with the same name already exists, the new entry overrides it.
+func mergeClaudeMCPServers(existing []ProviderMCPServer, additional map[string]any) []ProviderMCPServer {
+	nameIndex := map[string]int{}
+	for i, s := range existing {
+		nameIndex[s.Name] = i
+	}
+	for name, val := range additional {
+		server, ok := val.(map[string]any)
+		if !ok {
+			continue
+		}
+		cmd, _ := server["command"].(string)
+		url, _ := server["url"].(string)
+		typ, _ := server["type"].(string)
+		var args []string
+		if argsRaw, ok := server["args"].([]any); ok {
+			for _, a := range argsRaw {
+				args = append(args, fmt.Sprintf("%v", a))
+			}
+		}
+		var env map[string]string
+		if envRaw, ok := server["env"].(map[string]any); ok {
+			env = make(map[string]string, len(envRaw))
+			for k, v := range envRaw {
+				env[k] = fmt.Sprintf("%v", v)
+			}
+		}
+		enabled := true
+		if _, disabled := server["_disabled"]; disabled {
+			enabled = false
+		}
+		entry := ProviderMCPServer{Name: name, Command: cmd, Args: args, URL: url, Env: env, Type: typ, Enabled: enabled}
+		if idx, exists := nameIndex[name]; exists {
+			existing[idx] = entry
+		} else {
+			nameIndex[name] = len(existing)
+			existing = append(existing, entry)
+		}
+	}
+	return existing
 }
 
 func readClaudeMCP(home string) []ProviderMCPServer {

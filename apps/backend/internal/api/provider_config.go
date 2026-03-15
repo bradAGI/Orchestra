@@ -18,11 +18,13 @@ import (
 
 // ProviderPermissions is the normalized permission config returned to the frontend.
 type ProviderPermissions struct {
-	ApprovalMode string   `json:"approval_mode"`
-	Allow        []string `json:"allow"`
-	Deny         []string `json:"deny"`
-	Ask          []string `json:"ask"`
-	Sandbox      string   `json:"sandbox,omitempty"`
+	ApprovalMode   string   `json:"approval_mode"`
+	Allow          []string `json:"allow"`
+	Deny           []string `json:"deny"`
+	Ask            []string `json:"ask"`
+	AllowedTools   []string `json:"allowed_tools,omitempty"`
+	EnabledPlugins []string `json:"enabled_plugins,omitempty"`
+	Sandbox        string   `json:"sandbox,omitempty"`
 }
 
 // ProviderModelConfig is the normalized model config returned to the frontend.
@@ -67,6 +69,40 @@ func (s *Server) GetProviderPermissions(w http.ResponseWriter, r *http.Request) 
 	default:
 		writeJSONError(w, http.StatusBadRequest, "unknown_provider", fmt.Sprintf("unknown provider: %s", provider))
 		return
+	}
+
+	// Enrich Claude permissions with project-scoped allowedTools and enabledPlugins
+	if provider == "claude" {
+		// Read enabledPlugins from settings.json
+		settingsCfg, settingsErr := readClaudeSettings(homeDir)
+		if settingsErr == nil {
+			if plugins, ok := settingsCfg["enabledPlugins"].(map[string]any); ok {
+				for name, enabled := range plugins {
+					if enabled == true {
+						perms.EnabledPlugins = append(perms.EnabledPlugins, name)
+					}
+				}
+			}
+		}
+
+		// Read per-project allowedTools from ~/.claude.json
+		projectID := r.URL.Query().Get("project_id")
+		if projectID != "" && s.db != nil {
+			project, dbErr := s.db.GetProjectByID(r.Context(), projectID)
+			if dbErr == nil && project.RootPath != "" {
+				claudeJsonData, readErr := os.ReadFile(filepath.Join(homeDir, ".claude.json"))
+				if readErr == nil {
+					var claudeJson map[string]any
+					if json.Unmarshal(claudeJsonData, &claudeJson) == nil {
+						if projects, ok := claudeJson["projects"].(map[string]any); ok {
+							if projCfg, ok := projects[project.RootPath].(map[string]any); ok {
+								perms.AllowedTools = toStringSlice(projCfg["allowedTools"])
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
