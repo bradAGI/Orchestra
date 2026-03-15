@@ -497,20 +497,147 @@ export function IssueDetailView({
             {logsLoading ? (
               <div className="h-full flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary/30" /></div>
             ) : logs && !logs.includes('# No logs available') ? (
-              <div className="flex flex-col h-full bg-[#0d1117] overflow-auto">
-                <pre className="flex-1 p-4 text-[11px] font-mono text-[#c9d1d9] whitespace-pre-wrap leading-[1.7] selection:bg-primary/30">{
-                  logs.split('\n').map((line, i) => {
-                    const lineNum = String(i + 1).padStart(4, ' ')
-                    // Render markdown-like headings slightly better
-                    if (line.startsWith('# ')) {
-                      return <span key={i}><span className="text-[#484f58] select-none">{lineNum}  </span><span className="text-[#58a6ff] font-bold">{line}</span>{'\n'}</span>
+              <div className="flex flex-col h-full overflow-auto">
+                {(() => {
+                  // Parse log lines — supports both Gemini NDJSON and Codex mixed PTY/JSON
+                  const parsed: Array<{ idx: number; kind: string; ts: string; label: string; content: string; detail?: string; status?: string }> = []
+                  let seenFirstJSON = false
+
+                  logs.split('\n').forEach((line, idx) => {
+                    const trimmed = line.trim()
+                    if (!trimmed) return
+
+                    if (!trimmed.startsWith('{')) {
+                      // Skip PTY noise before first JSON (echoed commands, shell prompts)
+                      if (!seenFirstJSON) return
+                      const isError = /error|fail|429|refused/i.test(trimmed)
+                      if (isError) {
+                        parsed.push({ idx, kind: 'error', ts: '', label: 'Error', content: trimmed })
+                      }
+                      return
                     }
-                    if (line.startsWith('## ')) {
-                      return <span key={i}><span className="text-[#484f58] select-none">{lineNum}  </span><span className="text-[#58a6ff] font-semibold">{line}</span>{'\n'}</span>
+
+                    seenFirstJSON = true
+                    let obj: Record<string, unknown>
+                    try { obj = JSON.parse(trimmed) } catch { return }
+
+                    const type = (obj.type as string) || ''
+                    const ts = obj.timestamp ? new Date(obj.timestamp as string).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''
+
+                    // Gemini format
+                    if (type === 'init') {
+                      parsed.push({ idx, kind: 'system', ts, label: 'Session Started', content: (obj.model as string) || '' })
+                    } else if (type === 'message' && obj.role === 'user') {
+                      const content = (obj.content as string) || ''
+                      parsed.push({ idx, kind: 'prompt', ts, label: 'Prompt', content: content.slice(0, 200) + (content.length > 200 ? '...' : '') })
+                    } else if (type === 'message' && obj.role === 'assistant') {
+                      const content = (obj.content as string) || ''
+                      if (content.trim()) parsed.push({ idx, kind: 'agent', ts, label: '', content })
+                    } else if (type === 'tool_use') {
+                      const tool = (obj.tool_name as string) || 'tool'
+                      const params = obj.parameters as Record<string, unknown> | undefined
+                      const summary = String(params?.command || params?.dir_path || params?.file_path || params?.pattern || params?.description || '')
+                      parsed.push({ idx, kind: 'tool', ts, label: tool, content: summary })
+                    } else if (type === 'tool_result') {
+                      const output = (obj.output as string) || ''
+                      const status = (obj.status as string) || 'success'
+                      parsed.push({ idx, kind: 'result', ts, label: status === 'error' ? 'Error' : 'Result', content: output.slice(0, 200), status })
+                    // Codex format
+                    } else if (type === 'thread.started') {
+                      parsed.push({ idx, kind: 'system', ts, label: 'Session Started', content: 'Codex' })
+                    } else if (type === 'turn.started') {
+                      parsed.push({ idx, kind: 'system', ts, label: 'Turn Started', content: '' })
+                    } else if (type === 'item.completed') {
+                      const item = obj.item as Record<string, unknown> | undefined
+                      if (!item) return
+                      const itemType = (item.type as string) || ''
+                      const text = (item.text as string) || (item.aggregated_output as string) || ''
+                      if (itemType === 'agent_message') {
+                        parsed.push({ idx, kind: 'agent', ts, label: '', content: text })
+                      } else if (itemType === 'reasoning') {
+                        parsed.push({ idx, kind: 'thinking', ts, label: 'Thinking', content: text })
+                      } else if (itemType === 'command_execution' || itemType === 'file_edit' || itemType === 'file_create') {
+                        const cmd = (item.command as string) || ''
+                        const file = (item.file_path as string) || ''
+                        parsed.push({ idx, kind: 'tool', ts, label: itemType.replace('_', ' '), content: cmd || file || text.slice(0, 150), detail: text.length > 150 ? text.slice(0, 300) : undefined })
+                      } else if (text.trim()) {
+                        parsed.push({ idx, kind: 'agent', ts, label: '', content: text })
+                      }
+                    } else if (type === 'turn.completed') {
+                      parsed.push({ idx, kind: 'system', ts, label: 'Turn Completed', content: '' })
                     }
-                    return <span key={i}><span className="text-[#484f58] select-none">{lineNum}  </span>{line}{'\n'}</span>
                   })
-                }</pre>
+
+                  return parsed.map((entry) => {
+                    if (entry.kind === 'system') {
+                      return (
+                        <div key={entry.idx} className="flex items-center gap-3 px-4 py-2 border-b border-border/10 bg-muted/5">
+                          <span className="text-[9px] font-mono text-muted-foreground/30 shrink-0 w-16">{entry.ts}</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-primary/50">{entry.label}</span>
+                          <span className="text-[9px] font-mono text-muted-foreground/20">{entry.content}</span>
+                        </div>
+                      )
+                    }
+                    if (entry.kind === 'prompt') {
+                      return (
+                        <div key={entry.idx} className="px-4 py-3 border-b border-border/10 bg-primary/5">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[9px] font-mono text-muted-foreground/30">{entry.ts}</span>
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-primary/60">{entry.label}</span>
+                          </div>
+                          <p className="text-[11px] text-foreground/40 leading-relaxed line-clamp-2">{entry.content}</p>
+                        </div>
+                      )
+                    }
+                    if (entry.kind === 'agent') {
+                      return (
+                        <div key={entry.idx} className="px-4 py-2.5 border-b border-border/10 hover:bg-muted/5 transition-colors">
+                          <div className="flex items-start gap-2">
+                            <span className="text-[9px] font-mono text-muted-foreground/30 shrink-0 mt-0.5">{entry.ts}</span>
+                            <p className="text-[12px] text-foreground/70 leading-relaxed whitespace-pre-wrap">{entry.content}</p>
+                          </div>
+                        </div>
+                      )
+                    }
+                    if (entry.kind === 'thinking') {
+                      return (
+                        <div key={entry.idx} className="flex items-center gap-2 px-4 py-1.5 border-b border-border/5 bg-violet-500/5">
+                          <span className="text-[9px] font-mono text-muted-foreground/30 shrink-0">{entry.ts}</span>
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-violet-500/60">{entry.label}</span>
+                          <span className="text-[10px] text-violet-300/50 italic truncate">{entry.content}</span>
+                        </div>
+                      )
+                    }
+                    if (entry.kind === 'tool') {
+                      return (
+                        <div key={entry.idx} className="flex items-center gap-2 px-4 py-1.5 border-b border-border/5 bg-amber-500/5">
+                          <span className="text-[9px] font-mono text-muted-foreground/30 shrink-0">{entry.ts}</span>
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-amber-500/60">{entry.label}</span>
+                          <span className="text-[10px] text-muted-foreground/40 truncate">{entry.content}</span>
+                        </div>
+                      )
+                    }
+                    if (entry.kind === 'result') {
+                      const isError = entry.status === 'error'
+                      return (
+                        <div key={entry.idx} className={`flex items-center gap-2 px-4 py-1.5 border-b border-border/5 ${isError ? 'bg-red-500/5' : 'bg-emerald-500/5'}`}>
+                          <span className="text-[9px] font-mono text-muted-foreground/30 shrink-0">{entry.ts}</span>
+                          <span className={`text-[9px] font-bold uppercase tracking-wider ${isError ? 'text-red-500/60' : 'text-emerald-500/60'}`}>{entry.label}</span>
+                          <span className="text-[10px] text-muted-foreground/50 truncate">{entry.content}</span>
+                        </div>
+                      )
+                    }
+                    if (entry.kind === 'error') {
+                      return (
+                        <div key={entry.idx} className="flex items-center gap-2 px-4 py-1.5 border-b border-border/5 bg-red-500/5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-red-500/40 shrink-0" />
+                          <span className="text-[10px] font-mono text-red-400/70">{entry.content}</span>
+                        </div>
+                      )
+                    }
+                    return null
+                  })
+                })()}
               </div>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground/20 gap-3">
