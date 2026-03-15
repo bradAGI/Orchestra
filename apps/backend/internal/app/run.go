@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strconv"
@@ -624,12 +625,56 @@ func processExecutionTick(
 				return
 			}
 
+			// Get git diff stats for the comment
+			diffStats := ""
+			if project.RootPath != "" {
+				cmd := exec.Command("git", "-C", project.RootPath, "diff", "--stat", "HEAD")
+				if out, err := cmd.Output(); err == nil && len(out) > 0 {
+					diffStats = string(out)
+				}
+			}
+
+			// Get list of changed files
+			changedFiles := ""
+			if project.RootPath != "" {
+				cmd := exec.Command("git", "-C", project.RootPath, "diff", "--name-only", "HEAD")
+				if out, err := cmd.Output(); err == nil && len(out) > 0 {
+					changedFiles = strings.TrimSpace(string(out))
+				}
+				// Also include untracked files
+				cmd2 := exec.Command("git", "-C", project.RootPath, "ls-files", "--others", "--exclude-standard")
+				if out2, err := cmd2.Output(); err == nil && len(out2) > 0 {
+					if changedFiles != "" {
+						changedFiles += "\n"
+					}
+					changedFiles += strings.TrimSpace(string(out2))
+				}
+			}
+
 			comment := fmt.Sprintf("## %s Agent Run Completed\n\n", strings.ToUpper(activeProviderName))
 			comment += fmt.Sprintf("**Issue**: %s\n**Agent**: %s\n**Turns**: %d\n\n", entry.IssueIdentifier, activeProviderName, entry.TurnCount+1)
+
 			if agentSummary != "" {
-				comment += "### Summary\n\n" + agentSummary + "\n"
+				comment += "### Summary\n\n" + agentSummary + "\n\n"
 			}
-			comment += "\n---\n*Automatically posted by Orchestra*"
+
+			if changedFiles != "" {
+				files := strings.Split(changedFiles, "\n")
+				comment += "### Files Changed\n\n"
+				for _, f := range files {
+					f = strings.TrimSpace(f)
+					if f != "" {
+						comment += "- `" + f + "`\n"
+					}
+				}
+				comment += "\n"
+			}
+
+			if diffStats != "" {
+				comment += "### Diff Stats\n\n```\n" + strings.TrimSpace(diffStats) + "\n```\n\n"
+			}
+
+			comment += "---\n*Automatically posted by [Orchestra](https://github.com/Traves-Theberge/Orchestra)*"
 
 			if err := ghutil.PostIssueComment(context.Background(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, issueNumber, comment); err != nil {
 				logger.Warn().Err(err).Str("issue_id", entry.IssueID).Msg("failed to post GitHub comment")

@@ -546,13 +546,36 @@ func (s *Server) GetIssueDiff(w http.ResponseWriter, r *http.Request) {
 		if searchErr == nil && len(issues) > 0 && issues[0].ProjectID != "" {
 			project, projErr := s.db.GetProjectByID(r.Context(), issues[0].ProjectID)
 			if projErr == nil && project.RootPath != "" && filepath.IsAbs(project.RootPath) {
+				// Get diff of tracked files
 				cmd := exec.CommandContext(r.Context(), "git", "diff", "HEAD")
 				cmd.Dir = project.RootPath
-				out, gitErr := cmd.CombinedOutput()
-				if gitErr == nil && len(out) > 0 {
+				tracked, _ := cmd.CombinedOutput()
+
+				// Also get diff of untracked (new) files
+				cmd2 := exec.CommandContext(r.Context(), "git", "ls-files", "--others", "--exclude-standard")
+				cmd2.Dir = project.RootPath
+				untrackedList, _ := cmd2.Output()
+
+				var allDiff []byte
+				allDiff = append(allDiff, tracked...)
+
+				// For each untracked file, generate a diff-like output
+				for _, fname := range strings.Split(strings.TrimSpace(string(untrackedList)), "\n") {
+					fname = strings.TrimSpace(fname)
+					if fname == "" {
+						continue
+					}
+					cmd3 := exec.CommandContext(r.Context(), "git", "diff", "--no-index", "/dev/null", fname)
+					cmd3.Dir = project.RootPath
+					if out3, err := cmd3.CombinedOutput(); err != nil || len(out3) > 0 {
+						allDiff = append(allDiff, out3...)
+					}
+				}
+
+				if len(allDiff) > 0 {
 					w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 					w.WriteHeader(http.StatusOK)
-					_, _ = w.Write(out)
+					_, _ = w.Write(allDiff)
 					return
 				}
 			}
