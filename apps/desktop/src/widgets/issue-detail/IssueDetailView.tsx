@@ -549,7 +549,7 @@ export function IssueDetailView({
                 // Always show explicitly allowed events
                 if (allowedKinds.has(kind)) return true
                 // Show agent message events from any provider
-                if ((kind === 'message' || kind === 'agent_message' || kind === 'item.completed' || kind === 'assistant' || kind === 'result/end_turn') && item.message && item.message.length > 10) return true
+                if ((kind === 'message' || kind === 'agent_message' || kind === 'item.completed' || kind === 'assistant' || kind === 'result/end_turn') && typeof item.message === 'string' && item.message.length > 10) return true
                 return false
               })
               return meaningfulEvents.length === 0 ? (
@@ -571,7 +571,7 @@ export function IssueDetailView({
                           <span className="text-[9px] text-muted-foreground/40 flex items-center gap-1">{getAgentIcon(item.provider, 10)} {item.provider}</span>
                         )}
                       </div>
-                      {item.message && (
+                      {item.message && typeof item.message === 'string' && (
                         <p className="text-[11px] text-muted-foreground/60 mt-0.5 line-clamp-1">{item.message}</p>
                       )}
                     </div>
@@ -618,10 +618,10 @@ export function IssueDetailView({
                     if (type === 'init') {
                       parsed.push({ idx, kind: 'session', ts, label: (obj.model as string) || 'agent', content: '' })
                     } else if (type === 'message' && obj.role === 'user') {
-                      const c = (obj.content as string) || ''
+                      const c = typeof obj.content === 'string' ? obj.content : JSON.stringify(obj.content || '').slice(0, 300)
                       parsed.push({ idx, kind: 'prompt', ts, label: '', content: c.length > 200 ? c.slice(0, 200) + '...' : c })
                     } else if (type === 'message' && obj.role === 'assistant') {
-                      const c = (obj.content as string) || ''
+                      const c = typeof obj.content === 'string' ? obj.content : ''
                       if (c.trim()) parsed.push({ idx, kind: 'agent', ts, label: '', content: c })
                     } else if (type === 'tool_use') {
                       const tool = (obj.tool_name as string) || 'tool'
@@ -669,7 +669,8 @@ export function IssueDetailView({
                       if (content) {
                         for (const block of content) {
                           if (block.type === 'tool_result') {
-                            const text = (block.content as string) || ''
+                            const raw = block.content
+                            const text = typeof raw === 'string' ? raw : Array.isArray(raw) ? (raw as Array<Record<string,unknown>>).map(b => typeof b.text === 'string' ? b.text : '').join('') : ''
                             parsed.push({ idx, kind: 'result', ts, label: '', content: text.length > 200 ? text.slice(0, 200) + '...' : text, status: block.is_error ? 'error' : 'success' })
                           }
                         }
