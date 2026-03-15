@@ -3,3 +3,4 @@ node_modules/
 *.log
 Notes.md
 /SPEC.md
+.superpowers/
