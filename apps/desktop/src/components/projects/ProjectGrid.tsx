@@ -105,7 +105,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, stats, loading, onCl
             className="group relative overflow-hidden bg-card/60 border border-border/50 transition-[border-color,box-shadow,background-color] duration-300 hover:shadow-2xl hover:shadow-primary/10 cursor-pointer h-56 flex flex-col justify-between shadow-lg hover:border-primary/30 rounded-2xl"
         >
             {/* Animated primary bar */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary/50 via-primary to-transparent opacity-30 transition-opacity group-hover:opacity-100" />
 
             <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10 translate-y-1 group-hover:translate-y-0">
                 <AppTooltip content="Remove from workspace">

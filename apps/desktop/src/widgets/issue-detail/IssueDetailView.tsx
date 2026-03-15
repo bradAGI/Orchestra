@@ -7,12 +7,17 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 import type { BackendConfig, IssueUpdatePayload, IssueHistoryEntry } from '@/lib/orchestra-client'
-import { fetchIssueHistory, fetchIssueDiff, fetchIssueLogs, createProjectGitHubPull } from '@/lib/orchestra-client'
+import { fetchIssueHistory, fetchIssueDiff, fetchIssueLogs, createProjectGitHubPull, gitCommit, updateProjectGitHubIssue, fetchProjectGitBranches } from '@/lib/orchestra-client'
 import type { SnapshotPayload } from '@/lib/orchestra-types'
 import type { TimelineItem } from '@/components/app-shell/types'
 import { AgentSelector, CustomDropdown, getAgentIcon } from '@/components/app-shell/shared/controls'
 import type { IssueDetailResult } from './types'
 import { extractOperationalPlanItems, extractPlanFromText, getEventIcon, parseDiff, type DiffFile, type PlanItem } from './IssueDetailUtils'
+
+function extractIssueNumber(url: string): string {
+  const match = url.match(/\/issues\/(\d+)/)
+  return match ? match[1] : ''
+}
 
 function DescriptionEditor({ value, onChange, onBlur, theme }: {
   value: string
@@ -157,7 +162,10 @@ export function IssueDetailView({
   // Extract operational plan from the most recent agent message that contains checkboxes.
   // Agent restates the plan with updated checkboxes as it progresses — we want the LATEST version.
   const planItems: PlanItem[] = useMemo(() => {
-    const messageEvents = issueHistory.filter(e => (e.kind === 'message' || e.kind === 'agent_message' || e.kind === 'item.completed') && e.message)
+    const PLAN_EVENT_KINDS = new Set(['message', 'agent_message', 'item.completed'])
+    const messageEvents = issueHistory.filter(e =>
+      PLAN_EVENT_KINDS.has(e.kind) && e.message && e.source !== 'pty'
+    )
 
     if (messageEvents.length > 0) {
       // Scan individual messages newest-first for one that has checkboxes
@@ -282,11 +290,23 @@ export function IssueDetailView({
           {localState === 'Review' && typed.url && typeof typed.url === 'string' && (typed.url as string).includes('github.com') && (
             <button
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
-              onClick={() => {
-                // Open GitHub compare page for PR creation
+              onClick={async () => {
                 const issueUrl = typed.url as string
                 const repoUrl = issueUrl.replace(/\/issues\/\d+$/, '')
-                const compareUrl = `${repoUrl}/compare?expand=1&title=${encodeURIComponent(localTitle || identifier)}&body=${encodeURIComponent(`## ${localTitle || identifier}\n\n${localDescription || 'No description.'}\n\nCloses ${issueUrl}\n\n---\n*Created from Orchestra task ${identifier}*`)}`
+                let head = 'main'
+                // Try to detect current branch
+                if (config && projectId) {
+                  try {
+                    const branches = await fetchProjectGitBranches(config, projectId)
+                    if (branches.current && branches.current !== 'main' && branches.current !== 'master') {
+                      head = branches.current
+                    }
+                  } catch { /* use main */ }
+                }
+                const base = 'main'
+                const title = encodeURIComponent(localTitle || identifier)
+                const body = encodeURIComponent(`## ${localTitle || identifier}\n\n${localDescription || 'No description.'}\n\nCloses ${issueUrl}\n\n---\n*Created from Orchestra task ${identifier}*`)
+                const compareUrl = `${repoUrl}/compare/${base}...${head}?expand=1&title=${title}&body=${body}`
                 const bridge = window.orchestraDesktop
                 if (bridge && typeof bridge.openExternal === 'function') {
                   void bridge.openExternal(compareUrl)
@@ -299,12 +319,39 @@ export function IssueDetailView({
               Draft PR
             </button>
           )}
+          {localState === 'Review' && config && projectId && (
+            <button
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
+              onClick={async () => {
+                const msg = `feat(${identifier}): ${localTitle}\n\nImplemented by ${(typed.provider as string) || 'agent'} via Orchestra.\nCloses #${extractIssueNumber(typed.url as string || '')}`
+                try {
+                  await gitCommit(config, projectId, msg)
+                } catch (err) {
+                  console.error('Failed to commit:', err)
+                }
+              }}
+            >
+              <CheckCircle2 size={12} />
+              Commit
+            </button>
+          )}
           {localState === 'Review' && onUpdate && (
             <button
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-muted/20 text-muted-foreground border border-border/30 hover:bg-muted/40 transition-colors"
               onClick={async () => {
                 await onUpdate({ state: 'Done' })
                 setLocalState('Done')
+                // Close GitHub issue if linked
+                if (config && projectId && typed.url && typeof typed.url === 'string') {
+                  const match = (typed.url as string).match(/\/issues\/(\d+)/)
+                  if (match) {
+                    try {
+                      await updateProjectGitHubIssue(config, projectId, parseInt(match[1]), { state: 'closed' })
+                    } catch (err) {
+                      console.error('Failed to close GitHub issue:', err)
+                    }
+                  }
+                }
               }}
             >
               <CheckCircle2 size={12} />

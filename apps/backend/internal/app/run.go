@@ -466,9 +466,16 @@ func processExecutionTick(
 
 		// Persist to database in real-time
 		if warehouseDB != nil && event.SessionID != "" {
-			eventID := uuid.New().String()
-			raw, _ := json.Marshal(event.Raw)
-			_ = warehouseDB.RecordEvent(context.Background(), eventID, event.SessionID, event.Kind, event.Message, raw, int(event.Usage.InputTokens), int(event.Usage.OutputTokens), event.Timestamp.Format(time.RFC3339))
+			// Skip recording PTY echo noise (echoed prompts, shell decorations)
+			if event.Kind == "pty" && (event.Message == "" || len(event.Message) < 5) {
+				// skip
+			} else if event.Kind == "pty" && (strings.Contains(event.Message, "## Instructions") || strings.Contains(event.Message, "## Task") || strings.Contains(event.Message, "step one")) {
+				// skip PTY events that are just the echoed prompt
+			} else {
+				eventID := uuid.New().String()
+				raw, _ := json.Marshal(event.Raw)
+				_ = warehouseDB.RecordEvent(context.Background(), eventID, event.SessionID, event.Kind, event.Message, raw, int(event.Usage.InputTokens), int(event.Usage.OutputTokens), event.Timestamp.Format(time.RFC3339))
+			}
 		}
 
 		// Append to log file in real-time
@@ -621,10 +628,8 @@ func processExecutionTick(
 
 func buildExecutionPrompt(issueIdentifier string, title string, description string, attempt int64) string {
 	prompt := fmt.Sprintf("You are an autonomous coding agent working on issue **%s**.\n\n## Task\n**%s**\n\n%s", issueIdentifier, title, description)
-	if strings.TrimSpace(description) != "" {
-		prompt += "\n"
-	}
-	prompt += fmt.Sprintf("\n## Instructions\n\n1. First, write an **Operational Plan** using markdown checkboxes:\n   - [ ] step one\n   - [ ] step two\n\n2. Work through each step. After completing a step, restate the plan with that item checked.\n\n3. Use the tools available to implement the changes.\n\n4. When all steps are complete, verify your work and restate the final plan with all items checked.\n\nAttempt: %d", attempt)
+	prompt += "\n\n## Instructions\n\n1. Write an **Operational Plan** using markdown checkboxes (`- [ ]` pending, `- [x]` done).\n\n2. Work through each step. After completing a step, restate the plan with updated checkboxes.\n\n3. Use all available tools to implement changes.\n\n4. Verify your work compiles/passes. Do NOT stop until all items are checked off."
+	prompt += fmt.Sprintf("\n\nAttempt: %d", attempt)
 	return prompt
 }
 

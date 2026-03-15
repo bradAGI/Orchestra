@@ -741,6 +741,30 @@ export async function disconnectProjectGitHub(config: BackendConfig, projectId: 
   })
 }
 
+export type ProviderMCPServer = {
+    name: string
+    command: string
+    args?: string[]
+    url?: string
+    enabled: boolean
+}
+
+export async function fetchProviderMCPServers(config: BackendConfig, provider: string): Promise<ProviderMCPServer[]> {
+    return requestJSON<ProviderMCPServer[]>(config, `/api/v1/agents/${encodeURIComponent(provider)}/mcp`)
+}
+
+export async function addProviderMCPServer(config: BackendConfig, provider: string, server: { name: string; command: string; args?: string[] }): Promise<void> {
+    await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/mcp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(server),
+    })
+}
+
+export async function deleteProviderMCPServer(config: BackendConfig, provider: string, name: string): Promise<void> {
+    await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/mcp/${encodeURIComponent(name)}`, { method: 'DELETE' })
+}
+
 export async function fetchSTTHealth(config: BackendConfig): Promise<STTHealth> {
   return requestJSON<STTHealth>(config, '/api/v1/stt/health')
 }

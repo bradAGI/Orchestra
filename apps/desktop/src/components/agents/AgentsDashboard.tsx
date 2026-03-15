@@ -15,8 +15,12 @@ import {
     fetchMCPServers,
     createMCPServer,
     deleteMCPServer,
+    fetchProviderMCPServers,
+    addProviderMCPServer,
+    deleteProviderMCPServer,
     type MCPServer,
     type MCPTool,
+    type ProviderMCPServer,
 } from '@/lib/orchestra-client'
 import {
     Dialog,
@@ -87,6 +91,9 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
     const [editedContent, setEditedContent] = useState('')
 
     /* ---------- profiles state ---------- */
+    const [expandedItem, setExpandedItem] = useState<string | null>(null)
+    const [editingItemContent, setEditingItemContent] = useState('')
+    const [savingItem, setSavingItem] = useState<string | null>(null)
     const [skillDialogOpen, setSkillDialogOpen] = useState(false)
     const [newSkillName, setNewSkillName] = useState('')
     const [newSkillContent, setNewSkillContent] = useState('')
@@ -189,6 +196,18 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
     }
 
     /* ---------- MCP CRUD ---------- */
+    const handleDeleteProviderMCPServer = async (name: string) => {
+        if (!config || !selectedAgent) return
+        if (!window.confirm(`Delete MCP server "${name}" from ${selectedAgent}?`)) return
+        try {
+            await deleteProviderMCPServer(config, selectedAgent, name)
+            await reloadProviderMcp()
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err)
+            setError(message || 'Failed to delete MCP server')
+        }
+    }
+
     const handleDeleteMCPServer = async (name: string) => {
         if (!config) return
         const server = mcpServers.find(s => s.name === name)
@@ -203,12 +222,53 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
         }
     }
 
+    const handleExpandItem = (path: string, content: string) => {
+        if (expandedItem === path) {
+            setExpandedItem(null)
+        } else {
+            setExpandedItem(path)
+            setEditingItemContent(content)
+        }
+    }
+
+    const handleSaveItem = async (path: string) => {
+        if (!config) return
+        setSavingItem(path)
+        try {
+            await updateAgentConfigByPath(config, path, editingItemContent)
+            setConfigs(prev => prev.map(c => c.path === path ? { ...c, content: editingItemContent } : c))
+            setExpandedItem(null)
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err)
+            setError(message || 'Save failed')
+        } finally {
+            setSavingItem(null)
+        }
+    }
+
+    const handleDeleteItem = async (path: string, name: string) => {
+        if (!config) return
+        if (!window.confirm(`Delete "${name}"? This will remove the file from disk.`)) return
+        try {
+            await updateAgentConfigByPath(config, path, '')
+            await loadData()
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err)
+            setError(message || 'Delete failed')
+        }
+    }
+
     const handleCreateMCPServer = async () => {
         if (!config || !newMcpName || !newMcpCommand) return
         setCreating(true)
         try {
-            await createMCPServer(config, newMcpName, newMcpCommand)
-            await loadData()
+            if (selectedAgent) {
+                await addProviderMCPServer(config, selectedAgent, { name: newMcpName, command: newMcpCommand })
+                await reloadProviderMcp()
+            } else {
+                await createMCPServer(config, newMcpName, newMcpCommand)
+                await loadData()
+            }
             setMcpDialogOpen(false)
             setNewMcpName('')
             setNewMcpCommand('')
@@ -267,42 +327,25 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
         )
     }, [configs, selectedAgent])
 
-    // Parse MCP servers from provider config files
-    const providerMcpServers = useMemo(() => {
-        if (!selectedAgent) return [] as { name: string; command: string; source: string }[]
-        const results: { name: string; command: string; source: string }[] = []
+    // Fetch MCP servers from provider config files via backend API
+    const [providerMcpServers, setProviderMcpServers] = useState<ProviderMCPServer[]>([])
 
-        for (const cfg of configs) {
-            if (!cfg.content || !cfg.name.toLowerCase().includes(selectedAgent)) continue
-            try {
-                // Try JSON parse (Claude, Gemini, OpenCode)
-                const parsed = JSON.parse(cfg.content)
-
-                // Claude: mcpServers in .claude.json
-                if (parsed.mcpServers && typeof parsed.mcpServers === 'object') {
-                    for (const [name, val] of Object.entries(parsed.mcpServers)) {
-                        const server = val as Record<string, unknown>
-                        results.push({ name, command: (server.command as string) || (server.url as string) || 'configured', source: cfg.path })
-                    }
-                }
-                // OpenCode: mcp section
-                if (parsed.mcp && typeof parsed.mcp === 'object') {
-                    for (const [name, val] of Object.entries(parsed.mcp)) {
-                        const server = val as Record<string, unknown>
-                        const cmd = Array.isArray(server.command) ? (server.command as string[]).join(' ') : (server.command as string) || (server.url as string) || 'configured'
-                        results.push({ name, command: cmd, source: cfg.path })
-                    }
-                }
-            } catch {
-                // Try TOML-style parsing for Codex (basic: [mcp_servers.name])
-                const tomlMatches = cfg.content.matchAll(/\[mcp_servers\.(\w+)\]\s*\n\s*command\s*=\s*"([^"]+)"/g)
-                for (const match of tomlMatches) {
-                    results.push({ name: match[1], command: match[2], source: cfg.path })
-                }
-            }
+    const reloadProviderMcp = React.useCallback(async () => {
+        if (!config || !selectedAgent) {
+            setProviderMcpServers([])
+            return
         }
-        return results
-    }, [configs, selectedAgent])
+        try {
+            const servers = await fetchProviderMCPServers(config, selectedAgent)
+            setProviderMcpServers(servers)
+        } catch {
+            setProviderMcpServers([])
+        }
+    }, [config, selectedAgent])
+
+    useEffect(() => {
+        reloadProviderMcp()
+    }, [reloadProviderMcp])
 
     const hasCoreConfig = (provider: Provider) =>
         configs.some(c => c.category === 'core' && c.name.toLowerCase().includes(provider))
@@ -333,7 +376,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
     /* ================================================================ */
 
     return (
-        <div className="flex flex-col h-full bg-background overflow-hidden">
+        <div className="flex flex-col h-full overflow-hidden">
             {/* ---- Error bar ---- */}
             {error && (
                 <div className="px-6 py-2 bg-red-500/10 border-b border-red-500/20 flex items-center gap-2 shrink-0">
@@ -350,8 +393,8 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                 {/* MAIN VIEW: Agent Grid                                        */}
                 {/* ============================================================ */}
                 {selectedAgent === null && (
-                    <div className="h-full flex items-center justify-center p-8">
-                        <div className="grid grid-cols-2 gap-5 max-w-2xl w-full">
+                    <div className="h-full p-6">
+                        <div className="grid grid-cols-2 gap-4 h-full">
                             {PROVIDERS.map(id => {
                                 const configured = hasCoreConfig(id)
                                 return (
@@ -359,9 +402,9 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                         key={id}
                                         type="button"
                                         onClick={() => setSelectedAgent(id)}
-                                        className="bg-card/60 border border-border/30 rounded-2xl p-6 hover:border-primary/30 transition-all cursor-pointer text-left group"
+                                        className="bg-transparent border border-border/20 rounded-2xl p-8 hover:border-primary/20 hover:bg-muted/10 transition-all cursor-pointer text-left group flex flex-col"
                                     >
-                                        <div className="flex flex-col items-center text-center gap-4">
+                                        <div className="flex flex-col items-center text-center gap-4 flex-1 justify-center">
                                             <div className="py-2">
                                                 {getAgentIcon(id, 32)}
                                             </div>
@@ -391,7 +434,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                 {/* DETAIL VIEW: Agent selected                                  */}
                 {/* ============================================================ */}
                 {selectedAgent !== null && (
-                    <div className="max-w-3xl mx-auto py-8 px-6 space-y-6">
+                    <div className="w-full px-6 py-8 px-6 space-y-6">
                         {/* ---- Header ---- */}
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
@@ -483,15 +526,19 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                 <div className="divide-y divide-border/15">
                                     {/* Provider-specific MCP servers */}
                                     {providerMcpServers.map(server => (
-                                        <div key={server.name} className="flex items-center gap-3 py-2.5">
-                                            <div className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                                        <div key={server.name} className="flex items-center gap-3 py-2.5 group">
+                                            <div className={`h-2 w-2 rounded-full shrink-0 ${server.enabled ? 'bg-emerald-500' : 'bg-muted-foreground/30'}`} />
                                             <div className="flex-1 min-w-0">
                                                 <span className="text-xs font-bold tracking-wider">{server.name}</span>
-                                                <p className="text-[9px] font-mono text-muted-foreground/40 truncate">{server.command}</p>
+                                                <p className="text-[9px] font-mono text-muted-foreground/40 truncate">{server.command || server.url || 'configured'}</p>
                                             </div>
                                             <Badge variant="outline" className="text-[8px] font-bold uppercase shrink-0 text-emerald-500/60 border-emerald-500/20">
                                                 {selectedAgent}
                                             </Badge>
+                                            <button onClick={e => { e.stopPropagation(); handleDeleteProviderMCPServer(server.name) }}
+                                                className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground/20 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100 shrink-0">
+                                                <Trash2 size={10} />
+                                            </button>
                                         </div>
                                     ))}
                                     {/* Orchestra MCP servers */}
@@ -551,8 +598,35 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                     {skills.map(skill => {
                                         const shortName = skill.name.includes('/') ? skill.name.split('/').slice(1).join('/') : skill.name
                                         const preview = skill.content.replace(/^---[\s\S]*?---\s*/, '').trim().slice(0, 80)
+                                        const isExpanded = expandedItem === skill.path
                                         return (
-                                            <ConfigItemRow key={skill.path} icon="S" color="amber" name={shortName} preview={preview} scope={skill.scope} />
+                                            <div key={skill.path}>
+                                                <div className="flex items-center gap-3 py-2.5 cursor-pointer hover:bg-muted/10 transition-colors group"
+                                                     onClick={() => handleExpandItem(skill.path, skill.content)}>
+                                                    <ConfigItemRow icon="S" color="amber" name={shortName} preview={preview} scope={skill.scope} />
+                                                    <button onClick={e => { e.stopPropagation(); handleDeleteItem(skill.path, shortName) }}
+                                                        className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground/20 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100 shrink-0">
+                                                        <Trash2 size={10} />
+                                                    </button>
+                                                </div>
+                                                {isExpanded && (
+                                                    <div className="px-3 pb-3 space-y-2">
+                                                        <textarea
+                                                            className="w-full min-h-[300px] rounded-lg border border-border bg-background px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-primary/20 outline-none resize-y"
+                                                            value={editingItemContent}
+                                                            onChange={e => setEditingItemContent(e.target.value)}
+                                                        />
+                                                        <div className="flex justify-end gap-2">
+                                                            <Button variant="ghost" size="sm" className="h-6 text-[9px]" onClick={() => setExpandedItem(null)}>Cancel</Button>
+                                                            <Button size="sm" className="h-6 text-[9px]" disabled={savingItem === skill.path}
+                                                                onClick={() => handleSaveItem(skill.path)}>
+                                                                {savingItem === skill.path ? <Loader2 size={10} className="animate-spin mr-1" /> : <Save size={10} className="mr-1" />}
+                                                                Save
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         )
                                     })}
                                 </div>
@@ -589,8 +663,35 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                     {subAgents.map(agent => {
                                         const shortName = agent.name.includes('/') ? agent.name.split('/').slice(1).join('/') : agent.name
                                         const preview = agent.content.replace(/^---[\s\S]*?---\s*/, '').trim().slice(0, 80)
+                                        const isExpanded = expandedItem === agent.path
                                         return (
-                                            <ConfigItemRow key={agent.path} icon="A" color="blue" name={shortName} preview={preview} scope={agent.scope} />
+                                            <div key={agent.path}>
+                                                <div className="flex items-center gap-3 py-2.5 cursor-pointer hover:bg-muted/10 transition-colors group"
+                                                     onClick={() => handleExpandItem(agent.path, agent.content)}>
+                                                    <ConfigItemRow icon="A" color="blue" name={shortName} preview={preview} scope={agent.scope} />
+                                                    <button onClick={e => { e.stopPropagation(); handleDeleteItem(agent.path, shortName) }}
+                                                        className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground/20 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100 shrink-0">
+                                                        <Trash2 size={10} />
+                                                    </button>
+                                                </div>
+                                                {isExpanded && (
+                                                    <div className="px-3 pb-3 space-y-2">
+                                                        <textarea
+                                                            className="w-full min-h-[300px] rounded-lg border border-border bg-background px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-primary/20 outline-none resize-y"
+                                                            value={editingItemContent}
+                                                            onChange={e => setEditingItemContent(e.target.value)}
+                                                        />
+                                                        <div className="flex justify-end gap-2">
+                                                            <Button variant="ghost" size="sm" className="h-6 text-[9px]" onClick={() => setExpandedItem(null)}>Cancel</Button>
+                                                            <Button size="sm" className="h-6 text-[9px]" disabled={savingItem === agent.path}
+                                                                onClick={() => handleSaveItem(agent.path)}>
+                                                                {savingItem === agent.path ? <Loader2 size={10} className="animate-spin mr-1" /> : <Save size={10} className="mr-1" />}
+                                                                Save
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         )
                                     })}
                                 </div>
@@ -605,7 +706,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                 <DialogContent className="max-w-md bg-popover border-border shadow-2xl">
                     <DialogHeader>
                         <DialogTitle className="text-lg font-bold">Add MCP Server</DialogTitle>
-                        <DialogDescription className="text-xs text-muted-foreground/60">Connect a new tool server to Orchestra</DialogDescription>
+                        <DialogDescription className="text-xs text-muted-foreground/60">{selectedAgent ? `Add an MCP server to ${selectedAgent}'s config` : 'Connect a new tool server to Orchestra'}</DialogDescription>
                     </DialogHeader>
                     <div className="py-4 space-y-4">
                         <div className="space-y-1.5">
@@ -660,7 +761,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Content</label>
                             <textarea
-                                className="w-full h-40 rounded-lg border border-border bg-background px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-primary/20 outline-none resize-none"
+                                className="w-full min-h-[300px] rounded-lg border border-border bg-background px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-primary/20 outline-none resize-y"
                                 value={newSkillContent}
                                 onChange={e => setNewSkillContent(e.target.value)}
                                 placeholder={createType === 'skill'

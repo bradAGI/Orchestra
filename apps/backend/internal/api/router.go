@@ -102,6 +102,9 @@ func NewRouterWithPubSub(
 	protected.Post("/api/v1/config/agents/new", server.PostAgentConfigNew)
 	protected.Post("/api/v1/config/agents/items", server.PostAgentConfigUpdate)
 	protected.Get("/api/v1/agents", server.GetAgents)
+	protected.Get("/api/v1/agents/{provider}/mcp", server.GetProviderMCPServers)
+	protected.Post("/api/v1/agents/{provider}/mcp", server.AddProviderMCPServer)
+	protected.Delete("/api/v1/agents/{provider}/mcp/{name}", server.DeleteProviderMCPServer)
 
 	protected.Get("/api/v1/docs", server.GetDocs)
 	protected.Get("/api/v1/docs/*", server.GetDocContent)

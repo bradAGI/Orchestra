@@ -185,11 +185,16 @@ function collectCandidateMessages(timeline: TimelineItem[], issueId: string, iss
     }
 
     const kind = typeof (runEvent as Record<string, unknown>).kind === 'string' ? (runEvent as Record<string, string>).kind : ''
-    const message = typeof (runEvent as Record<string, unknown>).message === 'string' ? (runEvent as Record<string, string>).message : ''
-    if (!message) {
+    const msg = typeof (runEvent as Record<string, unknown>).message === 'string' ? (runEvent as Record<string, string>).message : ''
+    if (!msg) {
       continue
     }
 
+    // Skip PTY noise and example plan items from WORKFLOW.md
+    if (kind === 'pty' || kind === 'stderr') continue
+    if (msg.includes('step one') && msg.includes('step two')) continue
+
+    const message = msg
     const normalizedKind = kind.toLowerCase()
     if (
       normalizedKind.includes('thought') ||
