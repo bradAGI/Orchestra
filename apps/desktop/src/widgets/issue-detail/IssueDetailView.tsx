@@ -279,27 +279,19 @@ export function IssueDetailView({
               Stop
             </button>
           )}
-          {localState === 'Review' && config && projectId && (
+          {localState === 'Review' && typed.url && typeof typed.url === 'string' && (typed.url as string).includes('github.com') && (
             <button
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
-              onClick={async () => {
-                const prTitle = localTitle || identifier
-                const prBody = `## ${prTitle}\n\n${localDescription || 'No description.'}\n\n---\n*Created from Orchestra task ${identifier}*`
-                try {
-                  const result = await createProjectGitHubPull(config, projectId, {
-                    title: prTitle,
-                    body: prBody,
-                    head: 'main',
-                    base: 'main',
-                  })
-                  const bridge = window.orchestraDesktop
-                  if (bridge && typeof bridge.openExternal === 'function') {
-                    void bridge.openExternal(result.html_url)
-                  } else {
-                    window.open(result.html_url, '_blank')
-                  }
-                } catch (err) {
-                  console.error('Failed to create PR:', err)
+              onClick={() => {
+                // Open GitHub compare page for PR creation
+                const issueUrl = typed.url as string
+                const repoUrl = issueUrl.replace(/\/issues\/\d+$/, '')
+                const compareUrl = `${repoUrl}/compare?expand=1&title=${encodeURIComponent(localTitle || identifier)}&body=${encodeURIComponent(`## ${localTitle || identifier}\n\n${localDescription || 'No description.'}\n\nCloses ${issueUrl}\n\n---\n*Created from Orchestra task ${identifier}*`)}`
+                const bridge = window.orchestraDesktop
+                if (bridge && typeof bridge.openExternal === 'function') {
+                  void bridge.openExternal(compareUrl)
+                } else {
+                  window.open(compareUrl, '_blank')
                 }
               }}
             >
@@ -307,7 +299,7 @@ export function IssueDetailView({
               Draft PR
             </button>
           )}
-          {(localState === 'Review' || localState === 'Done') && onUpdate && (
+          {localState === 'Review' && onUpdate && (
             <button
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-muted/20 text-muted-foreground border border-border/30 hover:bg-muted/40 transition-colors"
               onClick={async () => {
@@ -316,7 +308,19 @@ export function IssueDetailView({
               }}
             >
               <CheckCircle2 size={12} />
-              {localState === 'Done' ? 'Closed' : 'Close'}
+              Close
+            </button>
+          )}
+          {localState === 'Done' && onUpdate && (
+            <button
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
+              onClick={async () => {
+                await onUpdate({ state: 'Backlog' })
+                setLocalState('Backlog')
+              }}
+            >
+              <X size={12} />
+              Reopen
             </button>
           )}
           <CustomDropdown

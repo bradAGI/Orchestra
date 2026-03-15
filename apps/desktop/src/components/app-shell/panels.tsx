@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Ansi from 'ansi-to-react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import { Activity, AlertCircle, AlertTriangle, AppWindow, Bot, Check, CheckCircle2, ChevronDown, Circle, CircleDashed, Cpu, Eye, EyeOff, FileText, Folder, FolderTree, GitBranch, Loader2, ListChecks, MoreHorizontal, ShieldCheck, SignalHigh, SignalLow, SignalMedium, Square, Terminal, User, Users, Globe, Wrench, Clock, Search, LayoutDashboard, ListTodo, History, Ticket, Database, Settings2, Sun, Moon, Download, RefreshCcw, Info, BarChart3, Zap, Layout, Rows, Play, ChevronRight, File, ExternalLink, Plus, Trash2, Keyboard, X, TrendingUp, Code, Layers, Mic } from 'lucide-react'
+import { Activity, AlertCircle, AlertTriangle, AppWindow, Bell, Bot, Check, CheckCircle2, ChevronDown, Circle, CircleDashed, Cpu, Eye, EyeOff, FileText, Folder, FolderTree, GitBranch, Loader2, ListChecks, MoreHorizontal, ShieldCheck, SignalHigh, SignalLow, SignalMedium, Square, Terminal, User, Users, Globe, Wrench, Clock, Search, LayoutDashboard, ListTodo, History, Ticket, Database, Settings2, Sun, Moon, Download, RefreshCcw, Info, BarChart3, Zap, Layout, Rows, Play, ChevronRight, File, ExternalLink, Plus, Trash2, Keyboard, X, TrendingUp, Code, Layers, Mic, Volume2, VolumeX } from 'lucide-react'
 import * as Tooltip from '@radix-ui/react-tooltip'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -233,6 +233,12 @@ export function SettingsCard({
   onCreateProfile,
   onDeleteProfile,
   onSaveAgentConfig,
+  notifSound,
+  notifMuted,
+  notifVolume,
+  onNotifSoundChange,
+  onNotifMutedChange,
+  onNotifVolumeChange,
 }: {
   loadingConfig: boolean
   savingConfig: boolean
@@ -254,13 +260,20 @@ export function SettingsCard({
   onCreateProfile: (name: string) => Promise<void>
   onDeleteProfile: (profileId: string) => Promise<void>
   onSaveAgentConfig: (config: { commands: Record<string, string>; agent_provider: string }) => Promise<void>
+  notifSound?: string
+  notifMuted?: boolean
+  notifVolume?: number
+  onNotifSoundChange?: (sound: string) => void
+  onNotifMutedChange?: (muted: boolean) => void
+  onNotifVolumeChange?: (volume: number) => void
 }) {
   const { isMac } = usePlatform()
-  const [activeTab, setActiveTab] = useState<'backend' | 'agents' | 'migration' | 'shortcuts'>('backend')
+  const [activeTab, setActiveTab] = useState<'backend' | 'agents' | 'migration' | 'shortcuts' | 'notifications'>('backend')
 
   const tabs = [
     { id: 'backend', label: 'Backend', tooltip: 'Configure backend profiles and API connection', icon: <Database className="h-3.5 w-3.5" /> },
     { id: 'agents', label: 'Agents', tooltip: 'Set provider commands and default runner', icon: <Zap className="h-3.5 w-3.5" /> },
+    { id: 'notifications', label: 'Notifications', tooltip: 'Sound and notification preferences', icon: <Bell className="h-3.5 w-3.5" /> },
     { id: 'migration', label: 'Migration', tooltip: 'Plan and apply workspace migrations', icon: <RefreshCcw className="h-3.5 w-3.5" /> },
     { id: 'shortcuts', label: 'Shortcuts', tooltip: 'View global keyboard shortcuts', icon: <Keyboard className="h-3.5 w-3.5" /> },
   ] as const
@@ -407,6 +420,98 @@ export function SettingsCard({
                   Custom shortcut remapping is currently in development and will be available in v1.1.0. 
                   This will include per-agent command overrides.
                 </p>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'notifications' && (
+            <div className="space-y-6 pb-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 rounded-xl border border-border/40 bg-card">
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-black tracking-tight">Mute All Sounds</p>
+                    <p className="text-[10px] text-muted-foreground">Disable notification sounds when agents complete</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const next = !notifMuted
+                      onNotifMutedChange?.(next)
+                      localStorage.setItem('orchestra_notif_muted', String(next))
+                    }}
+                    className={`h-8 w-14 rounded-full transition-colors ${notifMuted ? 'bg-muted' : 'bg-primary'} relative`}
+                  >
+                    <div className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${notifMuted ? 'left-1' : 'left-7'}`} />
+                    {notifMuted ? <VolumeX size={12} className="absolute left-2.5 top-2 text-muted-foreground" /> : <Volume2 size={12} className="absolute right-2.5 top-2 text-white" />}
+                  </button>
+                </div>
+
+                <div className="p-4 rounded-xl border border-border/40 bg-card space-y-3">
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-black tracking-tight">Notification Sound</p>
+                    <p className="text-[10px] text-muted-foreground">Sound played when an agent completes a task</p>
+                  </div>
+                  <div className="flex gap-2">
+                    {[
+                      { id: 'chime', label: 'Chime' },
+                      { id: 'bell', label: 'Bell' },
+                      { id: 'pulse', label: 'Pulse' },
+                    ].map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => {
+                          onNotifSoundChange?.(s.id)
+                          localStorage.setItem('orchestra_notif_sound', s.id)
+                        }}
+                        className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
+                          notifSound === s.id
+                            ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                            : 'bg-muted/30 text-muted-foreground hover:bg-muted/50'
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl border border-border/40 bg-card space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-black tracking-tight">Volume</p>
+                      <p className="text-[10px] text-muted-foreground">{Math.round((notifVolume ?? 0.3) * 100)}%</p>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={notifVolume ?? 0.3}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value)
+                      onNotifVolumeChange?.(v)
+                      localStorage.setItem('orchestra_notif_volume', String(v))
+                    }}
+                    className="w-full accent-primary"
+                  />
+                </div>
+
+                <div className="p-4 rounded-xl border border-border/40 bg-card space-y-3">
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-black tracking-tight">Browser Notifications</p>
+                    <p className="text-[10px] text-muted-foreground">Desktop notification when agents complete tasks</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if ('Notification' in window) {
+                        void Notification.requestPermission()
+                      }
+                    }}
+                    className="px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-muted/30 text-muted-foreground hover:bg-muted/50 transition-all"
+                  >
+                    {'Notification' in window ? `Status: ${Notification.permission}` : 'Not supported'}
+                  </button>
+                </div>
               </div>
             </div>
           )}

@@ -576,12 +576,21 @@ func processExecutionTick(
 
 	// Post completion comment to GitHub issue if linked
 	if entry.ProjectID != "" && warehouseDB != nil {
+		// Extract the last substantive agent message for the summary
+		agentSummary := ""
+		for i := len(eventsBuffer) - 1; i >= 0; i-- {
+			msg := strings.TrimSpace(eventsBuffer[i].Message)
+			if msg != "" && len(msg) > 50 {
+				agentSummary = msg
+				break
+			}
+		}
+
 		go func() {
 			project := resolvedProject
 			if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
 				return
 			}
-			// Extract issue number from the issue URL or identifier
 			issue, fetchErr := service.FetchIssueByID(context.Background(), entry.IssueID)
 			if fetchErr != nil || issue == nil || issue.URL == "" {
 				return
@@ -590,9 +599,15 @@ func processExecutionTick(
 			if issueNumber <= 0 {
 				return
 			}
-			// Build summary from the last agent message
-			summary := fmt.Sprintf("## Agent Run Completed\n\n**Agent**: %s\n**Issue**: %s\n**Status**: Moved to Review\n\nThe agent has completed its work on this task. Please review the changes.", activeProviderName, entry.IssueIdentifier)
-			if err := ghutil.PostIssueComment(context.Background(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, issueNumber, summary); err != nil {
+
+			comment := fmt.Sprintf("## %s Agent Run Completed\n\n", strings.ToUpper(activeProviderName))
+			comment += fmt.Sprintf("**Issue**: %s\n**Agent**: %s\n**Turns**: %d\n\n", entry.IssueIdentifier, activeProviderName, entry.TurnCount+1)
+			if agentSummary != "" {
+				comment += "### Summary\n\n" + agentSummary + "\n"
+			}
+			comment += "\n---\n*Automatically posted by Orchestra*"
+
+			if err := ghutil.PostIssueComment(context.Background(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, issueNumber, comment); err != nil {
 				logger.Warn().Err(err).Str("issue_id", entry.IssueID).Msg("failed to post GitHub comment")
 			} else {
 				logger.Info().Str("issue_id", entry.IssueID).Int("github_issue", issueNumber).Msg("posted completion comment to GitHub")

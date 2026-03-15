@@ -117,6 +117,11 @@ export default function App() {
   const [issueLookupId, setIssueLookupId] = useState('')
   const [issueLookupPending, setIssueLookupPending] = useState(false)
   const [issueLookupResult, setIssueLookupResult] = useState<IssueDetailResult | null>(null)
+
+  // Notification settings (persisted in localStorage)
+  const [notifSound, setNotifSound] = useState(() => localStorage.getItem('orchestra_notif_sound') || 'chime')
+  const [notifMuted, setNotifMuted] = useState(() => localStorage.getItem('orchestra_notif_muted') === 'true')
+  const [notifVolume, setNotifVolume] = useState(() => parseFloat(localStorage.getItem('orchestra_notif_volume') || '0.3'))
   const [issueLookupError, setIssueLookupError] = useState('')
   const [sessionLookupResult, setSessionLookupResult] = useState<SessionDetail | null>(null)
   const [sessionLookupPending, setSessionLookupPending] = useState(false)
@@ -437,22 +442,48 @@ export default function App() {
                   },
                 ]
               })
-              // Play notification sound
-              try {
-                const ctx = new AudioContext()
-                const osc = ctx.createOscillator()
-                const gain = ctx.createGain()
-                osc.connect(gain)
-                gain.connect(ctx.destination)
-                osc.frequency.setValueAtTime(880, ctx.currentTime)
-                osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1)
-                osc.frequency.setValueAtTime(1320, ctx.currentTime + 0.2)
-                gain.gain.setValueAtTime(0.3, ctx.currentTime)
-                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4)
-                osc.start(ctx.currentTime)
-                osc.stop(ctx.currentTime + 0.4)
-                osc.onended = () => ctx.close()
-              } catch { /* ignore audio errors */ }
+              // Play notification sound (respects settings)
+              if (!notifMuted) {
+                try {
+                  const ctx = new AudioContext()
+                  const gain = ctx.createGain()
+                  gain.connect(ctx.destination)
+                  gain.gain.setValueAtTime(notifVolume, ctx.currentTime)
+                  gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5)
+
+                  if (notifSound === 'bell') {
+                    const osc = ctx.createOscillator()
+                    osc.type = 'sine'
+                    osc.connect(gain)
+                    osc.frequency.setValueAtTime(1047, ctx.currentTime)
+                    osc.frequency.exponentialRampToValueAtTime(523, ctx.currentTime + 0.3)
+                    osc.start(ctx.currentTime)
+                    osc.stop(ctx.currentTime + 0.5)
+                    osc.onended = () => ctx.close()
+                  } else if (notifSound === 'pulse') {
+                    const osc = ctx.createOscillator()
+                    osc.type = 'square'
+                    osc.connect(gain)
+                    osc.frequency.setValueAtTime(440, ctx.currentTime)
+                    osc.frequency.setValueAtTime(440, ctx.currentTime + 0.05)
+                    osc.frequency.setValueAtTime(0, ctx.currentTime + 0.1)
+                    osc.frequency.setValueAtTime(440, ctx.currentTime + 0.15)
+                    osc.start(ctx.currentTime)
+                    osc.stop(ctx.currentTime + 0.3)
+                    osc.onended = () => ctx.close()
+                  } else {
+                    // Default: chime (ascending tones)
+                    const osc = ctx.createOscillator()
+                    osc.connect(gain)
+                    osc.frequency.setValueAtTime(880, ctx.currentTime)
+                    osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1)
+                    osc.frequency.setValueAtTime(1320, ctx.currentTime + 0.2)
+                    osc.start(ctx.currentTime)
+                    osc.stop(ctx.currentTime + 0.4)
+                    osc.onended = () => ctx.close()
+                  }
+                } catch { /* ignore audio errors */ }
+              }
               // Show browser notification
               if ('Notification' in window && Notification.permission === 'granted') {
                 new Notification('Agent Completed', { body: `${issueIdentifier} has been moved to Review.`, icon: '/favicon.ico' })
@@ -1238,6 +1269,12 @@ export default function App() {
                     onCreateProfile={handleCreateProfile}
                     onDeleteProfile={handleDeleteProfile}
                     onSaveAgentConfig={handleAgentConfigSave}
+                    notifSound={notifSound}
+                    notifMuted={notifMuted}
+                    notifVolume={notifVolume}
+                    onNotifSoundChange={setNotifSound}
+                    onNotifMutedChange={setNotifMuted}
+                    onNotifVolumeChange={setNotifVolume}
                   />
                 </section>
               ) : null}
