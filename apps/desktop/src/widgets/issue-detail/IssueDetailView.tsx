@@ -162,9 +162,9 @@ export function IssueDetailView({
   // Extract operational plan from the most recent agent message that contains checkboxes.
   // Agent restates the plan with updated checkboxes as it progresses — we want the LATEST version.
   const planItems: PlanItem[] = useMemo(() => {
-    const PLAN_EVENT_KINDS = new Set(['message', 'agent_message', 'item.completed'])
+    const PLAN_EVENT_KINDS = new Set(['message', 'agent_message', 'item.completed', 'assistant', 'result/end_turn', 'result'])
     const messageEvents = issueHistory.filter(e =>
-      PLAN_EVENT_KINDS.has(e.kind) && e.message && e.source !== 'pty'
+      PLAN_EVENT_KINDS.has(e.kind) && e.message && e.kind !== 'pty'
     )
 
     if (messageEvents.length > 0) {
@@ -536,8 +536,8 @@ export function IssueDetailView({
                 const kind = item.kind?.toLowerCase() ?? ''
                 // Always show explicitly allowed events
                 if (allowedKinds.has(kind)) return true
-                // Show "message" and "agent_message" events only if they have actual content
-                if ((kind === 'message' || kind === 'agent_message' || kind === 'item.completed') && item.message && item.message.length > 10) return true
+                // Show agent message events from any provider
+                if ((kind === 'message' || kind === 'agent_message' || kind === 'item.completed' || kind === 'assistant' || kind === 'result/end_turn') && item.message && item.message.length > 10) return true
                 return false
               })
               return meaningfulEvents.length === 0 ? (
@@ -633,13 +633,45 @@ export function IssueDetailView({
                       else if (iType === 'command_execution') parsed.push({ idx, kind: 'tool', ts, label: 'shell', content: (item.command as string) || text.slice(0, 150) })
                       else if (iType === 'file_edit' || iType === 'file_create') parsed.push({ idx, kind: 'tool', ts, label: iType === 'file_edit' ? 'edit' : 'create', content: (item.file_path as string) || text.slice(0, 150) })
                       else if (text.trim()) parsed.push({ idx, kind: 'agent', ts, label: '', content: text })
-                    // ── Claude (content_block events) ──
+                    // ── Claude Code stream-json events ──
+                    } else if (type === 'system' && (obj.subtype as string) === 'init') {
+                      parsed.push({ idx, kind: 'session', ts, label: (obj.model as string) || 'claude', content: '' })
+                    } else if (type === 'assistant') {
+                      const msg = obj.message as Record<string, unknown> | undefined
+                      const content = msg?.content as Array<Record<string, unknown>> | undefined
+                      if (content) {
+                        for (const block of content) {
+                          if (block.type === 'text' && block.text) {
+                            parsed.push({ idx, kind: 'agent', ts, label: '', content: block.text as string })
+                          } else if (block.type === 'tool_use') {
+                            parsed.push({ idx, kind: 'tool', ts, label: (block.name as string) || 'tool', content: JSON.stringify((block.input as Record<string, unknown>)?.command || (block.input as Record<string, unknown>)?.file_path || '').slice(0, 150) })
+                          } else if (block.type === 'thinking') {
+                            const thinking = (block.thinking as string) || ''
+                            if (thinking.trim()) parsed.push({ idx, kind: 'thinking', ts, label: '', content: thinking })
+                          }
+                        }
+                      }
+                    } else if (type === 'user') {
+                      const msg = obj.message as Record<string, unknown> | undefined
+                      const content = msg?.content as Array<Record<string, unknown>> | undefined
+                      if (content) {
+                        for (const block of content) {
+                          if (block.type === 'tool_result') {
+                            const text = (block.content as string) || ''
+                            parsed.push({ idx, kind: 'result', ts, label: '', content: text.length > 200 ? text.slice(0, 200) + '...' : text, status: block.is_error ? 'error' : 'success' })
+                          }
+                        }
+                      }
                     } else if (type === 'content_block_delta') {
                       const delta = obj.delta as Record<string, unknown> | undefined
                       const text = (delta?.text as string) || ''
                       if (text.trim()) parsed.push({ idx, kind: 'agent', ts, label: '', content: text })
                     } else if (type === 'result') {
-                      parsed.push({ idx, kind: 'lifecycle', ts, label: 'Completed', content: (obj.stop_reason as string) || '' })
+                      const resultText = (obj.result as string) || ''
+                      if (resultText.trim()) {
+                        parsed.push({ idx, kind: 'agent', ts, label: '', content: resultText })
+                      }
+                      parsed.push({ idx: idx + 0.5, kind: 'lifecycle', ts, label: 'Completed', content: (obj.stop_reason as string) || '' })
                     }
                   })
 

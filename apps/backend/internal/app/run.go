@@ -487,8 +487,17 @@ func processExecutionTick(
 		}
 
 		// Append to log file in real-time
-		if event.SessionID != "" && event.RawLine != "" {
-			_, _ = logfile.AppendToSessionLog(workspaceRoot, entry.IssueIdentifier, event.SessionID, event.RawLine+"\n")
+		if event.SessionID != "" {
+			line := event.RawLine
+			if line == "" && event.Raw != nil {
+				// Reconstruct raw line from event data for providers that don't set RawLine
+				if raw, err := json.Marshal(event.Raw); err == nil {
+					line = string(raw)
+				}
+			}
+			if line != "" {
+				_, _ = logfile.AppendToSessionLog(workspaceRoot, entry.IssueIdentifier, event.SessionID, line+"\n")
+			}
 		}
 
 		// Log to stdout for TUI visibility
