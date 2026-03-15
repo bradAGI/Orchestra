@@ -27,8 +27,6 @@ import {
   fetchIssueDiff,
   fetchIssueLogs,
   fetchIssueHistory,
-  fetchSTTHealth,
-  transcribeAudio,
   updateIssue,
   createGitHubPR,
   type BackendConfig,
@@ -786,17 +784,11 @@ export function CreateTaskDialog({
   const [projectID, setProjectID] = useState(initialProjectID || (projects.length > 0 ? projects[0].id : ''))
   const [pending, setPending] = useState(false)
   const [submitError, setSubmitError] = useState('')
-  const [sttMode, setSTTMode] = useState<'whisper' | 'webspeech' | 'none'>('none')
-  const [sttChecking, setSTTChecking] = useState(false)
   const [recording, setRecording] = useState(false)
-  const [transcribing, setTranscribing] = useState(false)
-  const recorderRef = useRef<MediaRecorder | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-  const chunksRef = useRef<Blob[]>([])
   const webSpeechRef = useRef<SpeechRecognition | null>(null)
   const webSpeechResultRef = useRef('')
 
-  const sttReady = sttMode !== 'none'
+  const hasSpeechAPI = typeof window !== 'undefined' && !!(window.SpeechRecognition || window.webkitSpeechRecognition)
 
   useEffect(() => {
     if (open) {
@@ -812,48 +804,13 @@ export function CreateTaskDialog({
   }, [open, initialState, initialProjectID, availableAgents, projects])
 
   useEffect(() => {
-    if (!open) return
-    let cancelled = false
-    setSTTChecking(true)
-
-    const checkWhisper = config
-      ? fetchSTTHealth(config)
-          .then((health) => !!health.ready)
-          .catch(() => false)
-      : Promise.resolve(false)
-
-    void checkWhisper.then((whisperOk) => {
-      if (cancelled) return
-      if (whisperOk) {
-        setSTTMode('whisper')
-      } else {
-        const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition
-        setSTTMode(SpeechRecognitionCtor ? 'webspeech' : 'none')
-      }
-      setSTTChecking(false)
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [open, config])
-
-  useEffect(() => {
     if (!open) {
-      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
-        recorderRef.current.stop()
-      }
-      streamRef.current?.getTracks().forEach((track) => track.stop())
-      recorderRef.current = null
-      streamRef.current = null
-      chunksRef.current = []
       if (webSpeechRef.current) {
         webSpeechRef.current.abort()
         webSpeechRef.current = null
       }
       webSpeechResultRef.current = ''
       setRecording(false)
-      setTranscribing(false)
     }
   }, [open])
 
@@ -891,112 +848,54 @@ export function CreateTaskDialog({
 
   const stopRecording = () => {
     if (!recording) return
-    if (sttMode === 'webspeech' && webSpeechRef.current) {
-      webSpeechRef.current.stop()
-    } else {
-      recorderRef.current?.stop()
-    }
+    webSpeechRef.current?.stop()
     setRecording(false)
   }
 
-  const startRecording = async () => {
-    if (sttChecking || transcribing || recording || sttMode === 'none') return
-
-    if (sttMode === 'webspeech') {
-      try {
-        const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition
-        if (!SpeechRecognitionCtor) return
-        const recognition = new SpeechRecognitionCtor()
-        recognition.continuous = true
-        recognition.interimResults = false
-        recognition.lang = 'en-US'
-        webSpeechResultRef.current = ''
-        webSpeechRef.current = recognition
-
-        recognition.onresult = (event: SpeechRecognitionEvent) => {
-          let transcript = ''
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            if (event.results[i].isFinal) {
-              transcript += event.results[i][0].transcript
-            }
-          }
-          webSpeechResultRef.current += transcript
-        }
-
-        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-          if (event.error !== 'aborted') {
-            setSubmitError(`Speech recognition error: ${event.error}`)
-          }
-          setRecording(false)
-          webSpeechRef.current = null
-        }
-
-        recognition.onend = () => {
-          const text = webSpeechResultRef.current.trim()
-          if (text) {
-            setDescription((prev) => (prev.trim() ? `${prev.trimEnd()}\n${text}` : text))
-          }
-          webSpeechRef.current = null
-          webSpeechResultRef.current = ''
-        }
-
-        recognition.start()
-        setRecording(true)
-        setSubmitError('')
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Speech recognition failed'
-        setSubmitError(message)
-        setRecording(false)
-      }
-      return
-    }
-
-    // Whisper mode
-    if (!config) return
+  const startRecording = () => {
+    if (recording || !hasSpeechAPI) return
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const recorder = new MediaRecorder(stream)
-      streamRef.current = stream
-      recorderRef.current = recorder
-      chunksRef.current = []
+      const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition
+      if (!SpeechRecognitionCtor) return
+      const recognition = new SpeechRecognitionCtor()
+      recognition.continuous = true
+      recognition.interimResults = false
+      recognition.lang = 'en-US'
+      webSpeechResultRef.current = ''
+      webSpeechRef.current = recognition
 
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunksRef.current.push(event.data)
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let transcript = ''
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            transcript += event.results[i][0].transcript
+          }
         }
+        webSpeechResultRef.current += transcript
       }
 
-      recorder.onstop = () => {
-        const audioBlob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' })
-        chunksRef.current = []
-        stream.getTracks().forEach((track) => track.stop())
-        streamRef.current = null
-        recorderRef.current = null
-
-        if (audioBlob.size === 0 || !config) return
-
-        setTranscribing(true)
-        void transcribeAudio(config, audioBlob)
-          .then((result) => {
-            const text = result.text?.trim() || ''
-            if (text) {
-              setDescription((prev) => (prev.trim() ? `${prev.trimEnd()}\n${text}` : text))
-            }
-          })
-          .catch((error: unknown) => {
-            const message = error instanceof Error ? error.message : 'Speech transcription failed'
-            setSubmitError(message)
-          })
-          .finally(() => {
-            setTranscribing(false)
-          })
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        if (event.error !== 'aborted') {
+          setSubmitError(`Speech recognition error: ${event.error}`)
+        }
+        setRecording(false)
+        webSpeechRef.current = null
       }
 
-      recorder.start()
+      recognition.onend = () => {
+        const text = webSpeechResultRef.current.trim()
+        if (text) {
+          setDescription((prev) => (prev.trim() ? `${prev.trimEnd()}\n${text}` : text))
+        }
+        webSpeechRef.current = null
+        webSpeechResultRef.current = ''
+      }
+
+      recognition.start()
       setRecording(true)
       setSubmitError('')
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Microphone access failed'
+      const message = error instanceof Error ? error.message : 'Speech recognition failed'
       setSubmitError(message)
       setRecording(false)
     }
@@ -1058,7 +957,7 @@ export function CreateTaskDialog({
                 size="sm"
                 onPointerDown={(event) => {
                   event.preventDefault()
-                  void startRecording()
+                  startRecording()
                 }}
                 onPointerUp={(event) => {
                   event.preventDefault()
@@ -1073,7 +972,7 @@ export function CreateTaskDialog({
                 onKeyDown={(event) => {
                   if (event.key === ' ' || event.key === 'Enter') {
                     event.preventDefault()
-                    void startRecording()
+                    startRecording()
                   }
                 }}
                 onKeyUp={(event) => {
@@ -1082,11 +981,11 @@ export function CreateTaskDialog({
                     stopRecording()
                   }
                 }}
-                disabled={!sttReady || sttChecking || transcribing}
+                disabled={!hasSpeechAPI}
                 className={`h-7 px-3 text-[10px] font-bold uppercase tracking-widest touch-none ${recording ? 'text-red-400' : 'text-muted-foreground/50 hover:text-foreground'}`}
               >
                 {recording ? <Square className="h-3 w-3 mr-1" /> : <Mic className="h-3 w-3 mr-1" />}
-                {transcribing ? 'Transcribing...' : recording ? 'Release to Stop' : 'Hold to Talk'}
+                {recording ? 'Release to Stop' : 'Hold to Talk'}
               </Button>
               <Button
                 type="button"
