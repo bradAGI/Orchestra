@@ -215,14 +215,14 @@ export function IssueDetailView({
   // Fetch tab-specific data
   useEffect(() => {
     if (!config || !identifier) return
-    if (bottomTab === 'output' && (localState === 'In Progress' || localState === 'Review' || localState === 'Done')) {
+    if (bottomTab === 'output' && (isRunning || localState === 'In Progress' || localState === 'Review' || localState === 'Done')) {
       setLogsLoading(true)
       fetchIssueLogs(config, identifier, provider)
         .then(setLogs)
         .catch(() => setLogs(''))
         .finally(() => setLogsLoading(false))
     }
-    if (bottomTab === 'changes' && (localState === 'In Progress' || localState === 'Review' || localState === 'Done')) {
+    if (bottomTab === 'changes' && (isRunning || localState === 'In Progress' || localState === 'Review' || localState === 'Done')) {
       setDiffLoading(true)
       fetchIssueDiff(config, identifier, provider)
         .then(raw => {
@@ -233,7 +233,7 @@ export function IssueDetailView({
         .catch(() => setDiffFiles([]))
         .finally(() => setDiffLoading(false))
     }
-  }, [bottomTab, config, identifier, provider])
+  }, [bottomTab, config, identifier, provider, localState, isRunning])
 
   const handleStateChange = async (newState: string) => {
     setLocalState(newState)
