@@ -20,6 +20,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react'
+import { getWhisperClient, type WhisperStatus } from '@/lib/whisper-client'
 import { TerminalView } from '@/components/terminal/TerminalView'
 import {
   fetchArtifactContent,
@@ -785,10 +786,8 @@ export function CreateTaskDialog({
   const [pending, setPending] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [recording, setRecording] = useState(false)
-  const webSpeechRef = useRef<SpeechRecognition | null>(null)
-  const webSpeechResultRef = useRef('')
-
-  const hasSpeechAPI = typeof window !== 'undefined' && !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+  const [whisperStatus, setWhisperStatus] = useState<WhisperStatus>({ state: 'idle' })
+  const transcriptionCancelledRef = useRef(false)
 
   useEffect(() => {
     if (open) {
@@ -805,12 +804,15 @@ export function CreateTaskDialog({
 
   useEffect(() => {
     if (!open) {
-      if (webSpeechRef.current) {
-        webSpeechRef.current.abort()
-        webSpeechRef.current = null
+      const client = getWhisperClient()
+      if (client.recording) {
+        void client.stopRecording()
       }
-      webSpeechResultRef.current = ''
+      transcriptionCancelledRef.current = true
       setRecording(false)
+      setWhisperStatus({ state: 'idle' })
+    } else {
+      transcriptionCancelledRef.current = false
     }
   }, [open])
 
@@ -846,58 +848,39 @@ export function CreateTaskDialog({
     }
   }
 
-  const stopRecording = () => {
-    if (!recording) return
-    webSpeechRef.current?.stop()
-    setRecording(false)
-  }
-
-  const startRecording = () => {
-    if (recording || !hasSpeechAPI) return
+  const startRecording = async () => {
+    if (recording || whisperStatus.state !== 'idle') return
     try {
-      const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition
-      if (!SpeechRecognitionCtor) return
-      const recognition = new SpeechRecognitionCtor()
-      recognition.continuous = true
-      recognition.interimResults = false
-      recognition.lang = 'en-US'
-      webSpeechResultRef.current = ''
-      webSpeechRef.current = recognition
-
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        let transcript = ''
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            transcript += event.results[i][0].transcript
-          }
-        }
-        webSpeechResultRef.current += transcript
-      }
-
-      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        if (event.error !== 'aborted') {
-          setSubmitError(`Speech recognition error: ${event.error}`)
-        }
-        setRecording(false)
-        webSpeechRef.current = null
-      }
-
-      recognition.onend = () => {
-        const text = webSpeechResultRef.current.trim()
-        if (text) {
-          setDescription((prev) => (prev.trim() ? `${prev.trimEnd()}\n${text}` : text))
-        }
-        webSpeechRef.current = null
-        webSpeechResultRef.current = ''
-      }
-
-      recognition.start()
+      const client = getWhisperClient(setWhisperStatus)
+      await client.startRecording()
       setRecording(true)
       setSubmitError('')
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Speech recognition failed'
+      const message = error instanceof Error ? error.message : 'Microphone access failed'
       setSubmitError(message)
-      setRecording(false)
+    }
+  }
+
+  const stopRecording = async () => {
+    if (!recording) return
+    setRecording(false)
+    try {
+      const client = getWhisperClient(setWhisperStatus)
+      const pcm = await client.stopRecording()
+      if (pcm.length === 0 || transcriptionCancelledRef.current) return
+      const text = await client.transcribe(pcm)
+      if (!transcriptionCancelledRef.current && text.trim()) {
+        setDescription((prev) => (prev.trim() ? `${prev.trimEnd()}\n${text.trim()}` : text.trim()))
+      }
+    } catch (error) {
+      if (!transcriptionCancelledRef.current) {
+        const message = error instanceof Error ? error.message : 'Transcription failed'
+        setSubmitError(message)
+      }
+    } finally {
+      if (!transcriptionCancelledRef.current) {
+        setWhisperStatus({ state: 'idle' })
+      }
     }
   }
 
@@ -957,35 +940,48 @@ export function CreateTaskDialog({
                 size="sm"
                 onPointerDown={(event) => {
                   event.preventDefault()
-                  startRecording()
+                  void startRecording()
                 }}
                 onPointerUp={(event) => {
                   event.preventDefault()
-                  stopRecording()
+                  void stopRecording()
                 }}
                 onPointerLeave={() => {
-                  stopRecording()
+                  void stopRecording()
                 }}
                 onPointerCancel={() => {
-                  stopRecording()
+                  void stopRecording()
                 }}
                 onKeyDown={(event) => {
                   if (event.key === ' ' || event.key === 'Enter') {
                     event.preventDefault()
-                    startRecording()
+                    void startRecording()
                   }
                 }}
                 onKeyUp={(event) => {
                   if (event.key === ' ' || event.key === 'Enter') {
                     event.preventDefault()
-                    stopRecording()
+                    void stopRecording()
                   }
                 }}
-                disabled={!hasSpeechAPI}
-                className={`h-7 px-3 text-[10px] font-bold uppercase tracking-widest touch-none ${recording ? 'text-red-400' : 'text-muted-foreground/50 hover:text-foreground'}`}
+                disabled={whisperStatus.state !== 'idle' && !recording}
+                className={`h-7 px-3 text-[10px] font-bold uppercase tracking-widest touch-none ${
+                  recording
+                    ? 'text-red-400'
+                    : whisperStatus.state !== 'idle'
+                      ? 'text-amber-400'
+                      : 'text-muted-foreground/50 hover:text-foreground'
+                }`}
               >
-                {recording ? <Square className="h-3 w-3 mr-1" /> : <Mic className="h-3 w-3 mr-1" />}
-                {recording ? 'Release to Stop' : 'Hold to Talk'}
+                {recording ? (
+                  <><Square className="h-3 w-3 mr-1" /> Release to Stop</>
+                ) : whisperStatus.state === 'loading' ? (
+                  <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Loading {whisperStatus.progress}%</>
+                ) : whisperStatus.state === 'transcribing' ? (
+                  <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Transcribing...</>
+                ) : (
+                  <><Mic className="h-3 w-3 mr-1" /> Hold to Talk</>
+                )}
               </Button>
               <Button
                 type="button"
