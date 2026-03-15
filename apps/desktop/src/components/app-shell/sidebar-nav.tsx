@@ -63,7 +63,7 @@ export function SidebarNav({
       <div className="flex h-full flex-col py-3">
         <div className="mb-2 flex justify-center">
           <div className="flex items-center gap-2">
-            <span className="grid h-6 w-6 shrink-0 place-items-center rounded bg-background text-foreground shadow-sm">
+            <span className="grid h-6 w-6 shrink-0 place-items-center text-foreground">
               <AppMonogramIcon className="h-4 w-4" />
             </span>
             {!sidebarCollapsed ? (
