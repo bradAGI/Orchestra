@@ -287,7 +287,7 @@ export function IssueDetailView({
           </Badge>
           <h2 className="text-base font-bold truncate">{localTitle}</h2>
         </div>
-        <div className="flex items-center gap-2 shrink-0 mr-8">
+        <div className="flex items-center gap-2 shrink-0">
           {isRunning && onStopSession && (
             <button
               className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-colors"
@@ -312,18 +312,6 @@ export function IssueDetailView({
               Reopen
             </button>
           )}
-          <CustomDropdown
-            className="w-28"
-            value={localState}
-            options={[
-              { label: 'Backlog', value: 'Backlog', icon: <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/20" /> },
-              { label: 'Todo', value: 'Todo', icon: <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" /> },
-              { label: 'In Progress', value: 'In Progress', icon: <div className="h-1.5 w-1.5 rounded-full bg-amber-500" /> },
-              { label: 'Review', value: 'Review', icon: <div className="h-1.5 w-1.5 rounded-full bg-blue-500" /> },
-              { label: 'Done', value: 'Done', icon: <div className="h-1.5 w-1.5 rounded-full bg-primary" /> },
-            ]}
-            onChange={handleStateChange}
-          />
         </div>
       </div>
 
@@ -376,6 +364,21 @@ export function IssueDetailView({
 
             {/* Sidebar properties */}
             <div className="w-72 border-l border-border/40 shrink-0 overflow-y-auto bg-muted/5">
+              <div className="px-4 py-3 border-b border-border/20">
+                <label className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground/30 mb-1.5 block">Status</label>
+                <CustomDropdown
+                  className="w-full"
+                  value={localState}
+                  options={[
+                    { label: 'Backlog', value: 'Backlog', icon: <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/20" /> },
+                    { label: 'Todo', value: 'Todo', icon: <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" /> },
+                    { label: 'In Progress', value: 'In Progress', icon: <div className="h-1.5 w-1.5 rounded-full bg-amber-500" /> },
+                    { label: 'Review', value: 'Review', icon: <div className="h-1.5 w-1.5 rounded-full bg-blue-500" /> },
+                    { label: 'Done', value: 'Done', icon: <div className="h-1.5 w-1.5 rounded-full bg-primary" /> },
+                  ]}
+                  onChange={handleStateChange}
+                />
+              </div>
               {[
                 { label: 'Agent', content: (
                   <AgentSelector value={localAssignee} agents={availableAgents} onChange={handleAssigneeChange} direction="down" />
