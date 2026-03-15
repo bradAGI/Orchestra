@@ -108,6 +108,34 @@ export function ChangesList({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
+      {/* Commit section — always visible at top */}
+      <div className="border-b border-border/40 p-3 shrink-0 bg-card/50">
+        <textarea
+          value={commitMsg}
+          onChange={(e) => setCommitMsg(e.target.value)}
+          placeholder="Commit message..."
+          rows={2}
+          className="w-full bg-muted/10 border border-border/40 rounded-lg px-3 py-2 text-[11px] text-foreground placeholder:text-muted-foreground/40 resize-none outline-none focus:border-primary/60"
+        />
+        <div className="flex gap-2 mt-2">
+          <button
+            onClick={() => handleCommit(false)}
+            disabled={!commitMsg.trim() || staged.length === 0 || loading}
+            className="flex-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          >
+            Commit
+          </button>
+          <button
+            onClick={() => handleCommit(true)}
+            disabled={!commitMsg.trim() || staged.length === 0 || loading}
+            className="flex items-center justify-center gap-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          >
+            <Send size={10} />
+            Push
+          </button>
+        </div>
+      </div>
+
       {/* Staged section */}
       <div className="shrink-0">
         <div className="flex items-center justify-between px-3 py-1.5 bg-green-500/5">
@@ -204,33 +232,8 @@ export function ChangesList({
         </div>
       </div>
 
-      {/* Commit section */}
-      <div className="mt-auto border-t border-border/40 p-3 shrink-0">
-        <textarea
-          value={commitMsg}
-          onChange={(e) => setCommitMsg(e.target.value)}
-          placeholder="Commit message..."
-          rows={2}
-          className="w-full bg-muted/10 border border-border/40 rounded-xl px-3 py-2 text-[11px] text-foreground placeholder:text-muted-foreground/40 resize-none outline-none focus:border-primary/60"
-        />
-        <div className="flex gap-2 mt-2">
-          <button
-            onClick={() => handleCommit(false)}
-            disabled={!commitMsg.trim() || loading}
-            className="flex-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Commit
-          </button>
-          <button
-            onClick={() => handleCommit(true)}
-            disabled={!commitMsg.trim() || loading}
-            className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Send size={10} />
-            Commit & Push
-          </button>
-        </div>
-      </div>
+      {/* Bottom spacer */}
+      <div className="flex-1" />
     </div>
   )
 }

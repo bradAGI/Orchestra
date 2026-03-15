@@ -93,55 +93,62 @@ export function BranchBar({
   }
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 border-b border-border/40 overflow-x-auto shrink-0">
-      <GitBranch size={14} className="text-muted-foreground shrink-0" />
+    <div className="flex items-center gap-1.5 px-3 py-2.5 border-b border-border/40 overflow-x-auto shrink-0 bg-card/30">
+      <div className="flex items-center gap-1 mr-1 shrink-0">
+        <GitBranch size={14} className="text-primary/60" />
+        <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40">Branches</span>
+      </div>
 
-      {branches.map((branch) => (
-        <button
-          key={branch}
-          onClick={() => handleCheckout(branch)}
-          className={`rounded-full px-3 py-1 text-[11px] font-medium whitespace-nowrap transition-colors ${
-            branch === currentBranch
-              ? 'bg-primary/10 text-primary'
-              : 'bg-muted/20 text-muted-foreground hover:bg-muted/40'
-          }`}
-        >
-          {branch === currentBranch && (
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 align-middle" />
-          )}
-          {branch}
-        </button>
-      ))}
+      <div className="flex items-center gap-1 flex-1 overflow-x-auto">
+        {branches.map((branch) => (
+          <button
+            key={branch}
+            onClick={() => handleCheckout(branch)}
+            disabled={loading}
+            className={`rounded-md px-2.5 py-1 text-[10px] font-bold whitespace-nowrap transition-all ${
+              branch === currentBranch
+                ? 'bg-primary/15 text-primary border border-primary/20 shadow-sm shadow-primary/10'
+                : 'bg-muted/10 text-muted-foreground/60 border border-transparent hover:bg-muted/30 hover:text-foreground'
+            }`}
+          >
+            {branch === currentBranch && (
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 align-middle animate-pulse" />
+            )}
+            {branch}
+          </button>
+        ))}
 
-      {creating ? (
-        <input
-          ref={inputRef}
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleCreate()
-            if (e.key === 'Escape') { setCreating(false); setNewName('') }
-          }}
-          onBlur={() => { if (!newName.trim()) { setCreating(false); setNewName('') } }}
-          placeholder="branch name..."
-          className="rounded-full px-3 py-1 text-[11px] bg-muted/20 text-foreground border border-border/40 outline-none focus:border-primary/60 w-32"
-        />
-      ) : (
-        <button
-          onClick={() => setCreating(true)}
-          className="rounded-full px-3 py-1 text-[11px] text-muted-foreground bg-muted/20 hover:bg-muted/40 flex items-center gap-1"
-        >
-          <Plus size={12} />
-          New
-        </button>
-      )}
+        {creating ? (
+          <input
+            ref={inputRef}
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleCreate()
+              if (e.key === 'Escape') { setCreating(false); setNewName('') }
+            }}
+            onBlur={() => { if (!newName.trim()) { setCreating(false); setNewName('') } }}
+            placeholder="branch name..."
+            className="rounded-md px-2.5 py-1 text-[10px] bg-muted/10 text-foreground border border-primary/30 outline-none focus:border-primary/60 w-28"
+          />
+        ) : (
+          <button
+            onClick={() => setCreating(true)}
+            className="rounded-md px-2.5 py-1 text-[10px] text-muted-foreground/40 border border-dashed border-border/30 hover:border-primary/30 hover:text-primary/60 flex items-center gap-1 transition-all"
+          >
+            <Plus size={10} />
+            New
+          </button>
+        )}
+      </div>
 
-      <div className="ml-auto relative shrink-0" ref={stashRef}>
+      <div className="ml-2 relative shrink-0" ref={stashRef}>
         <button
           onClick={() => setStashOpen((v) => !v)}
-          className="rounded-full px-3 py-1 text-[11px] text-muted-foreground bg-muted/20 hover:bg-muted/40 flex items-center gap-1"
+          disabled={loading}
+          className="rounded-md px-2.5 py-1 text-[10px] font-bold text-muted-foreground/50 bg-muted/10 border border-border/20 hover:bg-muted/30 hover:text-foreground flex items-center gap-1 transition-all"
         >
-          <Archive size={12} />
+          <Archive size={10} />
           Stash
         </button>
         {stashOpen && (
