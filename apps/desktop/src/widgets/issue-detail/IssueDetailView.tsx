@@ -375,52 +375,62 @@ export function IssueDetailView({
             </div>
 
             {/* Sidebar properties */}
-            <div className="w-56 border-l border-border/20 shrink-0 bg-muted/5">
-              {[
-                { label: 'Agent', content: (
+            <div className="w-72 border-l border-border/20 shrink-0 bg-card/30 overflow-y-auto">
+              <div className="p-5 space-y-5">
+                {/* Agent */}
+                <div className="rounded-xl border border-border/30 bg-muted/5 p-4">
+                  <label className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50 mb-2 block">Agent</label>
                   <AgentSelector value={localAssignee} agents={availableAgents} onChange={handleAssigneeChange} direction="down" />
-                )},
-                { label: 'Project', content: (
-                  <div className="flex items-center gap-2">
-                    <div className="h-5 w-5 rounded bg-primary/10 flex items-center justify-center shrink-0">
-                      <FileText size={10} className="text-primary/60" />
+                </div>
+
+                {/* Project */}
+                <div className="rounded-xl border border-border/30 bg-muted/5 p-4">
+                  <label className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50 mb-2 block">Project</label>
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <FileText size={14} className="text-primary/60" />
                     </div>
-                    <span className="text-xs font-medium text-foreground/60 truncate">{projectName || 'Unlinked'}</span>
+                    <span className="text-sm font-semibold text-foreground/70 truncate">{projectName || 'Unlinked'}</span>
                   </div>
-                )},
-                { label: 'ID', content: (
-                  <span className="font-mono text-xs text-primary/60">{identifier}</span>
-                )},
-                { label: 'Created', content: (
-                  <span className="text-xs text-muted-foreground/40">
-                    {(typed.created_at as string) ? new Date(typed.created_at as string).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                  </span>
-                )},
-              ].map(({ label, content }) => (
-                <div key={label} className="px-4 py-3 border-b border-border/10">
-                  <label className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground/30 mb-1.5 block">{label}</label>
-                  {content}
                 </div>
-              ))}
-              {typed.url && typeof typed.url === 'string' && (typed.url as string).includes('github.com') && (
-                <div className="px-4 py-3 border-b border-border/10">
-                  <label className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground/30 mb-1.5 block">GitHub</label>
-                  <button
-                    onClick={() => {
-                      const bridge = window.orchestraDesktop
-                      if (bridge && typeof bridge.openExternal === 'function') {
-                        void bridge.openExternal(typed.url as string)
-                      } else {
-                        window.open(typed.url as string, '_blank')
-                      }
-                    }}
-                    className="text-xs text-primary/60 hover:text-primary flex items-center gap-1.5 transition-colors cursor-pointer text-left"
-                  >
-                    <Github size={12} />
-                    {(typed.url as string).replace('https://github.com/', '')}
-                  </button>
+
+                {/* ID & Created */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-border/30 bg-muted/5 p-4">
+                    <label className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50 mb-2 block">ID</label>
+                    <span className="font-mono text-sm font-bold text-primary/70">{identifier}</span>
+                  </div>
+                  <div className="rounded-xl border border-border/30 bg-muted/5 p-4">
+                    <label className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50 mb-2 block">Created</label>
+                    <span className="text-sm text-foreground/50">
+                      {(typed.created_at as string) ? new Date(typed.created_at as string).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '—'}
+                    </span>
+                  </div>
                 </div>
-              )}
+
+                {/* GitHub */}
+                {typed.url && typeof typed.url === 'string' && (typed.url as string).includes('github.com') && (
+                  <div className="rounded-xl border border-border/30 bg-muted/5 p-4">
+                    <label className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50 mb-2 block">GitHub</label>
+                    <button
+                      onClick={() => {
+                        const bridge = window.orchestraDesktop
+                        if (bridge && typeof bridge.openExternal === 'function') {
+                          void bridge.openExternal(typed.url as string)
+                        } else {
+                          window.open(typed.url as string, '_blank')
+                        }
+                      }}
+                      className="text-sm text-primary/70 hover:text-primary flex items-center gap-2 transition-colors cursor-pointer text-left group"
+                    >
+                      <div className="h-8 w-8 rounded-lg bg-muted/20 flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
+                        <Github size={14} className="text-muted-foreground/50 group-hover:text-primary transition-colors" />
+                      </div>
+                      <span className="truncate">{(typed.url as string).replace('https://github.com/', '')}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
