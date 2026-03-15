@@ -641,9 +641,24 @@ func extractMessage(payload map[string]any) string {
 	}
 
 	if message := nestedMap(payload, "message"); message != nil {
-		if text := firstString(message, "text", "content"); text != "" {
+		if text := firstString(message, "text"); text != "" {
 			return text
 		}
+		// Claude stream-json: message.content is an array of {type, text} objects
+		if msgContent, ok := message["content"].([]any); ok {
+			for _, item := range msgContent {
+				if node, ok := item.(map[string]any); ok {
+					if text := firstString(node, "text"); text != "" {
+						return text
+					}
+				}
+			}
+		}
+	}
+
+	// Also check top-level "result" field (Claude final result)
+	if result := firstString(payload, "result"); result != "" {
+		return result
 	}
 
 	if content, ok := payload["content"].([]any); ok {
