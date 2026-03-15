@@ -432,23 +432,65 @@ export function SettingsCard({
                     <p className="text-xs font-black tracking-tight">Mute All Sounds</p>
                     <p className="text-[10px] text-muted-foreground">Disable notification sounds when agents complete</p>
                   </div>
-                  <button
-                    onClick={() => {
-                      const next = !notifMuted
-                      onNotifMutedChange?.(next)
-                      localStorage.setItem('orchestra_notif_muted', String(next))
-                    }}
-                    className={`h-8 w-14 rounded-full transition-colors ${notifMuted ? 'bg-muted' : 'bg-primary'} relative`}
-                  >
-                    <div className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${notifMuted ? 'left-1' : 'left-7'}`} />
-                    {notifMuted ? <VolumeX size={12} className="absolute left-2.5 top-2 text-muted-foreground" /> : <Volume2 size={12} className="absolute right-2.5 top-2 text-white" />}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[9px] font-bold uppercase tracking-widest ${!notifMuted ? 'text-primary' : 'text-muted-foreground/30'}`}>On</span>
+                    <button
+                      onClick={() => {
+                        const next = !notifMuted
+                        onNotifMutedChange?.(next)
+                        localStorage.setItem('orchestra_notif_muted', String(next))
+                      }}
+                      className={`h-8 w-14 rounded-full transition-colors ${notifMuted ? 'bg-muted' : 'bg-primary'} relative`}
+                    >
+                      <div className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${notifMuted ? 'left-7' : 'left-1'}`} />
+                    </button>
+                    <span className={`text-[9px] font-bold uppercase tracking-widest ${notifMuted ? 'text-red-400' : 'text-muted-foreground/30'}`}>Mute</span>
+                  </div>
                 </div>
 
                 <div className="p-4 rounded-xl border border-border/40 bg-card space-y-3">
-                  <div className="space-y-0.5">
-                    <p className="text-xs font-black tracking-tight">Notification Sound</p>
-                    <p className="text-[10px] text-muted-foreground">Sound played when an agent completes a task</p>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-black tracking-tight">Notification Sound</p>
+                      <p className="text-[10px] text-muted-foreground">Sound played when an agent completes a task</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        try {
+                          const vol = notifVolume ?? 0.3
+                          const sound = notifSound ?? 'chime'
+                          const ctx = new AudioContext()
+                          const g = ctx.createGain()
+                          g.connect(ctx.destination)
+                          g.gain.setValueAtTime(vol, ctx.currentTime)
+                          g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5)
+                          const osc = ctx.createOscillator()
+                          osc.connect(g)
+                          if (sound === 'bell') {
+                            osc.type = 'sine'
+                            osc.frequency.setValueAtTime(1047, ctx.currentTime)
+                            osc.frequency.exponentialRampToValueAtTime(523, ctx.currentTime + 0.3)
+                          } else if (sound === 'pulse') {
+                            osc.type = 'square'
+                            osc.frequency.setValueAtTime(440, ctx.currentTime)
+                            osc.frequency.setValueAtTime(440, ctx.currentTime + 0.05)
+                            osc.frequency.setValueAtTime(0, ctx.currentTime + 0.1)
+                            osc.frequency.setValueAtTime(440, ctx.currentTime + 0.15)
+                          } else {
+                            osc.frequency.setValueAtTime(880, ctx.currentTime)
+                            osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1)
+                            osc.frequency.setValueAtTime(1320, ctx.currentTime + 0.2)
+                          }
+                          osc.start(ctx.currentTime)
+                          osc.stop(ctx.currentTime + 0.5)
+                          osc.onended = () => ctx.close()
+                        } catch { /* ignore */ }
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
+                    >
+                      <Play size={10} />
+                      Test
+                    </button>
                   </div>
                   <div className="flex gap-2">
                     {[
