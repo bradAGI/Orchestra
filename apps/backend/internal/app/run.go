@@ -212,8 +212,8 @@ func processExecutionTick(
 		return
 	}
 
-	// Backfill title/description from tracker if missing (e.g. retry path creates entries without these fields)
-	if entry.Title == "" || entry.Description == "" {
+	// Backfill title/description/project from tracker if missing (e.g. retry path creates entries without these fields)
+	if entry.Title == "" || entry.Description == "" || entry.ProjectID == "" {
 		issue, fetchErr := service.FetchIssueByID(context.Background(), entry.IssueID)
 		if fetchErr == nil && issue != nil {
 			if entry.Title == "" {
@@ -221,6 +221,9 @@ func processExecutionTick(
 			}
 			if entry.Description == "" {
 				entry.Description = issue.Description
+			}
+			if entry.ProjectID == "" {
+				entry.ProjectID = issue.ProjectID
 			}
 		}
 	}
@@ -254,13 +257,19 @@ func processExecutionTick(
 	var err error
 	if entry.ProjectID != "" && warehouseDB != nil {
 		project, projErr := warehouseDB.GetProjectByID(context.Background(), entry.ProjectID)
-		if projErr == nil && project.RootPath != "" && filepath.IsAbs(project.RootPath) {
-			if info, statErr := os.Stat(project.RootPath); statErr == nil && info.IsDir() {
-				workspacePath = project.RootPath
-				effectiveWorkspaceRoot = filepath.Dir(project.RootPath)
-				logger.Info().Str("issue_id", entry.IssueID).Str("project_path", workspacePath).Msg("using project root as workspace")
-			}
+		if projErr != nil {
+			logger.Warn().Err(projErr).Str("issue_id", entry.IssueID).Str("project_id", entry.ProjectID).Msg("failed to lookup project for workspace")
+		} else if project.RootPath == "" || !filepath.IsAbs(project.RootPath) {
+			logger.Warn().Str("issue_id", entry.IssueID).Str("root_path", project.RootPath).Msg("project root path is empty or not absolute")
+		} else if info, statErr := os.Stat(project.RootPath); statErr != nil || !info.IsDir() {
+			logger.Warn().Str("issue_id", entry.IssueID).Str("root_path", project.RootPath).Msg("project root path does not exist or is not a directory")
+		} else {
+			workspacePath = project.RootPath
+			effectiveWorkspaceRoot = filepath.Dir(project.RootPath)
+			logger.Info().Str("issue_id", entry.IssueID).Str("project_path", workspacePath).Msg("using project root as workspace")
 		}
+	} else {
+		logger.Info().Str("issue_id", entry.IssueID).Str("project_id", entry.ProjectID).Bool("db_nil", warehouseDB == nil).Msg("skipping project workspace lookup")
 	}
 	if effectiveWorkspaceRoot == "" {
 		effectiveWorkspaceRoot = workspaceRoot

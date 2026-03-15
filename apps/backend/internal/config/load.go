@@ -19,7 +19,7 @@ func Load() (Config, error) {
 	agentProviderDefault := "codex"
 	agentMaxTurnsDefault := 3
 	agentCommandsDefault := map[string]string{
-		"codex":    "codex exec --skip-git-repo-check --full-auto --dangerously-bypass-approvals-and-sandbox --json {{prompt}}",
+		"codex":    "codex exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox --json {{prompt}}",
 		"claude":   "claude -p {{prompt}} --output-format json --dangerously-skip-permissions",
 		"opencode": "opencode run {{prompt}} --format json",
 		"gemini":   "gemini -p {{prompt}} --output-format stream-json --approval-mode yolo",
