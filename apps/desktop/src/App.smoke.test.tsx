@@ -1137,7 +1137,6 @@ describe('App smoke render', () => {
 
       const sections = [
         { testId: 'sidebar-nav-projects', label: /Projects/i },
-        { testId: 'sidebar-nav-timeline', label: /Activity Feed/i },
         { testId: 'sidebar-nav-settings', label: /Settings/i },
       ]
 

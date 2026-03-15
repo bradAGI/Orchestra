@@ -26,5 +26,5 @@ The Top Bar acts as the global contextual header and control surface.
 ## 📏 Layout Philosophy
 
 - **Flex-Stretching**: The main content area (`App.tsx`) uses a combination of `flex-1` and `min-h-0` to ensure that child components stretch to fill the viewport precisely, preventing unwanted page-level scrolling.
-- **Independent Scrolling**: Scrolling is handled exclusively by `OverlayScrollbarsComponent` wrappers placed *inside* individual panels (like the Activity Feed or the Kanban columns) rather than scrolling the entire page. This ensures the Top Bar and Sidebar are always visible.
+- **Independent Scrolling**: Scrolling is handled exclusively by `OverlayScrollbarsComponent` wrappers placed *inside* individual panels (like the Kanban columns) rather than scrolling the entire page. This ensures the Top Bar and Sidebar are always visible.
 - **High-Density Scaling**: The primary content `div` applies a fixed CSS `zoom` scale (e.g., `zoom: 0.7` or `0.6`) combined with an `origin-top-left` transform. This physically shrinks the rendered elements, providing a "pro-tool" density that can display vast amounts of telemetry data on a single screen without relying on tiny font sizes.

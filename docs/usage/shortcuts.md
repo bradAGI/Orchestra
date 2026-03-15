@@ -17,7 +17,7 @@ Orchestra is built for speed. Use these keyboard shortcuts and navigation patter
 The **Command Palette** (`⌘ K`) allows you to search for any issue ID (e.g., `FETCH-1`) or Project name. Selecting a result will instantly navigate you to that view and open the relevant inspector.
 
 ### Sidebar Management
-You can collapse the sidebar using the chevron icon at the top or the global shortcut. This provides more room for deep-log analysis in the **Activity Feed** or high-density Kanban views.
+You can collapse the sidebar using the chevron icon at the top or the global shortcut. This provides more room for high-density Kanban views.
 
 ## 📋 Table & Board Interactions
 

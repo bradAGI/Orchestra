@@ -8,10 +8,6 @@ The default landing view. A visual, drag-and-drop interface for managing issue s
 - **State Mapping**: Maps task states to visual columns: Backlog, Todo, In Progress, Review, Done.
 - **Interactive Triggers**: Dragging an issue into the `In Progress` column triggers a backend API call to update the issue state, which automatically provisions a workspace and dispatches an agent.
 
-## Activity Feed
-
-A real-time, chronological stream of all system events (e.g., `run_started`, `hook_completed`, `run_failed`). It uses Server-Sent Events (SSE) to update instantly without polling. Accessible from the **Activity Feed** sidebar item.
-
 ## 📂 Project Management (`ProjectGrid` & `ProjectDetailView`)
 
 Views dedicated to managing isolated workspaces.

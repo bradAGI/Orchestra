@@ -3,7 +3,6 @@ import {
   Database,
   FileText,
   FolderTree,
-  History,
   ListTodo,
   Settings2,
   Terminal,
@@ -22,12 +21,6 @@ export const sidebarItems: SidebarItem[] = [
     label: 'Projects',
     description: 'Local workspace grouping',
     icon: FolderTree,
-  },
-  {
-    id: 'timeline',
-    label: 'Activity Feed',
-    description: 'Real-time lifecycle events',
-    icon: History,
   },
   {
     id: 'console',
@@ -64,7 +57,6 @@ export const sidebarItems: SidebarItem[] = [
 export type SectionID =
   | 'dashboard'
   | 'running'
-  | 'timeline'
   | 'issues'
   | 'projects'
   | 'agents'
@@ -76,7 +68,6 @@ export type SectionID =
 const SECTION_IDS: readonly SectionID[] = [
   'dashboard',
   'running',
-  'timeline',
   'issues',
   'projects',
   'agents',
@@ -93,7 +84,6 @@ export function isSectionID(value: string): value is SectionID {
 export type SectionVisibility = {
   showDashboard: boolean
   showRunning: boolean
-  showTimeline: boolean
   showIssueBoard: boolean
   showProjects: boolean
   showAgents: boolean
@@ -106,7 +96,6 @@ export type SectionVisibility = {
 const sectionMeta: Record<SectionID, { label: string; title: string }> = {
   dashboard: { label: 'Operations', title: 'Dashboard' },
   running: { label: 'Operations', title: 'Running' },
-  timeline: { label: 'Diagnostics', title: 'Activity Feed' },
   issues: { label: 'Tracker', title: 'Tasks' },
   projects: { label: 'Workspace', title: 'Projects' },
   agents: { label: 'Compute', title: 'Agents' },
@@ -120,7 +109,6 @@ export function getSectionVisibility(activeSection: SectionID): SectionVisibilit
   return {
     showDashboard: activeSection === 'dashboard',
     showRunning: activeSection === 'running',
-    showTimeline: activeSection === 'timeline',
     showIssueBoard: activeSection === 'issues',
     showProjects: activeSection === 'projects',
     showAgents: activeSection === 'agents',

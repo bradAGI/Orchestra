@@ -20,7 +20,6 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react'
-import type { TimelineItem } from '@/components/app-shell/types'
 import { TerminalView } from '@/components/terminal/TerminalView'
 import {
   fetchArtifactContent,
@@ -787,13 +786,17 @@ export function CreateTaskDialog({
   const [projectID, setProjectID] = useState(initialProjectID || (projects.length > 0 ? projects[0].id : ''))
   const [pending, setPending] = useState(false)
   const [submitError, setSubmitError] = useState('')
-  const [sttReady, setSTTReady] = useState(false)
+  const [sttMode, setSTTMode] = useState<'whisper' | 'webspeech' | 'none'>('none')
   const [sttChecking, setSTTChecking] = useState(false)
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<Blob[]>([])
+  const webSpeechRef = useRef<SpeechRecognition | null>(null)
+  const webSpeechResultRef = useRef('')
+
+  const sttReady = sttMode !== 'none'
 
   useEffect(() => {
     if (open) {
@@ -809,25 +812,26 @@ export function CreateTaskDialog({
   }, [open, initialState, initialProjectID, availableAgents, projects])
 
   useEffect(() => {
-    if (!open || !config) return
+    if (!open) return
     let cancelled = false
     setSTTChecking(true)
-    void fetchSTTHealth(config)
-      .then((health) => {
-        if (!cancelled) {
-          setSTTReady(!!health.ready)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setSTTReady(false)
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setSTTChecking(false)
-        }
-      })
+
+    const checkWhisper = config
+      ? fetchSTTHealth(config)
+          .then((health) => !!health.ready)
+          .catch(() => false)
+      : Promise.resolve(false)
+
+    void checkWhisper.then((whisperOk) => {
+      if (cancelled) return
+      if (whisperOk) {
+        setSTTMode('whisper')
+      } else {
+        const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition
+        setSTTMode(SpeechRecognitionCtor ? 'webspeech' : 'none')
+      }
+      setSTTChecking(false)
+    })
 
     return () => {
       cancelled = true
@@ -843,6 +847,11 @@ export function CreateTaskDialog({
       recorderRef.current = null
       streamRef.current = null
       chunksRef.current = []
+      if (webSpeechRef.current) {
+        webSpeechRef.current.abort()
+        webSpeechRef.current = null
+      }
+      webSpeechResultRef.current = ''
       setRecording(false)
       setTranscribing(false)
     }
@@ -882,12 +891,68 @@ export function CreateTaskDialog({
 
   const stopRecording = () => {
     if (!recording) return
-    recorderRef.current?.stop()
+    if (sttMode === 'webspeech' && webSpeechRef.current) {
+      webSpeechRef.current.stop()
+    } else {
+      recorderRef.current?.stop()
+    }
     setRecording(false)
   }
 
   const startRecording = async () => {
-    if (!config || sttChecking || transcribing || recording) return
+    if (sttChecking || transcribing || recording || sttMode === 'none') return
+
+    if (sttMode === 'webspeech') {
+      try {
+        const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition
+        if (!SpeechRecognitionCtor) return
+        const recognition = new SpeechRecognitionCtor()
+        recognition.continuous = true
+        recognition.interimResults = false
+        recognition.lang = 'en-US'
+        webSpeechResultRef.current = ''
+        webSpeechRef.current = recognition
+
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+          let transcript = ''
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            if (event.results[i].isFinal) {
+              transcript += event.results[i][0].transcript
+            }
+          }
+          webSpeechResultRef.current += transcript
+        }
+
+        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+          if (event.error !== 'aborted') {
+            setSubmitError(`Speech recognition error: ${event.error}`)
+          }
+          setRecording(false)
+          webSpeechRef.current = null
+        }
+
+        recognition.onend = () => {
+          const text = webSpeechResultRef.current.trim()
+          if (text) {
+            setDescription((prev) => (prev.trim() ? `${prev.trimEnd()}\n${text}` : text))
+          }
+          webSpeechRef.current = null
+          webSpeechResultRef.current = ''
+        }
+
+        recognition.start()
+        setRecording(true)
+        setSubmitError('')
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Speech recognition failed'
+        setSubmitError(message)
+        setRecording(false)
+      }
+      return
+    }
+
+    // Whisper mode
+    if (!config) return
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const recorder = new MediaRecorder(stream)
@@ -939,8 +1004,8 @@ export function CreateTaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl bg-card border-border/30 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] p-0 overflow-hidden max-h-[80vh] flex flex-col rounded-2xl">
-        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+      <DialogContent className="max-w-xl bg-card border-border/30 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] p-0 overflow-hidden min-h-[55vh] max-h-[85vh] flex flex-col rounded-2xl">
+        <form onSubmit={handleSubmit} className="flex flex-col h-full flex-1">
           <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pt-6 pb-4 space-y-4">
             <input
               autoFocus
@@ -964,7 +1029,7 @@ export function CreateTaskDialog({
             </div>
           )}
 
-          <div className="border-t border-border/20 px-4 py-3 flex items-center justify-between bg-muted/10">
+          <div className="px-4 py-3 flex items-center justify-between bg-muted/10">
             <div className="flex items-center gap-1">
               <ProjectSelector
                 value={projectID}
@@ -1017,7 +1082,7 @@ export function CreateTaskDialog({
                     stopRecording()
                   }
                 }}
-                disabled={!config || !sttReady || sttChecking || transcribing}
+                disabled={!sttReady || sttChecking || transcribing}
                 className={`h-7 px-3 text-[10px] font-bold uppercase tracking-widest touch-none ${recording ? 'text-red-400' : 'text-muted-foreground/50 hover:text-foreground'}`}
               >
                 {recording ? <Square className="h-3 w-3 mr-1" /> : <Mic className="h-3 w-3 mr-1" />}

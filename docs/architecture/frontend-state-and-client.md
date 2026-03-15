@@ -17,7 +17,7 @@ The heart of the live dashboard is the `startRuntimeSync` function. It manages a
 ### 1. Server-Sent Events (SSE) - "Live Mode"
 When the app loads, it immediately attempts to open a persistent HTTP connection to `/api/v1/events`. 
 - **`snapshot` event**: Pushes the entire system state (all running agents, the retry queue, token totals).
-- **Lifecycle Events**: Pushes granular updates like `run_started`, `run_failed`, or `hook_completed`. These are routed directly into the **Activity Feed** (`TimelineCard`) to provide a real-time narrative of the agent's actions.
+- **Lifecycle Events**: Pushes granular updates like `run_started`, `run_failed`, or `hook_completed`. These are stored as timeline events and used by the Issue Inspector to provide contextual activity history.
 
 ### 2. Polling Fallback - "Degraded Mode"
 If the backend SSE connection drops (e.g., server restarts, network partition) or if the UI is running against a remote, protected host that blocks SSE streams:

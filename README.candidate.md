@@ -42,7 +42,7 @@ Orchestra coordinates issue execution through agent providers, stores runtime/se
 - Task/issue lifecycle APIs (list/create/update/delete, history, logs, diff, artifacts, stop session, create PR).
 - Project operations APIs including file tree/content and git actions (`status`, `diff`, `commit`, `push`, `pull`).
 - MCP integration for listing tools/servers and executing external tools through orchestrated runs.
-- Desktop operator console with sections for dashboard, tasks, running queue, projects, timeline, console, agents, warehouse, settings, and docs.
+- Desktop operator console with sections for dashboard, tasks, running queue, projects, console, agents, warehouse, settings, and docs.
 - Terminal WebSocket endpoint for interactive sessions: `GET /api/v1/terminal/{session_id}`.
 
 ## Tech Stack

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, Database, FolderTree, History, ListTodo, RefreshCcw, Settings2, Cpu, Zap, FileText, Terminal } from 'lucide-react'
+import { Activity, Database, FolderTree, ListTodo, RefreshCcw, Settings2, Cpu, Zap, FileText, Terminal } from 'lucide-react'
 import {
   IssueDetailView,
   CreateTaskDialog,
@@ -67,7 +67,6 @@ import {
   sidebarItems,
   type SectionID,
 } from '@app/routes/sections'
-import { TimelineCard } from '@widgets/timeline'
 import { KanbanBoard } from '@widgets/kanban'
 import type { IssueDetailResult, ToolSummary } from '@widgets/issue-detail/types'
 import { Command } from 'cmdk'
@@ -1219,12 +1218,6 @@ export default function App() {
                     onStopSession={handleStopSession}
                     onCreateIssue={handleCreateIssue}
                   />
-                </section>
-              ) : null}
-
-              {sectionVisibility.showTimeline ? (
-                <section className="flex-1 flex flex-col min-h-0">
-                  <TimelineCard timeline={timeline} />
                 </section>
               ) : null}
 
