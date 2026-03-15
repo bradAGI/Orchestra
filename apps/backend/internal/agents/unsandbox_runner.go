@@ -1,10 +1,14 @@
 package agents
 
 import (
+	"archive/tar"
 	"bufio"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -133,6 +137,16 @@ func (r *UnsandboxRunner) RunTurn(ctx context.Context, request TurnRequest, onEv
 		}
 	}
 
+	// Symlink claude JSONL output to /root/output so unsandbox makes it downloadable.
+	// Claude writes sessions to ~/.claude/projects/ — link the whole tree.
+	// Also link any unfirehose output dirs that agents may create.
+	symlinkCmd := strings.Join([]string{
+		"mkdir -p /root/output",
+		"ln -sf ~/.claude/projects /root/output/claude-sessions 2>/dev/null; true",
+		"ln -sf ~/.claude/todos /root/output/claude-todos 2>/dev/null; true",
+	}, " && ")
+	r.client.ShellSession(ctx, remoteSessionID, symlinkCmd)
+
 	emit("bootstrap_completed", "container ready", nil)
 
 	// 3. Build and execute the agent command inside the workspace
@@ -187,7 +201,28 @@ func (r *UnsandboxRunner) RunTurn(ctx context.Context, request TurnRequest, onEv
 		}
 	}
 
-	// 5. Emit completion
+	// 5. Retrieve JSONL artifacts from /root/output before session ends.
+	// Claude writes full session JSONL inside the container — the symlinks
+	// at /root/output/claude-sessions make them downloadable.
+	// Tar them up, base64, stream back via shell, extract locally.
+	emit("artifacts", "retrieving session JSONL from container", nil)
+	extractCmd := "cd /root/output && tar czf - claude-sessions claude-todos 2>/dev/null | base64"
+	tarResult, tarErr := r.client.ShellSession(ctx, remoteSessionID, extractCmd)
+	if tarErr == nil && tarResult != nil && tarResult.Output != "" {
+		tarData, decErr := base64.StdEncoding.DecodeString(strings.TrimSpace(tarResult.Output))
+		if decErr == nil && len(tarData) > 0 {
+			// Extract into ~/.orchestra/unfirehose/artifacts/{sessionID}/
+			u, _ := user.Current()
+			if u != nil {
+				artifactDir := filepath.Join(u.HomeDir, ".orchestra", "unfirehose", "artifacts", sessionID)
+				os.MkdirAll(artifactDir, 0755)
+				extractTarGz(tarData, artifactDir)
+				emit("artifacts", fmt.Sprintf("saved %d bytes of session JSONL to %s", len(tarData), artifactDir), nil)
+			}
+		}
+	}
+
+	// 6. Emit completion
 	exitCode := 0
 	if result.Status == "error" || result.Error != "" {
 		exitCode = 1
@@ -246,6 +281,49 @@ func syncCredentials() string {
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+// extractTarGz extracts a gzipped tarball into a directory.
+func extractTarGz(data []byte, destDir string) error {
+	gr, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	defer gr.Close()
+
+	tr := tar.NewReader(gr)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		target := filepath.Join(destDir, filepath.Clean(header.Name))
+		// Prevent path traversal
+		if !strings.HasPrefix(target, filepath.Clean(destDir)+string(os.PathSeparator)) && target != filepath.Clean(destDir) {
+			continue
+		}
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			os.MkdirAll(target, 0755)
+		case tar.TypeReg:
+			os.MkdirAll(filepath.Dir(target), 0755)
+			f, err := os.Create(target)
+			if err != nil {
+				continue
+			}
+			io.Copy(f, tr)
+			f.Close()
+		case tar.TypeSymlink:
+			os.MkdirAll(filepath.Dir(target), 0755)
+			os.Symlink(header.Linkname, target)
+		}
+	}
+	return nil
 }
 
 // detectGitRemote tries to find the origin remote URL for a workspace path.
