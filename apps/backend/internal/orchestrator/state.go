@@ -34,6 +34,7 @@ type RunningEntry struct {
 	IssueID         string   `json:"issue_id"`
 	IssueIdentifier string   `json:"issue_identifier"`
 	Title           string   `json:"title,omitempty"`
+	Description     string   `json:"description,omitempty"`
 	State           string   `json:"state"`
 	AssigneeID      string   `json:"assignee_id,omitempty"`
 	ProjectID       string   `json:"project_id,omitempty"`
@@ -294,6 +295,23 @@ func (s *Service) SetTrackerClient(client tracker.Client) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.trackerClient = client
+}
+
+func (s *Service) FetchIssueByID(ctx context.Context, issueID string) (*tracker.Issue, error) {
+	s.mu.RLock()
+	client := s.trackerClient
+	s.mu.RUnlock()
+	if client == nil {
+		return nil, fmt.Errorf("no tracker client configured")
+	}
+	issues, err := client.FetchIssuesByIDs(ctx, []string{issueID})
+	if err != nil {
+		return nil, err
+	}
+	if len(issues) == 0 {
+		return nil, fmt.Errorf("issue not found: %s", issueID)
+	}
+	return &issues[0], nil
 }
 
 func (s *Service) SetDB(database *db.DB) {
@@ -816,6 +834,7 @@ func (s *Service) enqueueCandidates(candidates []tracker.Issue) {
 			IssueID:         issue.ID,
 			IssueIdentifier: issue.Identifier,
 			Title:           issue.Title,
+			Description:     issue.Description,
 			State:           issue.State,
 			AssigneeID:      issue.AssigneeID,
 			ProjectID:       issue.ProjectID,

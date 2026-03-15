@@ -27,6 +27,34 @@ func TestWriteSessionLogCreatesSessionAndLatest(t *testing.T) {
 	}
 }
 
+func TestResetLatestLogCreatesWorkingSymlink(t *testing.T) {
+	root := t.TempDir()
+	issueID := "ORC-10"
+	sessionID := "ORC-10-12345"
+
+	_, err := WriteSessionLog(root, issueID, sessionID, "test log content")
+	if err != nil {
+		t.Fatalf("write session log: %v", err)
+	}
+
+	latestPath := filepath.Join(root, "_logs", "ORC-10", "latest.log")
+	content, err := os.ReadFile(latestPath)
+	if err != nil {
+		t.Fatalf("read latest.log via symlink: %v", err)
+	}
+	if string(content) != "test log content" {
+		t.Fatalf("unexpected latest.log content: %q", string(content))
+	}
+
+	target, err := os.Readlink(latestPath)
+	if err != nil {
+		t.Fatalf("readlink latest.log: %v", err)
+	}
+	if filepath.IsAbs(target) {
+		t.Fatalf("expected relative symlink target, got %q", target)
+	}
+}
+
 func TestWriteSessionLogSanitizesPaths(t *testing.T) {
 	root := t.TempDir()
 	path, err := WriteSessionLog(root, "ORC/55", "thread:1", "ok")

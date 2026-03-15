@@ -900,3 +900,24 @@ func TestRevalidateClaimedIssueReturnsErrorOnTrackerFailure(t *testing.T) {
 		t.Fatalf("expected running entry unchanged on tracker failure, got %+v", snapshot.Running)
 	}
 }
+
+func TestPerformRefreshCarriesDescriptionIntoRunningEntry(t *testing.T) {
+	service := NewService()
+	service.SetStateSets([]string{"Todo", "In Progress"}, []string{"Done"})
+	service.SetTrackerClient(memory.NewClient([]tracker.Issue{
+		{ID: "1", Identifier: "ORC-1", State: "Todo", AssignedToWorker: true, Title: "Fix bug", Description: "Detailed description of the bug"},
+	}))
+
+	service.QueueRefresh()
+	if err := service.PerformRefresh(context.Background()); err != nil {
+		t.Fatalf("perform refresh: %v", err)
+	}
+
+	snapshot := service.Snapshot()
+	if len(snapshot.Running) != 1 {
+		t.Fatalf("expected 1 running, got %d", len(snapshot.Running))
+	}
+	if snapshot.Running[0].Description != "Detailed description of the bug" {
+		t.Fatalf("expected description carried through, got %q", snapshot.Running[0].Description)
+	}
+}

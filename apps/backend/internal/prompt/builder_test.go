@@ -67,6 +67,35 @@ func TestBuildSupportsLowercaseLiquidStyleKeysAndIssueParityFields(t *testing.T)
 	}
 }
 
+func TestBuildRendersDescriptionInTemplate(t *testing.T) {
+	workflowPath := filepath.Join(t.TempDir(), "WORKFLOW.md")
+	content := "---\n---\nTask: {{ .Issue.Title }}\n\n{{ .Issue.Description }}"
+	if err := os.WriteFile(workflowPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("write workflow: %v", err)
+	}
+
+	prompt, err := Build(workflowPath, BuildInput{
+		Issue: tracker.Issue{
+			ID:          "1",
+			Identifier:  "ORC-9",
+			Title:       "Fix bug",
+			Description: "The login button is broken on mobile",
+			State:       "Todo",
+		},
+		Attempt: 1,
+	})
+	if err != nil {
+		t.Fatalf("build prompt: %v", err)
+	}
+
+	if !strings.Contains(prompt, "Fix bug") {
+		t.Fatalf("expected title in prompt, got %q", prompt)
+	}
+	if !strings.Contains(prompt, "The login button is broken on mobile") {
+		t.Fatalf("expected description in prompt, got %q", prompt)
+	}
+}
+
 func TestBuildFailsWhenWorkflowPromptIsEmpty(t *testing.T) {
 	workflowPath := filepath.Join(t.TempDir(), "WORKFLOW.md")
 	content := "---\n---\n"

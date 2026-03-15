@@ -210,6 +210,19 @@ func processExecutionTick(
 		return
 	}
 
+	// Backfill title/description from tracker if missing (e.g. retry path creates entries without these fields)
+	if entry.Title == "" || entry.Description == "" {
+		issue, fetchErr := service.FetchIssueByID(context.Background(), entry.IssueID)
+		if fetchErr == nil && issue != nil {
+			if entry.Title == "" {
+				entry.Title = issue.Title
+			}
+			if entry.Description == "" {
+				entry.Description = issue.Description
+			}
+		}
+	}
+
 	// Resolve provider from entry or configuration
 	activeProvider := provider
 	activeProviderName := providerName
@@ -233,6 +246,7 @@ func processExecutionTick(
 	// If the task belongs to a project, use the project's root_path as the workspace
 	// so the agent operates on the actual codebase, not an empty temp directory.
 	var workspacePath string
+	var effectiveWorkspaceRoot string
 	var created bool
 	var createRes workspace.HookResult
 	var err error
@@ -241,9 +255,13 @@ func processExecutionTick(
 		if projErr == nil && project.RootPath != "" && filepath.IsAbs(project.RootPath) {
 			if info, statErr := os.Stat(project.RootPath); statErr == nil && info.IsDir() {
 				workspacePath = project.RootPath
+				effectiveWorkspaceRoot = filepath.Dir(project.RootPath)
 				logger.Info().Str("issue_id", entry.IssueID).Str("project_path", workspacePath).Msg("using project root as workspace")
 			}
 		}
+	}
+	if effectiveWorkspaceRoot == "" {
+		effectiveWorkspaceRoot = workspaceRoot
 	}
 
 	if workspacePath == "" {
@@ -341,12 +359,12 @@ func processExecutionTick(
 		"attempt":          attempt,
 	})
 	renderedPrompt, promptErr := prompt.Build(workflowFile, prompt.BuildInput{
-		Issue:   tracker.Issue{ID: entry.IssueID, Identifier: entry.IssueIdentifier, Title: entry.Title, State: entry.State},
+		Issue:   tracker.Issue{ID: entry.IssueID, Identifier: entry.IssueIdentifier, Title: entry.Title, Description: entry.Description, State: entry.State},
 		Attempt: attempt,
 	})
 	if promptErr != nil {
 		logger.Warn().Err(promptErr).Str("issue_id", entry.IssueID).Msg("prompt build failed; using fallback prompt")
-		renderedPrompt = buildExecutionPrompt(entry.IssueIdentifier, attempt)
+		renderedPrompt = buildExecutionPrompt(entry.IssueIdentifier, entry.Title, entry.Description, attempt)
 	}
 
 	runCtx, cancel := context.WithCancel(context.Background())
@@ -408,6 +426,8 @@ func processExecutionTick(
 
 	sessionID := fmt.Sprintf("%s-%d", entry.IssueIdentifier, time.Now().UnixNano())
 	_ = logfile.ResetLatestLog(workspaceRoot, entry.IssueIdentifier, sessionID)
+	sessionLogPath := filepath.Join(workspaceRoot, "_logs", logfile.Sanitize(entry.IssueIdentifier), "latest.log")
+	service.RecordRunArtifact(entry.IssueID, activeProviderName, sessionID, sessionLogPath)
 
 	if warehouseDB != nil {
 		// Link session to the task's project — never create new projects from the execution worker
@@ -417,7 +437,7 @@ func processExecutionTick(
 	result, runErr := registry.RunTurn(runCtx, activeProvider, agents.TurnRequest{
 		SessionID:       sessionID,
 		Workspace:       workspacePath,
-		WorkspaceRoot:   workspaceRoot,
+		WorkspaceRoot:   effectiveWorkspaceRoot,
 		Prompt:          renderedPrompt,
 		IssueIdentifier: entry.IssueIdentifier,
 		Attempt:         int(attempt),
@@ -545,8 +565,13 @@ func processExecutionTick(
 	publishSnapshot(pubsub, service)
 }
 
-func buildExecutionPrompt(issueIdentifier string, attempt int64) string {
-	return fmt.Sprintf("Issue %s attempt %d. Follow WORKFLOW.md and implement required changes.", issueIdentifier, attempt)
+func buildExecutionPrompt(issueIdentifier string, title string, description string, attempt int64) string {
+	prompt := fmt.Sprintf("You are an autonomous coding agent working on issue **%s**.\n\n## Task\n**%s**\n\n%s", issueIdentifier, title, description)
+	if strings.TrimSpace(description) != "" {
+		prompt += "\n"
+	}
+	prompt += fmt.Sprintf("\n## Instructions\n\n1. First, write an **Operational Plan** using markdown checkboxes:\n   - [ ] step one\n   - [ ] step two\n\n2. Work through each step. After completing a step, restate the plan with that item checked.\n\n3. Use the tools available to implement the changes.\n\n4. When all steps are complete, verify your work and restate the final plan with all items checked.\n\nAttempt: %d", attempt)
+	return prompt
 }
 
 func cleanupTerminalWorkspaces(service *orchestrator.Service, trackerClient tracker.Client, workspaceService workspace.Service, hooks workspace.Hooks, logger zerolog.Logger) {

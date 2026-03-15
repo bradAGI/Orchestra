@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/orchestra/orchestra/apps/backend/internal/mcp"
@@ -455,19 +456,43 @@ func (s *Server) GetIssueLogs(w http.ResponseWriter, r *http.Request) {
 	if ok && runtime.Running != nil && runtime.Running.SessionLogPath != "" {
 		logPath = runtime.Running.SessionLogPath
 	} else {
-		// Try fallback to disk in the global logs directory
-		logPath = filepath.Join(s.workspaceRoot, "_logs", identifier, "latest.log")
+		// Try latest.log symlink first
+		candidate := filepath.Join(s.workspaceRoot, "_logs", identifier, "latest.log")
+		if _, err := os.Stat(candidate); err == nil {
+			logPath = candidate
+		} else {
+			// Scan for most recent .log file in the directory
+			logsDir := filepath.Join(s.workspaceRoot, "_logs", identifier)
+			entries, dirErr := os.ReadDir(logsDir)
+			if dirErr == nil {
+				var newest string
+				var newestTime time.Time
+				for _, e := range entries {
+					if e.IsDir() || !strings.HasSuffix(e.Name(), ".log") || e.Name() == "latest.log" {
+						continue
+					}
+					info, infoErr := e.Info()
+					if infoErr != nil {
+						continue
+					}
+					if newest == "" || info.ModTime().After(newestTime) {
+						newest = filepath.Join(logsDir, e.Name())
+						newestTime = info.ModTime()
+					}
+				}
+				logPath = newest
+			}
+		}
 	}
 
-	// Check if log file exists
 	if logPath == "" {
-		writeJSONError(w, http.StatusNotFound, "logs_not_found", "no logs found for this issue")
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("# No logs available yet\n\nThis issue hasn't started processing or logs haven't been created."))
 		return
 	}
 
-	// Check if file actually exists
 	if _, err := os.Stat(logPath); os.IsNotExist(err) {
-		// Return empty logs response instead of 404 for issues that haven't started
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("# No logs available yet\n\nThis issue hasn't started processing or logs haven't been created."))
