@@ -78,30 +78,64 @@ func (r *UnsandboxRunner) RunTurn(ctx context.Context, request TurnRequest, onEv
 	remoteSessionID := unsandboxSession.ID
 	emit("session_created", fmt.Sprintf("unsandbox session %s ready", remoteSessionID), map[string]any{"unsandbox_session_id": remoteSessionID})
 
-	// 2. Bootstrap: sync credentials + clone repo + install agent
-	bootstrapScript := r.buildBootstrapScript(request)
-	if bootstrapScript != "" {
-		emit("bootstrap_started", "bootstrapping container", nil)
+	// 2. Bootstrap: sync credentials, inject project files, install agent
+	emit("bootstrap_started", "bootstrapping container", nil)
 
-		bootResult, err := r.client.ShellSession(ctx, remoteSessionID, bootstrapScript)
-		if err != nil {
-			emit("bootstrap_failed", fmt.Sprintf("bootstrap error: %s", err), nil)
-			// Don't abort — the agent command might still work
-		} else if bootResult != nil && bootResult.Output != "" {
-			// Emit bootstrap output as events
-			scanner := bufio.NewScanner(strings.NewReader(bootResult.Output))
-			for scanner.Scan() {
-				line := scanner.Text()
-				if strings.TrimSpace(line) != "" {
-					emit("bootstrap", line, nil)
-				}
-			}
+	// Sync credentials
+	if credScript := syncCredentials(); credScript != "" {
+		if _, err := r.client.ShellSession(ctx, remoteSessionID, credScript); err != nil {
+			emit("bootstrap_warning", fmt.Sprintf("credential sync failed: %s", err), nil)
 		}
-
-		emit("bootstrap_completed", "container bootstrapped", nil)
 	}
 
-	// 3. Build and execute the agent command
+	// Inject project files into container
+	repoName := "project"
+	if request.Workspace != "" {
+		repoName = filepath.Base(request.Workspace)
+	}
+	workDir := "/workspace/" + repoName
+
+	if request.Workspace != "" {
+		repoURL := detectGitRemote(request.Workspace)
+		if repoURL != "" {
+			// Public/SSH repo — clone it
+			emit("bootstrap", fmt.Sprintf("cloning %s", repoURL), nil)
+			cloneCmd := fmt.Sprintf("git clone '%s' '%s' 2>&1 || mkdir -p '%s'", repoURL, workDir, workDir)
+			if _, err := r.client.ShellSession(ctx, remoteSessionID, cloneCmd); err != nil {
+				emit("bootstrap_warning", fmt.Sprintf("git clone failed: %s", err), nil)
+			}
+		} else {
+			// No remote — tar + base64 + inject via chunked heredoc
+			emit("bootstrap", "uploading project files via tarball", nil)
+			if err := r.client.InjectDirectory(ctx, remoteSessionID, request.Workspace, workDir); err != nil {
+				emit("bootstrap_warning", fmt.Sprintf("project upload failed: %s", err), nil)
+				// Create empty dir as fallback
+				r.client.ShellSession(ctx, remoteSessionID, fmt.Sprintf("mkdir -p '%s'", workDir))
+			} else {
+				emit("bootstrap", "project files uploaded", nil)
+			}
+		}
+	} else {
+		r.client.ShellSession(ctx, remoteSessionID, fmt.Sprintf("mkdir -p '%s'", workDir))
+	}
+
+	// Install claude CLI if needed
+	if strings.Contains(r.command, "claude") {
+		installCmd := strings.Join([]string{
+			`export PATH="$HOME/.local/bin:$PATH"`,
+			"if ! command -v claude >/dev/null 2>&1; then",
+			"  curl -fsSL https://claude.ai/install.sh | bash 2>&1",
+			"fi",
+			`grep -q ".local/bin" ~/.bashrc 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc`,
+		}, "\n")
+		if _, err := r.client.ShellSession(ctx, remoteSessionID, installCmd); err != nil {
+			emit("bootstrap_warning", fmt.Sprintf("claude install failed: %s", err), nil)
+		}
+	}
+
+	emit("bootstrap_completed", "container ready", nil)
+
+	// 3. Build and execute the agent command inside the workspace
 	finalPrompt := strings.TrimSpace(request.Prompt)
 	commandLine := r.command
 	if strings.TrimSpace(request.CommandOverride) != "" {
@@ -114,6 +148,9 @@ func (r *UnsandboxRunner) RunTurn(ctx context.Context, request TurnRequest, onEv
 	} else {
 		agentCmd = finalPrompt
 	}
+
+	// Wrap in cd to workspace + PATH setup
+	agentCmd = fmt.Sprintf("export PATH=\"$HOME/.local/bin:$PATH\" && cd '%s' && %s", workDir, agentCmd)
 
 	emit("run_started", "executing agent in unsandbox", nil)
 
@@ -174,49 +211,6 @@ func (r *UnsandboxRunner) RunTurn(ctx context.Context, request TurnRequest, onEv
 	}, nil
 }
 
-// buildBootstrapScript generates the container setup script.
-// Mirrors the unfirehose bootstrap pattern: credentials, repo, agent install.
-func (r *UnsandboxRunner) buildBootstrapScript(request TurnRequest) string {
-	var parts []string
-	parts = append(parts, "#!/bin/bash", "set -e")
-
-	// Sync Claude credentials (if available locally)
-	if credScript := syncCredentials(); credScript != "" {
-		parts = append(parts, credScript)
-	}
-
-	// Clone the workspace repo if we can detect a git remote
-	if request.Workspace != "" {
-		repoURL := detectGitRemote(request.Workspace)
-		repoName := filepath.Base(request.Workspace)
-		workDir := "/workspace/" + repoName
-
-		if repoURL != "" {
-			parts = append(parts,
-				fmt.Sprintf("git clone '%s' '%s' 2>&1 || mkdir -p '%s'", repoURL, workDir, workDir),
-				fmt.Sprintf("cd '%s'", workDir),
-			)
-		} else {
-			parts = append(parts, fmt.Sprintf("mkdir -p '%s' && cd '%s'", workDir, workDir))
-		}
-	}
-
-	// Install claude CLI if the command references it
-	if strings.Contains(r.command, "claude") {
-		parts = append(parts,
-			`export PATH="$HOME/.local/bin:$PATH"`,
-			"if ! command -v claude >/dev/null 2>&1; then",
-			"  curl -fsSL https://claude.ai/install.sh | bash 2>&1",
-			"fi",
-			`grep -q ".local/bin" ~/.bashrc 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc`,
-		)
-	}
-
-	if len(parts) <= 2 {
-		return "" // nothing to bootstrap
-	}
-	return strings.Join(parts, "\n")
-}
 
 // syncCredentials reads local Claude credentials and returns shell commands
 // to inject them into the container with secure permissions.
