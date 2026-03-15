@@ -336,6 +336,20 @@ func processExecutionTick(
 	}
 
 	if entry.TurnCount == 0 {
+		// Record base SHA before any changes
+		if workspacePath != "" {
+			headCmd := exec.Command("git", "rev-parse", "HEAD")
+			headCmd.Dir = workspacePath
+			if headOut, headErr := headCmd.Output(); headErr == nil {
+				baseSHA := strings.TrimSpace(string(headOut))
+				if baseSHA != "" {
+					if _, updateErr := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"base_sha": baseSHA}); updateErr != nil {
+						logger.Warn().Err(updateErr).Msg("failed to store base SHA on issue")
+					}
+				}
+			}
+		}
+
 		// Create a git branch for this task so changes don't collide with other agents
 		if workspacePath != "" && entry.ProjectID != "" {
 			branchName := strings.ToLower(strings.ReplaceAll(entry.IssueIdentifier, " ", "-"))

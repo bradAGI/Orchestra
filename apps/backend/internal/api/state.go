@@ -258,6 +258,7 @@ func (s *Server) GetIssue(w http.ResponseWriter, r *http.Request) {
 			"disabled_tools":   issue.DisabledTools,
 			"created_at":       issue.CreatedAt,
 			"updated_at":       issue.UpdatedAt,
+			"base_sha":         issue.BaseSHA,
 			"status":           "idle",
 			"history":          history,
 			"attempts": map[string]any{
@@ -343,6 +344,7 @@ func (s *Server) GetIssue(w http.ResponseWriter, r *http.Request) {
 		"disabled_tools":   []string{},
 		"created_at":       "",
 		"updated_at":       "",
+		"base_sha":         "",
 		"status":           presented["status"],
 		"attempts": map[string]any{
 			"restart_count":         restartCount,
@@ -389,6 +391,7 @@ func (s *Server) GetIssue(w http.ResponseWriter, r *http.Request) {
 		}
 		response["created_at"] = issueDetails.CreatedAt
 		response["updated_at"] = issueDetails.UpdatedAt
+		response["base_sha"] = issueDetails.BaseSHA
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -565,8 +568,14 @@ func (s *Server) GetIssueDiff(w http.ResponseWriter, r *http.Request) {
 					if out2, _ := cmd2.CombinedOutput(); len(out2) > 0 {
 						allDiff = append(allDiff, out2...)
 					}
+				} else if issues[0].BaseSHA != "" {
+					// No branch but we have a base SHA — diff from base to HEAD
+					cmd := exec.CommandContext(r.Context(), "git", "diff", issues[0].BaseSHA+"...HEAD")
+					cmd.Dir = project.RootPath
+					tracked, _ := cmd.CombinedOutput()
+					allDiff = append(allDiff, tracked...)
 				} else {
-					// No task branch — show uncommitted changes only
+					// No branch, no base SHA — show uncommitted changes only
 					cmd := exec.CommandContext(r.Context(), "git", "diff", "HEAD")
 					cmd.Dir = project.RootPath
 					tracked, _ := cmd.CombinedOutput()
