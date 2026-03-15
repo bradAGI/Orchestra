@@ -35,8 +35,8 @@ func TestLoad_UsesOrchestraEnv(t *testing.T) {
 	if cfg.WorkflowFile != "WORKFLOW.md" {
 		t.Fatalf("expected default workflow file WORKFLOW.md, got=%q", cfg.WorkflowFile)
 	}
-	if cfg.AgentMaxTurns != 3 {
-		t.Fatalf("expected default agent max turns 3, got=%d", cfg.AgentMaxTurns)
+	if cfg.AgentMaxTurns != 25 {
+		t.Fatalf("expected default agent max turns 25, got=%d", cfg.AgentMaxTurns)
 	}
 }
 
@@ -223,8 +223,8 @@ func TestLoad_InvalidAgentMaxTurnsFallsBackToDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected config load success, got err=%v", err)
 	}
-	if cfg.AgentMaxTurns != 3 {
-		t.Fatalf("expected default agent max turns 3, got=%d", cfg.AgentMaxTurns)
+	if cfg.AgentMaxTurns != 25 {
+		t.Fatalf("expected default agent max turns 25, got=%d", cfg.AgentMaxTurns)
 	}
 }
 
