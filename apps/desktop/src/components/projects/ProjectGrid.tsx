@@ -224,18 +224,24 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
     return (
         <div className="flex flex-col h-full bg-transparent">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border sticky top-0 bg-background/80 backdrop-blur-xl z-20">
-                <div className="flex items-center gap-4">
-                    <div className="relative w-72">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
-                        <input
-                            type="text"
-                            placeholder="Search workspace..."
-                            value={search}
-                            onChange={handleSearchChange}
-                            className="w-full pl-10 pr-4 h-10 bg-muted/50 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-muted-foreground/60"
-                        />
-                    </div>
+                <div className="relative w-72">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+                    <input
+                        type="text"
+                        placeholder="Search workspace..."
+                        value={search}
+                        onChange={handleSearchChange}
+                        className="w-full pl-10 pr-4 h-10 bg-muted/50 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-muted-foreground/60"
+                    />
+                </div>
 
+                <div className="flex items-center gap-2">
+                    <AppTooltip content="Add Local Repository">
+                        <Button variant="default" size="default" onClick={onAddProject} className="h-9 gap-2 bg-primary text-xs hover:bg-primary/90 shadow-lg shadow-primary/20">
+                            <Plus size={16} />
+                            <span className="font-bold uppercase tracking-widest text-[10px]">Add Project</span>
+                        </Button>
+                    </AppTooltip>
                     <div className="flex items-center bg-muted/30 p-1 rounded-xl border border-border/50 shadow-inner">
                         <AppTooltip content="Grid View">
                             <Button
@@ -259,13 +265,6 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
                         </AppTooltip>
                     </div>
                 </div>
-
-                <AppTooltip content="Add Local Repository">
-                    <Button variant="default" size="default" onClick={onAddProject} className="h-9 gap-2 bg-primary text-xs hover:bg-primary/90 shadow-lg shadow-primary/20">
-                        <Plus size={16} />
-                        <span className="font-bold uppercase tracking-widest text-[10px]">Add Project</span>
-                    </Button>
-                </AppTooltip>
             </div>
 
             <div className="flex-1 flex flex-col overflow-hidden min-h-0 custom-scrollbar">
