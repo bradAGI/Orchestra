@@ -240,6 +240,13 @@ export function IssueDetailView({
     if (newState !== 'In Progress' && isRunning && onStopSession) {
       await onStopSession(provider)
     }
+    // Reset plan/activity/output when moving back to Backlog or Todo
+    if (newState === 'Backlog' || newState === 'Todo') {
+      setIssueHistory([])
+      setLogs('')
+      setDiffFiles([])
+      setActiveDiffFile(null)
+    }
     if (onUpdate) await onUpdate({ state: newState })
   }
 

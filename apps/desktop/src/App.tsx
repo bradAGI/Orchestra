@@ -1282,7 +1282,7 @@ export default function App() {
       </AppShell>
 
       <Dialog open={inspectDialogOpen} onOpenChange={setInspectDialogOpen}>
-        <DialogContent className="max-w-[98vw] w-[98vw] h-[96vh] max-h-[96vh] overflow-hidden flex flex-col p-4">
+        <DialogContent className="!fixed !inset-0 !translate-x-0 !translate-y-0 !left-0 !top-0 !max-w-none w-full h-full overflow-hidden flex flex-col p-6 rounded-none border-none" style={{ zoom: 0.6 }}>
           <DialogHeader className="sr-only">
             <DialogTitle>Issue Inspector</DialogTitle>
             <DialogDescription>Task details</DialogDescription>
