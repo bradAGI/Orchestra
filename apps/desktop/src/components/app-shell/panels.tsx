@@ -163,8 +163,9 @@ export function DashboardOverview({
                 <div 
                   key={project.id} 
                   onClick={() => onProjectClick(project.id)}
-                  className="group relative p-6 rounded-3xl border border-border/60 bg-card hover:border-primary/40 hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500 cursor-pointer overflow-hidden"
+                  className="group relative p-6 rounded-3xl border border-border/60 bg-gradient-to-b from-card via-card to-muted/20 hover:border-primary/40 hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500 cursor-pointer overflow-hidden"
                 >
+                  <div className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br from-primary/[0.04] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
                     <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                       <ChevronRight className="h-4 w-4" />
@@ -323,7 +324,8 @@ export function SettingsCard({
         <div className="w-full flex-1 flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-400">
           {activeTab === 'backend' && (
             <div className="flex min-h-0 flex-1 flex-col">
-              <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-border/40 bg-card p-6 shadow-sm transition-all hover:shadow-md">
+              <div className="group relative flex min-h-0 flex-1 flex-col rounded-2xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 p-6 shadow-sm transition-all hover:shadow-md overflow-hidden">
+                <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 <BackendConfigForm
                   loadingConfig={loadingConfig}
                   savingConfig={savingConfig}
@@ -344,7 +346,8 @@ export function SettingsCard({
           {activeTab === 'agents' && (
             <div className="space-y-6 flex-1 flex flex-col">
               {agentConfig ? (
-                <div className="rounded-2xl border border-border/40 bg-card p-6 shadow-sm transition-all hover:shadow-md">
+                <div className="group relative rounded-2xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 p-6 shadow-sm transition-all hover:shadow-md overflow-hidden">
+                  <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   <AgentConfigForm
                     agentConfig={agentConfig}
                     onSave={onSaveAgentConfig}
@@ -362,7 +365,8 @@ export function SettingsCard({
 
           {activeTab === 'migration' && (
             <div className="space-y-6 flex-1 flex flex-col">
-              <div className="rounded-2xl border border-border/40 bg-card p-6 shadow-sm transition-all hover:shadow-md">
+              <div className="group relative rounded-2xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 p-6 shadow-sm transition-all hover:shadow-md overflow-hidden">
+                <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 text-primary/80">
                     <RefreshCcw className="h-4 w-4" />
@@ -398,7 +402,7 @@ export function SettingsCard({
                   { label: 'Toggle Sidebar', desc: 'Collapse/expand navigation', keys: [isMac ? '⌘' : 'Ctrl', '/'] },
                   { label: 'Quick Switch', desc: 'Back to operations overview', keys: [isMac ? '⌥' : 'Alt', '1'] },
                 ].map((s, idx) => (
-                  <div key={idx} className="group/item flex items-center justify-between p-4 rounded-xl border border-border/40 bg-card shadow-sm transition-all hover:border-primary/20">
+                  <div key={idx} className="group/item relative flex items-center justify-between p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 shadow-sm transition-all hover:border-primary/20 overflow-hidden">
                     <div className="space-y-0.5">
                       <p className="text-xs font-black tracking-tight">{s.label}</p>
                       <p className="text-[10px] text-muted-foreground leading-tight">{s.desc}</p>
@@ -427,7 +431,8 @@ export function SettingsCard({
           {activeTab === 'notifications' && (
             <div className="space-y-6 pb-6">
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-xl border border-border/40 bg-card">
+                <div className="group relative flex items-center justify-between p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 overflow-hidden">
+                  <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   <div className="space-y-0.5">
                     <p className="text-xs font-black tracking-tight">Mute All Sounds</p>
                     <p className="text-[10px] text-muted-foreground">Disable notification sounds when agents complete</p>
@@ -448,7 +453,8 @@ export function SettingsCard({
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl border border-border/40 bg-card space-y-3">
+                <div className="group relative p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 space-y-3 overflow-hidden">
+                  <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <p className="text-xs font-black tracking-tight">Notification Sound</p>
@@ -516,7 +522,8 @@ export function SettingsCard({
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl border border-border/40 bg-card space-y-3">
+                <div className="group relative p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 space-y-3 overflow-hidden">
+                  <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <p className="text-xs font-black tracking-tight">Volume</p>
@@ -538,7 +545,8 @@ export function SettingsCard({
                   />
                 </div>
 
-                <div className="p-4 rounded-xl border border-border/40 bg-card space-y-3">
+                <div className="group relative p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 space-y-3 overflow-hidden">
+                  <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   <div className="space-y-0.5">
                     <p className="text-xs font-black tracking-tight">Browser Notifications</p>
                     <p className="text-[10px] text-muted-foreground">Desktop notification when agents complete tasks</p>

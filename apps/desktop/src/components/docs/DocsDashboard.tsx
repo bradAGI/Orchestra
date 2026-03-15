@@ -429,7 +429,8 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config }) => {
                             <div className="mt-12 space-y-4 pt-8 border-t border-border">
                                 <h3 className="text-[10px] font-black uppercase tracking-widest text-primary/60 px-3 italic">System Wiki</h3>
                                 <div className="grid gap-2">
-                                    <div className="p-4 rounded-2xl bg-muted/30 border border-border space-y-2 group hover:bg-muted/50 transition-all">
+                                    <div className="relative p-4 rounded-2xl bg-gradient-to-b from-card via-card to-muted/20 border border-border space-y-2 group hover:border-primary/30 transition-all overflow-hidden">
+                                        <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                                         <div className="flex items-center gap-2 font-black text-[10px] uppercase tracking-widest text-foreground/60">
                                             <Sparkles size={12} className="text-amber-500" />
                                             Contribution
@@ -439,7 +440,8 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config }) => {
                                         </p>
                                     </div>
                                     
-                                    <div className="p-4 rounded-2xl bg-muted/30 border border-border space-y-2 group hover:bg-muted/50 transition-all">
+                                    <div className="relative p-4 rounded-2xl bg-gradient-to-b from-card via-card to-muted/20 border border-border space-y-2 group hover:border-primary/30 transition-all overflow-hidden">
+                                        <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                                         <div className="flex items-center gap-2 font-black text-[10px] uppercase tracking-widest text-foreground/60">
                                             <ShieldCheck size={12} className="text-primary" />
                                             Standards

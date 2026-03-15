@@ -64,7 +64,8 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, l
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-card/40 backdrop-blur-xl border border-border/60 rounded-2xl p-5 relative overflow-hidden group shadow-lg transition-all duration-500 hover:-translate-y-1 hover:shadow-xl hover:border-emerald-500/20">
+                <div className="bg-gradient-to-b from-card via-card to-muted/20 backdrop-blur-xl border border-border/60 rounded-2xl p-5 relative overflow-hidden group shadow-lg transition-all duration-500 hover:-translate-y-1 hover:shadow-xl hover:border-emerald-500/20">
+                    <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity text-emerald-500">
                         <Zap size={64} />
                     </div>
@@ -81,7 +82,8 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, l
                     </div>
                 </div>
 
-                <div className="bg-card/40 backdrop-blur-xl border border-border/60 rounded-2xl p-5 relative overflow-hidden group shadow-lg transition-all duration-500 hover:-translate-y-1 hover:shadow-xl hover:border-primary/20">
+                <div className="bg-gradient-to-b from-card via-card to-muted/20 backdrop-blur-xl border border-border/60 rounded-2xl p-5 relative overflow-hidden group shadow-lg transition-all duration-500 hover:-translate-y-1 hover:shadow-xl hover:border-primary/20">
+                    <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity text-primary">
                         <TrendingUp size={64} />
                     </div>
@@ -98,7 +100,8 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, l
                     </div>
                 </div>
 
-                <div className="bg-card/40 backdrop-blur-xl border border-border/60 rounded-2xl p-5 relative overflow-hidden group shadow-lg transition-all duration-500 hover:-translate-y-1 hover:shadow-xl hover:border-blue-500/20">
+                <div className="bg-gradient-to-b from-card via-card to-muted/20 backdrop-blur-xl border border-border/60 rounded-2xl p-5 relative overflow-hidden group shadow-lg transition-all duration-500 hover:-translate-y-1 hover:shadow-xl hover:border-blue-500/20">
+                    <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity text-blue-500">
                         <Cpu size={64} />
                     </div>
@@ -132,7 +135,8 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, l
             </div>
 
             {chartData.length > 0 && (
-                <div className="bg-card/40 backdrop-blur-xl border border-border/60 rounded-2xl p-6 shadow-lg transition-all hover:border-primary/10">
+                <div className="group relative bg-gradient-to-b from-card via-card to-muted/20 backdrop-blur-xl border border-border/60 rounded-2xl p-6 shadow-lg transition-all hover:border-primary/10 overflow-hidden">
+                    <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
                             <TrendingUp size={12} className="text-primary" />
@@ -176,7 +180,8 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ stats, l
                 </div>
             )}
 
-            <div className="bg-card/40 backdrop-blur-xl border border-border/60 rounded-2xl overflow-hidden shadow-lg transition-all hover:border-primary/10">
+            <div className="group relative bg-gradient-to-b from-card via-card to-muted/20 backdrop-blur-xl border border-border/60 rounded-2xl overflow-hidden shadow-lg transition-all hover:border-primary/10">
+                <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 <div className="p-4 border-b border-border/40 flex items-center justify-between bg-muted/10">
                     <div className="flex items-center gap-3">
                         <div className="p-1.5 rounded-lg bg-primary/10 text-primary">

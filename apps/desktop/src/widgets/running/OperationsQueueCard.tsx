@@ -82,7 +82,8 @@ export function OperationsQueueCard({
   }), [])
 
   return (
-    <Card className="border bg-card shadow-lg dark:bg-card flex flex-col h-full overflow-hidden">
+    <Card className="group relative border bg-gradient-to-b from-card via-card to-muted/20 shadow-lg flex flex-col h-full overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
       <CardHeader className="pb-4 shrink-0">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="space-y-1">

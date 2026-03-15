@@ -3,30 +3,30 @@
 @tailwind utilities;
 
 :root {
-  --background: 210 20% 98%;
-  --foreground: 161 50% 5%;
+  --background: 220 20% 97%;
+  --foreground: 224 50% 10%;
   --card: 0 0% 100%;
-  --card-foreground: 161 50% 5%;
-  --primary: 161 72% 38%;
-  --primary-foreground: 210 20% 98%;
-  --muted: 210 10% 94%;
-  --muted-foreground: 210 10% 40%;
-  --border: 210 10% 88%;
+  --card-foreground: 224 50% 10%;
+  --primary: 230 44% 56%;
+  --primary-foreground: 0 0% 100%;
+  --muted: 220 14% 92%;
+  --muted-foreground: 220 10% 40%;
+  --border: 220 13% 87%;
   --popover: 0 0% 100%;
-  --popover-foreground: 161 50% 5%;
+  --popover-foreground: 224 50% 10%;
 }
 
 .dark {
-  --background: 160 10% 3%;
+  --background: 160 10% 4%;
   --foreground: 160 20% 98%;
-  --card: 160 10% 6%;
+  --card: 160 10% 7%;
   --card-foreground: 160 20% 98%;
   --primary: 161 72% 45%;
   --primary-foreground: 160 10% 3%;
   --muted: 160 10% 12%;
   --muted-foreground: 160 5% 65%;
   --border: 160 10% 15%;
-  --popover: 160 10% 8%;
+  --popover: 160 10% 9%;
   --popover-foreground: 160 20% 98%;
 }
 

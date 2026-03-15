@@ -44,7 +44,7 @@ export function SidebarNav({
 
   return (
     <aside
-      className="relative h-full border-r border-border bg-card shadow-[10px_0_40px_rgba(0,0,0,0.04)] transition-all duration-300 dark:border-border dark:bg-background dark:shadow-[10px_0_40px_rgba(0,0,0,0.2)]"
+      className="relative h-full border-r border-border bg-card shadow-[10px_0_40px_rgba(0,0,0,0.04)] transition-all duration-300 dark:border-border dark:bg-card dark:shadow-[10px_0_40px_rgba(0,0,0,0.2)]"
       style={{ width: `${sidebarWidth}px` }}
     >
       <AppTooltip 
@@ -69,7 +69,6 @@ export function SidebarNav({
             {!sidebarCollapsed ? (
               <div className="min-w-0">
                 <p className="truncate text-[9px] font-bold uppercase tracking-[0.15em] text-black dark:text-muted-foreground leading-none">Orchestra</p>
-                <p className="truncate text-[8px] text-black/40 dark:text-muted-foreground mt-0.5">Control Plane</p>
               </div>
             ) : null}
           </div>

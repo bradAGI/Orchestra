@@ -12,28 +12,32 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({ session })
     return (
         <div className="flex flex-col gap-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-muted/30 p-3 rounded-lg border border-border/40">
+                <div className="group relative bg-gradient-to-b from-card via-card to-muted/20 p-3 rounded-lg border border-border/40 overflow-hidden">
+                    <div className="pointer-events-none absolute inset-0 rounded-lg bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     <div className="flex items-center gap-2 mb-1 text-muted-foreground uppercase text-[10px] font-bold tracking-wider">
                         <Activity size={12} />
                         Provider
                     </div>
                     <div className="text-sm font-bold uppercase tracking-tight">{session.provider}</div>
                 </div>
-                <div className="bg-muted/30 p-3 rounded-lg border border-border/40">
+                <div className="group relative bg-gradient-to-b from-card via-card to-muted/20 p-3 rounded-lg border border-border/40 overflow-hidden">
+                    <div className="pointer-events-none absolute inset-0 rounded-lg bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     <div className="flex items-center gap-2 mb-1 text-muted-foreground uppercase text-[10px] font-bold tracking-wider">
                         <Zap size={12} />
                         Compute
                     </div>
                     <div className="text-sm font-bold">{(session.total_input + session.total_output).toLocaleString()} tokens</div>
                 </div>
-                <div className="bg-muted/30 p-3 rounded-lg border border-border/40">
+                <div className="group relative bg-gradient-to-b from-card via-card to-muted/20 p-3 rounded-lg border border-border/40 overflow-hidden">
+                    <div className="pointer-events-none absolute inset-0 rounded-lg bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     <div className="flex items-center gap-2 mb-1 text-muted-foreground uppercase text-[10px] font-bold tracking-wider">
                         <Clock size={12} />
                         Timestamp
                     </div>
                     <div className="text-sm font-medium">{new Date(session.created_at).toLocaleString()}</div>
                 </div>
-                <div className="bg-muted/30 p-3 rounded-lg border border-border/40">
+                <div className="group relative bg-gradient-to-b from-card via-card to-muted/20 p-3 rounded-lg border border-border/40 overflow-hidden">
+                    <div className="pointer-events-none absolute inset-0 rounded-lg bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     <div className="flex items-center gap-2 mb-1 text-muted-foreground uppercase text-[10px] font-bold tracking-wider">
                         <Layout size={12} />
                         Project

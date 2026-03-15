@@ -95,7 +95,8 @@ export function TimelineCard({ timeline }: { timeline: TimelineItem[] }) {
   }
 
   return (
-    <Card className="h-full border border-border/40 bg-card/40 backdrop-blur-xl shadow-2xl flex flex-col transition-all duration-500 hover:shadow-primary/5">
+    <Card className="group relative h-full border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 backdrop-blur-xl shadow-2xl flex flex-col transition-all duration-500 hover:shadow-primary/5 overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
       <CardHeader className="pb-3 border-b border-border/20 bg-muted/5 shrink-0">
         <div className="flex items-center justify-between">
           <div className="space-y-1">

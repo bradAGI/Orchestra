@@ -368,14 +368,15 @@ export function KanbanBoard({
                   column.id !== 'done' && column.id !== 'review' ? (
                     <button
                       type="button"
-                      className="w-full h-full min-h-[200px] flex flex-col items-center justify-center cursor-pointer hover:bg-primary/5 rounded-lg transition-colors group/empty"
+                      className="relative w-full h-full min-h-[200px] flex flex-col items-center justify-center cursor-pointer bg-gradient-to-b from-card via-card to-muted/20 border border-border/40 rounded-xl transition-all group/empty overflow-hidden hover:border-primary/30"
                       onClick={() => handleCreateClick(column.id)}
                     >
+                      <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover/empty:opacity-100 transition-opacity duration-500" />
                       <Plus className="h-5 w-5 text-muted-foreground/20 group-hover/empty:text-primary/40 transition-colors mb-2" />
                       <p className="text-[10px] uppercase tracking-widest text-muted-foreground/20 group-hover/empty:text-muted-foreground/40 transition-colors">Click to add task</p>
                     </button>
                   ) : (
-                    <div className="w-full h-full min-h-[200px] flex items-center justify-center">
+                    <div className="relative w-full h-full min-h-[200px] flex items-center justify-center bg-gradient-to-b from-card via-card to-muted/20 border border-border/40 rounded-xl overflow-hidden">
                       <p className="text-[10px] uppercase tracking-widest text-muted-foreground/15">No completed tasks</p>
                     </div>
                   )

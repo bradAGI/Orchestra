@@ -1,46 +1,28 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import {
-    ArrowLeft, Folder, Globe, History, Zap, ExternalLink,
-    Calendar, GitBranch, RefreshCcw, Trash2, Github,
-    FileText, Layers, ChevronRight, File, Folder as FolderIcon, FolderOpen, AlertCircle, Search, X, Code, Database, Image, Ticket, Plus, Loader2
+    ArrowLeft, Folder, Globe, ExternalLink,
+    GitBranch, RefreshCcw, Trash2, Github,
+    FileText, Layers, ChevronRight, File, Folder as FolderIcon, FolderOpen, AlertCircle, Search, X, Code, Database, Image
 } from 'lucide-react'
 import type { Project, ProjectStats, SnapshotPayload } from '@/lib/orchestra-types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { KanbanBoard } from '@/components/app-shell/panels'
+import { GitTab } from '@/widgets/git'
 import {
     fetchProjectTree,
-    fetchProjectGitHistory,
-    fetchProjectGitStatus,
-    fetchProjectGitDiff,
     refreshProject,
-    gitCommit,
-    gitPush,
-    gitPull,
     disconnectProjectGitHub,
     fetchProjectFileContent,
     fetchProjectGitHubIssues,
-    fetchProjectGitBranches,
-    fetchProjectGitHubPulls,
-    fetchProjectGitHubPullDiff,
-    createProjectGitHubIssue,
-    updateProjectGitHubIssue,
-    createProjectGitHubPull,
     type BackendConfig,
-    type GitCommit,
     type GitHubIssue,
-    type GitHubPR,
-    type GitStatusEntry,
     type IssueListItem,
     type IssueUpdatePayload,
     type ProjectTreeNode,
 } from '@/lib/orchestra-client'
-import { getAgentIcon, CustomDropdown } from '@/components/app-shell/shared/controls'
 import { AppTooltip } from '../ui/tooltip-wrapper'
 import { Skeleton } from '@/components/ui/skeleton'
-import { OverlayScrollbarsComponent } from 'overlayscrollbars-react'
-import { Prism } from 'react-syntax-highlighter'
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
 import {
     Dialog,
@@ -70,8 +52,6 @@ interface ProjectDetailViewProps {
     onDeleteProject: (id: string) => Promise<void>
     onRefreshProjects: () => Promise<void>
 }
-
-type CommitInfo = GitCommit | { message: string; author: string; date: string; hash?: string }
 
 type ProjectTab = 'overview' | 'files' | 'git'
 
@@ -110,37 +90,10 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     const [githubDisconnectPending, setGitHubDisconnectPending] = useState(false)
     const [githubActionError, setGitHubActionError] = useState('')
     const [tabError, setTabError] = useState<string | null>(null)
-    const [gitPending, setGitPending] = useState(false)
-    const [commitMessage, setCommitMessage] = useState('')
-    const [showCommitDialog, setShowCommitDialog] = useState(false)
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
     const [deletePending, setDeletePending] = useState(false)
     const [deleteError, setDeleteError] = useState('')
-    const [selectedDiff, setSelectedDiff] = useState<string | null>(null)
-    const [isDiffModalOpen, setIsDiffModalOpen] = useState(false)
-    const [diffLoading, setDiffLoading] = useState(false)
-    const [selectedCommitInfo, setSelectedCommitInfo] = useState<CommitInfo | null>(null)
-    const [diffFiles, setDiffFiles] = useState<{path: string, content: string}[]>([])
-    const [activeDiffFile, setActiveDiffFile] = useState<string | null>(null)
     const [githubIssues, setGithubIssues] = useState<GitHubIssue[]>([])
-    const [gitSubTab, setGitSubTab] = useState<'commits' | 'issues' | 'prs'>('commits')
-    const [branches, setBranches] = useState<{ current: string; branches: string[] }>({ current: '', branches: [] })
-    const [selectedBranch, setSelectedBranch] = useState('')
-    const [ghIssueFilter, setGhIssueFilter] = useState<'open' | 'closed' | 'all'>('open')
-    const [ghPulls, setGhPulls] = useState<GitHubPR[]>([])
-    const [expandedIssue, setExpandedIssue] = useState<number | null>(null)
-    const [expandedPR, setExpandedPR] = useState<number | null>(null)
-    const [prDiff, setPrDiff] = useState<string>('')
-    const [prDiffLoading, setPrDiffLoading] = useState(false)
-    const [createIssueOpen, setCreateIssueOpen] = useState(false)
-    const [createPROpen, setCreatePROpen] = useState(false)
-    const [newIssueTitle, setNewIssueTitle] = useState('')
-    const [newIssueBody, setNewIssueBody] = useState('')
-    const [newPRTitle, setNewPRTitle] = useState('')
-    const [newPRBody, setNewPRBody] = useState('')
-    const [newPRHead, setNewPRHead] = useState('')
-    const [newPRBase, setNewPRBase] = useState('main')
-    const [ghSubmitting, setGhSubmitting] = useState(false)
     const refreshTimersRef = React.useRef<number[]>([])
 
     useEffect(() => {
@@ -150,43 +103,25 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         }
     }, [])
 
-    // Fetch branches on git tab activation
-    useEffect(() => {
-        if (activeTab !== 'git' || !config || !pathExists) return
-        fetchProjectGitBranches(config, project.id)
-            .then(b => { setBranches(b); if (!selectedBranch) setSelectedBranch(b.current) })
-            .catch(() => {})
-    }, [activeTab, config, project.id])
-
-    // Fetch GitHub issues on mount (for backlog) and when filter changes in Git > Issues
+    // Fetch GitHub issues on mount (for backlog in overview)
     useEffect(() => {
         if (!config || !project.github_token) return
-        const state = (activeTab === 'git' && gitSubTab === 'issues') ? ghIssueFilter : 'open'
-        fetchProjectGitHubIssues(config, project.id, state)
+        fetchProjectGitHubIssues(config, project.id, 'open')
             .then(setGithubIssues)
             .catch(() => setGithubIssues([]))
-    }, [activeTab, gitSubTab, ghIssueFilter, config, project.id, project.github_token])
+    }, [config, project.id, project.github_token])
 
-    // Poll GitHub issues every 60s only when viewing relevant tabs
+    // Poll GitHub issues every 60s when viewing overview
     useEffect(() => {
         if (!config || !project.github_token) return
-        if (activeTab !== 'overview' && !(activeTab === 'git' && gitSubTab === 'issues')) return
+        if (activeTab !== 'overview') return
         const interval = setInterval(() => {
-            const state = (activeTab === 'git' && gitSubTab === 'issues') ? ghIssueFilter : 'open'
-            fetchProjectGitHubIssues(config, project.id, state)
+            fetchProjectGitHubIssues(config, project.id, 'open')
                 .then(setGithubIssues)
                 .catch(() => {})
         }, 60000)
         return () => clearInterval(interval)
-    }, [config, project.id, project.github_token, activeTab, gitSubTab, ghIssueFilter])
-
-    // Fetch PRs
-    useEffect(() => {
-        if (activeTab !== 'git' || gitSubTab !== 'prs' || !config || !project.github_token) return
-        fetchProjectGitHubPulls(config, project.id)
-            .then(setGhPulls)
-            .catch(() => setGhPulls([]))
-    }, [activeTab, gitSubTab, config, project.id, project.github_token])
+    }, [config, project.id, project.github_token, activeTab])
 
     useEffect(() => {
         setFileQuery('')
@@ -195,61 +130,6 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         setSelectedFile(null)
         setFileContent(null)
     }, [project.id])
-
-    const parseDiff = (rawDiff: string) => {
-        const files: {path: string, content: string}[] = []
-        const lines = rawDiff.split('\n')
-        let currentFile: string | null = null
-        let currentContent: string[] = []
-
-        lines.forEach(line => {
-            if (line.startsWith('diff --git')) {
-                if (currentFile) {
-                    files.push({ path: currentFile, content: currentContent.join('\n') })
-                }
-                const match = line.match(/b\/(.+)$/)
-                currentFile = match ? match[1] : 'unknown'
-                currentContent = [line]
-            } else if (currentFile) {
-                currentContent.push(line)
-            }
-        })
-
-        if (currentFile) {
-            files.push({ path: currentFile, content: currentContent.join('\n') })
-        }
-
-        return files
-    }
-
-    const handleViewDiff = async (hash?: string) => {
-        if (!config) return
-        setDiffLoading(true)
-        setIsDiffModalOpen(true)
-        setSelectedDiff(null)
-        setDiffFiles([])
-        setActiveDiffFile(null)
-
-        if (hash) {
-            const commit = gitHistory.find(c => c.hash === hash)
-            setSelectedCommitInfo(commit ?? null)
-        } else {
-            setSelectedCommitInfo({ message: 'Uncommitted Changes', author: 'Local User', date: new Date().toISOString() })
-        }
-
-        try {
-            const diff = await fetchProjectGitDiff(config, project.id, hash)
-            setSelectedDiff(diff)
-            const parsed = parseDiff(diff)
-            setDiffFiles(parsed)
-            if (parsed.length > 0) setActiveDiffFile(parsed[0].path)
-        } catch (err) {
-            console.error('Failed to fetch git diff:', err)
-            setSelectedDiff('Error: Failed to fetch diff.')
-        } finally {
-            setDiffLoading(false)
-        }
-    }
 
     useEffect(() => {
         // Clear errors and stale data when switching tabs
@@ -267,11 +147,6 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                     setFileTree(tree)
                     setExpandedPaths({})
                     setFocusedPath(null)
-                } else if (activeTab === 'git') {
-                    const history = await fetchProjectGitHistory(config, project.id)
-                    const status = await fetchProjectGitStatus(config, project.id)
-                    setGitHistory(history || [])
-                    setGitStatus(status || [])
                 }
             } catch (err) {
                 const msg = err instanceof Error ? err.message : String(err)
@@ -295,39 +170,9 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                 setFileTree(tree)
                 setExpandedPaths({})
                 setFocusedPath(null)
-            } else if (activeTab === 'git') {
-                const [history, status] = await Promise.all([
-                    fetchProjectGitHistory(config, project.id),
-                    fetchProjectGitStatus(config, project.id)
-                ])
-                setGitHistory(history || [])
-                setGitStatus(status || [])
             }
         } finally {
             setRefreshing(false)
-        }
-    }
-
-    const handleGitAction = async (action: 'commit' | 'push' | 'pull') => {
-        if (!config) return
-        setGitPending(true)
-        try {
-            if (action === 'commit') {
-                if (!commitMessage.trim()) return
-                await gitCommit(config, project.id, commitMessage)
-                setCommitMessage('')
-                setShowCommitDialog(false)
-            } else if (action === 'push') {
-                await gitPush(config, project.id)
-            } else if (action === 'pull') {
-                await gitPull(config, project.id)
-            }
-            await handleRefresh()
-        } catch (err) {
-            console.error(`Git ${action} failed:`, err)
-            setTabError(`Git ${action} failed: ${err instanceof Error ? err.message : String(err)}`)
-        } finally {
-            setGitPending(false)
         }
     }
 
@@ -742,7 +587,8 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                 </div>
                             )}
                             {/* Board */}
-                            <div className="bg-card/40 rounded-xl border border-border/30 p-6 backdrop-blur-sm flex-1 flex flex-col">
+                            <div className="group relative bg-gradient-to-b from-card via-card to-muted/20 rounded-xl border border-border/30 p-6 backdrop-blur-sm flex-1 flex flex-col overflow-hidden">
+                                <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                                 <KanbanBoard
                                     loadingState={loadingState}
                                     snapshot={snapshot}
@@ -867,7 +713,8 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                     </div>
 
                                      {/* Content Viewer */}
-                                     <div className="flex-1 bg-card border border-border/30 rounded-xl overflow-hidden shadow-2xl flex flex-col">
+                                     <div className="group relative flex-1 bg-gradient-to-b from-card via-card to-muted/20 border border-border/30 rounded-xl overflow-hidden shadow-2xl flex flex-col">
+                                         <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                                          <div className="p-2 border-b border-border/40 bg-muted/10 flex items-center justify-between">
                                             <div className="flex items-center gap-2 overflow-hidden">
                                                 <File size={12} className="text-primary/60 shrink-0" />
