@@ -637,18 +637,12 @@ func writeCodexHooks(home string, hooks []ProviderHook) error {
 /*  Gemini: ~/.gemini/settings.json                                    */
 /* ================================================================== */
 
-// Permissions: settings.json → tools.allowed, general.defaultApprovalMode
+// Permissions: settings.json → tools.allowed
+// Gemini manages approvals via tools.allowed and the --yolo flag, not a config setting.
 func readGeminiPermissions(home string) ProviderPermissions {
 	cfg, err := readGeminiConfig(home)
 	if err != nil {
 		return ProviderPermissions{ApprovalMode: "interactive", Allow: []string{}, Deny: []string{}, Ask: []string{}}
-	}
-
-	mode := "interactive"
-	if general, ok := cfg["general"].(map[string]any); ok {
-		if m, ok := general["defaultApprovalMode"].(string); ok {
-			mode = m
-		}
 	}
 
 	var allow []string
@@ -656,7 +650,7 @@ func readGeminiPermissions(home string) ProviderPermissions {
 		allow = toStringSlice(tools["allowed"])
 	}
 
-	return ProviderPermissions{ApprovalMode: mode, Allow: allow, Deny: []string{}, Ask: []string{}}
+	return ProviderPermissions{ApprovalMode: "interactive", Allow: allow, Deny: []string{}, Ask: []string{}}
 }
 
 func writeGeminiPermissions(home string, perms ProviderPermissions) error {
@@ -664,13 +658,6 @@ func writeGeminiPermissions(home string, perms ProviderPermissions) error {
 	if err != nil {
 		return err
 	}
-
-	general, _ := cfg["general"].(map[string]any)
-	if general == nil {
-		general = map[string]any{}
-	}
-	general["defaultApprovalMode"] = perms.ApprovalMode
-	cfg["general"] = general
 
 	tools, _ := cfg["tools"].(map[string]any)
 	if tools == nil {
@@ -720,29 +707,52 @@ func writeGeminiModel(home string, model ProviderModelConfig) error {
 	return writeGeminiConfig(home, cfg)
 }
 
-// Hooks: settings.json → hooksConfig { <event>: [ { command: ... } ] }
+// Hooks: settings.json → hooks { <event>: [ { matcher: "...", hooks: [ { type, command, timeout } ] } ] }
+// Gemini hooks use the same nested matcher-group structure as Claude.
 func readGeminiHooks(home string) []ProviderHook {
 	cfg, err := readGeminiConfig(home)
 	if err != nil {
 		return nil
 	}
-	hooksObj, ok := cfg["hooksConfig"].(map[string]any)
+	hooksObj, ok := cfg["hooks"].(map[string]any)
 	if !ok {
 		return nil
 	}
 	var hooks []ProviderHook
 	for event, val := range hooksObj {
-		entries, ok := val.([]any)
+		matcherGroups, ok := val.([]any)
 		if !ok {
 			continue
 		}
-		for _, e := range entries {
-			entry, ok := e.(map[string]any)
+		for _, mg := range matcherGroups {
+			group, ok := mg.(map[string]any)
 			if !ok {
 				continue
 			}
-			cmd, _ := entry["command"].(string)
-			hooks = append(hooks, ProviderHook{Event: event, Command: cmd})
+			matcher, _ := group["matcher"].(string)
+			innerHooks, ok := group["hooks"].([]any)
+			if !ok {
+				continue
+			}
+			for _, ih := range innerHooks {
+				hookEntry, ok := ih.(map[string]any)
+				if !ok {
+					continue
+				}
+				cmd, _ := hookEntry["command"].(string)
+				typ, _ := hookEntry["type"].(string)
+				timeout := 0
+				if t, ok := hookEntry["timeout"].(float64); ok {
+					timeout = int(t)
+				}
+				hooks = append(hooks, ProviderHook{
+					Event:   event,
+					Matcher: matcher,
+					Type:    typ,
+					Command: cmd,
+					Timeout: timeout,
+				})
+			}
 		}
 	}
 	return hooks
@@ -753,14 +763,67 @@ func writeGeminiHooks(home string, hooks []ProviderHook) error {
 	if err != nil {
 		return err
 	}
-	hooksObj := map[string]any{}
-	for _, h := range hooks {
-		entry := map[string]any{"command": h.Command}
-		arr, _ := hooksObj[h.Event].([]any)
-		arr = append(arr, entry)
-		hooksObj[h.Event] = arr
+
+	// Group hooks by event, then by matcher to rebuild the nested structure.
+	type hookEntry struct {
+		Type    string
+		Command string
+		Timeout int
 	}
-	cfg["hooksConfig"] = hooksObj
+	type matcherGroup struct {
+		Matcher string
+		Hooks   []hookEntry
+	}
+
+	eventGroups := map[string][]matcherGroup{}
+	for _, h := range hooks {
+		event := h.Event
+		matcher := h.Matcher
+		entry := hookEntry{Type: h.Type, Command: h.Command, Timeout: h.Timeout}
+		if entry.Type == "" {
+			entry.Type = "command"
+		}
+
+		groups := eventGroups[event]
+		found := false
+		for i, g := range groups {
+			if g.Matcher == matcher {
+				groups[i].Hooks = append(groups[i].Hooks, entry)
+				found = true
+				break
+			}
+		}
+		if !found {
+			groups = append(groups, matcherGroup{Matcher: matcher, Hooks: []hookEntry{entry}})
+		}
+		eventGroups[event] = groups
+	}
+
+	hooksObj := map[string]any{}
+	for event, groups := range eventGroups {
+		var arr []any
+		for _, g := range groups {
+			groupObj := map[string]any{}
+			if g.Matcher != "" {
+				groupObj["matcher"] = g.Matcher
+			}
+			var innerArr []any
+			for _, he := range g.Hooks {
+				innerObj := map[string]any{
+					"type":    he.Type,
+					"command": he.Command,
+				}
+				if he.Timeout > 0 {
+					innerObj["timeout"] = he.Timeout
+				}
+				innerArr = append(innerArr, innerObj)
+			}
+			groupObj["hooks"] = innerArr
+			arr = append(arr, groupObj)
+		}
+		hooksObj[event] = arr
+	}
+	cfg["hooks"] = hooksObj
 	return writeGeminiConfig(home, cfg)
 }
 
@@ -768,23 +831,62 @@ func writeGeminiHooks(home string, hooks []ProviderHook) error {
 /*  OpenCode: ~/.config/opencode/opencode.json                         */
 /* ================================================================== */
 
-// Permissions: opencode.json → permission { ... }
+// Permissions: opencode.json → permission { "bash": "allow", "edit": "deny", ... }
+// Can also be a flat string like "allow", or nested like { "bash": { "git *": "allow" } }
 func readOpenCodePermissions(home string) ProviderPermissions {
 	cfg, err := readOpenCodeConfig(home)
 	if err != nil {
 		return ProviderPermissions{ApprovalMode: "interactive", Allow: []string{}, Deny: []string{}, Ask: []string{}}
 	}
-	permObj, _ := cfg["permission"].(map[string]any)
-	if permObj == nil {
+
+	permRaw := cfg["permission"]
+	if permRaw == nil {
 		return ProviderPermissions{ApprovalMode: "interactive", Allow: []string{}, Deny: []string{}, Ask: []string{}}
 	}
-	mode, _ := permObj["mode"].(string)
-	if mode == "" {
-		mode = "interactive"
+
+	// Flat string: "allow" or "deny"
+	if modeStr, ok := permRaw.(string); ok {
+		return ProviderPermissions{ApprovalMode: modeStr, Allow: []string{}, Deny: []string{}, Ask: []string{}}
 	}
-	allow := toStringSlice(permObj["allow"])
-	deny := toStringSlice(permObj["deny"])
-	return ProviderPermissions{ApprovalMode: mode, Allow: allow, Deny: deny, Ask: []string{}}
+
+	permObj, ok := permRaw.(map[string]any)
+	if !ok {
+		return ProviderPermissions{ApprovalMode: "interactive", Allow: []string{}, Deny: []string{}, Ask: []string{}}
+	}
+
+	var allow, deny, ask []string
+	for toolName, val := range permObj {
+		switch v := val.(type) {
+		case string:
+			switch v {
+			case "allow":
+				allow = append(allow, toolName)
+			case "deny":
+				deny = append(deny, toolName)
+			case "ask":
+				ask = append(ask, toolName)
+			}
+		case map[string]any:
+			// Nested patterns: { "git *": "allow", "rm *": "deny" }
+			for pattern, action := range v {
+				actionStr, ok := action.(string)
+				if !ok {
+					continue
+				}
+				entry := fmt.Sprintf("%s(%s)", toolName, pattern)
+				switch actionStr {
+				case "allow":
+					allow = append(allow, entry)
+				case "deny":
+					deny = append(deny, entry)
+				case "ask":
+					ask = append(ask, entry)
+				}
+			}
+		}
+	}
+
+	return ProviderPermissions{ApprovalMode: "interactive", Allow: allow, Deny: deny, Ask: ask}
 }
 
 func writeOpenCodePermissions(home string, perms ProviderPermissions) error {
@@ -792,11 +894,64 @@ func writeOpenCodePermissions(home string, perms ProviderPermissions) error {
 	if err != nil {
 		return err
 	}
-	cfg["permission"] = map[string]any{
-		"mode":  perms.ApprovalMode,
-		"allow": perms.Allow,
-		"deny":  perms.Deny,
+
+	permObj := map[string]any{}
+
+	// Helper to parse "tool(pattern)" format
+	parseRule := func(rule string) (tool, pattern string) {
+		if idx := strings.Index(rule, "("); idx > 0 && strings.HasSuffix(rule, ")") {
+			return rule[:idx], rule[idx+1 : len(rule)-1]
+		}
+		return rule, ""
 	}
+
+	// Track nested patterns per tool: tool → { pattern → action }
+	nested := map[string]map[string]string{}
+
+	for _, rule := range perms.Allow {
+		tool, pattern := parseRule(rule)
+		if pattern == "" {
+			permObj[tool] = "allow"
+		} else {
+			if nested[tool] == nil {
+				nested[tool] = map[string]string{}
+			}
+			nested[tool][pattern] = "allow"
+		}
+	}
+	for _, rule := range perms.Deny {
+		tool, pattern := parseRule(rule)
+		if pattern == "" {
+			permObj[tool] = "deny"
+		} else {
+			if nested[tool] == nil {
+				nested[tool] = map[string]string{}
+			}
+			nested[tool][pattern] = "deny"
+		}
+	}
+	for _, rule := range perms.Ask {
+		tool, pattern := parseRule(rule)
+		if pattern == "" {
+			permObj[tool] = "ask"
+		} else {
+			if nested[tool] == nil {
+				nested[tool] = map[string]string{}
+			}
+			nested[tool][pattern] = "ask"
+		}
+	}
+
+	// Merge nested patterns (these override flat entries for the same tool)
+	for tool, patterns := range nested {
+		inner := map[string]any{}
+		for p, a := range patterns {
+			inner[p] = a
+		}
+		permObj[tool] = inner
+	}
+
+	cfg["permission"] = permObj
 	return writeOpenCodeConfig(home, cfg)
 }
 

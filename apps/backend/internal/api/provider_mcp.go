@@ -135,9 +135,9 @@ func (s *Server) AddProviderMCPServer(w http.ResponseWriter, r *http.Request) {
 	case "codex":
 		err = addCodexMCP(homeDir, req.Name, req.Command, req.Args, req.URL, req.Env)
 	case "opencode":
-		err = addOpenCodeMCP(homeDir, req.Name, req.Command, req.Args)
+		err = addOpenCodeMCP(homeDir, req.Name, req.Command, req.Args, req.URL, req.Type)
 	case "gemini":
-		err = addGeminiMCP(homeDir, req.Name, req.Command, req.Args)
+		err = addGeminiMCP(homeDir, req.Name, req.Command, req.Args, req.URL, req.Env)
 	default:
 		writeJSONError(w, http.StatusBadRequest, "unknown_provider", fmt.Sprintf("unknown provider: %s", provider))
 		return
@@ -533,12 +533,18 @@ func readOpenCodeMCP(home string) []ProviderMCPServer {
 		if e, ok := server["enabled"].(bool); ok {
 			enabled = e
 		}
-		servers = append(servers, ProviderMCPServer{Name: name, Command: cmd, URL: url, Enabled: enabled})
+		typ := "local"
+		if t, ok := server["type"].(string); ok {
+			typ = t
+		} else if url != "" {
+			typ = "remote"
+		}
+		servers = append(servers, ProviderMCPServer{Name: name, Command: cmd, URL: url, Type: typ, Enabled: enabled})
 	}
 	return servers
 }
 
-func addOpenCodeMCP(home, name, command string, args []string) error {
+func addOpenCodeMCP(home, name, command string, args []string, url string, typ string) error {
 	cfg, err := readOpenCodeConfig(home)
 	if err != nil {
 		return err
@@ -547,15 +553,28 @@ func addOpenCodeMCP(home, name, command string, args []string) error {
 	if !ok {
 		mcp = map[string]any{}
 	}
-	// OpenCode uses command as an array
-	cmdParts := []string{command}
-	if len(args) > 0 {
-		cmdParts = append(cmdParts, args...)
-	}
-	mcp[name] = map[string]any{
-		"command": cmdParts,
+	entry := map[string]any{
 		"enabled": true,
 	}
+	if command != "" {
+		// OpenCode uses command as an array
+		cmdParts := []string{command}
+		if len(args) > 0 {
+			cmdParts = append(cmdParts, args...)
+		}
+		entry["command"] = cmdParts
+	}
+	if url != "" {
+		entry["url"] = url
+	}
+	if typ != "" {
+		entry["type"] = typ
+	} else if command != "" {
+		entry["type"] = "local"
+	} else if url != "" {
+		entry["type"] = "remote"
+	}
+	mcp[name] = entry
 	cfg["mcp"] = mcp
 	return writeOpenCodeConfig(home, cfg)
 }
@@ -631,12 +650,20 @@ func readGeminiMCP(home string) []ProviderMCPServer {
 				args = append(args, fmt.Sprintf("%v", a))
 			}
 		}
-		servers = append(servers, ProviderMCPServer{Name: name, Command: cmd, Args: args, URL: url, Enabled: true})
+		var env map[string]string
+		if envRaw, ok := server["env"].(map[string]any); ok {
+			env = make(map[string]string)
+			for k, v := range envRaw {
+				env[k] = fmt.Sprintf("%v", v)
+			}
+		}
+		typ, _ := server["type"].(string)
+		servers = append(servers, ProviderMCPServer{Name: name, Command: cmd, Args: args, URL: url, Env: env, Type: typ, Enabled: true})
 	}
 	return servers
 }
 
-func addGeminiMCP(home, name, command string, args []string) error {
+func addGeminiMCP(home, name, command string, args []string, url string, env map[string]string) error {
 	cfg, err := readGeminiConfig(home)
 	if err != nil {
 		return err
@@ -645,9 +672,18 @@ func addGeminiMCP(home, name, command string, args []string) error {
 	if !ok {
 		mcpServers = map[string]any{}
 	}
-	entry := map[string]any{"command": command}
+	entry := map[string]any{}
+	if command != "" {
+		entry["command"] = command
+	}
 	if len(args) > 0 {
 		entry["args"] = args
+	}
+	if url != "" {
+		entry["url"] = url
+	}
+	if len(env) > 0 {
+		entry["env"] = env
 	}
 	mcpServers[name] = entry
 	cfg["mcpServers"] = mcpServers
