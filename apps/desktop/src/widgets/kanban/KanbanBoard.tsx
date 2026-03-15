@@ -360,7 +360,7 @@ export function KanbanBoard({
               <OverlayScrollbarsComponent
                 element="div"
                 options={osOptions}
-                className={`flex-1 flex flex-col gap-2 rounded-xl p-1.5 transition-colors min-h-0 border border-border/40 ${isDraggingOver === column.id ? 'bg-primary/5 ring-2 ring-primary/20 ring-inset' : 'bg-muted/10'}`}
+                className={`flex-1 flex flex-col gap-3 rounded-xl p-1.5 transition-colors min-h-0 border border-border/40 ${isDraggingOver === column.id ? 'bg-primary/5 ring-2 ring-primary/20 ring-inset' : 'bg-muted/10'}`}
               >
                 {loadingState ? (
                   Array.from({ length: 3 }).map((_, idx) => <Skeleton key={idx} className="h-28 w-full rounded-lg" />)
@@ -386,7 +386,7 @@ export function KanbanBoard({
                         key={item.issue_id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, getActionIssueRef(item))}
-                        className="group relative cursor-grab border-transparent bg-card p-3.5 shadow-sm transition-all duration-300 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5 active:cursor-grabbing active:scale-[0.98] rounded-xl"
+                        className="group relative cursor-grab border border-border/60 bg-card p-3.5 mb-1.5 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 active:cursor-grabbing active:scale-[0.98] rounded-xl"
                         onClick={() => void onInspectIssue(getActionIssueRef(item))}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -454,8 +454,9 @@ export function KanbanBoard({
                           {item.title || item.description || item.last_message || item.error || 'No message'}
                         </p>
                         {projects.length > 1 && item.project_id && (
-                          <span className="mt-1 text-[9px] text-muted-foreground/30 font-medium truncate block">
-                            {projects.find(p => p.id === item.project_id)?.name}
+                          <span className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-muted/50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 ring-1 ring-border/30 group-hover:ring-primary/20 group-hover:text-muted-foreground transition-all">
+                            <Folder className="h-2.5 w-2.5 shrink-0" />
+                            <span className="truncate">{projects.find(p => p.id === item.project_id)?.name}</span>
                           </span>
                         )}
                         <div className="mt-3 flex items-center justify-between border-t border-border/40 pt-2.5 overflow-hidden">

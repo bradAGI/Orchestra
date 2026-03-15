@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
-import { CheckCircle2, FileText, Github, History, Info, Loader2, Terminal } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { CheckCircle2, FileText, Github, History, Info, Loader2, Pencil, Terminal } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Prism } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 import type { BackendConfig, IssueUpdatePayload, IssueHistoryEntry } from '@/lib/orchestra-client'
 import { fetchIssueHistory, fetchIssueDiff, fetchIssueLogs } from '@/lib/orchestra-client'
@@ -11,6 +13,92 @@ import type { TimelineItem } from '@/components/app-shell/types'
 import { AgentSelector, CustomDropdown, getAgentIcon } from '@/components/app-shell/shared/controls'
 import type { IssueDetailResult, ToolSummary } from './types'
 import { extractOperationalPlanItems, extractPlanFromText, getEventIcon, parseDiff, type DiffFile, type PlanItem } from './IssueDetailUtils'
+
+function DescriptionEditor({ value, onChange, onBlur, theme }: {
+  value: string
+  onChange: (v: string) => void
+  onBlur: () => void
+  theme?: 'light' | 'dark'
+}) {
+  const [editing, setEditing] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (editing && textareaRef.current) {
+      textareaRef.current.focus()
+      textareaRef.current.selectionStart = textareaRef.current.value.length
+    }
+  }, [editing])
+
+  if (editing) {
+    return (
+      <div className="flex-1 flex flex-col min-h-0 rounded-lg border border-primary/30 bg-muted/10 overflow-hidden">
+        <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/30 bg-muted/20 shrink-0">
+          <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Editing Markdown</span>
+          <button
+            className="text-[9px] font-bold uppercase tracking-widest text-primary/60 hover:text-primary transition-colors"
+            onClick={() => setEditing(false)}
+          >
+            Preview
+          </button>
+        </div>
+        <textarea
+          ref={textareaRef}
+          className="w-full flex-1 bg-transparent text-sm text-foreground font-mono outline-none focus:outline-none placeholder:text-muted-foreground/15 leading-relaxed resize-none p-4"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          onBlur={() => { onBlur(); setEditing(false) }}
+          placeholder="Describe what this task should accomplish...&#10;&#10;Supports **Markdown** formatting."
+        />
+      </div>
+    )
+  }
+
+  if (!value.trim()) {
+    return (
+      <button
+        className="flex-1 flex flex-col items-center justify-center rounded-lg border border-dashed border-border/40 hover:border-primary/30 hover:bg-primary/5 transition-all cursor-text group"
+        onClick={() => setEditing(true)}
+      >
+        <Pencil className="h-5 w-5 text-muted-foreground/15 group-hover:text-primary/30 transition-colors mb-2" />
+        <span className="text-sm text-muted-foreground/20 group-hover:text-muted-foreground/40 transition-colors">Click to add a description...</span>
+      </button>
+    )
+  }
+
+  return (
+    <div
+      className="flex-1 min-h-0 rounded-lg border border-transparent hover:border-border/30 cursor-text transition-all group/md relative overflow-auto"
+      onClick={() => setEditing(true)}
+    >
+      <div className="absolute top-2 right-2 opacity-0 group-hover/md:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1 rounded-md bg-muted/80 backdrop-blur px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 border border-border/30">
+          <Pencil className="h-2.5 w-2.5" />
+          Edit
+        </div>
+      </div>
+      <div className={`prose ${theme === 'dark' ? 'prose-invert' : ''} prose-sm max-w-none text-foreground/70 leading-relaxed
+        prose-headings:text-foreground prose-headings:font-bold prose-headings:tracking-tight
+        prose-h1:text-lg prose-h1:border-b prose-h1:border-border/20 prose-h1:pb-2 prose-h1:mb-3
+        prose-h2:text-base prose-h2:mb-2
+        prose-h3:text-sm prose-h3:mb-1
+        prose-p:mb-2 prose-p:text-foreground/60
+        prose-a:text-primary prose-a:no-underline hover:prose-a:underline
+        prose-strong:text-foreground/80 prose-strong:font-bold
+        prose-code:text-[12px] prose-code:font-mono prose-code:bg-muted/40 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:border prose-code:border-border/20 prose-code:before:content-none prose-code:after:content-none
+        prose-pre:bg-[#0d1117] prose-pre:border prose-pre:border-border/20 prose-pre:rounded-lg
+        prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-li:text-foreground/60
+        prose-li:marker:text-muted-foreground/30
+        prose-blockquote:border-l-primary/30 prose-blockquote:text-muted-foreground/50 prose-blockquote:italic prose-blockquote:not-italic prose-blockquote:font-normal
+        prose-hr:border-border/20
+        prose-img:rounded-lg prose-img:border prose-img:border-border/20
+        prose-table:text-sm prose-th:text-foreground/70 prose-td:text-foreground/50
+      `}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{value}</ReactMarkdown>
+      </div>
+    </div>
+  )
+}
 
 export function IssueDetailView({
   result,
@@ -75,49 +163,31 @@ export function IssueDetailView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resultId])
 
-  // Extract operational plan from agent messages in history.
-  // Agent messages get chunked across multiple events, so we concatenate
-  // consecutive message events and find the best plan from the combined text.
+  // Extract operational plan from the most recent agent message that contains checkboxes.
+  // Agent restates the plan with updated checkboxes as it progresses — we want the LATEST version.
   const planItems: PlanItem[] = (() => {
-    // 1. Concatenate consecutive message events into blocks, then scan each block
     const messageEvents = issueHistory.filter(e => e.kind === 'message' && e.message)
+
     if (messageEvents.length > 0) {
-      // Build blocks of consecutive messages (same provider = likely one response split across events)
-      const blocks: string[] = []
-      let current = ''
-      let lastProvider = ''
-      for (const entry of messageEvents) {
-        if (entry.provider !== lastProvider && current) {
-          blocks.push(current)
-          current = ''
-        }
-        current += (current ? '\n' : '') + entry.message
-        lastProvider = entry.provider || ''
-      }
-      if (current) blocks.push(current)
-
-      // Scan blocks newest-first for the most complete plan
-      let bestItems: PlanItem[] = []
-      for (const block of blocks.reverse()) {
-        const items = extractPlanFromText(block)
-        if (items.length > bestItems.length) {
-          bestItems = items
-        }
-      }
-      if (bestItems.length > 0) return bestItems
-
-      // Also try each individual message (some agents send complete plans in one message)
+      // Scan individual messages newest-first for one that has checkboxes
       for (const entry of [...messageEvents].reverse()) {
         const items = extractPlanFromText(entry.message!)
         if (items.length > 0) return items
       }
+
+      // If no single message has checkboxes, try concatenating the last few
+      // (agent may have split one plan restatement across 2-3 chunked messages)
+      const last5 = messageEvents.slice(-5)
+      const combined = last5.map(e => e.message).join('\n')
+      const items = extractPlanFromText(combined)
+      if (items.length > 0) return items
     }
 
-    // 2. Fallback to timeline events
+    // Fallback to timeline events
     const fromTimeline = extractOperationalPlanItems(timeline, issueId, identifier, description)
     if (fromTimeline.length > 0) return fromTimeline
 
-    // 3. Final fallback: parse description
+    // Final fallback: parse description
     return extractPlanFromText(description)
   })()
   const completedCount = planItems.filter(i => i.done).length
@@ -145,14 +215,14 @@ export function IssueDetailView({
   // Fetch tab-specific data
   useEffect(() => {
     if (!config || !identifier) return
-    if (bottomTab === 'output') {
+    if (bottomTab === 'output' && (localState === 'In Progress' || localState === 'Review' || localState === 'Done')) {
       setLogsLoading(true)
       fetchIssueLogs(config, identifier, provider)
         .then(setLogs)
         .catch(() => setLogs(''))
         .finally(() => setLogsLoading(false))
     }
-    if (bottomTab === 'changes') {
+    if (bottomTab === 'changes' && (localState === 'In Progress' || localState === 'Review' || localState === 'Done')) {
       setDiffLoading(true)
       fetchIssueDiff(config, identifier, provider)
         .then(raw => {
@@ -272,12 +342,11 @@ export function IssueDetailView({
                 placeholder="Task title..."
               />
               <div className="w-12 h-0.5 bg-primary/30 rounded-full mb-4" />
-              <textarea
-                className="w-full flex-1 bg-transparent text-sm text-foreground/60 outline-none focus:outline-none placeholder:text-muted-foreground/15 leading-relaxed resize-none transition-colors"
+              <DescriptionEditor
                 value={localDescription}
-                onChange={e => setLocalDescription(e.target.value)}
+                onChange={setLocalDescription}
                 onBlur={() => { if (localDescription !== description && onUpdate) void onUpdate({ description: localDescription }) }}
-                placeholder="Describe what this task should accomplish..."
+                theme={theme}
               />
             </div>
 
@@ -312,11 +381,20 @@ export function IssueDetailView({
               {typed.url && typeof typed.url === 'string' && (typed.url as string).includes('github.com') && (
                 <div className="px-4 py-3 border-b border-border/10">
                   <label className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground/30 mb-1.5 block">GitHub</label>
-                  <a href={typed.url as string} target="_blank" rel="noopener noreferrer"
-                    className="text-xs text-primary/60 hover:text-primary flex items-center gap-1.5 transition-colors">
+                  <button
+                    onClick={() => {
+                      const bridge = window.orchestraDesktop
+                      if (bridge && typeof bridge.openExternal === 'function') {
+                        void bridge.openExternal(typed.url as string)
+                      } else {
+                        window.open(typed.url as string, '_blank')
+                      }
+                    }}
+                    className="text-xs text-primary/60 hover:text-primary flex items-center gap-1.5 transition-colors cursor-pointer text-left"
+                  >
                     <Github size={12} />
                     {(typed.url as string).replace('https://github.com/', '')}
-                  </a>
+                  </button>
                 </div>
               )}
             </div>

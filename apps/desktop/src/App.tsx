@@ -600,25 +600,31 @@ export default function App() {
   const handleIssueUpdate = async (identifier: string, updates: IssueUpdatePayload) => {
     if (!config) return
     try {
-      // If this is a GitHub backlog issue being edited, promote it to a local task first
+      // If this is a GitHub backlog issue, promote to local task linked to the SAME GitHub issue
       if (identifier.startsWith('GH-')) {
         const ghIssue = allBoardIssuesRef.current.find(i =>
           i.identifier === identifier || i.issue_identifier === identifier
         )
         if (ghIssue) {
+          const updatesRec = updates as Record<string, unknown>
+          // Create local task linked to the existing GitHub issue
           const newIssue = await createIssue(config, {
-            title: (updates as Record<string, unknown>).title as string || ghIssue.title || '',
-            description: (updates as Record<string, unknown>).description as string || ghIssue.description || '',
-            state: (updates as Record<string, unknown>).state as string || 'Backlog',
-            assignee_id: (updates as Record<string, unknown>).assignee_id as string || '',
+            title: updatesRec.title as string || ghIssue.title || '',
+            description: updatesRec.description as string || ghIssue.description || '',
+            state: updatesRec.state as string || 'Backlog',
+            assignee_id: updatesRec.assignee_id as string || '',
             project_id: ghIssue.project_id || '',
-            provider: (updates as Record<string, unknown>).provider as string || '',
+            provider: updatesRec.provider as string || '',
           })
-          setStatusMessage(`GitHub issue ${identifier} promoted to local task.`)
+          // Link to the EXISTING GitHub issue — don't create a new one
+          const ghUrl = ghIssue.url || ''
+          if (newIssue?.identifier && ghUrl) {
+            await updateIssue(config, newIssue.identifier, { url: ghUrl } as IssueUpdatePayload)
+          }
+          setStatusMessage(`${identifier} linked to ${newIssue?.identifier || 'local task'}`)
           const updatedIssues = await fetchIssues(config)
           setBoardIssues(updatedIssues)
           await handleRefresh()
-          // Open the new local issue in the inspector
           if (newIssue?.identifier) {
             setIssueLookupId(newIssue.identifier)
             await executeIssueLookup(newIssue.identifier)
