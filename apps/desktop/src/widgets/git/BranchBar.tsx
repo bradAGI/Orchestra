@@ -1,0 +1,166 @@
+import { useState, useRef, useEffect } from 'react'
+import { GitBranch, Plus, Archive } from 'lucide-react'
+import type { BackendConfig } from '@/lib/orchestra-client'
+import { gitCheckout, gitCreateBranch, gitStash, gitStashPop } from '@/lib/orchestra-client'
+
+export function BranchBar({
+  projectId,
+  config,
+  currentBranch,
+  branches,
+  onBranchChange,
+}: {
+  projectId: string
+  config: BackendConfig
+  currentBranch: string
+  branches: string[]
+  onBranchChange: () => void
+}) {
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [stashOpen, setStashOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const stashRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (creating) inputRef.current?.focus()
+  }, [creating])
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (stashRef.current && !stashRef.current.contains(e.target as Node)) {
+        setStashOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  async function handleCheckout(branch: string) {
+    if (branch === currentBranch || loading) return
+    setLoading(true)
+    try {
+      await gitCheckout(config, projectId, branch)
+      onBranchChange()
+    } catch (err) {
+      console.error('checkout failed', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleCreate() {
+    const name = newName.trim()
+    if (!name || loading) return
+    setLoading(true)
+    try {
+      await gitCreateBranch(config, projectId, name)
+      setCreating(false)
+      setNewName('')
+      onBranchChange()
+    } catch (err) {
+      console.error('create branch failed', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleStash() {
+    setStashOpen(false)
+    setLoading(true)
+    try {
+      await gitStash(config, projectId)
+      onBranchChange()
+    } catch (err) {
+      console.error('stash failed', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleStashPop() {
+    setStashOpen(false)
+    setLoading(true)
+    try {
+      await gitStashPop(config, projectId)
+      onBranchChange()
+    } catch (err) {
+      console.error('stash pop failed', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 border-b border-border/40 overflow-x-auto shrink-0">
+      <GitBranch size={14} className="text-muted-foreground shrink-0" />
+
+      {branches.map((branch) => (
+        <button
+          key={branch}
+          onClick={() => handleCheckout(branch)}
+          className={`rounded-full px-3 py-1 text-[11px] font-medium whitespace-nowrap transition-colors ${
+            branch === currentBranch
+              ? 'bg-primary/10 text-primary'
+              : 'bg-muted/20 text-muted-foreground hover:bg-muted/40'
+          }`}
+        >
+          {branch === currentBranch && (
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 align-middle" />
+          )}
+          {branch}
+        </button>
+      ))}
+
+      {creating ? (
+        <input
+          ref={inputRef}
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleCreate()
+            if (e.key === 'Escape') { setCreating(false); setNewName('') }
+          }}
+          onBlur={() => { if (!newName.trim()) { setCreating(false); setNewName('') } }}
+          placeholder="branch name..."
+          className="rounded-full px-3 py-1 text-[11px] bg-muted/20 text-foreground border border-border/40 outline-none focus:border-primary/60 w-32"
+        />
+      ) : (
+        <button
+          onClick={() => setCreating(true)}
+          className="rounded-full px-3 py-1 text-[11px] text-muted-foreground bg-muted/20 hover:bg-muted/40 flex items-center gap-1"
+        >
+          <Plus size={12} />
+          New
+        </button>
+      )}
+
+      <div className="ml-auto relative shrink-0" ref={stashRef}>
+        <button
+          onClick={() => setStashOpen((v) => !v)}
+          className="rounded-full px-3 py-1 text-[11px] text-muted-foreground bg-muted/20 hover:bg-muted/40 flex items-center gap-1"
+        >
+          <Archive size={12} />
+          Stash
+        </button>
+        {stashOpen && (
+          <div className="absolute right-0 top-full mt-1 bg-card border border-border/40 rounded-xl shadow-lg z-20 py-1 min-w-[120px]">
+            <button
+              onClick={handleStash}
+              className="w-full text-left px-3 py-1.5 text-[11px] text-foreground hover:bg-muted/20"
+            >
+              Stash Changes
+            </button>
+            <button
+              onClick={handleStashPop}
+              className="w-full text-left px-3 py-1.5 text-[11px] text-foreground hover:bg-muted/20"
+            >
+              Pop Stash
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
