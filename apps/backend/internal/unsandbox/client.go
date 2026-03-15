@@ -223,9 +223,10 @@ func (c *Client) CreateSession(ctx context.Context, language string, network str
 }
 
 // ShellSession runs a command in an existing session and returns output.
+// Uses language=bash + code=command to match the unsandbox execute API.
 func (c *Client) ShellSession(ctx context.Context, sessionID, command string) (*ExecuteResult, error) {
-	body := map[string]string{"command": command}
-	resp, err := c.request(ctx, "POST", "/sessions/"+sessionID+"/exec", body)
+	body := map[string]string{"language": "bash", "code": command}
+	resp, err := c.request(ctx, "POST", "/sessions/"+sessionID+"/execute", body)
 	if err != nil {
 		return nil, err
 	}

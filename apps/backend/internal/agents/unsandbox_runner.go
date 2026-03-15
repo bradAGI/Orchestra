@@ -202,22 +202,32 @@ func (r *UnsandboxRunner) RunTurn(ctx context.Context, request TurnRequest, onEv
 	}
 
 	// 5. Retrieve JSONL artifacts from /root/output before session ends.
-	// Claude writes full session JSONL inside the container — the symlinks
-	// at /root/output/claude-sessions make them downloadable.
-	// Tar them up, base64, stream back via shell, extract locally.
+	// Claude writes full session JSONL inside the container at ~/.claude/projects/.
+	// The bootstrap symlinked this to /root/output/claude-sessions.
+	// We tar it, base64 stream it back, and extract into the LOCAL ~/.claude/projects/
+	// so unfirehose's existing ingest pipeline (claude-code adapter) picks it up
+	// automatically — no separate Go transformer needed.
 	emit("artifacts", "retrieving session JSONL from container", nil)
 	extractCmd := "cd /root/output && tar czf - claude-sessions claude-todos 2>/dev/null | base64"
 	tarResult, tarErr := r.client.ShellSession(ctx, remoteSessionID, extractCmd)
 	if tarErr == nil && tarResult != nil && tarResult.Output != "" {
 		tarData, decErr := base64.StdEncoding.DecodeString(strings.TrimSpace(tarResult.Output))
 		if decErr == nil && len(tarData) > 0 {
-			// Extract into ~/.orchestra/unfirehose/artifacts/{sessionID}/
 			u, _ := user.Current()
 			if u != nil {
+				// Extract claude-sessions/ into ~/.claude/projects/ (where ingest reads from).
+				// The tar contains "claude-sessions/{project-slug}/{session}.jsonl" which is
+				// actually a symlink to ~/.claude/projects/ — so the real files are at that
+				// path inside the container. We extract and remap.
+				claudeDir := filepath.Join(u.HomeDir, ".claude", "projects")
+				os.MkdirAll(claudeDir, 0755)
+				extractTarGz(tarData, claudeDir)
+				emit("artifacts", fmt.Sprintf("extracted %d bytes of session JSONL into %s for ingest", len(tarData), claudeDir), nil)
+
+				// Also save a copy to orchestra's own dir for provenance tracking
 				artifactDir := filepath.Join(u.HomeDir, ".orchestra", "unfirehose", "artifacts", sessionID)
 				os.MkdirAll(artifactDir, 0755)
 				extractTarGz(tarData, artifactDir)
-				emit("artifacts", fmt.Sprintf("saved %d bytes of session JSONL to %s", len(tarData), artifactDir), nil)
 			}
 		}
 	}
