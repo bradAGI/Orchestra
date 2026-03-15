@@ -70,7 +70,7 @@ func NewRouterWithPubSub(
 	r.Use(middleware.Timeout(30 * time.Second))
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   allowedOrigins,
-		AllowedMethods:   []string{"GET", "POST", "DELETE", "PATCH", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		AllowCredentials: false,
 		MaxAge:           300,
@@ -135,6 +135,13 @@ func NewRouterWithPubSub(
 	protected.Post("/api/v1/projects/{project_id}/git/commit", server.PostGitCommit)
 	protected.Post("/api/v1/projects/{project_id}/git/push", server.PostGitPush)
 	protected.Post("/api/v1/projects/{project_id}/git/pull", server.PostGitPull)
+	protected.Post("/api/v1/projects/{project_id}/git/branches", server.PostGitCreateBranch)
+	protected.Post("/api/v1/projects/{project_id}/git/checkout", server.PostGitCheckout)
+	protected.Delete("/api/v1/projects/{project_id}/git/branches/{branch}", server.DeleteGitBranch)
+	protected.Post("/api/v1/projects/{project_id}/git/stage", server.PostGitStage)
+	protected.Post("/api/v1/projects/{project_id}/git/unstage", server.PostGitUnstage)
+	protected.Post("/api/v1/projects/{project_id}/git/stash", server.PostGitStash)
+	protected.Post("/api/v1/projects/{project_id}/git/stash/pop", server.PostGitStashPop)
 	protected.Post("/api/v1/projects/{project_id}/github/disconnect", server.HandleGitHubDisconnect)
 	protected.Get("/api/v1/projects/{project_id}/git/branches", server.GetProjectGitBranches)
 	protected.Get("/api/v1/projects/{project_id}/github/issues", server.GetProjectGitHubIssues)
@@ -143,6 +150,10 @@ func NewRouterWithPubSub(
 	protected.Get("/api/v1/projects/{project_id}/github/pulls", server.GetProjectGitHubPulls)
 	protected.Get("/api/v1/projects/{project_id}/github/pulls/{number}/diff", server.GetProjectGitHubPullDiff)
 	protected.Post("/api/v1/projects/{project_id}/github/pulls", server.CreateProjectGitHubPull)
+	protected.Get("/api/v1/projects/{project_id}/github/pulls/{number}/reviews", server.GetPRReviews)
+	protected.Post("/api/v1/projects/{project_id}/github/pulls/{number}/reviews", server.PostPRReview)
+	protected.Put("/api/v1/projects/{project_id}/github/pulls/{number}/merge", server.PostPRMerge)
+	protected.Get("/api/v1/projects/{project_id}/github/pulls/{number}/comments", server.GetPRComments)
 	protected.Get("/api/v1/sessions", server.GetSessions)
 	protected.Get("/api/v1/sessions/{session_id}", server.GetSessionDetail)
 	protected.Post("/api/v1/issues/{issue_identifier}/pr", server.CreateGitHubPR)

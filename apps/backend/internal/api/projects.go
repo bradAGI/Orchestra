@@ -14,7 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/orchestra/orchestra/apps/backend/internal/utils/git"
-	"github.com/orchestra/orchestra/apps/backend/internal/utils/github"
+	ghutil "github.com/orchestra/orchestra/apps/backend/internal/utils/github"
 	"github.com/orchestra/orchestra/apps/backend/internal/workspace"
 )
 
@@ -669,7 +669,7 @@ func (s *Server) GetProjectGitHubIssues(w http.ResponseWriter, r *http.Request) 
 	if state == "" {
 		state = "open"
 	}
-	issues, err := github.ListIssues(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, state)
+	issues, err := ghutil.ListIssues(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, state)
 	if err != nil {
 		s.logger.Warn().Err(err).Str("project_id", projectID).Msg("failed to fetch github issues")
 		writeJSONError(w, http.StatusBadGateway, "github_fetch_failed", "failed to fetch issues from GitHub")
@@ -737,7 +737,7 @@ func (s *Server) CreateProjectGitHubIssue(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	var req github.CreateIssueRequest
+	var req ghutil.CreateIssueRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
 		return
@@ -748,7 +748,7 @@ func (s *Server) CreateProjectGitHubIssue(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	issue, err := github.CreateIssue(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, req)
+	issue, err := ghutil.CreateIssue(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, req)
 	if err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Msg("failed to create github issue")
 		writeJSONError(w, http.StatusBadGateway, "github_create_failed", fmt.Sprintf("failed to create issue: %v", err))
@@ -781,13 +781,13 @@ func (s *Server) UpdateProjectGitHubIssue(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	var req github.UpdateIssueRequest
+	var req ghutil.UpdateIssueRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
 		return
 	}
 
-	issue, err := github.UpdateIssue(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, number, req)
+	issue, err := ghutil.UpdateIssue(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, number, req)
 	if err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Int("number", number).Msg("failed to update github issue")
 		writeJSONError(w, http.StatusBadGateway, "github_update_failed", fmt.Sprintf("failed to update issue: %v", err))
@@ -812,7 +812,7 @@ func (s *Server) GetProjectGitHubPulls(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prs, err := github.ListPullRequests(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken)
+	prs, err := ghutil.ListPullRequests(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken)
 	if err != nil {
 		s.logger.Warn().Err(err).Str("project_id", projectID).Msg("failed to fetch github pull requests")
 		writeJSONError(w, http.StatusBadGateway, "github_fetch_failed", "failed to fetch pull requests from GitHub")
@@ -844,7 +844,7 @@ func (s *Server) GetProjectGitHubPullDiff(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	diff, err := github.GetPullRequestDiff(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, number)
+	diff, err := ghutil.GetPullRequestDiff(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, number)
 	if err != nil {
 		s.logger.Warn().Err(err).Str("project_id", projectID).Int("number", number).Msg("failed to fetch PR diff")
 		writeJSONError(w, http.StatusBadGateway, "github_fetch_failed", fmt.Sprintf("failed to fetch PR diff: %v", err))
@@ -868,7 +868,7 @@ func (s *Server) CreateProjectGitHubPull(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var req github.PRRequest
+	var req ghutil.PRRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
 		return
@@ -879,7 +879,7 @@ func (s *Server) CreateProjectGitHubPull(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	pr, err := github.CreatePullRequest(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, req)
+	pr, err := ghutil.CreatePullRequest(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, req)
 	if err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Msg("failed to create github pull request")
 		writeJSONError(w, http.StatusBadGateway, "github_create_failed", fmt.Sprintf("failed to create pull request: %v", err))
@@ -889,4 +889,376 @@ func (s *Server) CreateProjectGitHubPull(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(pr)
+}
+
+func (s *Server) PostGitCheckout(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if err := workspace.ValidateProjectPath(project.RootPath, s.config.ProjectRoots); err != nil {
+		s.logger.Warn().Err(err).Str("path", project.RootPath).Msg("unauthorized git checkout attempt")
+		writeJSONError(w, http.StatusForbidden, "unauthorized_project_path", "unauthorized project path")
+		return
+	}
+
+	var req struct {
+		Branch string `json:"branch"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+		return
+	}
+
+	if req.Branch == "" {
+		writeJSONError(w, http.StatusBadRequest, "invalid_request", "branch is required")
+		return
+	}
+
+	if err := git.Checkout(r.Context(), project.RootPath, req.Branch); err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git checkout failed")
+		writeJSONError(w, http.StatusInternalServerError, "git_checkout_failed", err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func (s *Server) PostGitCreateBranch(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if err := workspace.ValidateProjectPath(project.RootPath, s.config.ProjectRoots); err != nil {
+		s.logger.Warn().Err(err).Str("path", project.RootPath).Msg("unauthorized git create branch attempt")
+		writeJSONError(w, http.StatusForbidden, "unauthorized_project_path", "unauthorized project path")
+		return
+	}
+
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+		return
+	}
+
+	if req.Name == "" {
+		writeJSONError(w, http.StatusBadRequest, "invalid_request", "name is required")
+		return
+	}
+
+	if err := git.CreateBranch(r.Context(), project.RootPath, req.Name); err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git create branch failed")
+		writeJSONError(w, http.StatusInternalServerError, "git_create_branch_failed", err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func (s *Server) DeleteGitBranch(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	branch := chi.URLParam(r, "branch")
+
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if err := workspace.ValidateProjectPath(project.RootPath, s.config.ProjectRoots); err != nil {
+		s.logger.Warn().Err(err).Str("path", project.RootPath).Msg("unauthorized git delete branch attempt")
+		writeJSONError(w, http.StatusForbidden, "unauthorized_project_path", "unauthorized project path")
+		return
+	}
+
+	if branch == "" {
+		writeJSONError(w, http.StatusBadRequest, "invalid_request", "branch is required")
+		return
+	}
+
+	if err := git.DeleteBranch(r.Context(), project.RootPath, branch); err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git delete branch failed")
+		writeJSONError(w, http.StatusInternalServerError, "git_delete_branch_failed", err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func (s *Server) PostGitStage(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if err := workspace.ValidateProjectPath(project.RootPath, s.config.ProjectRoots); err != nil {
+		s.logger.Warn().Err(err).Str("path", project.RootPath).Msg("unauthorized git stage attempt")
+		writeJSONError(w, http.StatusForbidden, "unauthorized_project_path", "unauthorized project path")
+		return
+	}
+
+	var req struct {
+		Files []string `json:"files"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+		return
+	}
+
+	if len(req.Files) == 0 {
+		writeJSONError(w, http.StatusBadRequest, "invalid_request", "files is required")
+		return
+	}
+
+	if err := git.Stage(r.Context(), project.RootPath, req.Files); err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git stage failed")
+		writeJSONError(w, http.StatusInternalServerError, "git_stage_failed", err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func (s *Server) PostGitUnstage(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if err := workspace.ValidateProjectPath(project.RootPath, s.config.ProjectRoots); err != nil {
+		s.logger.Warn().Err(err).Str("path", project.RootPath).Msg("unauthorized git unstage attempt")
+		writeJSONError(w, http.StatusForbidden, "unauthorized_project_path", "unauthorized project path")
+		return
+	}
+
+	var req struct {
+		Files []string `json:"files"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+		return
+	}
+
+	if len(req.Files) == 0 {
+		writeJSONError(w, http.StatusBadRequest, "invalid_request", "files is required")
+		return
+	}
+
+	if err := git.Unstage(r.Context(), project.RootPath, req.Files); err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git unstage failed")
+		writeJSONError(w, http.StatusInternalServerError, "git_unstage_failed", err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func (s *Server) PostGitStash(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if err := workspace.ValidateProjectPath(project.RootPath, s.config.ProjectRoots); err != nil {
+		s.logger.Warn().Err(err).Str("path", project.RootPath).Msg("unauthorized git stash attempt")
+		writeJSONError(w, http.StatusForbidden, "unauthorized_project_path", "unauthorized project path")
+		return
+	}
+
+	if err := git.Stash(r.Context(), project.RootPath); err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git stash failed")
+		writeJSONError(w, http.StatusInternalServerError, "git_stash_failed", err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func (s *Server) PostGitStashPop(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if err := workspace.ValidateProjectPath(project.RootPath, s.config.ProjectRoots); err != nil {
+		s.logger.Warn().Err(err).Str("path", project.RootPath).Msg("unauthorized git stash pop attempt")
+		writeJSONError(w, http.StatusForbidden, "unauthorized_project_path", "unauthorized project path")
+		return
+	}
+
+	if err := git.StashPop(r.Context(), project.RootPath); err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git stash pop failed")
+		writeJSONError(w, http.StatusInternalServerError, "git_stash_pop_failed", err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func (s *Server) GetPRReviews(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	numberStr := chi.URLParam(r, "number")
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_number", "invalid pull request number")
+		return
+	}
+
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
+		writeJSONError(w, http.StatusBadRequest, "github_not_configured", "GitHub is not configured for this project")
+		return
+	}
+
+	reviews, err := ghutil.ListPRReviews(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, number)
+	if err != nil {
+		s.logger.Warn().Err(err).Str("project_id", projectID).Int("number", number).Msg("failed to fetch PR reviews")
+		writeJSONError(w, http.StatusBadGateway, "github_fetch_failed", fmt.Sprintf("failed to fetch PR reviews: %v", err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(reviews)
+}
+
+func (s *Server) PostPRReview(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	numberStr := chi.URLParam(r, "number")
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_number", "invalid pull request number")
+		return
+	}
+
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
+		writeJSONError(w, http.StatusBadRequest, "github_not_configured", "GitHub is not configured for this project")
+		return
+	}
+
+	var req ghutil.ReviewRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+		return
+	}
+
+	if err := ghutil.SubmitPRReview(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, number, req); err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Int("number", number).Msg("failed to submit PR review")
+		writeJSONError(w, http.StatusBadGateway, "github_review_failed", fmt.Sprintf("failed to submit PR review: %v", err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func (s *Server) PostPRMerge(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	numberStr := chi.URLParam(r, "number")
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_number", "invalid pull request number")
+		return
+	}
+
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
+		writeJSONError(w, http.StatusBadRequest, "github_not_configured", "GitHub is not configured for this project")
+		return
+	}
+
+	var req struct {
+		Method string `json:"method"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+		return
+	}
+
+	if req.Method == "" {
+		req.Method = "merge"
+	}
+
+	if err := ghutil.MergePR(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, number, req.Method); err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Int("number", number).Msg("failed to merge PR")
+		writeJSONError(w, http.StatusBadGateway, "github_merge_failed", fmt.Sprintf("failed to merge PR: %v", err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func (s *Server) GetPRComments(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	numberStr := chi.URLParam(r, "number")
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_number", "invalid pull request number")
+		return
+	}
+
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
+		writeJSONError(w, http.StatusBadRequest, "github_not_configured", "GitHub is not configured for this project")
+		return
+	}
+
+	comments, err := ghutil.ListPRComments(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, number)
+	if err != nil {
+		s.logger.Warn().Err(err).Str("project_id", projectID).Int("number", number).Msg("failed to fetch PR comments")
+		writeJSONError(w, http.StatusBadGateway, "github_fetch_failed", fmt.Sprintf("failed to fetch PR comments: %v", err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(comments)
 }

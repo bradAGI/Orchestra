@@ -104,6 +104,80 @@ func CreateBranch(ctx context.Context, dir, name string) error {
 	return nil
 }
 
+// Checkout switches to the given branch
+func Checkout(ctx context.Context, dir, branch string) error {
+	cmd := exec.CommandContext(ctx, "git", "checkout", branch)
+	cmd.Dir = dir
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("git checkout failed: %v - %s", err, stderr.String())
+	}
+	return nil
+}
+
+// DeleteBranch deletes the given branch
+func DeleteBranch(ctx context.Context, dir, name string) error {
+	cmd := exec.CommandContext(ctx, "git", "branch", "-d", name)
+	cmd.Dir = dir
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("git branch -d failed: %v - %s", err, stderr.String())
+	}
+	return nil
+}
+
+// Stage adds the given files to the index
+func Stage(ctx context.Context, dir string, files []string) error {
+	args := append([]string{"add"}, files...)
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = dir
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("git add failed: %v - %s", err, stderr.String())
+	}
+	return nil
+}
+
+// Unstage removes the given files from the index
+func Unstage(ctx context.Context, dir string, files []string) error {
+	args := append([]string{"reset", "HEAD", "--"}, files...)
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = dir
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("git reset HEAD failed: %v - %s", err, stderr.String())
+	}
+	return nil
+}
+
+// Stash stashes uncommitted changes
+func Stash(ctx context.Context, dir string) error {
+	cmd := exec.CommandContext(ctx, "git", "stash")
+	cmd.Dir = dir
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("git stash failed: %v - %s", err, stderr.String())
+	}
+	return nil
+}
+
+// StashPop pops the most recent stash
+func StashPop(ctx context.Context, dir string) error {
+	cmd := exec.CommandContext(ctx, "git", "stash", "pop")
+	cmd.Dir = dir
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("git stash pop failed: %v - %s", err, stderr.String())
+	}
+	return nil
+}
+
 // ParseGitHubRemote extracts owner and repo from a GitHub URL
 func ParseGitHubRemote(remoteURL string) (owner string, repo string, ok bool) {
 	if remoteURL == "" {
