@@ -280,14 +280,14 @@ export function IssueDetailView({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-border/40 shrink-0">
+      <div className="flex items-center justify-between gap-4 px-5 h-14 border-b border-border/40 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <Badge variant="outline" className="shrink-0 font-mono text-[11px] px-2.5 py-1 bg-primary/5 text-primary border-primary/20">
             {identifier}
           </Badge>
-          <h2 className="text-lg font-bold truncate">{localTitle}</h2>
+          <h2 className="text-base font-bold truncate">{localTitle}</h2>
         </div>
-        <div className="flex items-center gap-2 shrink-0 mr-10">
+        <div className="flex items-center gap-2 shrink-0 mr-8">
           {isRunning && onStopSession && (
             <button
               className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-colors"
