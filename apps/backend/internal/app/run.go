@@ -255,8 +255,10 @@ func processExecutionTick(
 	var created bool
 	var createRes workspace.HookResult
 	var err error
+	var resolvedProject db.Project
 	if entry.ProjectID != "" && warehouseDB != nil {
 		project, projErr := warehouseDB.GetProjectByID(context.Background(), entry.ProjectID)
+		resolvedProject = project
 		if projErr != nil {
 			logger.Warn().Err(projErr).Str("issue_id", entry.IssueID).Str("project_id", entry.ProjectID).Msg("failed to lookup project for workspace")
 		} else if project.RootPath == "" || !filepath.IsAbs(project.RootPath) {
@@ -575,8 +577,8 @@ func processExecutionTick(
 	// Post completion comment to GitHub issue if linked
 	if entry.ProjectID != "" && warehouseDB != nil {
 		go func() {
-			project, projErr := warehouseDB.GetProjectByID(context.Background(), entry.ProjectID)
-			if projErr != nil || project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
+			project := resolvedProject
+			if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
 				return
 			}
 			// Extract issue number from the issue URL or identifier

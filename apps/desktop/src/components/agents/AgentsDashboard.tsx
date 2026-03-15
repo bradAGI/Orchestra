@@ -293,13 +293,6 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                         results.push({ name, command: cmd, source: cfg.path })
                     }
                 }
-                // Gemini: mcpServers
-                if (parsed.mcpServers && typeof parsed.mcpServers === 'object' && !parsed.mcp) {
-                    for (const [name, val] of Object.entries(parsed.mcpServers)) {
-                        const server = val as Record<string, unknown>
-                        results.push({ name, command: (server.command as string) || (server.url as string) || 'configured', source: cfg.path })
-                    }
-                }
             } catch {
                 // Try TOML-style parsing for Codex (basic: [mcp_servers.name])
                 const tomlMatches = cfg.content.matchAll(/\[mcp_servers\.(\w+)\]\s*\n\s*command\s*=\s*"([^"]+)"/g)

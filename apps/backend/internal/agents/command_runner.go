@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"log"
+
 	"github.com/acarl005/stripansi"
 	"github.com/orchestra/orchestra/apps/backend/internal/terminal"
 	"github.com/orchestra/orchestra/apps/backend/internal/workspace"
@@ -42,8 +44,7 @@ const (
 
 func (r *CommandRunner) RunTurn(ctx context.Context, request TurnRequest, onEvent EventHandler) (TurnResult, error) {
 	if err := workspace.ValidateWorkspacePath(request.WorkspaceRoot, request.Workspace); err != nil {
-		// Log warning but allow execution — project root paths are validated upstream
-		_ = err
+		log.Printf("WARN: workspace path validation: %v (proceeding anyway)", err)
 	}
 
 	sessionID := request.SessionID

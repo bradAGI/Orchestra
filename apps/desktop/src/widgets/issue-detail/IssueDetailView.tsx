@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bot, Brain, CheckCircle2, ChevronRight, FileText, GitPullRequest, Github, History, Info, Loader2, Pencil, Play, Terminal, Wrench, X, Zap } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Prism } from 'react-syntax-highlighter'
@@ -156,7 +156,7 @@ export function IssueDetailView({
 
   // Extract operational plan from the most recent agent message that contains checkboxes.
   // Agent restates the plan with updated checkboxes as it progresses — we want the LATEST version.
-  const planItems: PlanItem[] = (() => {
+  const planItems: PlanItem[] = useMemo(() => {
     const messageEvents = issueHistory.filter(e => (e.kind === 'message' || e.kind === 'agent_message' || e.kind === 'item.completed') && e.message)
 
     if (messageEvents.length > 0) {
@@ -180,7 +180,7 @@ export function IssueDetailView({
 
     // Final fallback: parse description
     return extractPlanFromText(description)
-  })()
+  }, [issueHistory, timeline, issueId, identifier, description])
   const completedCount = planItems.filter(i => i.done).length
   const isRunning = snapshot?.running?.some(r => r.issue_id === issueId || r.issue_identifier === identifier) ?? false
 
