@@ -185,7 +185,11 @@ func filterAgentOutput(data []byte) []byte {
 		}
 
 		// Non-JSON lines pass through (shell prompts, ANSI output)
+		// But filter out tool name dumps and extremely long lines (likely agent noise)
 		if !strings.HasPrefix(trimmed, "{") {
+			if len(trimmed) > 500 || strings.Contains(trimmed, "mcp__") {
+				continue // Skip tool name dumps and overly long non-JSON lines
+			}
 			out = append(out, line)
 			continue
 		}
@@ -260,8 +264,12 @@ func filterAgentOutput(data []byte) []byte {
 					out = append(out, "\033[32m"+content+"\033[0m")
 				}
 			}
-		// Skip noise: system, rate_limit_event, init hooks, etc.
-		case "system", "rate_limit_event":
+		// Skip noise
+		case "system", "rate_limit_event", "progress", "tool_use", "tool_result",
+			"content_block_start", "content_block_delta", "content_block_stop",
+			"message_start", "message_delta", "message_stop", "ping",
+			"init", "config", "session_start", "session_end", "error",
+			"event_msg", "session_meta", "turn_context", "response_item":
 			// silently drop
 		default:
 			// Drop unknown JSON events
