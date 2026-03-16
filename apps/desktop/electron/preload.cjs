@@ -1,4 +1,11 @@
-const { contextBridge, ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer, webFrame } = require('electron')
+
+// Normalize zoom to counter system DPI scaling — makes Electron match the browser
+ipcRenderer.invoke('orchestra:get-scale-factor').then((scaleFactor) => {
+  if (scaleFactor && scaleFactor > 1) {
+    webFrame.setZoomFactor(1 / scaleFactor)
+  }
+}).catch(() => {})
 
 contextBridge.exposeInMainWorld('orchestraDesktop', {
   getBackendConfig: () => ipcRenderer.invoke('orchestra:get-backend-config'),

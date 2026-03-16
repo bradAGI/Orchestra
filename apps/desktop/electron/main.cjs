@@ -178,8 +178,6 @@ async function stopManagedBackend() {
 
 // GPU enabled for WebGPU (Transformers.js Whisper inference)
 app.commandLine.appendSwitch('enable-features', 'Vulkan,WebGPU')
-// Force 1x device scale so Electron renders identically to the browser
-app.commandLine.appendSwitch('force-device-scale-factor', '1')
 
 function createDefaultProfile() {
   const managed = managedBackendState?.config
@@ -505,6 +503,10 @@ ipcMain.handle('orchestra:open-path', async (_event, targetPath) => {
     return
   }
   await shell.openPath(targetPath)
+})
+
+ipcMain.handle('orchestra:get-scale-factor', () => {
+  return screen.getPrimaryDisplay().scaleFactor
 })
 
 ipcMain.handle('orchestra:select-folder', async () => {
