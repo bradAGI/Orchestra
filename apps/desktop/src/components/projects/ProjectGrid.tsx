@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
-import { Folder, Globe, History, Search, Zap, Plus, Trash2, ChevronLeft, ChevronRight, LayoutGrid, List } from 'lucide-react'
+import { Folder, GitBranch, History, Search, Zap, Plus, Trash2, ChevronLeft, ChevronRight, LayoutGrid, List, ArrowUpRight, Activity } from 'lucide-react'
 import type { Project, ProjectStats } from '@/lib/orchestra-types'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { AppTooltip } from '../ui/tooltip-wrapper'
 
 import {
@@ -23,6 +23,19 @@ interface ProjectCardProps {
     onDelete?: (project: Project) => void
 }
 
+function formatTokens(n: number): string {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`
+    return String(n)
+}
+
+function getActivityLevel(sessions: number): { label: string; color: string; pulse: boolean } {
+    if (sessions >= 20) return { label: 'High', color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/20', pulse: true }
+    if (sessions >= 5) return { label: 'Active', color: 'text-primary bg-primary/15 border-primary/20', pulse: false }
+    if (sessions >= 1) return { label: 'Low', color: 'text-amber-400 bg-amber-500/15 border-amber-500/20', pulse: false }
+    return { label: 'Idle', color: 'text-muted-foreground/40 bg-muted/20 border-border/30', pulse: false }
+}
+
 const ProjectListRow: React.FC<ProjectCardProps> = ({ project, stats, loading, onClick, onDelete }) => {
     if (loading) {
         return (
@@ -38,43 +51,52 @@ const ProjectListRow: React.FC<ProjectCardProps> = ({ project, stats, loading, o
         )
     }
 
+    const totalTokens = (stats?.total_input || 0) + (stats?.total_output || 0)
+    const activity = getActivityLevel(stats?.total_sessions || 0)
+
     return (
         <div
             onClick={() => onClick(project.id)}
-            className="group flex items-center gap-4 p-3 rounded-xl border border-border/40 bg-card/20 hover:bg-primary/5 hover:border-primary/30 transition-all cursor-pointer"
+            className="group relative flex items-center gap-4 p-3 rounded-xl border border-border/40 bg-gradient-to-r from-card via-card to-muted/10 hover:border-primary/30 transition-all cursor-pointer overflow-hidden"
         >
-            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                <Folder className="w-5 h-5 text-primary/60" />
+            <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-r from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+            <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
+                <Folder className="w-5 h-5 text-primary group-hover:text-primary-foreground" strokeWidth={2} />
             </div>
 
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                     <h3 className="text-sm font-bold truncate group-hover:text-primary transition-colors">{project.name}</h3>
-                    <span className="text-[10px] text-muted-foreground/40 font-mono truncate">{project.root_path}</span>
+                    <Badge variant="outline" className={`text-[7px] font-black uppercase tracking-widest h-4 px-1.5 ${activity.color}`}>
+                        {activity.label}
+                    </Badge>
                 </div>
-                <div className="flex items-center gap-4 mt-0.5">
-                    <div className="flex items-center gap-1.5">
-                        <History size={10} className="text-muted-foreground" />
-                        <span className="text-[11px] text-muted-foreground font-medium">{stats?.total_sessions || 0} Sessions</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                        <Zap size={10} className="text-muted-foreground" />
-                        <span className="text-[11px] text-muted-foreground font-medium">{(((stats?.total_input || 0) + (stats?.total_output || 0)) / 1000).toFixed(1)}k Tokens</span>
-                    </div>
+                <span className="text-[10px] text-muted-foreground/40 font-mono truncate block">{project.root_path}</span>
+            </div>
+
+            <div className="flex items-center gap-6 shrink-0">
+                <div className="text-right">
+                    <span className="text-xs font-black tabular-nums">{stats?.total_sessions || 0}</span>
+                    <span className="text-[8px] uppercase text-muted-foreground/40 font-bold tracking-wider ml-1">sessions</span>
+                </div>
+                <div className="text-right">
+                    <span className="text-xs font-black tabular-nums">{formatTokens(totalTokens)}</span>
+                    <span className="text-[8px] uppercase text-muted-foreground/40 font-bold tracking-wider ml-1">tokens</span>
                 </div>
             </div>
 
-            <div className="pr-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="pr-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 w-8 text-muted-foreground hover:text-red-500"
+                    className="h-7 w-7 p-0 text-muted-foreground/40 hover:text-red-500"
                     onClick={(e) => {
                         e.stopPropagation()
                         onDelete?.(project)
                     }}
                 >
-                    <Trash2 size={14} />
+                    <Trash2 size={13} />
                 </Button>
             </div>
         </div>
@@ -84,34 +106,44 @@ const ProjectListRow: React.FC<ProjectCardProps> = ({ project, stats, loading, o
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, stats, loading, onClick, onDelete }) => {
     if (loading) {
         return (
-            <Card className="h-56 bg-muted/50 border border-border/50 animate-pulse rounded-2xl">
-                <CardHeader className="pb-3">
-                    <Skeleton className="h-5 w-3/4 mb-1" />
-                    <Skeleton className="h-3 w-1/2" />
-                </CardHeader>
-                <CardContent className="space-y-3 pt-4 border-t border-border/40">
-                    <Skeleton className="h-2 w-full" />
-                    <div className="grid grid-cols-2 gap-2">
-                        <Skeleton className="h-8 w-full rounded-lg" />
-                        <Skeleton className="h-8 w-full rounded-lg" />
+            <div className="h-64 bg-muted/20 border border-border/30 rounded-2xl animate-pulse p-6 space-y-4">
+                <div className="flex items-center gap-3">
+                    <Skeleton className="h-12 w-12 rounded-xl" />
+                    <div className="space-y-2 flex-1">
+                        <Skeleton className="h-5 w-3/4" />
+                        <Skeleton className="h-3 w-1/2" />
                     </div>
-                </CardContent>
-            </Card>
-        );
+                </div>
+                <Skeleton className="h-1 w-full rounded-full" />
+                <div className="grid grid-cols-3 gap-2">
+                    <Skeleton className="h-16 rounded-xl" />
+                    <Skeleton className="h-16 rounded-xl" />
+                    <Skeleton className="h-16 rounded-xl" />
+                </div>
+            </div>
+        )
     }
-    return (
-        <Card
-            onClick={() => onClick(project.id)}
-            className="group relative overflow-hidden bg-gradient-to-b from-card via-card to-muted/20 border border-border/50 transition-[border-color,box-shadow,background-color] duration-300 hover:shadow-2xl hover:shadow-primary/10 cursor-pointer h-56 flex flex-col justify-between shadow-lg hover:border-primary/30 rounded-2xl"
-        >
-            <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.04] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
+    const totalTokens = (stats?.total_input || 0) + (stats?.total_output || 0)
+    const sessions = stats?.total_sessions || 0
+    const activity = getActivityLevel(sessions)
+    const hasGitHub = !!project.remote_url
+
+    return (
+        <div
+            onClick={() => onClick(project.id)}
+            className="group relative overflow-hidden bg-gradient-to-b from-card via-card to-muted/20 border border-border/50 rounded-2xl cursor-pointer transition-all duration-500 hover:border-primary/30 hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-0.5 flex flex-col"
+        >
+            {/* Hover glow overlay */}
+            <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.05] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+            {/* Delete button */}
             <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10 translate-y-1 group-hover:translate-y-0">
-                <AppTooltip content="Remove from workspace">
+                <AppTooltip content="Remove project">
                     <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 w-7 p-0 bg-background/90 border border-border/50 text-muted-foreground hover:text-destructive shadow-sm"
+                        className="h-7 w-7 p-0 bg-background/80 backdrop-blur-sm border border-border/50 text-muted-foreground/60 hover:text-red-500 hover:border-red-500/30 shadow-sm"
                         onClick={(e) => {
                             e.stopPropagation()
                             onDelete?.(project)
@@ -122,41 +154,68 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, stats, loading, onCl
                 </AppTooltip>
             </div>
 
-            <CardHeader className="pb-3 pt-4 text-left space-y-1.5">
-                <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-500 shadow-inner group-hover:shadow-primary/20">
-                        <Folder className="w-5 h-5" strokeWidth={2.5} />
+            {/* Header */}
+            <div className="px-5 pt-5 pb-4">
+                <div className="flex items-start gap-3.5">
+                    <div className="h-12 w-12 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center text-primary shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-500 shadow-lg shadow-primary/5">
+                        <Folder className="w-6 h-6" strokeWidth={2} />
                     </div>
-                    <CardTitle className="text-base font-black tracking-tight group-hover:text-primary transition-colors text-left truncate">{project.name}</CardTitle>
+                    <div className="min-w-0 flex-1 pt-0.5">
+                        <h3 className="text-[15px] font-black tracking-tight truncate group-hover:text-primary transition-colors leading-tight">{project.name}</h3>
+                        <p className="text-[10px] text-muted-foreground/40 font-mono truncate mt-1">{project.root_path}</p>
+                    </div>
                 </div>
-                <CardDescription className="text-[10px] text-muted-foreground/70 truncate font-mono ml-12 text-left">{project.root_path}</CardDescription>
-            </CardHeader>
 
-            {stats && (
-                <CardContent className="space-y-4 mt-auto pt-4 border-t border-border/40 flex-1 text-left bg-muted/5 group-hover:bg-muted/10 transition-colors">
-                    <div className="grid grid-cols-2 gap-3 text-left">
-                        <div className="flex items-center gap-2.5 group/stat rounded-lg border border-border/40 bg-background/50 px-2.5 py-2">
-                            <div className="p-1.5 rounded bg-background border border-border/50 text-primary/70 group-hover/stat:text-primary transition-colors shadow-sm">
-                                <History size={11} strokeWidth={3} />
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-xs font-black tabular-nums leading-none">{stats.total_sessions}</span>
-                                <span className="text-[8px] uppercase font-bold text-muted-foreground/50 tracking-wider">Sessions</span>
-                            </div>
+                {/* Status badges */}
+                <div className="flex items-center gap-2 mt-3">
+                    <Badge variant="outline" className={`text-[7px] font-black uppercase tracking-widest h-4 px-1.5 border ${activity.color}`}>
+                        {activity.pulse && <span className="h-1 w-1 rounded-full bg-current mr-1 animate-pulse" />}
+                        {activity.label}
+                    </Badge>
+                    {hasGitHub && (
+                        <Badge variant="outline" className="text-[7px] font-black uppercase tracking-widest h-4 px-1.5 text-muted-foreground/50 border-border/30">
+                            <GitBranch size={8} className="mr-0.5" />
+                            Git
+                        </Badge>
+                    )}
+                </div>
+            </div>
+
+            {/* Stats row */}
+            <div className="mt-auto px-4 pb-4">
+                <div className="grid grid-cols-3 gap-2">
+                    <div className="relative rounded-xl bg-background/50 border border-border/30 px-3 py-2.5 text-center overflow-hidden group/stat">
+                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/[0.02] to-transparent opacity-0 group-hover/stat:opacity-100 transition-opacity" />
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                            <History size={10} className="text-primary/50" strokeWidth={2.5} />
                         </div>
-                        <div className="flex items-center gap-2.5 group/stat rounded-lg border border-border/40 bg-background/50 px-2.5 py-2">
-                            <div className="p-1.5 rounded bg-background border border-border/50 text-primary/70 group-hover/stat:text-primary transition-colors shadow-sm">
-                                <Zap size={11} strokeWidth={3} />
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-xs font-black tabular-nums leading-none">{((stats.total_input + stats.total_output) / 1000).toFixed(1)}k</span>
-                                <span className="text-[8px] uppercase font-bold text-muted-foreground/50 tracking-wider">Tokens</span>
-                            </div>
-                        </div>
+                        <p className="text-sm font-black tabular-nums leading-none">{sessions}</p>
+                        <p className="text-[7px] uppercase font-bold text-muted-foreground/40 tracking-widest mt-1">Sessions</p>
                     </div>
-                </CardContent>
-            )}
-        </Card>
+                    <div className="relative rounded-xl bg-background/50 border border-border/30 px-3 py-2.5 text-center overflow-hidden group/stat">
+                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/[0.02] to-transparent opacity-0 group-hover/stat:opacity-100 transition-opacity" />
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                            <Zap size={10} className="text-primary/50" strokeWidth={2.5} />
+                        </div>
+                        <p className="text-sm font-black tabular-nums leading-none">{formatTokens(totalTokens)}</p>
+                        <p className="text-[7px] uppercase font-bold text-muted-foreground/40 tracking-widest mt-1">Tokens</p>
+                    </div>
+                    <div className="relative rounded-xl bg-background/50 border border-border/30 px-3 py-2.5 text-center overflow-hidden group/stat">
+                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/[0.02] to-transparent opacity-0 group-hover/stat:opacity-100 transition-opacity" />
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                            <Activity size={10} className="text-primary/50" strokeWidth={2.5} />
+                        </div>
+                        <p className="text-sm font-black tabular-nums leading-none">
+                            {stats?.last_active ? new Date(stats.last_active).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '—'}
+                        </p>
+                        <p className="text-[7px] uppercase font-bold text-muted-foreground/40 tracking-widest mt-1">Last Active</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Bottom accent line */}
+            <div className="h-[2px] bg-gradient-to-r from-transparent via-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        </div>
     )
 }
 
@@ -213,7 +272,7 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
 
     if (loading && projects.length === 0) {
         return (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 p-6">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
                     <ProjectCard key={i} project={LOADING_PROJECT_PLACEHOLDER} loading onClick={() => { }} />
                 ))}
@@ -223,65 +282,62 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
 
     return (
         <div className="flex flex-col h-full bg-transparent">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border sticky top-0 bg-background/80 backdrop-blur-xl z-20">
-                <div className="relative w-72">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
-                    <input
-                        type="text"
-                        placeholder="Search workspace..."
-                        value={search}
-                        onChange={handleSearchChange}
-                        className="w-full pl-10 pr-4 h-10 bg-muted/50 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-muted-foreground/60"
-                    />
+            {/* Header bar */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border/40 sticky top-0 bg-background/80 backdrop-blur-xl z-20">
+                <div className="flex items-center gap-4">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
+                        <input
+                            type="text"
+                            placeholder="Search projects..."
+                            value={search}
+                            onChange={handleSearchChange}
+                            className="w-64 pl-9 pr-4 h-9 bg-muted/30 border border-border/40 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all placeholder:text-muted-foreground/30"
+                        />
+                    </div>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/30">
+                        {filtered.length} project{filtered.length !== 1 ? 's' : ''}
+                    </span>
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <AppTooltip content="Add Local Repository">
-                        <Button variant="default" size="default" onClick={onAddProject} className="h-9 gap-2 bg-primary text-xs hover:bg-primary/90 shadow-lg shadow-primary/20">
-                            <Plus size={16} />
-                            <span className="font-bold uppercase tracking-widest text-[10px]">Add Project</span>
-                        </Button>
-                    </AppTooltip>
-                    <div className="flex items-center bg-muted/30 p-1 rounded-xl border border-border/50 shadow-inner">
-                        <AppTooltip content="Grid View">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className={`h-8 w-8 p-0 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-primary/20 text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                                onClick={() => setViewMode('grid')}
-                            >
-                                <LayoutGrid size={16} />
-                            </Button>
-                        </AppTooltip>
-                        <AppTooltip content="List View">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className={`h-8 w-8 p-0 rounded-lg transition-all ${viewMode === 'list' ? 'bg-primary/20 text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                                onClick={() => setViewMode('list')}
-                            >
-                                <List size={16} />
-                            </Button>
-                        </AppTooltip>
+                    <Button variant="default" size="sm" onClick={onAddProject} className="h-8 gap-1.5 bg-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 shadow-lg shadow-primary/20 px-3">
+                        <Plus size={14} />
+                        Add Project
+                    </Button>
+                    <div className="flex items-center bg-muted/20 p-0.5 rounded-lg border border-border/30">
+                        <button
+                            className={`h-7 w-7 rounded-md flex items-center justify-center transition-all ${viewMode === 'grid' ? 'bg-primary/15 text-primary shadow-sm' : 'text-muted-foreground/40 hover:text-foreground'}`}
+                            onClick={() => setViewMode('grid')}
+                        >
+                            <LayoutGrid size={14} />
+                        </button>
+                        <button
+                            className={`h-7 w-7 rounded-md flex items-center justify-center transition-all ${viewMode === 'list' ? 'bg-primary/15 text-primary shadow-sm' : 'text-muted-foreground/40 hover:text-foreground'}`}
+                            onClick={() => setViewMode('list')}
+                        >
+                            <List size={14} />
+                        </button>
                     </div>
                 </div>
             </div>
 
+            {/* Content */}
             <div className="flex-1 flex flex-col overflow-hidden min-h-0 custom-scrollbar">
                 {filtered.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-32 text-center">
-                        <div className="p-8 rounded-full bg-primary/10 mb-6 ring-1 ring-border/50">
-                            <Folder size={64} className="text-muted-foreground/30" />
+                        <div className="p-6 rounded-2xl bg-muted/10 border border-border/20 mb-6">
+                            <Folder size={48} className="text-muted-foreground/15" strokeWidth={1.5} />
                         </div>
-                        <h2 className="text-2xl font-bold mb-2 tracking-tight">{search ? 'No matches found' : 'No Projects Discovered'}</h2>
-                        <p className="text-muted-foreground/60 max-w-sm text-sm">
-                            {search ? `We couldn't find any results for "${search}"` : 'Run an agent session in a Git repository to automatically populate your local Data Warehouse.'}
+                        <h2 className="text-lg font-black tracking-tight mb-1">{search ? 'No matches' : 'No Projects'}</h2>
+                        <p className="text-muted-foreground/40 max-w-xs text-xs">
+                            {search ? `Nothing matched "${search}"` : 'Add a local repository to get started.'}
                         </p>
                     </div>
                 ) : (
                     <div className="flex-1 flex flex-col justify-between">
                         {viewMode === 'grid' ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-5">
                                 {currentItems.map((project) => (
                                     <ProjectCard
                                         key={project.id}
@@ -293,7 +349,7 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
                                 ))}
                             </div>
                         ) : (
-                            <div className="flex flex-col gap-2 p-3">
+                            <div className="flex flex-col gap-1.5 p-4">
                                 {currentItems.map((project) => (
                                     <ProjectListRow
                                         key={project.id}
@@ -309,46 +365,39 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
                 )}
             </div>
 
+            {/* Pagination */}
             {totalPages > 1 && filtered.length > 0 && (
-                <div className="flex items-center justify-between px-8 py-3 border-t border-border/50 bg-background/5">
-                    <div className="text-sm text-muted-foreground/80 font-medium">
-                        Showing <span className="font-mono text-foreground">{startIndex + 1}</span>–<span className="font-mono text-foreground">{Math.min(startIndex + ITEMS_PER_PAGE, filtered.length)}</span> <span className="opacity-40 mx-1">/</span> <span className="font-mono text-foreground">{filtered.length}</span> projects
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <Button
-                            variant="outline"
-                            size="sm"
+                <div className="flex items-center justify-between px-6 py-2.5 border-t border-border/30">
+                    <span className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest tabular-nums">
+                        {startIndex + 1}–{Math.min(startIndex + ITEMS_PER_PAGE, filtered.length)} of {filtered.length}
+                    </span>
+                    <div className="flex items-center gap-1">
+                        <button
                             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                             disabled={currentPage === 1}
-                            className="h-9 w-9 p-0 border-border/40 hover:bg-primary/10 hover:text-primary transition-all duration-300 disabled:opacity-30"
+                            className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground/40 hover:text-foreground hover:bg-muted/30 transition-all disabled:opacity-20"
                         >
-                            <ChevronLeft size={18} />
-                        </Button>
-
-                        <div className="flex items-center gap-1.5 px-1.5 py-1 rounded-full bg-muted/30 border border-border/20">
-                            {[...Array(totalPages)].map((_, i) => (
-                                <button
-                                    key={i}
-                                    onClick={() => setCurrentPage(i + 1)}
-                                    className={`h-8 min-w-[32px] px-2 rounded-full text-xs font-bold transition-all duration-300 ${currentPage === i + 1
-                                        ? 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg shadow-primary/25 scale-105'
-                                        : 'hover:bg-primary/10 text-muted-foreground hover:text-primary'
-                                        }`}
-                                >
-                                    {i + 1}
-                                </button>
-                            ))}
-                        </div>
-
-                        <Button
-                            variant="outline"
-                            size="sm"
+                            <ChevronLeft size={14} />
+                        </button>
+                        {[...Array(totalPages)].map((_, i) => (
+                            <button
+                                key={i}
+                                onClick={() => setCurrentPage(i + 1)}
+                                className={`h-7 min-w-[28px] rounded-md text-[10px] font-bold transition-all ${currentPage === i + 1
+                                    ? 'bg-primary text-primary-foreground shadow-sm'
+                                    : 'text-muted-foreground/40 hover:text-foreground hover:bg-muted/20'
+                                }`}
+                            >
+                                {i + 1}
+                            </button>
+                        ))}
+                        <button
                             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                             disabled={currentPage === totalPages}
-                            className="h-9 w-9 p-0 border-border/40 hover:bg-primary/10 hover:text-primary transition-all duration-300 disabled:opacity-30"
+                            className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground/40 hover:text-foreground hover:bg-muted/30 transition-all disabled:opacity-20"
                         >
-                            <ChevronRight size={18} />
-                        </Button>
+                            <ChevronRight size={14} />
+                        </button>
                     </div>
                 </div>
             )}
@@ -357,33 +406,23 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
             <Dialog open={!!projectToDelete} onOpenChange={(open) => !open && setProjectToDelete(null)}>
                 <DialogContent className="sm:max-w-md bg-popover border-border">
                     <DialogHeader>
-                        <DialogTitle className="text-xl font-bold text-foreground flex items-center gap-2">
-                            <Trash2 className="text-red-500" size={20} />
+                        <DialogTitle className="text-lg font-black text-foreground flex items-center gap-2">
+                            <Trash2 className="text-red-500" size={18} />
                             Remove Project
                         </DialogTitle>
-                        <DialogDescription className="text-muted-foreground pt-2 text-left">
-                            Are you sure you want to remove <span className="text-foreground font-bold">{projectToDelete?.name}</span> from your workspace?
-                            <br /><br />
-                            <span className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground/60">Project Path</span>
-                            <div className="bg-muted/10 border border-border/40 p-2 rounded mt-1 font-mono text-[10px] text-muted-foreground truncate">
+                        <DialogDescription className="text-muted-foreground pt-2 text-left text-sm">
+                            Remove <span className="text-foreground font-bold">{projectToDelete?.name}</span> from your workspace?
+                            <div className="bg-muted/20 border border-border/30 p-2 rounded-lg mt-3 font-mono text-[10px] text-muted-foreground/60 truncate">
                                 {projectToDelete?.root_path}
                             </div>
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogFooter className="mt-6">
-                        <Button
-                            variant="ghost"
-                            onClick={() => setProjectToDelete(null)}
-                            className="text-muted-foreground hover:text-foreground"
-                        >
+                    <DialogFooter className="mt-4">
+                        <Button variant="ghost" onClick={() => setProjectToDelete(null)} className="text-muted-foreground hover:text-foreground text-xs">
                             Cancel
                         </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={handleDeleteConfirm}
-                            className="bg-red-600 hover:bg-red-500 text-white font-bold"
-                        >
-                            Remove Project
+                        <Button variant="destructive" onClick={handleDeleteConfirm} className="bg-red-600 hover:bg-red-500 text-white font-bold text-xs">
+                            Remove
                         </Button>
                     </DialogFooter>
                 </DialogContent>
