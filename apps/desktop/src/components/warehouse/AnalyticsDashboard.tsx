@@ -450,7 +450,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                         </Badge>
                     </div>
                     <ChartContainer config={providerChartConfig} className="h-[220px] w-full">
-                        <BarChart data={providerCostData} layout="vertical" margin={{ top: 0, right: 20, left: 0, bottom: 0 }}>
+                        <BarChart data={providerCostData} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                             <defs>
                                 <filter id="barGlow" x="-50%" y="-50%" width="200%" height="200%">
                                     <feGaussianBlur stdDeviation="6" result="blur" />
@@ -467,7 +467,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                                 fontWeight={700}
                                 axisLine={false}
                                 tickLine={false}
-                                width={80}
+                                width={140}
                             />
                             <XAxis
                                 type="number"
@@ -625,7 +625,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                                 className="text-muted-foreground/40 font-mono"
                                 fontSize={9}
                                 tickFormatter={(v: number) => `$${v.toFixed(2)}`}
-                                width={50}
+                                width={60}
                                 axisLine={false}
                                 tickLine={false}
                             />
@@ -683,7 +683,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                                 className="text-muted-foreground/40 font-mono"
                                 fontSize={9}
                                 tickFormatter={(v: number) => `${(v / 1000).toFixed(1)}k`}
-                                width={45}
+                                width={55}
                                 axisLine={false}
                                 tickLine={false}
                             />
