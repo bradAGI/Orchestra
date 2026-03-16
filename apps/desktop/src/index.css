@@ -110,13 +110,6 @@ html, body {
   width: 100%;
 }
 
-#root {
-  transform: scale(0.8);
-  transform-origin: 0 0;
-  width: 125vw;
-  height: 125vh;
-  overflow: hidden;
-}
 
 body {
   @apply bg-background text-foreground antialiased;
