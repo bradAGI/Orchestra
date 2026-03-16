@@ -249,7 +249,7 @@ export function SettingsCard({
   migrationFrom: string
   migrationTo: string
   migrationPlan: WorkspaceMigrationResult | null
-  agentConfig: { commands: Record<string, string>; agent_provider: string } | null
+  agentConfig: { commands: Record<string, string>; agent_provider: string; max_turns: number } | null
   onMigrationFromChange: (value: string) => void
   onMigrationToChange: (value: string) => void
   onMigrationPlan: () => Promise<void>
@@ -258,7 +258,7 @@ export function SettingsCard({
   onSetActiveProfile: (profileId: string) => Promise<void>
   onCreateProfile: (name: string) => Promise<void>
   onDeleteProfile: (profileId: string) => Promise<void>
-  onSaveAgentConfig: (config: { commands: Record<string, string>; agent_provider: string }) => Promise<void>
+  onSaveAgentConfig: (config: { commands: Record<string, string>; agent_provider: string; max_turns: number }) => Promise<void>
   notifSound?: string
   notifMuted?: boolean
   notifVolume?: number
@@ -581,12 +581,13 @@ function AgentConfigForm({
   onSave,
   disabled,
 }: {
-  agentConfig: { commands: Record<string, string>; agent_provider: string }
-  onSave: (config: { commands: Record<string, string>; agent_provider: string }) => Promise<void>
+  agentConfig: { commands: Record<string, string>; agent_provider: string; max_turns: number }
+  onSave: (config: { commands: Record<string, string>; agent_provider: string; max_turns: number }) => Promise<void>
   disabled: boolean
 }) {
   const [provider, setProvider] = useState(agentConfig.agent_provider || '')
   const [commands, setCommands] = useState(agentConfig.commands || {})
+  const [maxTurns, setMaxTurns] = useState(agentConfig.max_turns || 10)
 
   const handleCommandChange = (key: string, value: string) => {
     setCommands((prev) => ({ ...prev, [key]: value }))
@@ -617,10 +618,31 @@ function AgentConfigForm({
         </div>
       </div>
 
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Activity className="h-3.5 w-3.5 text-primary" />
+          <h4 className="text-[10px] font-black uppercase tracking-widest text-foreground/80">Max Agent Turns</h4>
+        </div>
+        <p className="text-[10px] text-muted-foreground">Maximum number of turns before the agent stops. Range: 1-50.</p>
+        <div className="flex items-center gap-4 p-3 rounded-xl bg-muted/20 border border-border/40">
+          <input
+            type="range"
+            min={1}
+            max={50}
+            step={1}
+            value={maxTurns}
+            onChange={(e) => setMaxTurns(Number(e.target.value))}
+            disabled={disabled}
+            className="flex-1 accent-primary"
+          />
+          <span className="min-w-[40px] text-center text-sm font-black tabular-nums text-primary">{maxTurns}</span>
+        </div>
+      </div>
+
       <div className="flex justify-end pt-4 border-t border-border/40">
         <Button
           size="sm"
-          onClick={() => void onSave({ agent_provider: provider, commands })}
+          onClick={() => void onSave({ agent_provider: provider, commands, max_turns: maxTurns })}
           disabled={disabled || !provider}
           className="px-6 font-black uppercase tracking-widest text-[9px] h-9 rounded-lg"
         >

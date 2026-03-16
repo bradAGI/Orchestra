@@ -31,6 +31,7 @@ import {
   normalizeSnapshotPayload,
   postRefresh,
   updateAgentConfig,
+  patchAgentConfig,
   searchIssues,
   stopIssueSession,
   toDisplayError,
@@ -99,7 +100,7 @@ export default function App() {
   const [profilesPending, setProfilesPending] = useState(false)
   const [backendProfiles, setBackendProfiles] = useState<BackendProfile[]>([])
   const [activeProfileId, setActiveProfileId] = useState('')
-  const [agentConfig, setAgentConfig] = useState<{ commands: Record<string, string>; agent_provider: string } | null>(null)
+  const [agentConfig, setAgentConfig] = useState<{ commands: Record<string, string>; agent_provider: string; max_turns: number } | null>(null)
   const [availableAgents, setAvailableAgents] = useState<string[]>([])
   const [allTools, setAllTools] = useState<ToolSummary[]>([])
   const [loadingState, setLoadingState] = useState(true)
@@ -404,11 +405,12 @@ export default function App() {
   const allBoardIssuesRef = useRef(allBoardIssues)
   allBoardIssuesRef.current = allBoardIssues
 
-  const handleAgentConfigSave = async (nextAgentConfig: { commands: Record<string, string>; agent_provider: string }) => {
+  const handleAgentConfigSave = async (nextAgentConfig: { commands: Record<string, string>; agent_provider: string; max_turns: number }) => {
     if (!config) return
     setSavingConfig(true)
     try {
-      await updateAgentConfig(config, nextAgentConfig)
+      await updateAgentConfig(config, { commands: nextAgentConfig.commands, agent_provider: nextAgentConfig.agent_provider })
+      await patchAgentConfig(config, { max_turns: nextAgentConfig.max_turns })
       setAgentConfig(nextAgentConfig)
       setStatusMessage('Agent configuration updated.')
     } catch (err) {

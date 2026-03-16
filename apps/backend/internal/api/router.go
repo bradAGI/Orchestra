@@ -97,6 +97,7 @@ func NewRouterWithPubSub(
 	protected.Get("/api/v1/events", server.GetEvents)
 	protected.Get("/api/v1/workspace/migration/plan", server.GetWorkspaceMigrationPlan)
 	protected.Get("/api/v1/config/agents", server.GetAgentConfig)
+	protected.Patch("/api/v1/config/agents", server.PatchAgentConfig)
 	protected.Post("/api/v1/config/agents", server.PostAgentConfig)
 	protected.Get("/api/v1/config/agents/items", server.GetAgentConfigs)
 	protected.Post("/api/v1/config/agents/new", server.PostAgentConfigNew)

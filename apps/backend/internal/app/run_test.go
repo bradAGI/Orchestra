@@ -88,6 +88,7 @@ func TestProcessExecutionTickPublishesSuccessLifecycleEvents(t *testing.T) {
 	ch, unsub := pubsub.Subscribe(16)
 	defer unsub()
 
+	service.SetMaxTurns(10)
 	processExecutionTick(
 		service,
 		workspace.Service{Root: workspaceRoot},
@@ -96,7 +97,6 @@ func TestProcessExecutionTickPublishesSuccessLifecycleEvents(t *testing.T) {
 		"opencode",
 		workspaceRoot,
 		"does-not-exist.md",
-		1,
 		nil,
 		nil,
 		workspace.Hooks{},
@@ -148,6 +148,7 @@ func TestProcessExecutionTickPublishesFailureAndRetryLifecycleEvents(t *testing.
 	ch, unsub := pubsub.Subscribe(16)
 	defer unsub()
 
+	service.SetMaxTurns(10)
 	processExecutionTick(
 		service,
 		workspace.Service{Root: workspaceRoot},
@@ -156,7 +157,6 @@ func TestProcessExecutionTickPublishesFailureAndRetryLifecycleEvents(t *testing.
 		"opencode",
 		workspaceRoot,
 		"does-not-exist.md",
-		1,
 		nil,
 		nil,
 		workspace.Hooks{},
@@ -225,6 +225,7 @@ func TestProcessExecutionTickDoesNotPublishRetryWhenAttemptExceedsMax(t *testing
 	ch, unsub := pubsub.Subscribe(16)
 	defer unsub()
 
+	service.SetMaxTurns(2)
 	processExecutionTick(
 		service,
 		workspace.Service{Root: workspaceRoot},
@@ -233,7 +234,6 @@ func TestProcessExecutionTickDoesNotPublishRetryWhenAttemptExceedsMax(t *testing
 		"opencode",
 		workspaceRoot,
 		"does-not-exist.md",
-		2,
 		nil,
 		nil,
 		workspace.Hooks{},
@@ -365,6 +365,7 @@ func TestProcessExecutionTickPreservesRateLimitsFromMixedNestedEnvelope(t *testi
 	workspaceRoot := t.TempDir()
 	registry := agents.NewRegistry(map[string]string{"opencode": "printf '%s\\n' '{\"event\":\"thread/rate_limits\",\"meta\":{\"data\":[{\"rate_limits\":{\"remaining\":9,\"reset_at\":\"soon\"}}]}}' '{\"event\":\"turn.completed\",\"usage\":{\"inputTokens\":3,\"outputTokens\":2}}'"})
 
+	service.SetMaxTurns(10)
 	processExecutionTick(
 		service,
 		workspace.Service{Root: workspaceRoot},
@@ -373,7 +374,6 @@ func TestProcessExecutionTickPreservesRateLimitsFromMixedNestedEnvelope(t *testi
 		"opencode",
 		workspaceRoot,
 		"does-not-exist.md",
-		1,
 		nil,
 		nil,
 		workspace.Hooks{},
@@ -409,6 +409,7 @@ func TestProcessExecutionTickSkipsBeforeRunHookAfterFirstTurn(t *testing.T) {
 	registry := agents.NewRegistry(map[string]string{"opencode": "printf '{\"event\":\"turn.completed\"}\\n'"})
 	hooks := workspace.Hooks{BeforeRun: "echo ran > before-run.txt"}
 
+	service.SetMaxTurns(10)
 	processExecutionTick(
 		service,
 		workspace.Service{Root: workspaceRoot},
@@ -417,7 +418,6 @@ func TestProcessExecutionTickSkipsBeforeRunHookAfterFirstTurn(t *testing.T) {
 		"opencode",
 		workspaceRoot,
 		"does-not-exist.md",
-		2,
 		nil,
 		nil,
 		hooks,
@@ -451,6 +451,7 @@ func TestProcessExecutionTickPublishesBeforeRunHookFailureCause(t *testing.T) {
 	ch, unsub := pubsub.Subscribe(16)
 	defer unsub()
 
+	service.SetMaxTurns(10)
 	processExecutionTick(
 		service,
 		workspace.Service{Root: workspaceRoot},
@@ -459,7 +460,6 @@ func TestProcessExecutionTickPublishesBeforeRunHookFailureCause(t *testing.T) {
 		"opencode",
 		workspaceRoot,
 		"does-not-exist.md",
-		1,
 		nil,
 		nil,
 		workspace.Hooks{BeforeRun: "exit 14"},

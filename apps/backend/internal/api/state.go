@@ -636,6 +636,33 @@ func (s *Server) GetAgentConfig(w http.ResponseWriter, _ *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"commands":       commands,
 		"agent_provider": provider,
+		"max_turns":      s.orchestrator.GetMaxTurns(),
+	})
+}
+
+func (s *Server) PatchAgentConfig(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		MaxTurns *int `json:"max_turns"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_request", "invalid JSON body")
+		return
+	}
+	if req.MaxTurns != nil {
+		if *req.MaxTurns < 1 || *req.MaxTurns > 100 {
+			writeJSONError(w, http.StatusBadRequest, "invalid_value", "max_turns must be between 1 and 100")
+			return
+		}
+		s.orchestrator.SetMaxTurns(*req.MaxTurns)
+	}
+	// Return updated config
+	commands, provider := s.orchestrator.GetAgentConfig()
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"commands":       commands,
+		"agent_provider": provider,
+		"max_turns":      s.orchestrator.GetMaxTurns(),
 	})
 }
 

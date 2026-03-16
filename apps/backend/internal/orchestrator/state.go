@@ -102,6 +102,7 @@ type Service struct {
 	activeStates     []string
 	terminalStates   []string
 	maxConcurrent    int
+	maxTurns         int
 	maxByState       map[string]int
 	claimed          map[string]bool
 	cancels          map[string]context.CancelFunc
@@ -507,6 +508,18 @@ func (s *Service) SetMaxConcurrent(maxConcurrent int) {
 	if maxConcurrent > 0 {
 		s.maxConcurrent = maxConcurrent
 	}
+}
+
+func (s *Service) GetMaxTurns() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.maxTurns
+}
+
+func (s *Service) SetMaxTurns(turns int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.maxTurns = turns
 }
 
 func (s *Service) SetMaxConcurrentByState(limits map[string]int) {

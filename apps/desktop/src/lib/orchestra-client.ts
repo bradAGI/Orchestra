@@ -339,8 +339,16 @@ export async function fetchAgents(config: BackendConfig): Promise<string[]> {
   return payload.agents || []
 }
 
-export async function fetchAgentConfig(config: BackendConfig): Promise<{ commands: Record<string, string>; agent_provider: string }> {
-  return requestJSON<{ commands: Record<string, string>; agent_provider: string }>(config, '/api/v1/config/agents')
+export async function fetchAgentConfig(config: BackendConfig): Promise<{ commands: Record<string, string>; agent_provider: string; max_turns: number }> {
+  return requestJSON<{ commands: Record<string, string>; agent_provider: string; max_turns: number }>(config, '/api/v1/config/agents')
+}
+
+export async function patchAgentConfig(config: BackendConfig, updates: { max_turns?: number }): Promise<{ commands: Record<string, string>; agent_provider: string; max_turns: number }> {
+  return requestJSON<{ commands: Record<string, string>; agent_provider: string; max_turns: number }>(config, '/api/v1/config/agents', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  })
 }
 
 export async function postRefresh(config: BackendConfig): Promise<RefreshResult> {

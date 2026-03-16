@@ -66,6 +66,7 @@ func Run(logger zerolog.Logger) error {
 	orchestratorService.SetStateSets(cfg.ActiveStates, cfg.TerminalStates)
 	orchestratorService.SetMaxConcurrent(cfg.MaxConcurrent)
 	orchestratorService.SetMaxConcurrentByState(cfg.MaxConcurrentByState)
+	orchestratorService.SetMaxTurns(cfg.AgentMaxTurns)
 
 	trackerClient := newTrackerClient(cfg, warehouseDB)
 	orchestratorService.SetTrackerClient(trackerClient)
@@ -112,7 +113,7 @@ func Run(logger zerolog.Logger) error {
 	}, logger)
 
 	toolExecutor := tools.NewLinearToolExecutor(trackerClient)
-	go startExecutionWorker(orchestratorService, agentRegistry, provider, cfg.AgentProvider, cfg.WorkspaceRoot, cfg.WorkflowFile, cfg.AgentMaxTurns, toolExecutor.Execute, tools.TrackerToolSpecs(), cfg.WorkspaceHooks, pubsub, warehouseDB, termManager, logger)
+	go startExecutionWorker(orchestratorService, agentRegistry, provider, cfg.AgentProvider, cfg.WorkspaceRoot, cfg.WorkflowFile, toolExecutor.Execute, tools.TrackerToolSpecs(), cfg.WorkspaceHooks, pubsub, warehouseDB, termManager, logger)
 
 	logger.Info().Str("addr", addr).Str("service_id", runtime.ServiceOrchestrator).Msg("starting orchestrad")
 
@@ -163,7 +164,6 @@ func startExecutionWorker(
 	providerName string,
 	workspaceRoot string,
 	workflowFile string,
-	agentMaxTurns int,
 	toolExecutor agents.ToolExecutor,
 	toolSpecs []map[string]any,
 	workspaceHooks workspace.Hooks,
@@ -177,7 +177,7 @@ func startExecutionWorker(
 	defer ticker.Stop()
 
 	for range ticker.C {
-		processExecutionTick(service, workspaceService, registry, provider, providerName, workspaceRoot, workflowFile, agentMaxTurns, toolExecutor, toolSpecs, workspaceHooks, pubsub, warehouseDB, termManager, logger)
+		processExecutionTick(service, workspaceService, registry, provider, providerName, workspaceRoot, workflowFile, toolExecutor, toolSpecs, workspaceHooks, pubsub, warehouseDB, termManager, logger)
 	}
 }
 
@@ -189,7 +189,6 @@ func processExecutionTick(
 	providerName string,
 	workspaceRoot string,
 	workflowFile string,
-	agentMaxTurns int,
 	toolExecutor agents.ToolExecutor,
 	toolSpecs []map[string]any,
 	workspaceHooks workspace.Hooks,
@@ -585,7 +584,7 @@ func processExecutionTick(
 
 	service.RecordRunResult(entry.IssueID, activeProviderName, result.SessionID, result.Usage.InputTokens, result.Usage.OutputTokens, result.Usage.TotalTokens)
 
-	continueTurn, checkErr := service.ShouldContinueTurn(context.Background(), entry.IssueID, activeProviderName, attempt, agentMaxTurns)
+	continueTurn, checkErr := service.ShouldContinueTurn(context.Background(), entry.IssueID, activeProviderName, attempt, service.GetMaxTurns())
 	if checkErr != nil {
 		runAfterHook()
 		dueAt := service.NextRetryDue(entry.IssueID, attempt)
