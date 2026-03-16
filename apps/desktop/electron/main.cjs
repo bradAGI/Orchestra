@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, safeStorage, shell, dialog, Menu } = require('electron')
+const { app, BrowserWindow, ipcMain, safeStorage, shell, dialog, Menu, screen } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs/promises')
 const fsSync = require('node:fs')
@@ -346,11 +346,20 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
+      zoomFactor: 1.0,
     },
   })
 
   // Remove the menu entirely for a cleaner look
   Menu.setApplicationMenu(null)
+
+  // Ensure zoom factor is 1.0 on load (prevents display scaling issues)
+  win.webContents.on('did-finish-load', () => {
+    const scaleFactor = screen.getPrimaryDisplay().scaleFactor
+    win.webContents.setZoomFactor(1.0)
+    // Log for debugging display issues
+    console.log(`Display scale factor: ${scaleFactor}, zoom set to 1.0`)
+  })
 
   win.webContents.on('did-fail-load', (_event, code, description, url) => {
     console.error('did-fail-load', { code, description, url })
