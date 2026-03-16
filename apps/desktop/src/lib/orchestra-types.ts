@@ -117,6 +117,7 @@ export type GlobalStats = {
   total_input: number
   total_output: number
   provider_usage: Record<string, number>
+  model_usage: Record<string, number>
   recent_sessions: SessionSummary[]
 }
 
@@ -124,6 +125,7 @@ export type SessionSummary = {
   id: string
   source?: string
   provider?: string
+  model?: string
   project_id?: string
   project_name?: string
   total_input: number

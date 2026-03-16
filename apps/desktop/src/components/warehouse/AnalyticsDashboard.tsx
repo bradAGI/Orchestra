@@ -221,22 +221,42 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         return cost
     }, [stats, liveModels])
 
-    // Per-provider cost breakdown
+    // Per-model cost breakdown (uses actual model from sessions, not just provider)
     const providerCostData = useMemo(() => {
-        if (!stats?.provider_usage) return []
-        const total = stats.total_tokens || 1
-        return Object.entries(stats.provider_usage).map(([provider, tokens]) => {
-            const fraction = tokens / total
-            const iCost = calculateCost(stats.total_input * fraction, 'input', provider, liveModels)
-            const oCost = calculateCost(stats.total_output * fraction, 'output', provider, liveModels)
-            const pricing = getProviderPricing(provider, liveModels)
+        if (!stats?.recent_sessions) return []
+        // Aggregate tokens per model from session data
+        const modelMap = new Map<string, { input: number; output: number; provider: string }>()
+        for (const s of stats.recent_sessions) {
+            const modelKey = s.model || s.provider || 'unknown'
+            const existing = modelMap.get(modelKey) || { input: 0, output: 0, provider: s.provider || '' }
+            existing.input += s.total_input
+            existing.output += s.total_output
+            if (!existing.provider && s.provider) existing.provider = s.provider
+            modelMap.set(modelKey, existing)
+        }
+        // Also merge in model_usage from GlobalStats for sessions not in recent_sessions
+        if (stats.model_usage) {
+            for (const [model, tokens] of Object.entries(stats.model_usage)) {
+                if (!modelMap.has(model)) {
+                    // Rough split: assume 30% input, 70% output (typical for coding agents)
+                    modelMap.set(model, { input: Math.round(tokens * 0.3), output: Math.round(tokens * 0.7), provider: '' })
+                }
+            }
+        }
+        return [...modelMap.entries()].map(([model, data], idx) => {
+            const pricing = resolveModelPricing(model)
+            const fallback = getProviderPricing(data.provider, liveModels)
+            const inputRate = pricing?.input ?? fallback.input
+            const outputRate = pricing?.output ?? fallback.output
+            const iCost = (data.input / 1_000_000) * inputRate
+            const oCost = (data.output / 1_000_000) * outputRate
             return {
-                provider,
-                name: `${pricing.name} (${pricing.label})`,
+                provider: model,
+                name: pricing?.label || model,
                 inputCost: parseFloat(iCost.toFixed(4)),
                 outputCost: parseFloat(oCost.toFixed(4)),
                 total: parseFloat((iCost + oCost).toFixed(4)),
-                fill: pricing.color,
+                fill: CHART_COLORS[idx % CHART_COLORS.length],
             }
         }).sort((a, b) => b.total - a.total)
     }, [stats, liveModels])
@@ -738,6 +758,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                             <tr className="bg-muted/20 text-[10px] uppercase tracking-[0.2em] font-black text-muted-foreground/60 border-b border-border/40">
                                 <th className="px-5 py-3.5">Session ID</th>
                                 <th className="px-5 py-3.5">Provider</th>
+                                <th className="px-5 py-3.5">Model</th>
                                 <th className="px-5 py-3.5">Project</th>
                                 <th className="px-5 py-3.5 text-right">Tokens</th>
                                 <th className="px-5 py-3.5 text-right">Est. Cost</th>
@@ -747,10 +768,13 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                         </thead>
                         <tbody className="divide-y divide-border/20">
                             {stats.recent_sessions?.map((session: SessionSummary) => {
+                                const modelPricing = session.model ? resolveModelPricing(session.model) : null
                                 const pricing = getProviderPricing(session.provider, liveModels)
+                                const inputRate = modelPricing?.input ?? pricing.input
+                                const outputRate = modelPricing?.output ?? pricing.output
                                 const sessionCost =
-                                    calculateCost(session.total_input, 'input', session.provider, liveModels) +
-                                    calculateCost(session.total_output, 'output', session.provider, liveModels)
+                                    (session.total_input / 1_000_000) * inputRate +
+                                    (session.total_output / 1_000_000) * outputRate
                                 return (
                                     <tr key={session.id} className="hover:bg-primary/[0.03] transition-all group/row">
                                         <td className="px-5 py-4">
@@ -773,6 +797,11 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                                                     {pricing.name}
                                                 </span>
                                             </div>
+                                        </td>
+                                        <td className="px-5 py-4">
+                                            <span className="text-[10px] font-mono font-bold text-muted-foreground/60">
+                                                {session.model ? (resolveModelPricing(session.model)?.label || session.model) : '—'}
+                                            </span>
                                         </td>
                                         <td className="px-5 py-4">
                                             <div className="flex items-center gap-2 text-sm font-bold text-foreground/70 group-hover/row:text-primary transition-colors">
@@ -837,7 +866,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                             })}
                             {(!stats.recent_sessions || stats.recent_sessions.length === 0) && (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground italic text-xs uppercase tracking-widest font-black opacity-20">
+                                    <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground italic text-xs uppercase tracking-widest font-black opacity-20">
                                         No historical session telemetry indexed
                                     </td>
                                 </tr>
