@@ -137,12 +137,18 @@ func (c *Client) ExecuteWithOpts(ctx context.Context, language, code, network st
 	if v, ok := resp["output"].(string); ok {
 		result.Output = v
 	}
+	if v, ok := resp["stdout"].(string); ok && result.Output == "" {
+		result.Output = v
+	}
 	if v, ok := resp["error"].(string); ok {
 		result.Error = v
 	}
+	if v, ok := resp["stderr"].(string); ok && result.Error == "" {
+		result.Error = v
+	}
 
-	// If job is pending/running, poll until done
-	if result.JobID != "" && (result.Status == "pending" || result.Status == "running") {
+	// If job is pending/running/unknown, poll until done
+	if result.JobID != "" && result.Status != "completed" && result.Status != "failed" {
 		return c.WaitForJob(ctx, result.JobID)
 	}
 
@@ -172,7 +178,13 @@ func (c *Client) WaitForJob(ctx context.Context, jobID string) (*ExecuteResult, 
 			if v, ok := resp["output"].(string); ok {
 				result.Output = v
 			}
+			if v, ok := resp["stdout"].(string); ok && result.Output == "" {
+				result.Output = v
+			}
 			if v, ok := resp["error"].(string); ok {
+				result.Error = v
+			}
+			if v, ok := resp["stderr"].(string); ok && result.Error == "" {
 				result.Error = v
 			}
 			return result, nil
@@ -235,6 +247,15 @@ func (c *Client) ShellSession(ctx context.Context, sessionID, command string) (*
 	if v, ok := resp["output"].(string); ok {
 		result.Output = v
 	}
+	if v, ok := resp["stdout"].(string); ok && result.Output == "" {
+		result.Output = v
+	}
+	if v, ok := resp["error"].(string); ok {
+		result.Error = v
+	}
+	if v, ok := resp["stderr"].(string); ok && result.Error == "" {
+		result.Error = v
+	}
 	if v, ok := resp["status"].(string); ok {
 		result.Status = v
 	}
@@ -243,7 +264,7 @@ func (c *Client) ShellSession(ctx context.Context, sessionID, command string) (*
 	}
 
 	// Poll if async
-	if result.JobID != "" && (result.Status == "pending" || result.Status == "running") {
+	if result.JobID != "" && result.Status != "completed" && result.Status != "failed" {
 		return c.WaitForJob(ctx, result.JobID)
 	}
 
