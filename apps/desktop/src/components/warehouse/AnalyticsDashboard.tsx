@@ -68,7 +68,7 @@ const PROVIDER_DEFAULTS: Record<string, { name: string; model: string; input: nu
     claude:   { name: 'Claude',   model: 'claude-sonnet-4-6', input: 3.0,  output: 15.0, color: 'hsl(var(--chart-1))' },
     codex:    { name: 'Codex',    model: 'gpt-5.4',           input: 2.5,  output: 15.0, color: 'hsl(var(--chart-2))' },
     gemini:   { name: 'Gemini',   model: 'gemini-2.5-pro',    input: 1.25, output: 10.0, color: 'hsl(var(--chart-3))' },
-    opencode: { name: 'OpenCode', model: 'gpt-4o',            input: 2.5,  output: 10.0, color: 'hsl(var(--chart-4))' },
+    opencode: { name: 'OpenCode', model: 'user-configured',    input: 2.0,  output: 10.0, color: 'hsl(var(--chart-4))' },
 }
 
 function resolveModelPricing(modelId: string): { label: string; input: number; output: number } | null {
