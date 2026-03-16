@@ -119,7 +119,7 @@ func (c *Client) Execute(ctx context.Context, language, code string) (*ExecuteRe
 func (c *Client) ExecuteWithOpts(ctx context.Context, language, code, network string) (*ExecuteResult, error) {
 	body := map[string]string{"language": language, "code": code}
 	if network != "" {
-		body["network"] = network
+		body["network_mode"] = network
 	}
 
 	resp, err := c.request(ctx, "POST", "/execute", body)
@@ -213,7 +213,7 @@ type Session struct {
 func (c *Client) CreateSession(ctx context.Context, language string, network string) (*Session, error) {
 	body := map[string]string{"language": language}
 	if network != "" {
-		body["network"] = network
+		body["network_mode"] = network
 	}
 
 	resp, err := c.request(ctx, "POST", "/sessions", body)
@@ -308,7 +308,7 @@ type Service struct {
 func (c *Client) CreateService(ctx context.Context, name string, ports []int, bootstrap string, network string) (*Service, error) {
 	body := map[string]any{"name": name, "ports": ports, "bootstrap": bootstrap}
 	if network != "" {
-		body["network"] = network
+		body["network_mode"] = network
 	}
 
 	resp, err := c.request(ctx, "POST", "/services", body)
