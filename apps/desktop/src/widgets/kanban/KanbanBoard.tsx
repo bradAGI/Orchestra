@@ -226,7 +226,7 @@ export function KanbanBoard({
           <Skeleton className="h-8 w-40 rounded-md" />
           <Skeleton className="h-8 w-40 rounded-md" />
         </div>
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-4 overflow-hidden">
+        <div className="flex-1 grid grid-cols-5 gap-3 overflow-hidden">
           {['backlog', 'todo', 'progress', 'review', 'done'].map((column) => (
             <div key={column} className="flex flex-col min-h-0 space-y-4">
               <div className="flex items-center justify-between px-2 shrink-0">
@@ -323,7 +323,7 @@ export function KanbanBoard({
       </div>
 
       {viewMode === 'board' ? (
-        <div className="flex-1 grid grid-cols-1 gap-4 lg:grid-cols-5 min-h-0">
+        <div className="flex-1 grid grid-cols-5 gap-3 min-h-0">
           {orderedColumns.map((column) => (
             <div
               key={column.id}

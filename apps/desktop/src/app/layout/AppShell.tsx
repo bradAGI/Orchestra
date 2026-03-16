@@ -28,11 +28,8 @@ export function AppShell({
   children,
 }: AppShellProps) {
   return (
-    <div
-      className="h-screen w-screen overflow-hidden bg-background text-foreground origin-top-left"
-      style={{ transform: 'scale(0.85)', width: `${100 / 0.85}%`, height: `${100 / 0.85}%` }}
-    >
-      <div className="flex h-full w-full relative">
+    <div className="h-screen w-screen overflow-hidden bg-background text-foreground">
+      <div className="flex h-full w-full">
         <SidebarNav
           items={items}
           activeSection={activeSection}
@@ -47,7 +44,7 @@ export function AppShell({
           options={osOptions}
           className="min-w-0 flex-1 bg-gradient-to-b from-background via-background to-muted/30 h-full flex flex-col"
         >
-          <div className="px-6 pb-6 pt-4 lg:px-8 w-full max-w-[1800px] mx-auto flex flex-col h-full min-h-0 transition-all duration-500 overflow-hidden">
+          <div className="px-4 pb-4 pt-3 w-full flex flex-col h-full min-h-0">
             <TopBar {...topBarProps} />
             {children}
           </div>
