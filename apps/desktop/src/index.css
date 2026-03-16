@@ -102,8 +102,13 @@
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
 }
 
-html, body {
+html {
+  font-size: 13px;
   overflow: hidden !important;
+  height: 100%;
+}
+
+body {
   height: 100%;
 }
 
