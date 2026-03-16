@@ -428,12 +428,18 @@ func (db *DB) GetSessions(ctx context.Context, projectID string) ([]Session, err
 	var sessions []Session
 	for rows.Next() {
 		var s Session
-		var prjName sql.NullString
-		if err := rows.Scan(&s.ID, &s.ProjectID, &prjName, &s.SessionUUID, &s.Provider, &s.Model, &s.Branch, &s.CreatedAt, &s.UpdatedAt, &s.TotalInput, &s.TotalOutput); err != nil {
+		var prjID, prjName, branch sql.NullString
+		if err := rows.Scan(&s.ID, &prjID, &prjName, &s.SessionUUID, &s.Provider, &s.Model, &branch, &s.CreatedAt, &s.UpdatedAt, &s.TotalInput, &s.TotalOutput); err != nil {
 			return nil, err
+		}
+		if prjID.Valid {
+			s.ProjectID = prjID.String
 		}
 		if prjName.Valid {
 			s.ProjectName = prjName.String
+		}
+		if branch.Valid {
+			s.Branch = branch.String
 		}
 		sessions = append(sessions, s)
 	}
@@ -455,16 +461,22 @@ func (db *DB) GetSessionDetail(ctx context.Context, sessionID string) (*SessionD
 		WHERE s.id = ?
 		GROUP BY s.id
 	`
-	var prjName sql.NullString
+	var prjID, prjName, branch sql.NullString
 	err := db.QueryRowContext(ctx, sessionQuery, sessionID).Scan(
-		&detail.ID, &detail.ProjectID, &prjName, &detail.SessionUUID, &detail.Provider,
-		&detail.Model, &detail.Branch, &detail.CreatedAt, &detail.UpdatedAt, &detail.TotalInput, &detail.TotalOutput,
+		&detail.ID, &prjID, &prjName, &detail.SessionUUID, &detail.Provider,
+		&detail.Model, &branch, &detail.CreatedAt, &detail.UpdatedAt, &detail.TotalInput, &detail.TotalOutput,
 	)
 	if err != nil {
 		return nil, err
 	}
+	if prjID.Valid {
+		detail.ProjectID = prjID.String
+	}
 	if prjName.Valid {
 		detail.ProjectName = prjName.String
+	}
+	if branch.Valid {
+		detail.Branch = branch.String
 	}
 
 	eventRows, err := db.QueryContext(ctx, `
