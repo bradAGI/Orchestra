@@ -549,24 +549,32 @@ func (s *Server) GetIssueDiff(w http.ResponseWriter, r *http.Request) {
 		if searchErr == nil && len(issues) > 0 && issues[0].ProjectID != "" {
 			project, projErr := s.db.GetProjectByID(r.Context(), issues[0].ProjectID)
 			if projErr == nil && project.RootPath != "" && filepath.IsAbs(project.RootPath) {
-				// Determine the diff scope — use base_sha to show only THIS task's changes
-				baseSHA := issues[0].BaseSHA
+				// Show only uncommitted changes (staged + unstaged) for this task
+				// Auto-commit should have committed agent work, so this shows what's pending review
 				var allDiff []byte
 
-				if baseSHA != "" {
-					// Best case: we know exactly when this task started
-					// Show committed changes since base + uncommitted changes
-					cmd := exec.CommandContext(r.Context(), "git", "diff", baseSHA)
-					cmd.Dir = project.RootPath
-					if out, _ := cmd.CombinedOutput(); len(out) > 0 {
-						allDiff = append(allDiff, out...)
+				// Staged changes
+				cmd := exec.CommandContext(r.Context(), "git", "diff", "--cached")
+				cmd.Dir = project.RootPath
+				if staged, _ := cmd.CombinedOutput(); len(staged) > 0 {
+					allDiff = append(allDiff, staged...)
+				}
+
+				// Unstaged changes
+				cmd2 := exec.CommandContext(r.Context(), "git", "diff")
+				cmd2.Dir = project.RootPath
+				if unstaged, _ := cmd2.CombinedOutput(); len(unstaged) > 0 {
+					allDiff = append(allDiff, unstaged...)
+				}
+
+				// If no uncommitted changes, show the most recent commit's diff
+				// (the auto-commit from the agent run)
+				if len(allDiff) == 0 {
+					cmd3 := exec.CommandContext(r.Context(), "git", "diff", "HEAD~1..HEAD")
+					cmd3.Dir = project.RootPath
+					if committed, _ := cmd3.CombinedOutput(); len(committed) > 0 {
+						allDiff = append(allDiff, committed...)
 					}
-				} else {
-					// No base SHA — fall back to uncommitted changes only
-					cmd := exec.CommandContext(r.Context(), "git", "diff", "HEAD")
-					cmd.Dir = project.RootPath
-					tracked, _ := cmd.CombinedOutput()
-					allDiff = append(allDiff, tracked...)
 				}
 
 				// Include untracked (new) files
