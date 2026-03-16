@@ -102,17 +102,20 @@
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
 }
 
-html {
-  zoom: 0.8;
-  height: 125vh;
-  width: 125vw;
+html, body {
   overflow: hidden !important;
-}
-
-body {
-  overflow: hidden !important;
+  margin: 0;
+  padding: 0;
   height: 100%;
   width: 100%;
+}
+
+#root {
+  transform: scale(0.8);
+  transform-origin: 0 0;
+  width: 125%;
+  height: 125%;
+  overflow: hidden;
 }
 
 body {
