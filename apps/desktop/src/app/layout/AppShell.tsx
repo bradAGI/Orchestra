@@ -28,7 +28,7 @@ export function AppShell({
   children,
 }: AppShellProps) {
   return (
-    <div className="h-screen w-screen overflow-hidden bg-background text-foreground">
+    <div className="h-full w-full overflow-hidden bg-background text-foreground">
       <div className="flex h-full w-full">
         <SidebarNav
           items={items}
