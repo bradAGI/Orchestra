@@ -307,12 +307,17 @@ export function IssueDetailView({
                     if (branchName && branchName !== 'main') {
                       await gitCheckout(config, projectId, 'main')
                       await gitMerge(config, projectId, branchName)
-                      await gitDeleteBranch(config, projectId, branchName)
+                      try { await gitDeleteBranch(config, projectId, branchName) } catch { /* branch cleanup optional */ }
                     }
+                    // Close GitHub issue (non-blocking — don't let failure prevent Done state)
                     if (typed.url && typeof typed.url === 'string') {
                       const match = (typed.url as string).match(/\/issues\/(\d+)/)
                       if (match) {
-                        await updateProjectGitHubIssue(config, projectId, parseInt(match[1]), { state: 'closed' })
+                        try {
+                          await updateProjectGitHubIssue(config, projectId, parseInt(match[1]), { state: 'closed' })
+                        } catch (ghErr) {
+                          console.warn('GitHub issue close failed (continuing):', ghErr)
+                        }
                       }
                     }
                     await onUpdate({ state: 'Done' })
