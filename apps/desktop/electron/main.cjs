@@ -360,6 +360,12 @@ function createWindow() {
     console.error('render-process-gone', details)
   })
 
+  // Set zoom level for Electron — negative values zoom out
+  // -3 ≈ 0.6x which matches the original design scale
+  win.webContents.on('did-finish-load', () => {
+    win.webContents.setZoomLevel(-3)
+  })
+
   const devServerUrl = process.env.VITE_DEV_SERVER_URL
   if (devServerUrl) {
     win.loadURL(devServerUrl)

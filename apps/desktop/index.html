@@ -12,20 +12,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      // Scale the app: 0.6 in Electron (smaller window), 0.8 in browser (larger window)
-      (function() {
-        var isElectron = typeof window.orchestraDesktop !== 'undefined' || navigator.userAgent.indexOf('Electron') !== -1;
-        var scale = isElectron ? 0.6 : 0.8;
-        var size = (100 / scale).toFixed(3);
-        var root = document.getElementById('root');
-        root.style.transform = 'scale(' + scale + ')';
-        root.style.transformOrigin = '0 0';
-        root.style.width = size + 'vw';
-        root.style.height = size + 'vh';
-        root.style.overflow = 'hidden';
-      })();
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
   </html>
