@@ -491,7 +491,7 @@ func processExecutionTick(
 
 	if warehouseDB != nil {
 		// Link session to the task's project — never create new projects from the execution worker
-		_ = warehouseDB.RecordSession(context.Background(), sessionID, entry.ProjectID, entry.IssueID, sessionID, activeProviderName, "main")
+		_ = warehouseDB.RecordSession(context.Background(), sessionID, entry.ProjectID, entry.IssueID, sessionID, activeProviderName, "", "main")
 	}
 
 	result, runErr := registry.RunTurn(runCtx, activeProvider, agents.TurnRequest{

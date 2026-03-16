@@ -49,6 +49,7 @@ func Connect(dbPath string) (*DB, error) {
 	_, _ = db.Exec("ALTER TABLE runs ADD COLUMN issue_identifier TEXT")
 	_, _ = db.Exec("ALTER TABLE sessions ADD COLUMN issue_id TEXT")
 	_, _ = db.Exec("ALTER TABLE issues ADD COLUMN base_sha TEXT")
+	_, _ = db.Exec("ALTER TABLE sessions ADD COLUMN model TEXT")
 
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS issue_history (
 		id TEXT PRIMARY KEY,

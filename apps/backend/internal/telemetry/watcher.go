@@ -461,7 +461,7 @@ func processGeminiChatFile(ctx context.Context, database *db.DB, manualRoots []s
 	}
 
 	projectID := resolveGeminiProject(ctx, database, manualRoots, aliasMap, filePath, logger)
-	_ = database.RecordSession(ctx, chat.SessionID, projectID, "", chat.SessionID, "gemini", "unknown")
+	_ = database.RecordSession(ctx, chat.SessionID, projectID, "", chat.SessionID, "gemini", "", "unknown")
 
 	for idx, msg := range chat.Messages {
 		kind := strings.TrimSpace(msg.Type)
@@ -545,7 +545,7 @@ func processGeminiLogsFile(ctx context.Context, database *db.DB, manualRoots []s
 		if entry.SessionID == "" {
 			continue
 		}
-		_ = database.RecordSession(ctx, entry.SessionID, projectID, "", entry.SessionID, "gemini", "unknown")
+		_ = database.RecordSession(ctx, entry.SessionID, projectID, "", entry.SessionID, "gemini", "", "unknown")
 
 		ts := entry.Timestamp
 		if ts == "" {
@@ -613,13 +613,16 @@ func scanOpenCodeSQLite(ctx context.Context, database *db.DB, manualRoots []stri
 			}
 
 			projectID := matchExistingProject(ctx, database, directory)
-			_ = database.RecordSession(ctx, sessionID, projectID, "", sessionID, "opencode", "unknown")
 
 			var payload map[string]any
 			if err := json.Unmarshal([]byte(dataJSON), &payload); err != nil {
 				healthState.addParseError("opencode")
 				continue
 			}
+
+			// Extract model from OpenCode message data
+			sessionModel := extractOpenCodeModel(payload)
+			_ = database.RecordSession(ctx, sessionID, projectID, "", sessionID, "opencode", sessionModel, "unknown")
 
 			role, _ := payload["role"].(string)
 			kind := "message"
@@ -668,7 +671,7 @@ func scanOpenCodeSQLite(ctx context.Context, database *db.DB, manualRoots []stri
 			}
 
 			projectID := matchExistingProject(ctx, database, directory)
-			_ = database.RecordSession(ctx, sessionID, projectID, "", sessionID, "opencode", "unknown")
+			_ = database.RecordSession(ctx, sessionID, projectID, "", sessionID, "opencode", "", "unknown")
 
 			var payload map[string]any
 			if err := json.Unmarshal([]byte(dataJSON), &payload); err != nil {
@@ -704,6 +707,47 @@ func scanOpenCodeSQLite(ctx context.Context, database *db.DB, manualRoots []stri
 		saveOffset(ctx, database, partCheckpointKey, maxPart)
 	}
 	healthState.markSuccess("opencode", started)
+}
+
+// extractModelFromEntry pulls the model identifier from a raw JSONL log entry
+// based on the provider format:
+//   - Claude: type=="assistant" → message.model
+//   - Codex: type=="turn_context" → payload.model
+func extractModelFromEntry(raw map[string]interface{}, provider string) string {
+	switch provider {
+	case "claude":
+		// Claude assistant entries have message.model
+		if entryType, _ := raw["type"].(string); entryType == "assistant" {
+			if msg, ok := raw["message"].(map[string]interface{}); ok {
+				if model, ok := msg["model"].(string); ok && model != "" {
+					return model
+				}
+			}
+		}
+	case "codex":
+		// Codex turn_context entries have payload.model
+		if entryType, _ := raw["type"].(string); entryType == "turn_context" {
+			if payload, ok := raw["payload"].(map[string]interface{}); ok {
+				if model, ok := payload["model"].(string); ok && model != "" {
+					return model
+				}
+			}
+		}
+	}
+	return ""
+}
+
+// extractOpenCodeModel pulls the model identifier from an OpenCode message payload.
+// Format: data.model.modelID
+func extractOpenCodeModel(payload map[string]any) string {
+	modelObj, ok := payload["model"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	if modelID, ok := modelObj["modelID"].(string); ok && modelID != "" {
+		return modelID
+	}
+	return ""
 }
 
 func extractOpenCodeTokens(payload map[string]any) (int, int) {
@@ -1043,7 +1087,10 @@ func processFile(ctx context.Context, database *db.DB, manualRoots []string, pat
 				sid = s
 			}
 
-			_ = database.RecordSession(ctx, sid, projectID, "", sid, provider, "unknown")
+			// Extract model from provider-specific log formats
+			sessionModel := extractModelFromEntry(raw, provider)
+
+			_ = database.RecordSession(ctx, sid, projectID, "", sid, provider, sessionModel, "unknown")
 
 			if entry.Timestamp != "" {
 				eventID := uuid.New().String()
@@ -1062,7 +1109,7 @@ func processFile(ctx context.Context, database *db.DB, manualRoots []string, pat
 			healthState.addParseError(provider)
 			// Fallback for plain text .log files
 			if len(strings.TrimSpace(line)) > 0 {
-				_ = database.RecordSession(ctx, fallbackSessionID, projectID, "", fallbackSessionID, provider, "unknown")
+				_ = database.RecordSession(ctx, fallbackSessionID, projectID, "", fallbackSessionID, provider, "", "unknown")
 				eventID := uuid.New().String()
 				kind := "log"
 				if strings.Contains(strings.ToLower(line), "error") {

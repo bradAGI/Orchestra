@@ -47,7 +47,7 @@ func (db *DB) UpsertProject(ctx context.Context, rootPath string, remoteURL stri
 }
 
 // RecordSession initializes a telemetry session and ties it to a project and issue.
-func (db *DB) RecordSession(ctx context.Context, sessionID, projectID, issueID, sessionUUID, provider, branch string) error {
+func (db *DB) RecordSession(ctx context.Context, sessionID, projectID, issueID, sessionUUID, provider, model, branch string) error {
 	var prjID *string
 	if projectID != "" {
 		prjID = &projectID
@@ -58,13 +58,23 @@ func (db *DB) RecordSession(ctx context.Context, sessionID, projectID, issueID, 
 	}
 
 	query := `
-		INSERT INTO sessions (id, project_id, issue_id, session_uuid, provider, branch)
-		VALUES (?, ?, ?, ?, ?, ?)
-		ON CONFLICT(id) DO UPDATE SET 
+		INSERT INTO sessions (id, project_id, issue_id, session_uuid, provider, model, branch)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
 			project_id = CASE WHEN sessions.project_id IS NULL OR sessions.project_id = '' THEN excluded.project_id ELSE sessions.project_id END,
-			issue_id = CASE WHEN sessions.issue_id IS NULL OR sessions.issue_id = '' THEN excluded.issue_id ELSE sessions.issue_id END
+			issue_id = CASE WHEN sessions.issue_id IS NULL OR sessions.issue_id = '' THEN excluded.issue_id ELSE sessions.issue_id END,
+			model = CASE WHEN excluded.model != '' AND (sessions.model IS NULL OR sessions.model = '') THEN excluded.model ELSE sessions.model END
 	`
-	_, err := db.ExecContext(ctx, query, sessionID, prjID, issID, sessionUUID, provider, branch)
+	_, err := db.ExecContext(ctx, query, sessionID, prjID, issID, sessionUUID, provider, model, branch)
+	return err
+}
+
+// UpdateSessionModel updates the model for a session if it was previously unknown
+func (db *DB) UpdateSessionModel(ctx context.Context, sessionID, model string) error {
+	if model == "" {
+		return nil
+	}
+	_, err := db.ExecContext(ctx, "UPDATE sessions SET model = ? WHERE id = ? AND (model IS NULL OR model = '')", model, sessionID)
 	return err
 }
 
@@ -363,6 +373,7 @@ type Session struct {
 	ProjectName string `json:"project_name"`
 	SessionUUID string `json:"session_uuid"`
 	Provider    string `json:"provider"`
+	Model       string `json:"model"`
 	Branch      string `json:"branch"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
@@ -391,8 +402,8 @@ func (db *DB) GetSessions(ctx context.Context, projectID string) ([]Session, err
 	var err error
 
 	query := `
-		SELECT 
-			s.id, s.project_id, p.name, s.session_uuid, s.provider, s.branch, s.created_at,
+		SELECT
+			s.id, s.project_id, p.name, s.session_uuid, s.provider, COALESCE(s.model, ''), s.branch, s.created_at,
 			COALESCE(MAX(e.timestamp), s.created_at) as updated_at,
 			COALESCE(SUM(e.input_tokens), 0),
 			COALESCE(SUM(e.output_tokens), 0)
@@ -418,7 +429,7 @@ func (db *DB) GetSessions(ctx context.Context, projectID string) ([]Session, err
 	for rows.Next() {
 		var s Session
 		var prjName sql.NullString
-		if err := rows.Scan(&s.ID, &s.ProjectID, &prjName, &s.SessionUUID, &s.Provider, &s.Branch, &s.CreatedAt, &s.UpdatedAt, &s.TotalInput, &s.TotalOutput); err != nil {
+		if err := rows.Scan(&s.ID, &s.ProjectID, &prjName, &s.SessionUUID, &s.Provider, &s.Model, &s.Branch, &s.CreatedAt, &s.UpdatedAt, &s.TotalInput, &s.TotalOutput); err != nil {
 			return nil, err
 		}
 		if prjName.Valid {
@@ -433,8 +444,8 @@ func (db *DB) GetSessionDetail(ctx context.Context, sessionID string) (*SessionD
 	var detail SessionDetail
 
 	sessionQuery := `
-		SELECT 
-			s.id, s.project_id, p.name, s.session_uuid, s.provider, s.branch, s.created_at,
+		SELECT
+			s.id, s.project_id, p.name, s.session_uuid, s.provider, COALESCE(s.model, ''), s.branch, s.created_at,
 			COALESCE(MAX(e.timestamp), s.created_at) as updated_at,
 			COALESCE(SUM(e.input_tokens), 0),
 			COALESCE(SUM(e.output_tokens), 0)
@@ -447,7 +458,7 @@ func (db *DB) GetSessionDetail(ctx context.Context, sessionID string) (*SessionD
 	var prjName sql.NullString
 	err := db.QueryRowContext(ctx, sessionQuery, sessionID).Scan(
 		&detail.ID, &detail.ProjectID, &prjName, &detail.SessionUUID, &detail.Provider,
-		&detail.Branch, &detail.CreatedAt, &detail.UpdatedAt, &detail.TotalInput, &detail.TotalOutput,
+		&detail.Model, &detail.Branch, &detail.CreatedAt, &detail.UpdatedAt, &detail.TotalInput, &detail.TotalOutput,
 	)
 	if err != nil {
 		return nil, err
@@ -483,12 +494,14 @@ type GlobalStats struct {
 	TotalInput     int64            `json:"total_input"`
 	TotalOutput    int64            `json:"total_output"`
 	ProviderUsage  map[string]int64 `json:"provider_usage"`
+	ModelUsage     map[string]int64 `json:"model_usage"`
 	RecentSessions []Session        `json:"recent_sessions"`
 }
 
 func (db *DB) GetGlobalStats(ctx context.Context) (GlobalStats, error) {
 	var stats GlobalStats
 	stats.ProviderUsage = make(map[string]int64)
+	stats.ModelUsage = make(map[string]int64)
 
 	query := `SELECT SUM(input_tokens), SUM(output_tokens) FROM events`
 	_ = db.QueryRowContext(ctx, query).Scan(&stats.TotalInput, &stats.TotalOutput)
@@ -507,6 +520,24 @@ func (db *DB) GetGlobalStats(ctx context.Context) (GlobalStats, error) {
 			var tokens int64
 			if err := rows.Scan(&provider, &tokens); err == nil {
 				stats.ProviderUsage[provider] = tokens
+			}
+		}
+	}
+
+	modelRows, err := db.QueryContext(ctx, `
+		SELECT s.model, SUM(e.input_tokens + e.output_tokens)
+		FROM sessions s
+		JOIN events e ON s.id = e.session_id
+		WHERE s.model != '' AND s.model IS NOT NULL
+		GROUP BY s.model
+	`)
+	if err == nil {
+		defer modelRows.Close()
+		for modelRows.Next() {
+			var model string
+			var tokens int64
+			if err := modelRows.Scan(&model, &tokens); err == nil {
+				stats.ModelUsage[model] = tokens
 			}
 		}
 	}
