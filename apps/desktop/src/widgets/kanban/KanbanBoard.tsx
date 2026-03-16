@@ -387,7 +387,7 @@ export function KanbanBoard({
                         key={item.issue_id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, getActionIssueRef(item))}
-                        className="group relative cursor-grab border border-border/60 bg-gradient-to-b from-card via-card to-muted/20 p-3.5 mb-1.5 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 active:cursor-grabbing active:scale-[0.98] rounded-xl overflow-hidden"
+                        className="group relative cursor-grab border border-border/60 bg-gradient-to-b from-card via-card to-muted/20 p-3.5 mb-1.5 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 active:cursor-grabbing active:scale-[0.98] rounded-xl"
                         onClick={() => void onInspectIssue(getActionIssueRef(item))}
                       >
                         <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
