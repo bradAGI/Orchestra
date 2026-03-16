@@ -233,7 +233,7 @@ export default function App() {
     setActiveSection('issues')
   }
 
-  const sidebarWidth = sidebarCollapsed ? 64 : 220
+  const sidebarWidth = sidebarCollapsed ? 64 : 240
   const sectionVisibility = getSectionVisibility(activeSection)
   const currentSectionMeta = getCurrentSectionMeta(activeSection)
 

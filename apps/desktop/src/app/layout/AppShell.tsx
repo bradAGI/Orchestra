@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from 'react'
+import { type ComponentProps, type ReactNode, useMemo } from 'react'
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react'
 import { SidebarNav } from '@/components/app-shell/sidebar-nav'
 import { TopBar } from '@/components/app-shell/top-bar'
@@ -12,7 +12,6 @@ type AppShellProps = {
   sidebarWidth: number
   onToggleCollapsed: () => void
   osOptions: ComponentProps<typeof OverlayScrollbarsComponent>['options']
-  zoom?: number
   topBarProps: ComponentProps<typeof TopBar>
   children: ReactNode
 }
@@ -25,7 +24,6 @@ export function AppShell({
   sidebarWidth,
   onToggleCollapsed,
   osOptions,
-  zoom,
   topBarProps,
   children,
 }: AppShellProps) {
@@ -46,10 +44,7 @@ export function AppShell({
           options={osOptions}
           className="min-w-0 flex-1 bg-gradient-to-b from-background via-background to-muted/30 h-full flex flex-col"
         >
-          <div
-            className="px-6 pb-6 pt-4 lg:px-8 w-full max-w-[1800px] mx-auto flex flex-col h-full min-h-0 transition-all duration-500 origin-top-left overflow-hidden"
-            style={zoom ? { zoom } : undefined}
-          >
+          <div className="px-6 pb-6 pt-4 lg:px-8 w-full max-w-[1800px] mx-auto flex flex-col h-full min-h-0 transition-all duration-500 overflow-hidden">
             <TopBar {...topBarProps} />
             {children}
           </div>

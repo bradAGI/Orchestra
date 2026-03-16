@@ -1,10 +1,9 @@
 const { contextBridge, ipcRenderer, webFrame } = require('electron')
 
-// Normalize zoom to counter system DPI scaling — makes Electron match the browser
-ipcRenderer.invoke('orchestra:get-scale-factor').then((scaleFactor) => {
-  if (scaleFactor && scaleFactor > 1) {
-    webFrame.setZoomFactor(1 / scaleFactor)
-  }
+// Expose scale factor so the renderer can adjust content zoom if needed
+let _scaleFactor = 1
+ipcRenderer.invoke('orchestra:get-scale-factor').then((sf) => {
+  _scaleFactor = sf || 1
 }).catch(() => {})
 
 contextBridge.exposeInMainWorld('orchestraDesktop', {
@@ -19,4 +18,5 @@ contextBridge.exposeInMainWorld('orchestraDesktop', {
   openExternal: (url) => ipcRenderer.invoke('orchestra:open-external', url),
   openPath: (targetPath) => ipcRenderer.invoke('orchestra:open-path', targetPath),
   selectFolder: () => ipcRenderer.invoke('orchestra:select-folder'),
+  getScaleFactor: () => _scaleFactor,
 })

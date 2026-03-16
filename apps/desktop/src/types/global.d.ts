@@ -31,6 +31,7 @@ declare global {
       openExternal: (url: string) => Promise<void>
       openPath: (targetPath: string) => Promise<void>
       selectFolder: () => Promise<string | null>
+      getScaleFactor: () => number
     }
   }
 }
