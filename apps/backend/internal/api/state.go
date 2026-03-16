@@ -549,33 +549,20 @@ func (s *Server) GetIssueDiff(w http.ResponseWriter, r *http.Request) {
 		if searchErr == nil && len(issues) > 0 && issues[0].ProjectID != "" {
 			project, projErr := s.db.GetProjectByID(r.Context(), issues[0].ProjectID)
 			if projErr == nil && project.RootPath != "" && filepath.IsAbs(project.RootPath) {
-				// Determine the diff scope based on the issue's branch
-				branchName := issues[0].BranchName
-
+				// Determine the diff scope — use base_sha to show only THIS task's changes
+				baseSHA := issues[0].BaseSHA
 				var allDiff []byte
 
-				if branchName != "" && branchName != "main" && branchName != "master" {
-					// Task has its own branch — diff against main to show only this task's changes
-					cmd := exec.CommandContext(r.Context(), "git", "diff", "main..."+branchName)
+				if baseSHA != "" {
+					// Best case: we know exactly when this task started
+					// Show committed changes since base + uncommitted changes
+					cmd := exec.CommandContext(r.Context(), "git", "diff", baseSHA)
 					cmd.Dir = project.RootPath
-					if out, err := cmd.CombinedOutput(); err == nil {
+					if out, _ := cmd.CombinedOutput(); len(out) > 0 {
 						allDiff = append(allDiff, out...)
 					}
-
-					// Also include any uncommitted changes on this branch
-					cmd2 := exec.CommandContext(r.Context(), "git", "diff", "HEAD")
-					cmd2.Dir = project.RootPath
-					if out2, _ := cmd2.CombinedOutput(); len(out2) > 0 {
-						allDiff = append(allDiff, out2...)
-					}
-				} else if issues[0].BaseSHA != "" {
-					// No branch but we have a base SHA — diff from base to HEAD
-					cmd := exec.CommandContext(r.Context(), "git", "diff", issues[0].BaseSHA+"...HEAD")
-					cmd.Dir = project.RootPath
-					tracked, _ := cmd.CombinedOutput()
-					allDiff = append(allDiff, tracked...)
 				} else {
-					// No branch, no base SHA — show uncommitted changes only
+					// No base SHA — fall back to uncommitted changes only
 					cmd := exec.CommandContext(r.Context(), "git", "diff", "HEAD")
 					cmd.Dir = project.RootPath
 					tracked, _ := cmd.CombinedOutput()
