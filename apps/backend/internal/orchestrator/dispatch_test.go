@@ -126,6 +126,7 @@ func (s stateMapTrackerClient) UpdateIssue(_ context.Context, _ string, _ map[st
 func TestPerformRefreshEnqueuesCandidatesUpToConcurrency(t *testing.T) {
 	service := NewService()
 	service.SetMaxConcurrent(2)
+	service.SetStateSets([]string{"todo"}, []string{"done"})
 	service.SetTrackerClient(memory.NewClient([]tracker.Issue{
 		{ID: "1", Identifier: "ORC-1", State: "todo", AssignedToWorker: true},
 		{ID: "2", Identifier: "ORC-2", State: "todo", AssignedToWorker: true},
@@ -161,6 +162,7 @@ func TestShouldRetryAttemptHonorsMaxRetryPolicy(t *testing.T) {
 func TestPerformRefreshHonorsPerStateConcurrencyLimit(t *testing.T) {
 	service := NewService()
 	service.SetMaxConcurrent(10)
+	service.SetStateSets([]string{"todo", "in progress"}, []string{"done"})
 	service.SetMaxConcurrentByState(map[string]int{"todo": 2, "in progress": 1})
 	service.SetTrackerClient(memory.NewClient([]tracker.Issue{
 		{ID: "1", Identifier: "ORC-1", State: "todo", AssignedToWorker: true},
@@ -197,6 +199,7 @@ func TestPerformRefreshHonorsPerStateConcurrencyLimit(t *testing.T) {
 
 func TestPerformRefreshSkipsIssuesNotAssignedToWorker(t *testing.T) {
 	service := NewService()
+	service.SetStateSets([]string{"Todo"}, []string{"Done"})
 	service.SetTrackerClient(memory.NewClientWithWorkerAssignees([]tracker.Issue{
 		{ID: "1", Identifier: "ORC-1", State: "Todo", AssignedToWorker: false, AssigneeID: "user-1"},
 		{ID: "2", Identifier: "ORC-2", State: "Todo", AssignedToWorker: true, AssigneeID: "agent-claude"},

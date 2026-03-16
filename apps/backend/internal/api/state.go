@@ -3,6 +3,7 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
@@ -416,6 +417,19 @@ func (s *Server) PatchIssue(w http.ResponseWriter, r *http.Request) {
 	if issue == nil {
 		writeJSONError(w, http.StatusNotFound, "issue_not_found", "issue not found")
 		return
+	}
+
+	// Auto-commit when manually moved to Review (agent auto-commit only fires via RecordRunSuccess)
+	if newState, ok := updates["state"].(string); ok && (newState == "Review" || newState == "Done") {
+		if issue.ProjectID != "" && s.db != nil {
+			project, projErr := s.db.GetProjectByID(r.Context(), issue.ProjectID)
+			if projErr == nil && project.RootPath != "" {
+				commitMsg := fmt.Sprintf("feat(%s): %s\n\nVia Orchestra", issue.Identifier, issue.Title)
+				if commitErr := git.Commit(r.Context(), project.RootPath, commitMsg); commitErr != nil {
+					s.logger.Debug().Err(commitErr).Msg("auto-commit on state change (may have no changes)")
+				}
+			}
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

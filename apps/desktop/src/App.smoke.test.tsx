@@ -756,18 +756,13 @@ describe('App smoke render', () => {
       })
 
       // The ProjectGrid card has a delete button that calls setProjectToDelete
-      // Find the card and its delete button (the second icon button in the card overlay)
-      const allButtons = screen.getAllByRole('button')
-      // Find buttons with hover:text-destructive class (the trash button on project card)
-      const trashButton = allButtons.find(btn =>
-        btn.className.includes('hover:text-destructive'),
-      )
+      const trashButton = screen.getByTestId('project-delete-btn')
       expect(trashButton).toBeTruthy()
-      fireEvent.click(trashButton!)
+      fireEvent.click(trashButton)
 
       // ProjectGrid delete confirmation dialog
       const dialog = await screen.findByRole('dialog')
-      fireEvent.click(within(dialog).getByRole('button', { name: /Remove Project/i }))
+      fireEvent.click(within(dialog).getByRole('button', { name: /^Remove$/i }))
 
       await waitFor(() => {
         expect(fetchMockRef.mock.calls.some(

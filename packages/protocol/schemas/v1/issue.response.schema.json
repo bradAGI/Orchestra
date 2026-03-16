@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["issue_id", "issue_identifier", "status", "attempts", "logs", "recent_events"],
+  "properties": {
+    "issue_id": { "type": "string" },
+    "issue_identifier": { "type": "string" },
+    "id": { "type": "string" },
+    "identifier": { "type": "string" },
+    "title": { "type": "string" },
+    "description": { "type": "string" },
+    "state": { "type": "string" },
+    "assignee_id": { "type": "string" },
+    "priority": { "type": "number" },
+    "project_id": { "type": "string" },
+    "branch_name": { "type": "string" },
+    "url": { "type": "string" },
+    "labels": { "type": "array" },
+    "blocked_by": { "type": "array" },
+    "provider": { "type": "string" },
+    "disabled_tools": { "type": "array" },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" },
+    "base_sha": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["running", "retrying", "tracked", "idle"]
+    },
+    "attempts": {
+      "type": "object",
+      "required": ["restart_count", "current_retry_attempt"],
+      "properties": {
+        "restart_count": { "type": "number" },
+        "current_retry_attempt": { "type": "number" }
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" }
+      }
+    },
+    "running": {},
+    "retry": {},
+    "logs": {
+      "type": "object",
+      "required": ["codex_session_logs"],
+      "properties": {
+        "codex_session_logs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["label", "path"],
+            "properties": {
+              "label": { "type": "string" },
+              "path": { "type": "string" },
+              "url": {}
+            }
+          }
+        }
+      }
+    },
+    "recent_events": {
+      "type": "array"
+    },
+    "last_error": { "type": "string" },
+    "tracked": { "type": "object" },
+    "history": {},
+    "workspace_path": { "type": "string" }
+  }
+}

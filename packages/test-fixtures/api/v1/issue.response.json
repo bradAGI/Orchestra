@@ -1,0 +1,50 @@
+{
+  "issue_id": "issue-1",
+  "issue_identifier": "MT-649",
+  "id": "issue-1",
+  "identifier": "MT-649",
+  "title": "",
+  "description": "",
+  "state": "",
+  "assignee_id": "",
+  "priority": 0,
+  "project_id": "",
+  "branch_name": "",
+  "url": "",
+  "labels": [],
+  "blocked_by": [],
+  "provider": "",
+  "disabled_tools": [],
+  "created_at": "",
+  "updated_at": "",
+  "base_sha": "",
+  "status": "running",
+  "attempts": {
+    "restart_count": 0,
+    "current_retry_attempt": 0
+  },
+  "workspace": {
+    "path": ""
+  },
+  "running": {
+    "state": "",
+    "session_id": "",
+    "session_log_path": "",
+    "turn_count": 0,
+    "provider": "",
+    "disabled_tools": null
+  },
+  "retry": null,
+  "logs": {
+    "codex_session_logs": [
+      {
+        "label": "latest",
+        "path": "",
+        "url": null
+      }
+    ]
+  },
+  "recent_events": [],
+  "last_error": "",
+  "tracked": {}
+}

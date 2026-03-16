@@ -88,6 +88,7 @@ const ProjectListRow: React.FC<ProjectCardProps> = ({ project, stats, loading, o
                     variant="ghost"
                     size="sm"
                     className="h-7 w-7 p-0 text-muted-foreground/40 hover:text-red-500"
+                    data-testid="project-delete-btn"
                     onClick={(e) => {
                         e.stopPropagation()
                         onDelete?.(project)
@@ -141,6 +142,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, stats, loading, onCl
                         variant="ghost"
                         size="sm"
                         className="h-7 w-7 p-0 bg-background/80 backdrop-blur-sm border border-border/50 text-muted-foreground/60 hover:text-red-500 hover:border-red-500/30 shadow-sm"
+                        data-testid="project-delete-btn"
                         onClick={(e) => {
                             e.stopPropagation()
                             onDelete?.(project)

@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["generated_at", "counts", "running", "retrying", "codex_totals"],
+  "properties": {
+    "generated_at": {
+      "type": "string"
+    },
+    "counts": {
+      "type": "object",
+      "required": ["running", "retrying"],
+      "properties": {
+        "running": {
+          "type": "number"
+        },
+        "retrying": {
+          "type": "number"
+        }
+      }
+    },
+    "running": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["issue_id", "issue_identifier", "state", "session_id", "provider"],
+        "properties": {
+          "issue_id": { "type": "string" },
+          "issue_identifier": { "type": "string" },
+          "state": { "type": "string" },
+          "session_id": { "type": "string" },
+          "session_log_path": { "type": "string" },
+          "turn_count": { "type": "number" },
+          "last_event": { "type": "string" },
+          "last_message": { "type": "string" },
+          "last_event_at": { "type": "string" },
+          "started_at": { "type": "string" },
+          "provider": { "type": "string" },
+          "tokens": {
+            "type": "object",
+            "properties": {
+              "input_tokens": { "type": "number" },
+              "output_tokens": { "type": "number" },
+              "total_tokens": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "retrying": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["issue_id", "issue_identifier"],
+        "properties": {
+          "issue_id": { "type": "string" },
+          "issue_identifier": { "type": "string" },
+          "state": { "type": "string" },
+          "attempt": { "type": "number" },
+          "due_at": { "type": "string" },
+          "error": { "type": "string" }
+        }
+      }
+    },
+    "codex_totals": {
+      "type": "object",
+      "required": ["input_tokens", "output_tokens", "total_tokens", "seconds_running"],
+      "properties": {
+        "input_tokens": { "type": "number" },
+        "output_tokens": { "type": "number" },
+        "total_tokens": { "type": "number" },
+        "seconds_running": { "type": "number" }
+      }
+    },
+    "rate_limits": {}
+  }
+}
