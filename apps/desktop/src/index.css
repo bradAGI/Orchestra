@@ -104,9 +104,12 @@
 
 html {
   zoom: 0.8;
+  height: calc(100% / 0.8);
+  width: calc(100% / 0.8);
+  overflow: hidden !important;
 }
 
-html, body {
+body {
   overflow: hidden !important;
   height: 100%;
 }
