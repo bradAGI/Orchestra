@@ -594,31 +594,6 @@ function AgentConfigForm({
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 sm:grid-cols-2">
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-foreground/80">Default Runner</h4>
-          </div>
-          <div className="p-4 rounded-xl bg-muted/20 border border-border/40">
-            <CustomDropdown
-              className="w-full"
-              value={provider}
-              options={Object.keys(commands).map((p) => ({ label: p, value: p, icon: getAgentIcon(p) }))}
-              onChange={setProvider}
-              disabled={disabled}
-              placeholder="Select provider..."
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center p-4 rounded-xl bg-primary/5 border border-primary/10">
-          <p className="text-[10px] text-muted-foreground leading-relaxed italic">
-            Select the primary agent provider for new task executions. This can be overridden per-task.
-          </p>
-        </div>
-      </div>
-
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <Terminal className="h-3.5 w-3.5 text-primary" />
