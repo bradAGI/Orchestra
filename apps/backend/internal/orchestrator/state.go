@@ -829,7 +829,9 @@ func (s *Service) enqueueCandidates(candidates []tracker.Issue) {
 		}
 
 		targetProvider := s.agentProvider
-		if issue.AssigneeID != "" && strings.HasPrefix(issue.AssigneeID, "agent-") {
+		if issue.Provider != "" {
+			targetProvider = issue.Provider
+		} else if issue.AssigneeID != "" && strings.HasPrefix(issue.AssigneeID, "agent-") {
 			targetProvider = strings.TrimPrefix(issue.AssigneeID, "agent-")
 		}
 
