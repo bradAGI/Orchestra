@@ -942,3 +942,45 @@ export async function deleteUnsandboxConfig(config: BackendConfig): Promise<void
 export async function fetchUnsandboxStatus(config: BackendConfig): Promise<UnsandboxStatus> {
   return requestJSON<UnsandboxStatus>(config, '/api/v1/unsandbox/status')
 }
+
+export type UnsandboxExecuteResult = {
+  status: string
+  output: string
+  error: string
+  job_id: string
+}
+
+export async function executeUnsandbox(
+  config: BackendConfig,
+  language: string,
+  code: string,
+  network?: string,
+): Promise<UnsandboxExecuteResult> {
+  return requestJSON<UnsandboxExecuteResult>(config, '/api/v1/unsandbox/execute', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ language, code, network: network || 'semitrusted' }),
+  })
+}
+
+export type UnsandboxSession = {
+  id: string
+  language: string
+  status: string
+  created_at?: string
+  [key: string]: unknown
+}
+
+export async function fetchUnsandboxSessions(config: BackendConfig): Promise<{ sessions: UnsandboxSession[] }> {
+  return requestJSON<{ sessions: UnsandboxSession[] }>(config, '/api/v1/unsandbox/sessions')
+}
+
+export type UnsandboxService = {
+  id: string
+  status: string
+  [key: string]: unknown
+}
+
+export async function fetchUnsandboxServices(config: BackendConfig): Promise<{ services: UnsandboxService[] }> {
+  return requestJSON<{ services: UnsandboxService[] }>(config, '/api/v1/unsandbox/services')
+}

@@ -3,6 +3,7 @@ import {
   Database,
   FileText,
   FolderTree,
+  Globe,
   ListTodo,
   Settings2,
   Terminal,
@@ -41,6 +42,12 @@ export const sidebarItems: SidebarItem[] = [
     icon: Database,
   },
   {
+    id: 'sandbox',
+    label: 'Sandbox',
+    description: 'Remote code execution via unsandbox',
+    icon: Globe,
+  },
+  {
     id: 'settings',
     label: 'Settings',
     description: 'Backend and migration controls',
@@ -61,6 +68,7 @@ export type SectionID =
   | 'projects'
   | 'agents'
   | 'warehouse'
+  | 'sandbox'
   | 'settings'
   | 'docs'
   | 'console'
@@ -72,6 +80,7 @@ const SECTION_IDS: readonly SectionID[] = [
   'projects',
   'agents',
   'warehouse',
+  'sandbox',
   'settings',
   'docs',
   'console',
@@ -88,6 +97,7 @@ export type SectionVisibility = {
   showProjects: boolean
   showAgents: boolean
   showWarehouse: boolean
+  showSandbox: boolean
   showSettings: boolean
   showDocs: boolean
   showConsole: boolean
@@ -100,6 +110,7 @@ const sectionMeta: Record<SectionID, { label: string; title: string }> = {
   projects: { label: 'Workspace', title: 'Projects' },
   agents: { label: 'Compute', title: 'Agents' },
   warehouse: { label: 'Analytics', title: 'Analytics' },
+  sandbox: { label: 'Compute', title: 'Sandbox' },
   settings: { label: 'System', title: 'Settings' },
   docs: { label: 'Knowledge', title: 'Documentation' },
   console: { label: 'Runtime', title: 'Live Console' },
@@ -113,6 +124,7 @@ export function getSectionVisibility(activeSection: SectionID): SectionVisibilit
     showProjects: activeSection === 'projects',
     showAgents: activeSection === 'agents',
     showWarehouse: activeSection === 'warehouse',
+    showSandbox: activeSection === 'sandbox',
     showSettings: activeSection === 'settings',
     showDocs: activeSection === 'docs',
     showConsole: activeSection === 'console',

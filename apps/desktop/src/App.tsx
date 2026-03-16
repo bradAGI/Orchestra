@@ -59,6 +59,7 @@ import { AnalyticsDashboard } from '@/components/warehouse/AnalyticsDashboard'
 import { SessionDetailView } from '@/components/warehouse/SessionDetailView'
 import { AgentsDashboard } from '@/components/agents/AgentsDashboard'
 import { DocsDashboard } from '@/components/docs/DocsDashboard'
+import { SandboxDashboard } from '@/components/sandbox/SandboxDashboard'
 import { TerminalMultiplexer, type TerminalNode } from '@/components/terminal/TerminalMultiplexer'
 import { AppShell } from '@app/layout/AppShell'
 import {
@@ -1255,6 +1256,12 @@ export default function App() {
                     onCloseTerminal={handleCloseTerminal}
                     theme={theme}
                   />
+                </section>
+              ) : null}
+
+              {sectionVisibility.showSandbox ? (
+                <section className="col-span-12 flex flex-col">
+                  <SandboxDashboard config={config} />
                 </section>
               ) : null}
 
