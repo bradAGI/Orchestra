@@ -20,6 +20,7 @@ type Issue struct {
 	UpdatedAt        string    `json:"updated_at,omitempty"`
 	Provider         string    `json:"provider,omitempty"`
 	DisabledTools    []string  `json:"disabled_tools,omitempty"`
+	BaseSHA          string    `json:"base_sha,omitempty"`
 }
 
 type Blocker struct {
