@@ -25,7 +25,7 @@ export function AppShell({
   sidebarWidth,
   onToggleCollapsed,
   osOptions,
-  zoom = 0.6,
+  zoom = 1,
   topBarProps,
   children,
 }: AppShellProps) {
