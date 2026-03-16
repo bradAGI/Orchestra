@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, safeStorage, shell, dialog, Menu, screen } = require('electron')
+const { app, BrowserWindow, ipcMain, safeStorage, shell, dialog, Menu } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs/promises')
 const fsSync = require('node:fs')
@@ -503,10 +503,6 @@ ipcMain.handle('orchestra:open-path', async (_event, targetPath) => {
     return
   }
   await shell.openPath(targetPath)
-})
-
-ipcMain.handle('orchestra:get-scale-factor', () => {
-  return screen.getPrimaryDisplay().scaleFactor
 })
 
 ipcMain.handle('orchestra:select-folder', async () => {
