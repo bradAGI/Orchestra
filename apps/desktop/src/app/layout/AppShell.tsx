@@ -1,4 +1,4 @@
-import { type ComponentProps, type ReactNode, useMemo } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react'
 import { SidebarNav } from '@/components/app-shell/sidebar-nav'
 import { TopBar } from '@/components/app-shell/top-bar'
@@ -28,7 +28,10 @@ export function AppShell({
   children,
 }: AppShellProps) {
   return (
-    <div className="h-screen w-screen overflow-hidden bg-background text-foreground">
+    <div
+      className="h-screen w-screen overflow-hidden bg-background text-foreground origin-top-left"
+      style={{ transform: 'scale(0.85)', width: `${100 / 0.85}%`, height: `${100 / 0.85}%` }}
+    >
       <div className="flex h-full w-full relative">
         <SidebarNav
           items={items}
