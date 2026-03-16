@@ -4,3 +4,4 @@ node_modules/
 Notes.md
 /SPEC.md
 apps/tui/tui
+apps/backend/orchestrad
