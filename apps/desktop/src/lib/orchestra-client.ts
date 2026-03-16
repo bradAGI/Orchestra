@@ -866,6 +866,14 @@ export async function gitUnstage(config: BackendConfig, projectId: string, files
   await requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/unstage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ files }) })
 }
 
+export async function gitMerge(config: BackendConfig, projectId: string, branch: string): Promise<void> {
+  await requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/merge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ branch }),
+  })
+}
+
 export async function gitStash(config: BackendConfig, projectId: string): Promise<void> {
   await requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/stash`, { method: 'POST' })
 }

@@ -142,6 +142,7 @@ func NewRouterWithPubSub(
 	protected.Post("/api/v1/projects/{project_id}/git/unstage", server.PostGitUnstage)
 	protected.Post("/api/v1/projects/{project_id}/git/stash", server.PostGitStash)
 	protected.Post("/api/v1/projects/{project_id}/git/stash/pop", server.PostGitStashPop)
+	protected.Post("/api/v1/projects/{project_id}/git/merge", server.PostGitMerge)
 	protected.Post("/api/v1/projects/{project_id}/github/disconnect", server.HandleGitHubDisconnect)
 	protected.Get("/api/v1/projects/{project_id}/git/branches", server.GetProjectGitBranches)
 	protected.Get("/api/v1/projects/{project_id}/github/issues", server.GetProjectGitHubIssues)

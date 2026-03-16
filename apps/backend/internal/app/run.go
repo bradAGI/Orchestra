@@ -336,6 +336,13 @@ func processExecutionTick(
 	}
 
 	if entry.TurnCount == 0 {
+		// Start from main to ensure clean state
+		if workspacePath != "" {
+			if checkoutErr := gitutil.Checkout(context.Background(), workspacePath, "main"); checkoutErr != nil {
+				logger.Warn().Err(checkoutErr).Msg("could not checkout main before task start")
+			}
+		}
+
 		// Record base SHA before any changes
 		if workspacePath != "" {
 			headCmd := exec.Command("git", "rev-parse", "HEAD")
@@ -621,6 +628,25 @@ func processExecutionTick(
 	}
 
 	service.RecordRunSuccess(entry.IssueID, activeProviderName)
+
+	// Auto-commit agent work on the task branch
+	if workspacePath != "" {
+		commitMsg := fmt.Sprintf("feat(%s): %s\n\nImplemented by %s agent via Orchestra",
+			entry.IssueIdentifier, entry.Title, activeProviderName)
+		if commitErr := gitutil.Commit(context.Background(), workspacePath, commitMsg); commitErr != nil {
+			logger.Warn().Err(commitErr).Str("issue_id", entry.IssueID).Msg("auto-commit failed (may have no changes)")
+		} else {
+			logger.Info().Str("issue_id", entry.IssueID).Msg("auto-committed agent work")
+		}
+	}
+
+	// Push the task branch to remote
+	branchName := strings.ToLower(strings.ReplaceAll(entry.IssueIdentifier, " ", "-"))
+	if pushErr := gitutil.Push(context.Background(), workspacePath, "origin", branchName); pushErr != nil {
+		logger.Warn().Err(pushErr).Msg("auto-push failed (remote may not be configured)")
+	} else {
+		logger.Info().Str("branch", branchName).Msg("auto-pushed task branch")
+	}
 
 	// Close the agent's terminal session now that it's done
 	if termManager != nil {

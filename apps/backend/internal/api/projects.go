@@ -928,6 +928,36 @@ func (s *Server) PostGitCheckout(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
+func (s *Server) PostGitMerge(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if err := workspace.ValidateProjectPath(project.RootPath, s.config.ProjectRoots); err != nil {
+		writeJSONError(w, http.StatusForbidden, "unauthorized_project_path", "unauthorized project path")
+		return
+	}
+
+	var req struct {
+		Branch string `json:"branch"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Branch == "" {
+		writeJSONError(w, http.StatusBadRequest, "invalid_request", "branch is required")
+		return
+	}
+
+	if err := git.Merge(r.Context(), project.RootPath, req.Branch); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "git_merge_failed", err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
 func (s *Server) PostGitCreateBranch(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "project_id")
 	project, err := s.db.GetProjectByID(r.Context(), projectID)

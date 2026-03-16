@@ -7,7 +7,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 import type { BackendConfig, IssueUpdatePayload, IssueHistoryEntry } from '@/lib/orchestra-client'
-import { fetchIssueHistory, fetchIssueDiff, fetchIssueLogs, createProjectGitHubPull, gitCommit, updateProjectGitHubIssue, fetchProjectGitBranches } from '@/lib/orchestra-client'
+import { fetchIssueHistory, fetchIssueDiff, fetchIssueLogs, createProjectGitHubPull, gitCommit, gitCheckout, gitMerge, gitDeleteBranch, updateProjectGitHubIssue, fetchProjectGitBranches } from '@/lib/orchestra-client'
 import type { SnapshotPayload } from '@/lib/orchestra-types'
 import type { TimelineItem } from '@/components/app-shell/types'
 import { AgentSelector, CustomDropdown, getAgentIcon } from '@/components/app-shell/shared/controls'
@@ -296,6 +296,46 @@ export function IssueDetailView({
             >
               Stop
             </button>
+          )}
+          {localState === 'Review' && config && projectId && onUpdate && (
+            <>
+              <button
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
+                onClick={async () => {
+                  try {
+                    const branchName = (typed.branch_name as string) || ''
+                    if (branchName && branchName !== 'main') {
+                      await gitCheckout(config, projectId, 'main')
+                      await gitMerge(config, projectId, branchName)
+                      await gitDeleteBranch(config, projectId, branchName)
+                    }
+                    if (typed.url && typeof typed.url === 'string') {
+                      const match = (typed.url as string).match(/\/issues\/(\d+)/)
+                      if (match) {
+                        await updateProjectGitHubIssue(config, projectId, parseInt(match[1]), { state: 'closed' })
+                      }
+                    }
+                    await onUpdate({ state: 'Done' })
+                    setLocalState('Done')
+                  } catch (err) {
+                    console.error('Merge & Close failed:', err)
+                  }
+                }}
+              >
+                <GitPullRequest size={14} />
+                Merge &amp; Close
+              </button>
+              <button
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-muted/20 text-muted-foreground border border-border/30 hover:bg-muted/40 transition-colors"
+                onClick={async () => {
+                  await onUpdate({ state: 'Done' })
+                  setLocalState('Done')
+                }}
+              >
+                <X size={12} />
+                Close
+              </button>
+            </>
           )}
           {localState === 'Done' && onUpdate && (
             <button

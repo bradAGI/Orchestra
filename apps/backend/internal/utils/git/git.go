@@ -185,6 +185,19 @@ func StashPop(ctx context.Context, dir string) error {
 	return nil
 }
 
+// Merge merges the given branch into the current branch with --no-ff
+func Merge(ctx context.Context, dir, branch string) error {
+	cmd := exec.CommandContext(ctx, "git", "merge", branch, "--no-ff", "-m",
+		fmt.Sprintf("Merge branch '%s'", branch))
+	cmd.Dir = dir
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("git merge failed: %v - %s", err, stderr.String())
+	}
+	return nil
+}
+
 // ParseGitHubRemote extracts owner and repo from a GitHub URL
 func ParseGitHubRemote(remoteURL string) (owner string, repo string, ok bool) {
 	if remoteURL == "" {
