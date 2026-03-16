@@ -4,8 +4,10 @@ import type { GitCommit } from '@/lib/orchestra-client'
 
 function relativeTime(dateStr: string): string {
   const now = Date.now()
-  const then = new Date(dateStr).getTime()
-  const diff = now - then
+  // Handle Unix timestamp (seconds) or ISO date string
+  const parsed = /^\d+$/.test(dateStr) ? Number(dateStr) * 1000 : new Date(dateStr).getTime()
+  if (Number.isNaN(parsed)) return dateStr
+  const diff = now - parsed
   const mins = Math.floor(diff / 60000)
   if (mins < 1) return 'just now'
   if (mins < 60) return `${mins}m ago`

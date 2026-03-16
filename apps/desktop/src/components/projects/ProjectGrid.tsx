@@ -68,9 +68,6 @@ const ProjectListRow: React.FC<ProjectCardProps> = ({ project, stats, loading, o
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                     <h3 className="text-sm font-bold truncate group-hover:text-primary transition-colors">{project.name}</h3>
-                    <Badge variant="outline" className={`text-[7px] font-black uppercase tracking-widest h-4 px-1.5 ${activity.color}`}>
-                        {activity.label}
-                    </Badge>
                 </div>
                 <span className="text-[10px] text-muted-foreground/40 font-mono truncate block">{project.root_path}</span>
             </div>
@@ -168,10 +165,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, stats, loading, onCl
 
                 {/* Status badges */}
                 <div className="flex items-center gap-2 mt-3">
-                    <Badge variant="outline" className={`text-[7px] font-black uppercase tracking-widest h-4 px-1.5 border ${activity.color}`}>
-                        {activity.pulse && <span className="h-1 w-1 rounded-full bg-current mr-1 animate-pulse" />}
-                        {activity.label}
-                    </Badge>
                     {hasGitHub && (
                         <Badge variant="outline" className="text-[7px] font-black uppercase tracking-widest h-4 px-1.5 text-muted-foreground/50 border-border/30">
                             <GitBranch size={8} className="mr-0.5" />
@@ -206,7 +199,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, stats, loading, onCl
                             <Activity size={10} className="text-primary/50" strokeWidth={2.5} />
                         </div>
                         <p className="text-sm font-black tabular-nums leading-none">
-                            {stats?.last_active ? new Date(stats.last_active).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '—'}
+                            {stats?.last_active ? new Date(stats.last_active).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—'}
                         </p>
                         <p className="text-[7px] uppercase font-bold text-muted-foreground/40 tracking-widest mt-1">Last Active</p>
                     </div>
