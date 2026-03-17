@@ -18,19 +18,8 @@ type DocItem struct {
 }
 
 func (s *Server) GetDocs(w http.ResponseWriter, r *http.Request) {
-	root := "../../docs" // Relative to backend cmd or workspace root
-	// Navigate up to find project root if needed, but assuming execution from project root or apps/backend
-	absRoot := root
-	if !filepath.IsAbs(root) {
-		// Attempt to resolve based on common project structure
-		if _, err := os.Stat("../../docs"); err == nil {
-			absRoot = "../../docs"
-		} else if _, err := os.Stat("./docs"); err == nil {
-			absRoot = "./docs"
-		}
-	}
-
-	docs, err := walkDocs(absRoot, "")
+	root := resolveDocsRoot()
+	docs, err := walkDocs(root, "")
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "docs_failed", "failed to load documentation")
 		return
@@ -55,10 +44,7 @@ func (s *Server) GetDocContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	root := "../../docs"
-	if _, err := os.Stat("../../docs"); err != nil {
-		root = "./docs"
-	}
+	root := resolveDocsRoot()
 
 	fullPath := filepath.Join(root, cleanPath)
 	content, err := os.ReadFile(fullPath)
@@ -70,6 +56,16 @@ func (s *Server) GetDocContent(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/markdown")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(content)
+}
+
+func resolveDocsRoot() string {
+	candidates := []string{"./docs", "../../docs", "../docs"}
+	for _, c := range candidates {
+		if info, err := os.Stat(c); err == nil && info.IsDir() {
+			return c
+		}
+	}
+	return "./docs"
 }
 
 func walkDocs(root, rel string) ([]DocItem, error) {
