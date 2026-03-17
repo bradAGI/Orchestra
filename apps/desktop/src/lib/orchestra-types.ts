@@ -1,42 +1,74 @@
+/** Connection credentials for the orchestrator backend API. */
 export type BackendConfig = {
+  /** Base URL of the orchestrator HTTP server (e.g. "http://127.0.0.1:4010"). */
   baseUrl: string
+  /** Bearer token used to authenticate API requests. */
   apiToken: string
 }
 
+/** A named backend connection profile persisted by the desktop bridge. */
 export type BackendProfile = {
+  /** Unique identifier for this profile. */
   id: string
+  /** Human-readable profile name. */
   name: string
+  /** Base URL of the orchestrator HTTP server. */
   baseUrl: string
+  /** Bearer token for authentication. */
   apiToken: string
 }
 
+/** Payload returned by the desktop bridge containing all saved backend profiles. */
 export type BridgeProfilesPayload = {
+  /** ID of the currently active profile. */
   activeProfileId: string
+  /** All available backend profiles. */
   profiles: BackendProfile[]
 }
 
+/** Aggregate counts included in a runtime snapshot. */
 export type SnapshotCounts = {
+  /** Number of issues currently being executed by agents. */
   running: number
+  /** Number of issues waiting for a retry attempt. */
   retrying: number
 }
 
+/** An issue that is actively being worked on by an agent. */
 export type RunningEntry = {
+  /** Internal UUID of the issue. */
   issue_id: string
+  /** Human-readable issue identifier (e.g. "ORK-42"). */
   issue_identifier: string
+  /** Current lifecycle state (typically "RUNNING"). */
   state: string
+  /** Active agent session ID, if available. */
   session_id?: string
+  /** Number of agent conversation turns completed so far. */
   turn_count?: number
+  /** Kind of the most recent event (e.g. "tool_call"). */
   last_event?: string
+  /** Text of the most recent agent message. */
   last_message?: string
+  /** ISO-8601 timestamp of the most recent event. */
   last_event_at?: string
+  /** ISO-8601 timestamp when the run started. */
   started_at?: string
+  /** Provider executing this run. */
   provider?: string
+  /** Issue title. */
   title?: string
+  /** Issue description body. */
   description?: string
+  /** ID of the assignee agent. */
   assignee_id?: string
+  /** ID of the project this issue belongs to. */
   project_id?: string
+  /** Filesystem path to the session log file. */
   session_log_path?: string
+  /** Tool names disabled for this run. */
   disabled_tools?: string[]
+  /** Token usage counters for this run. */
   tokens?: { input_tokens: number; output_tokens: number; total_tokens: number }
 }
 

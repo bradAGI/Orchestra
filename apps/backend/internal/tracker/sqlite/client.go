@@ -1,3 +1,4 @@
+// Package sqlite provides a SQLite-backed implementation of the tracker.Client interface.
 package sqlite
 
 import (
@@ -12,6 +13,7 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
 )
 
+// Client is a SQLite-backed tracker that persists issues in a local database.
 type Client struct {
 	db                *db.DB
 	workerAssigneeIDs map[string]struct{}

@@ -85,11 +85,14 @@ type Snapshot struct {
 	MCPServers  map[string]string `json:"mcp_servers,omitempty"`
 }
 
+// SnapshotCount holds the count of currently running and retrying entries.
 type SnapshotCount struct {
 	Running  int `json:"running"`
 	Retrying int `json:"retrying"`
 }
 
+// RefreshResult describes the outcome of a refresh request, including whether
+// it was coalesced with a pending refresh and which operations were queued.
 type RefreshResult struct {
 	Queued      bool     `json:"queued"`
 	Coalesced   bool     `json:"coalesced"`
@@ -97,6 +100,9 @@ type RefreshResult struct {
 	Operations  []string `json:"operations"`
 }
 
+// Service is the central orchestrator that coordinates agent runs, manages
+// concurrency limits, tracks running and retrying issues, and interfaces with
+// the issue tracker, workspace, and MCP subsystems.
 type Service struct {
 	mu               sync.RWMutex
 	running          []RunningEntry
@@ -126,6 +132,8 @@ type Service struct {
 	mcpServers       map[string]string
 }
 
+// IssueRuntime bundles the running and retry state for a single issue,
+// used by lookup operations that need both views at once.
 type IssueRuntime struct {
 	IssueIdentifier string
 	IssueID         string
@@ -133,6 +141,8 @@ type IssueRuntime struct {
 	Retry           *RetryEntry
 }
 
+// NewService creates a new orchestrator Service with sensible defaults for
+// concurrency, retry policy, and stall detection.
 func NewService() *Service {
 	return &Service{
 		running:          make([]RunningEntry, 0),
@@ -150,12 +160,14 @@ func NewService() *Service {
 	}
 }
 
+// RegisterCancel stores a cancellation function for an active run, keyed by issue ID.
 func (s *Service) RegisterCancel(issueID string, provider string, cancel context.CancelFunc) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.cancels[issueID] = cancel
 }
 
+// DeregisterCancel removes the cancellation function for the given issue ID.
 func (s *Service) DeregisterCancel(issueID string, provider string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

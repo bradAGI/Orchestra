@@ -18,10 +18,14 @@ type Client struct {
 	issues map[string]tracker.Issue
 }
 
+// NewClient creates a new in-memory Client seeded with the given issues.
+// All issues are marked as assigned to the worker by default.
 func NewClient(seed []tracker.Issue) *Client {
 	return NewClientWithWorkerAssignees(seed, nil)
 }
 
+// NewClientWithWorkerAssignees creates a new in-memory Client seeded with the given issues.
+// Only issues assigned to one of the provided worker assignee IDs are marked as assigned to the worker.
 func NewClientWithWorkerAssignees(seed []tracker.Issue, workerAssigneeIDs []string) *Client {
 	assigneeSet := map[string]struct{}{}
 	for _, value := range workerAssigneeIDs {
@@ -43,6 +47,7 @@ func NewClientWithWorkerAssignees(seed []tracker.Issue, workerAssigneeIDs []stri
 	return &Client{issues: issues}
 }
 
+// FetchCandidateIssues returns all issues whose state matches one of the given active states.
 func (c *Client) FetchCandidateIssues(_ context.Context, activeStates []string) ([]tracker.Issue, error) {
 	stateSet := normalizeStateSet(activeStates)
 	c.mu.RLock()
@@ -59,6 +64,7 @@ func (c *Client) FetchCandidateIssues(_ context.Context, activeStates []string) 
 	return out, nil
 }
 
+// FetchIssueStatesByIDs returns a map of issue ID to current state for the given IDs.
 func (c *Client) FetchIssueStatesByIDs(_ context.Context, issueIDs []string) (map[string]string, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -74,6 +80,7 @@ func (c *Client) FetchIssueStatesByIDs(_ context.Context, issueIDs []string) (ma
 	return out, nil
 }
 
+// FetchIssuesByIDs returns the issues matching the given IDs.
 func (c *Client) FetchIssuesByIDs(_ context.Context, issueIDs []string) ([]tracker.Issue, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -88,6 +95,7 @@ func (c *Client) FetchIssuesByIDs(_ context.Context, issueIDs []string) ([]track
 	return out, nil
 }
 
+// FetchIssues returns issues matching the given filter criteria including state, project, and assignee.
 func (c *Client) FetchIssues(_ context.Context, filter tracker.IssueFilter) ([]tracker.Issue, error) {
 	stateSet := normalizeStateSet(filter.States)
 	c.mu.RLock()
@@ -113,10 +121,12 @@ func (c *Client) FetchIssues(_ context.Context, filter tracker.IssueFilter) ([]t
 	return out, nil
 }
 
+// FetchIssuesByStates returns issues filtered by the given states.
 func (c *Client) FetchIssuesByStates(ctx context.Context, states []string) ([]tracker.Issue, error) {
 	return c.FetchIssues(ctx, tracker.IssueFilter{States: states})
 }
 
+// SetIssueState updates the state of the issue with the given ID.
 func (c *Client) SetIssueState(issueID string, state string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -128,6 +138,7 @@ func (c *Client) SetIssueState(issueID string, state string) {
 	c.issues[issueID] = issue
 }
 
+// SearchIssues performs a case-insensitive text search across issue identifiers, titles, and descriptions.
 func (c *Client) SearchIssues(_ context.Context, query string) ([]tracker.Issue, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -150,6 +161,7 @@ func (c *Client) SearchIssues(_ context.Context, query string) ([]tracker.Issue,
 	return out, nil
 }
 
+// FetchIssueByIdentifier returns a single issue matching the given identifier or ID.
 func (c *Client) FetchIssueByIdentifier(_ context.Context, identifier string) (*tracker.Issue, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -164,6 +176,7 @@ func (c *Client) FetchIssueByIdentifier(_ context.Context, identifier string) (*
 	return nil, nil
 }
 
+// CreateIssue creates a new issue with an auto-generated ID and identifier, then stores it in memory.
 func (c *Client) CreateIssue(_ context.Context, title, description, state string, priority int, assigneeID, projectID string, provider string, disabledTools []string) (*tracker.Issue, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -190,6 +203,7 @@ func (c *Client) CreateIssue(_ context.Context, title, description, state string
 	return &issue, nil
 }
 
+// UpdateIssue applies field updates to the issue matching the given identifier or ID.
 func (c *Client) UpdateIssue(_ context.Context, identifier string, updates map[string]any) (*tracker.Issue, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -283,6 +297,7 @@ func (c *Client) UpdateIssue(_ context.Context, identifier string, updates map[s
 	return target, nil
 }
 
+// DeleteIssue removes the issue matching the given identifier or ID from memory.
 func (c *Client) DeleteIssue(_ context.Context, identifier string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()

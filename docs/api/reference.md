@@ -2,7 +2,8 @@
 
 > **Source files:**
 > - `apps/backend/internal/api/router.go` — Route definitions and middleware
-> - `apps/backend/internal/api/` — Handler implementations
+> - `apps/backend/internal/api/events.go` — SSE event stream handler
+> - `apps/backend/internal/api/auth.go` — Bearer token authentication
 > - `packages/protocol/schemas/v1/` — JSON Schema definitions
 
 Orchestra exposes a REST API under `/api/v1/` served by `orchestrad`. All endpoints return JSON unless otherwise noted. Protected endpoints require a Bearer token in the `Authorization` header. POST requests to `/api/` paths must use `Content-Type: application/json`.
@@ -18,6 +19,8 @@ Orchestra exposes a REST API under `/api/v1/` served by `orchestrad`. All endpoi
 | Content type | `application/json` (required for POST/PATCH/PUT) |
 | Rate limit | 20 req/s sustained, 60 burst |
 | Request timeout | 30 seconds |
+
+If no `APIToken` is set in the server configuration, authentication is disabled and all routes are public.
 
 ---
 
@@ -56,8 +59,8 @@ CRUD operations on Orchestra issues and their associated resources.
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/v1/issues` | List all issues |
-| `POST` | `/api/v1/issues` | Create a new issue. Body: `IssueCreateRequest` |
-| `GET` | `/api/v1/issues/{issue_identifier}` | Get issue detail |
+| `POST` | `/api/v1/issues` | Create a new issue. Body: `IssueCreateRequest` (see [3.2 Schemas](schemas.md)) |
+| `GET` | `/api/v1/issues/{issue_identifier}` | Get issue detail (status, attempts, logs, events) |
 | `PATCH` | `/api/v1/issues/{issue_identifier}` | Update issue fields. Body: `IssueUpdateRequest` |
 | `DELETE` | `/api/v1/issues/{issue_identifier}` | Delete an issue |
 | `DELETE` | `/api/v1/issues/{issue_identifier}/session` | Delete the agent session for an issue |
@@ -94,7 +97,7 @@ Full git workflow operations scoped to a project.
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/v1/projects/{project_id}/git` | Git statistics (commits, contributors) |
-| `GET` | `/api/v1/projects/{project_id}/git/status` | Working tree status |
+| `GET` | `/api/v1/projects/{project_id}/git/status` | Working tree status (staged, unstaged, untracked) |
 | `GET` | `/api/v1/projects/{project_id}/git/diff` | Current diff |
 | `GET` | `/api/v1/projects/{project_id}/git/branches` | List branches |
 | `POST` | `/api/v1/projects/{project_id}/git/branches` | Create a new branch |
@@ -113,7 +116,7 @@ Full git workflow operations scoped to a project.
 
 ### GitHub Integration
 
-GitHub issue, PR, and review operations scoped to a project.
+GitHub issue, PR, and review operations scoped to a project with a connected repository.
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -137,13 +140,20 @@ Manage agent providers and their configuration files.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/v1/agents` | List active agents |
-| `GET` | `/api/v1/config/agents` | Get agent configuration |
-| `PATCH` | `/api/v1/config/agents` | Patch agent configuration |
-| `POST` | `/api/v1/config/agents` | Create agent configuration |
-| `GET` | `/api/v1/config/agents/items` | List all agent config items (CORE + SKILL) |
+| `GET` | `/api/v1/agents` | List active agents and their runtime status |
+| `GET` | `/api/v1/config/agents` | Get the active agent configuration |
+| `PATCH` | `/api/v1/config/agents` | Patch agent configuration fields |
+| `POST` | `/api/v1/config/agents` | Replace agent configuration |
+| `GET` | `/api/v1/config/agents/items` | List all agent config items (CORE + SKILL, GLOBAL + PROJECT) |
 | `POST` | `/api/v1/config/agents/new` | Create a new agent config file |
-| `POST` | `/api/v1/config/agents/items` | Update agent config items |
+| `POST` | `/api/v1/config/agents/items` | Update agent config items by path |
+
+### Per-Provider Configuration
+
+Each provider (`codex`, `claude`, `opencode`, `gemini`) exposes sub-routes for granular configuration.
+
+| Method | Path | Description |
+|--------|------|-------------|
 | `GET` | `/api/v1/agents/{provider}/mcp` | List MCP servers for a provider |
 | `POST` | `/api/v1/agents/{provider}/mcp` | Add an MCP server to a provider |
 | `DELETE` | `/api/v1/agents/{provider}/mcp/{name}` | Remove an MCP server from a provider |
@@ -151,18 +161,18 @@ Manage agent providers and their configuration files.
 | `POST` | `/api/v1/agents/{provider}/permissions` | Update provider permissions |
 | `GET` | `/api/v1/agents/{provider}/model` | Get provider model configuration |
 | `POST` | `/api/v1/agents/{provider}/model` | Update provider model configuration |
-| `GET` | `/api/v1/agents/{provider}/hooks` | Get provider hooks |
-| `POST` | `/api/v1/agents/{provider}/hooks` | Update provider hooks |
+| `GET` | `/api/v1/agents/{provider}/hooks` | Get provider lifecycle hooks |
+| `POST` | `/api/v1/agents/{provider}/hooks` | Update provider lifecycle hooks |
 
 ---
 
 ### MCP (Model Context Protocol)
 
-Global MCP server and tool management.
+Global MCP server and tool management (not provider-specific).
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/v1/mcp/tools` | List all available MCP tools |
+| `GET` | `/api/v1/mcp/tools` | List all available MCP tools across servers |
 | `GET` | `/api/v1/mcp/servers` | List registered MCP servers |
 | `POST` | `/api/v1/mcp/servers` | Register a new MCP server |
 | `DELETE` | `/api/v1/mcp/servers/{id}` | Remove an MCP server |
@@ -171,22 +181,22 @@ Global MCP server and tool management.
 
 ### Sessions
 
-Agent session inspection.
+Agent session tracking and inspection.
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/v1/sessions` | List all sessions |
-| `GET` | `/api/v1/sessions/{session_id}` | Get session detail |
+| `GET` | `/api/v1/sessions/{session_id}` | Get session detail (events, token usage) |
 
 ---
 
 ### Warehouse
 
-Data warehouse statistics.
+Data warehouse and aggregated telemetry statistics.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/v1/warehouse/stats` | Warehouse storage and ingestion statistics |
+| `GET` | `/api/v1/warehouse/stats` | Global token usage, provider breakdown, recent sessions |
 
 ---
 
@@ -213,22 +223,22 @@ Data warehouse statistics.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/v1/workspace/migration/plan` | Preview a workspace migration plan |
+| `GET` | `/api/v1/workspace/migration/plan` | Preview a workspace migration plan without executing |
 | `POST` | `/api/v1/workspace/migrate` | Execute workspace migration |
 
 ---
 
 ### Unsandbox (Remote Execution)
 
-Manage remote execution environments via the unsandbox platform.
+Manage remote execution environments via the unsandbox/unturf/permacomputer platform.
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/v1/unsandbox/status` | Unsandbox connection status |
 | `POST` | `/api/v1/unsandbox/execute` | Execute a command in unsandbox |
-| `GET` | `/api/v1/unsandbox/sessions` | List unsandbox sessions |
+| `GET` | `/api/v1/unsandbox/sessions` | List unsandbox execution sessions |
 | `GET` | `/api/v1/unsandbox/services` | List available unsandbox services |
-| `GET` | `/api/v1/config/unsandbox` | Get unsandbox configuration |
+| `GET` | `/api/v1/config/unsandbox` | Get unsandbox configuration (API keys) |
 | `POST` | `/api/v1/config/unsandbox` | Update unsandbox configuration |
 | `DELETE` | `/api/v1/config/unsandbox` | Delete unsandbox configuration |
 
@@ -254,7 +264,9 @@ All API errors follow a consistent envelope format. See [3.2 JSON Schemas & Type
 | 404 | `not_found` | Resource or route not found |
 | 405 | `method_not_allowed` | HTTP method not supported for this route |
 | 415 | `unsupported_media_type` | POST body must be `application/json` |
+| 429 | `rate_limited` | Rate limit exceeded (20 req/s sustained, 60 burst) |
 | 500 | `internal_error` | Server-side failure |
+| 500 | `encode_error` | Failed to encode JSON response |
 
 ---
 
@@ -283,3 +295,25 @@ sequenceDiagram
     Router->>Handler: Dispatch
     Handler-->>Client: JSON Response
 ```
+
+---
+
+### Endpoint Count Summary
+
+| Category | Count |
+|----------|-------|
+| Public | 7 |
+| State & Events | 3 |
+| Issues | 13 |
+| Projects | 7 |
+| Git Operations | 15 |
+| GitHub Integration | 11 |
+| Agents & Config | 16 |
+| MCP | 4 |
+| Sessions | 2 |
+| Warehouse | 1 |
+| Telemetry & STT | 3 |
+| Documentation | 2 |
+| Workspace Migration | 2 |
+| Unsandbox | 7 |
+| **Total** | **93** |
