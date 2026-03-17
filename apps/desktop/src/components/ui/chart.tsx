@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: "", dark: ".dark" } as const
 
+/** Configuration map defining chart series labels, icons, and colors (supports light/dark themes). */
 export type ChartConfig = {
   [k in string]: {
     label?: React.ReactNode
@@ -32,6 +33,10 @@ function useChart() {
   return context
 }
 
+/**
+ * Responsive chart wrapper that provides theme-aware CSS custom properties
+ * and a ChartConfig context for tooltip and legend components.
+ */
 const ChartContainer = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> & {
@@ -65,6 +70,7 @@ const ChartContainer = React.forwardRef<
 })
 ChartContainer.displayName = "Chart"
 
+/** Injects CSS custom properties for chart colors based on the active theme. */
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(
     ([, config]) => config.theme || config.color
@@ -98,8 +104,10 @@ ${colorConfig
   )
 }
 
+/** Re-exported Recharts Tooltip component. */
 const ChartTooltip = RechartsPrimitive.Tooltip
 
+/** Styled tooltip content component that reads from ChartConfig context for labels and colors. */
 const ChartTooltipContent = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
@@ -256,8 +264,10 @@ const ChartTooltipContent = React.forwardRef<
 )
 ChartTooltipContent.displayName = "ChartTooltip"
 
+/** Re-exported Recharts Legend component. */
 const ChartLegend = RechartsPrimitive.Legend
 
+/** Styled legend content component that reads from ChartConfig context for labels and icons. */
 const ChartLegendContent = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> &

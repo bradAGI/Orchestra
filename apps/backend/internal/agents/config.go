@@ -8,13 +8,18 @@ import (
 	"strings"
 )
 
+// ConfigScope indicates whether a configuration file is user-global or project-local.
 type ConfigScope string
 
 const (
-	ScopeGlobal  ConfigScope = "GLOBAL"
+	// ScopeGlobal marks a configuration that applies across all projects (e.g. ~/.claude/settings.json).
+	ScopeGlobal ConfigScope = "GLOBAL"
+	// ScopeProject marks a configuration scoped to a single project directory.
 	ScopeProject ConfigScope = "PROJECT"
 )
 
+// AgentConfig represents a single agent configuration file discovered on disk,
+// including its content, filesystem path, category (core vs. skill), and scope.
 type AgentConfig struct {
 	Name     string      `json:"name"`     // e.g. "claude", "gemini", "workspace.json"
 	Content  string      `json:"content"`  // File content
@@ -23,7 +28,9 @@ type AgentConfig struct {
 	Scope    ConfigScope `json:"scope"`    // "GLOBAL" or "PROJECT"
 }
 
-// AgentMeta defines where each agent looks for its configs
+// AgentMeta defines the filesystem layout for each supported agent, mapping agent
+// names to their global config paths, project-local config paths, config format,
+// and skill/sub-agent discovery directories.
 var AgentMeta = map[string]struct {
 	GlobalPaths []string
 	LocalPaths  []string
@@ -56,6 +63,8 @@ var AgentMeta = map[string]struct {
 	},
 }
 
+// GetHomeDir returns the current user's home directory, or an empty string if
+// it cannot be determined.
 func GetHomeDir() string {
 	home, _ := os.UserHomeDir()
 	return home
@@ -68,6 +77,10 @@ func resolvePath(p string) string {
 	return p
 }
 
+// ListAgentConfigs discovers all agent configuration files for the given workspace
+// and optional project root. It scans Orchestra's internal config directory, each
+// agent's global and project-local paths, and skill/sub-agent directories, returning
+// a consolidated list of AgentConfig entries.
 func ListAgentConfigs(workspaceRoot string, projectRoot string) ([]AgentConfig, error) {
 	var configs []AgentConfig
 	home := GetHomeDir()
@@ -199,6 +212,8 @@ func discoverFilesInDir(dir string, prefix string, category string, scope Config
 	return configs
 }
 
+// UpdateConfigByPath writes content to the given absolute path, creating any
+// intermediate directories as needed.
 func UpdateConfigByPath(path string, content string) error {
 	cleanPath := filepath.Clean(path)
 	if err := os.MkdirAll(filepath.Dir(cleanPath), 0o755); err != nil {
@@ -233,10 +248,14 @@ func readOrCreate(path string) string {
 	return content
 }
 
+// UpdateGlobalAgentConfig writes content to the named file inside the workspace's
+// .orchestra/agents directory.
 func UpdateGlobalAgentConfig(workspaceRoot string, name string, content string) error {
 	return UpdateConfigByPath(filepath.Join(workspaceRoot, ".orchestra", "agents", name), content)
 }
 
+// GetGlobalConfigMap reads the named JSON configuration file from the workspace's
+// .orchestra/agents directory and returns its contents as a generic map.
 func GetGlobalConfigMap(workspaceRoot string, name string) (map[string]any, error) {
 	path := filepath.Join(workspaceRoot, ".orchestra", "agents", name)
 	if _, err := os.Stat(path); err != nil {
@@ -253,6 +272,8 @@ func GetGlobalConfigMap(workspaceRoot string, name string) (map[string]any, erro
 	return data, nil
 }
 
+// LoadGlobalWorkspaceDefaults loads and returns the workspace.json defaults from
+// the workspace's .orchestra/agents directory.
 func LoadGlobalWorkspaceDefaults(workspaceRoot string) (map[string]any, error) {
 	return GetGlobalConfigMap(workspaceRoot, "workspace.json")
 }

@@ -1,3 +1,5 @@
+// Package logging provides logger initialization for the Orchestra backend,
+// writing to both the console and a persistent log file.
 package logging
 
 import (
@@ -8,6 +10,9 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// New creates and returns a zerolog.Logger configured with console and file output.
+// The log level is controlled by the LOG_LEVEL environment variable, defaulting to info.
+// The log file path is controlled by ORCHESTRA_LOG_FILE, defaulting to ~/.orchestra/orchestrad.log.
 func New() zerolog.Logger {
 	level := zerolog.InfoLevel
 	if env := os.Getenv("LOG_LEVEL"); env != "" {

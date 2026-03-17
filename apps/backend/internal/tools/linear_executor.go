@@ -1,3 +1,4 @@
+// Package tools provides tool executors that bridge agent tool calls to tracker operations.
 package tools
 
 import (
@@ -8,10 +9,14 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
 )
 
+// LinearToolExecutor executes tracker-related tool calls dispatched by agents,
+// including issue queries, updates, and handoff requests.
 type LinearToolExecutor struct {
 	tracker tracker.Client
 }
 
+// TrackerToolSpecs returns the MCP tool specifications for tracker operations
+// including tracker_query, update_issue, and request_handoff.
 func TrackerToolSpecs() []map[string]any {
 	return []map[string]any{
 		{
@@ -57,10 +62,13 @@ func TrackerToolSpecs() []map[string]any {
 	}
 }
 
+// NewLinearToolExecutor creates a new LinearToolExecutor backed by the given tracker client.
 func NewLinearToolExecutor(client tracker.Client) *LinearToolExecutor {
 	return &LinearToolExecutor{tracker: client}
 }
 
+// Execute dispatches a tool call by name with the given arguments and returns
+// a response map indicating success or failure with content items.
 func (e *LinearToolExecutor) Execute(tool string, arguments map[string]any) map[string]any {
 	name := strings.TrimSpace(tool)
 	if name == "" {

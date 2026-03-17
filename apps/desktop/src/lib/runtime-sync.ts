@@ -1,30 +1,49 @@
 import type { BackendConfig } from '@/lib/orchestra-client'
 import type { EventEnvelope, SnapshotPayload } from '@/lib/orchestra-types'
 
+/** Minimal interface for an EventSource-compatible stream connection. */
 type EventSourceLike = {
   addEventListener: (type: string, listener: (event: unknown) => void) => void
   close: () => void
   onerror: ((event: Event) => void) | null
 }
 
+/** Callback handlers invoked by the runtime sync loop. */
 type RuntimeSyncHandlers = {
+  /** Called when a full runtime snapshot is received or refreshed. */
   onSnapshot: (snapshot: SnapshotPayload) => void
+  /** Called when an individual SSE lifecycle event arrives. */
   onTimelineEvent: (eventType: string, envelope: EventEnvelope) => void
+  /** Called with informational status messages (e.g. "SSE Live"). */
   onStatus: (message: string) => void
+  /** Called when an error occurs during sync. */
   onError: (message: string) => void
 }
 
+/**
+ * Injectable dependencies for the runtime sync loop, enabling testability
+ * by allowing replacement of fetch, timers, and EventSource.
+ */
 type RuntimeSyncDeps = {
+  /** Fetches a full snapshot from the backend. */
   fetchSnapshot: (config: BackendConfig) => Promise<SnapshotPayload>
+  /** Normalizes raw snapshot data into a typed payload. */
   normalizeSnapshot: (value: unknown) => SnapshotPayload
+  /** Normalizes raw event data into a typed envelope. */
   normalizeEnvelope: (value: unknown, fallbackType: string) => EventEnvelope
+  /** Creates an EventSource connection to the given URL. */
   createEventSource: (url: string) => EventSourceLike
+  /** setInterval replacement for dependency injection. */
   setIntervalFn: (cb: () => void, ms: number) => number
+  /** clearInterval replacement for dependency injection. */
   clearIntervalFn: (id: number) => void
+  /** setTimeout replacement for dependency injection. */
   setTimeoutFn: (cb: () => void, ms: number) => number
+  /** clearTimeout replacement for dependency injection. */
   clearTimeoutFn: (id: number) => void
 }
 
+/** SSE event types that represent orchestrator lifecycle transitions. */
 const lifecycleEventTypes = [
   'RUN_EVENT',
   'RUN_STARTED',
@@ -37,12 +56,22 @@ const lifecycleEventTypes = [
   'HOOK_FAILED',
 ]
 
+/**
+ * Computes an exponential backoff delay for SSE reconnection attempts.
+ * @param attempt - The reconnection attempt number (1-based).
+ * @returns Delay in milliseconds, capped at 30 seconds.
+ */
 function reconnectDelayMs(attempt: number): number {
   const base = 3000
   const max = 30000
   return Math.min(base * Math.pow(2, Math.max(0, attempt - 1)), max)
 }
 
+/**
+ * Starts a real-time sync connection to the backend using SSE with automatic
+ * reconnection and polling fallback. Returns controls to stop the sync or
+ * manually toggle snapshot polling.
+ */
 export function startRuntimeSync(config: BackendConfig, handlers: RuntimeSyncHandlers, deps: RuntimeSyncDeps): { stop: () => void; startPolling: () => void; stopPolling: () => void } {
   let closed = false
   let stream: EventSourceLike | null = null

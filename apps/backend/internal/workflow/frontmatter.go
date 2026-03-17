@@ -1,3 +1,5 @@
+// Package workflow provides parsing and storage for workflow files that combine
+// YAML front matter configuration with a Go template prompt body.
 package workflow
 
 import (
@@ -9,11 +11,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Document represents a parsed workflow file containing YAML configuration
+// and a prompt template body.
 type Document struct {
 	Config map[string]any
 	Prompt string
 }
 
+// LoadFile reads a workflow file from disk and parses it into a Document.
 func LoadFile(path string) (Document, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -23,6 +28,8 @@ func LoadFile(path string) (Document, error) {
 	return Parse(string(content))
 }
 
+// Parse splits workflow content into YAML front matter and prompt body,
+// returning a Document with the parsed configuration and trimmed prompt.
 func Parse(content string) (Document, error) {
 	frontMatterLines, promptLines := splitFrontMatter(content)
 	config, err := decodeFrontMatter(frontMatterLines)

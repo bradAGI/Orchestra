@@ -1,3 +1,5 @@
+// Package app wires together all subsystems and runs the orchestrad server,
+// including the execution worker, refresh loop, garbage collector, and HTTP API.
 package app
 
 import (
@@ -40,6 +42,12 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Run initializes all subsystems (database, orchestrator, tracker, MCP, telemetry),
+// wires up the HTTP API, and starts the orchestrad server with graceful shutdown
+// handling. It blocks until the server exits.
+// Run is the main entry point for the orchestrad server. It loads configuration,
+// initializes the database, tracker, agent registry, workspace service, and MCP
+// registry, then starts background workers and serves the HTTP API until shutdown.
 func Run(logger zerolog.Logger) error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -153,6 +161,8 @@ func Run(logger zerolog.Logger) error {
 	return nil
 }
 
+// newTrackerClient builds the appropriate tracker.Client based on the configured
+// tracker type (GitHub or SQLite-backed with memory fallback).
 func newTrackerClient(cfg config.Config, localDB *db.DB) tracker.Client {
 	if strings.ToLower(cfg.TrackerType) == "github" {
 		// For GitHub, Endpoint is owner/repo
@@ -167,6 +177,8 @@ func newTrackerClient(cfg config.Config, localDB *db.DB) tracker.Client {
 	return trackersqlite.NewClient(localDB, cfg.TrackerWorkerAssigneeIDs)
 }
 
+// startExecutionWorker runs a tight polling loop that claims runnable issues
+// and dispatches them to agents via processExecutionTick.
 func startExecutionWorker(
 	service *orchestrator.Service,
 	registry *agents.Registry,
@@ -193,6 +205,9 @@ func startExecutionWorker(
 	}
 }
 
+// processExecutionTick claims the next runnable issue, revalidates it against
+// the tracker, prepares the workspace and git branch, renders the prompt,
+// executes the agent turn, and handles success, failure, and retry scheduling.
 func processExecutionTick(
 	service *orchestrator.Service,
 	workspaceService workspace.Service,
@@ -794,6 +809,8 @@ func processExecutionTick(
 	publishSnapshot(pubsub, service)
 }
 
+// buildExecutionPrompt constructs a fallback prompt for the agent when the
+// workflow template is unavailable, including task details and attempt number.
 func buildExecutionPrompt(issueIdentifier string, title string, description string, attempt int64) string {
 	prompt := fmt.Sprintf("You are an autonomous coding agent working on issue **%s**.\n\n## Task\n**%s**\n\n%s", issueIdentifier, title, description)
 	prompt += "\n\n## Instructions\n\n1. Write an **Operational Plan** using markdown checkboxes (`- [ ]` pending, `- [x]` done).\n\n2. Work through each step. After completing a step, restate the plan with updated checkboxes.\n\n3. Use all available tools to implement changes.\n\n4. Verify your work compiles/passes. Do NOT stop until all items are checked off."
@@ -801,6 +818,8 @@ func buildExecutionPrompt(issueIdentifier string, title string, description stri
 	return prompt
 }
 
+// buildPriorTurnContext retrieves recent agent messages from the unified history
+// and formats them as context for multi-turn continuation prompts.
 func buildPriorTurnContext(warehouseDB *db.DB, issueID string, issueIdentifier string) string {
 	history, err := warehouseDB.GetUnifiedHistory(context.Background(), issueID)
 	if err != nil || len(history) == 0 {
@@ -843,6 +862,7 @@ func buildPriorTurnContext(warehouseDB *db.DB, issueID string, issueIdentifier s
 	return ctx
 }
 
+// extractGitHubIssueNumber parses a GitHub issue URL and returns the issue number.
 func extractGitHubIssueNumber(url string) int {
 	// Extract issue number from URL like https://github.com/owner/repo/issues/18
 	parts := strings.Split(strings.TrimRight(url, "/"), "/")
@@ -859,6 +879,8 @@ func extractGitHubIssueNumber(url string) int {
 	return n
 }
 
+// cleanupTerminalWorkspaces removes workspaces for issues that have reached a
+// terminal state, called once at startup to reclaim disk space.
 func cleanupTerminalWorkspaces(service *orchestrator.Service, trackerClient tracker.Client, workspaceService workspace.Service, hooks workspace.Hooks, logger zerolog.Logger) {
 	if trackerClient == nil {
 		return
@@ -877,6 +899,8 @@ func cleanupTerminalWorkspaces(service *orchestrator.Service, trackerClient trac
 	}
 }
 
+// startGarbageCollector runs hourly to prune old database events and remove
+// orphaned workspaces that are no longer associated with active runs.
 func startGarbageCollector(service *orchestrator.Service, warehouseDB *db.DB, root string, retentionDays int, logger zerolog.Logger) {
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
@@ -936,6 +960,8 @@ func startGarbageCollector(service *orchestrator.Service, warehouseDB *db.DB, ro
 	}
 }
 
+// startRefreshWorker runs a 1-second polling loop that triggers tracker refresh
+// cycles, publishes updated snapshots, and persists orchestrator state to disk.
 func startRefreshWorker(service *orchestrator.Service, pubsub *observability.PubSub, logger zerolog.Logger) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -963,6 +989,7 @@ func startRefreshWorker(service *orchestrator.Service, pubsub *observability.Pub
 	}
 }
 
+// publishSnapshot broadcasts the current orchestrator snapshot to all SSE subscribers.
 func publishSnapshot(pubsub *observability.PubSub, service *orchestrator.Service) {
 	if pubsub == nil || service == nil {
 		return
@@ -970,6 +997,8 @@ func publishSnapshot(pubsub *observability.PubSub, service *orchestrator.Service
 	pubsub.Publish(observability.Event{Type: "snapshot", Data: service.Snapshot()})
 }
 
+// publishLifecycleEvent broadcasts a named lifecycle event (e.g. RUN_STARTED,
+// RUN_FAILED, RETRY_SCHEDULED) to all SSE subscribers.
 func publishLifecycleEvent(pubsub *observability.PubSub, eventType string, data map[string]any) {
 	if pubsub == nil {
 		return
@@ -980,6 +1009,8 @@ func publishLifecycleEvent(pubsub *observability.PubSub, eventType string, data 
 	pubsub.Publish(observability.Event{Type: eventType, Data: data})
 }
 
+// publishRunEvent broadcasts an individual agent event (tool use, message, etc.)
+// to all SSE subscribers along with issue and provider context.
 func publishRunEvent(pubsub *observability.PubSub, entry orchestrator.RunningEntry, providerName string, event agents.Event) {
 	if pubsub == nil {
 		return
@@ -993,6 +1024,8 @@ func publishRunEvent(pubsub *observability.PubSub, entry orchestrator.RunningEnt
 	}})
 }
 
+// publishRefreshRetryLifecycleEvents compares snapshots before and after a refresh
+// cycle and emits RUN_FAILED and RETRY_SCHEDULED events for newly added retries.
 func publishRefreshRetryLifecycleEvents(pubsub *observability.PubSub, before orchestrator.Snapshot, after orchestrator.Snapshot) {
 	if pubsub == nil {
 		return
@@ -1028,6 +1061,8 @@ func publishRefreshRetryLifecycleEvents(pubsub *observability.PubSub, before orc
 	}
 }
 
+// retryLifecycleKey produces a deduplication key for a retry entry based on
+// issue ID, attempt number, and error message.
 func retryLifecycleKey(entry orchestrator.RetryEntry) string {
 	return strings.TrimSpace(entry.IssueID) + "|" + fmt.Sprintf("%d", entry.Attempt) + "|" + strings.TrimSpace(entry.Error)
 }

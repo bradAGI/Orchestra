@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 )
 
+// MigrationAction describes a single filesystem operation in a workspace migration plan.
 type MigrationAction struct {
 	Type   string `json:"type"`
 	Source string `json:"source"`
@@ -13,11 +14,15 @@ type MigrationAction struct {
 	Note   string `json:"note,omitempty"`
 }
 
+// MigrationResult holds the outcome of a workspace migration, including whether
+// actions were applied and the list of planned or executed actions.
 type MigrationResult struct {
 	Applied bool              `json:"applied"`
 	Actions []MigrationAction `json:"actions"`
 }
 
+// PlanWorkspaceMigration computes the actions needed to migrate workspace entries
+// from oldRoot to newRoot without executing them.
 func PlanWorkspaceMigration(oldRoot string, newRoot string) (MigrationResult, error) {
 	result := MigrationResult{Applied: false, Actions: []MigrationAction{}}
 
@@ -78,6 +83,8 @@ func PlanWorkspaceMigration(oldRoot string, newRoot string) (MigrationResult, er
 	return result, nil
 }
 
+// ExecuteWorkspaceMigration plans and optionally executes the migration of workspace
+// entries from oldRoot to newRoot. If dryRun is true, actions are planned but not applied.
 func ExecuteWorkspaceMigration(oldRoot string, newRoot string, dryRun bool) (MigrationResult, error) {
 	plan, err := PlanWorkspaceMigration(oldRoot, newRoot)
 	if err != nil {

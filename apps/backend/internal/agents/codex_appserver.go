@@ -14,16 +14,24 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/workspace"
 )
 
+// CodexAppServerRunner implements the Runner interface for the Codex app-server
+// JSON-RPC protocol. It manages the full lifecycle of a Codex session: initialize,
+// thread/start, turn/start, approval handling, and turn completion — communicating
+// with the app-server process over stdin/stdout using newline-delimited JSON.
 type CodexAppServerRunner struct {
 	command string
 }
 
 const nonInteractiveToolInputAnswer = "This is a non-interactive session. Operator input is unavailable."
 
+// NewCodexAppServerRunner creates a runner for a Codex app-server command.
 func NewCodexAppServerRunner(command string) *CodexAppServerRunner {
 	return &CodexAppServerRunner{command: strings.TrimSpace(command)}
 }
 
+// RunTurn starts the Codex app-server process, performs the JSON-RPC handshake
+// (initialize, thread/start, turn/start), handles approval and tool-call
+// requests, and waits for the turn to complete or fail.
 func (r *CodexAppServerRunner) RunTurn(ctx context.Context, request TurnRequest, onEvent EventHandler) (TurnResult, error) {
 	if err := workspace.ValidateWorkspacePath(request.WorkspaceRoot, request.Workspace); err != nil {
 		return TurnResult{}, fmt.Errorf("invalid workspace path: %w", err)

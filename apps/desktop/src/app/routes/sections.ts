@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import type { SidebarItem } from '@/components/app-shell/types'
 
+/** Sidebar navigation items displayed in the app shell, in display order. */
 export const sidebarItems: SidebarItem[] = [
   {
     id: 'ISSUES',
@@ -61,6 +62,7 @@ export const sidebarItems: SidebarItem[] = [
   },
 ]
 
+/** Union type of all navigable section identifiers in the desktop app. */
 export type SectionID =
   | 'DASHBOARD'
   | 'RUNNING'
@@ -73,6 +75,7 @@ export type SectionID =
   | 'DOCS'
   | 'CONSOLE'
 
+/** Ordered list of all valid section IDs, used for validation. */
 const SECTION_IDS: readonly SectionID[] = [
   'DASHBOARD',
   'RUNNING',
@@ -86,10 +89,16 @@ const SECTION_IDS: readonly SectionID[] = [
   'CONSOLE',
 ]
 
+/**
+ * Type guard that checks whether a string is a valid {@link SectionID}.
+ * @param value - The string to test.
+ * @returns `true` if the value is a recognized section ID.
+ */
 export function isSectionID(value: string): value is SectionID {
   return (SECTION_IDS as readonly string[]).includes(value)
 }
 
+/** Boolean flags indicating which section panels are currently visible. */
 export type SectionVisibility = {
   showDashboard: boolean
   showRunning: boolean
@@ -103,6 +112,7 @@ export type SectionVisibility = {
   showConsole: boolean
 }
 
+/** Display metadata (breadcrumb label and page title) for each section. */
 const sectionMeta: Record<SectionID, { label: string; title: string }> = {
   DASHBOARD: { label: 'Operations', title: 'Dashboard' },
   RUNNING: { label: 'Operations', title: 'Running' },
@@ -116,6 +126,11 @@ const sectionMeta: Record<SectionID, { label: string; title: string }> = {
   CONSOLE: { label: 'Runtime', title: 'Live Console' },
 }
 
+/**
+ * Derives visibility flags from the active section, setting exactly one to true.
+ * @param activeSection - The currently active section ID.
+ * @returns An object with boolean flags for each section's visibility.
+ */
 export function getSectionVisibility(activeSection: SectionID): SectionVisibility {
   return {
     showDashboard: activeSection === 'DASHBOARD',
@@ -131,6 +146,12 @@ export function getSectionVisibility(activeSection: SectionID): SectionVisibilit
   }
 }
 
+/**
+ * Returns the display label and title for the given section.
+ * Falls back to the ISSUES section metadata if the section is not found.
+ * @param activeSection - The currently active section ID.
+ * @returns Object with `label` (breadcrumb category) and `title` (page heading).
+ */
 export function getCurrentSectionMeta(activeSection: SectionID): { label: string; title: string } {
   return sectionMeta[activeSection] ?? sectionMeta.ISSUES
 }

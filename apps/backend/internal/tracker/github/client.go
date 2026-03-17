@@ -1,3 +1,4 @@
+// Package github provides a GitHub Issues-backed implementation of the tracker.Client interface.
 package github
 
 import (
@@ -11,6 +12,7 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
 )
 
+// Client is a tracker backed by the GitHub Issues REST API for a single repository.
 type Client struct {
 	owner      string
 	repo       string
@@ -18,6 +20,8 @@ type Client struct {
 	httpClient *http.Client
 }
 
+// NewClient creates a new GitHub tracker Client for the given repository.
+// If httpClient is nil, http.DefaultClient is used.
 func NewClient(owner, repo, token string, httpClient *http.Client) *Client {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
@@ -30,12 +34,14 @@ func NewClient(owner, repo, token string, httpClient *http.Client) *Client {
 	}
 }
 
+// FetchCandidateIssues returns GitHub issues matching the given active states.
 func (c *Client) FetchCandidateIssues(ctx context.Context, activeStates []string) ([]tracker.Issue, error) {
 	// For GitHub, we'll map "open" state to candidate issues if they have specific labels or just open status.
 	// This is a simplified implementation.
 	return c.FetchIssuesByStates(ctx, activeStates)
 }
 
+// FetchIssuesByIDs fetches individual GitHub issues by their number, one at a time.
 func (c *Client) FetchIssuesByIDs(ctx context.Context, issueIDs []string) ([]tracker.Issue, error) {
 	// GitHub REST API doesn't support bulk fetch by ID easily without multiple calls or search query.
 	var issues []tracker.Issue
@@ -49,6 +55,8 @@ func (c *Client) FetchIssuesByIDs(ctx context.Context, issueIDs []string) ([]tra
 	return issues, nil
 }
 
+// FetchIssuesByStates returns GitHub issues filtered by the given states,
+// mapping internal states to GitHub open/closed terminology.
 func (c *Client) FetchIssuesByStates(ctx context.Context, states []string) ([]tracker.Issue, error) {
 	// Map our states to GitHub states (open/closed)
 	ghState := "open"
@@ -121,6 +129,7 @@ func (c *Client) FetchIssuesByStates(ctx context.Context, states []string) ([]tr
 	return issues, nil
 }
 
+// FetchIssueStatesByIDs returns a map of issue ID to current state for the given IDs.
 func (c *Client) FetchIssueStatesByIDs(ctx context.Context, issueIDs []string) (map[string]string, error) {
 	results := make(map[string]string)
 	for _, id := range issueIDs {
@@ -133,19 +142,23 @@ func (c *Client) FetchIssueStatesByIDs(ctx context.Context, issueIDs []string) (
 	return results, nil
 }
 
+// FetchIssues returns issues matching the given filter, delegating to FetchIssuesByStates.
 func (c *Client) FetchIssues(ctx context.Context, filter tracker.IssueFilter) ([]tracker.Issue, error) {
 	return c.FetchIssuesByStates(ctx, filter.States)
 }
 
+// SearchIssues searches GitHub issues by query text. Not yet implemented.
 func (c *Client) SearchIssues(ctx context.Context, query string) ([]tracker.Issue, error) {
 	// Search implementation using GitHub search API
 	return nil, fmt.Errorf("GitHub SearchIssues not implemented yet")
 }
 
+// CreateIssue creates a new GitHub issue. Not yet implemented.
 func (c *Client) CreateIssue(ctx context.Context, title, description, state string, priority int, assigneeID, projectID string, provider string, disabledTools []string) (*tracker.Issue, error) {
 	return nil, fmt.Errorf("GitHub CreateIssue not implemented yet")
 }
 
+// UpdateIssue patches a GitHub issue via the REST API, mapping internal states to GitHub states.
 func (c *Client) UpdateIssue(ctx context.Context, identifier string, updates map[string]any) (*tracker.Issue, error) {
 	// identifier is usually repo-number (e.g. orchestra-123)
 	parts := strings.Split(identifier, "-")
@@ -197,6 +210,7 @@ func (c *Client) UpdateIssue(ctx context.Context, identifier string, updates map
 	return c.FetchIssueByIdentifier(ctx, issueNumber)
 }
 
+// DeleteIssue closes the GitHub issue since GitHub does not support true deletion.
 func (c *Client) DeleteIssue(ctx context.Context, identifier string) error {
 	issueNumber := identifier
 	if strings.Contains(identifier, "-") {
@@ -234,6 +248,7 @@ func (c *Client) DeleteIssue(ctx context.Context, identifier string) error {
 	return nil
 }
 
+// FetchIssueByIdentifier fetches a single GitHub issue by its number.
 func (c *Client) FetchIssueByIdentifier(ctx context.Context, id string) (*tracker.Issue, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%s", c.owner, c.repo, id)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)

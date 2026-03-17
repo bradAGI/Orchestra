@@ -73,6 +73,7 @@ import { AppTooltipProvider } from '@/components/ui/tooltip-wrapper'
 import { SectionErrorBoundary } from '@/components/ui/section-error-boundary'
 import { useBackendConfig, useNotifications, useIssueLookup, useWorkspaceMigration } from '@/hooks'
 
+/** Root application component that manages backend sync, navigation, and top-level UI state. */
 export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window === 'undefined') {

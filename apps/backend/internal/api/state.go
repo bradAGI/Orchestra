@@ -21,6 +21,9 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/workspace"
 )
 
+// CreateGitHubPR handles POST /api/v1/issues/{issue_identifier}/pr by creating
+// a GitHub pull request. It attempts to infer owner, repo, and token from the
+// associated project, global config, or the GitHub CLI.
 func (s *Server) CreateGitHubPR(w http.ResponseWriter, r *http.Request) {
 	identifier := chi.URLParam(r, "issue_identifier")
 	s.logger.Info().Str("issue_identifier", identifier).Msg("received request to create github pull request")
@@ -126,10 +129,15 @@ func (s *Server) CreateGitHubPR(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated,pr)
 }
 
+// GetState handles GET /api/v1/state by returning the current orchestrator
+// snapshot formatted by the presenter layer.
 func (s *Server) GetState(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK,presenter.StatePayload(s.orchestrator.Snapshot()))
 }
 
+// GetIssues handles GET /api/v1/issues by listing issues with optional
+// filtering by state, project_id, and assignee_id, and pagination via
+// limit/offset query parameters.
 func (s *Server) GetIssues(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	statesParam := query.Get("states")
@@ -172,6 +180,8 @@ func (s *Server) GetIssues(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"issues": issues, "total": total})
 }
 
+// GetSearch handles GET /api/v1/search by performing a full-text search across
+// issues using the "q" query parameter.
 func (s *Server) GetSearch(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("q")
 	if query == "" {
@@ -188,6 +198,8 @@ func (s *Server) GetSearch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK,map[string]any{"issues": issues})
 }
 
+// PostIssue handles POST /api/v1/issues by creating a new issue with the given
+// title, description, state, priority, assignee, project, and provider.
 func (s *Server) PostIssue(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Title         string   `json:"title"`
@@ -223,10 +235,15 @@ func (s *Server) PostIssue(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated,issue)
 }
 
+// PostRefresh handles POST /api/v1/refresh by queuing an orchestrator refresh
+// cycle and returning immediately with HTTP 202 Accepted.
 func (s *Server) PostRefresh(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusAccepted, s.orchestrator.QueueRefresh())
 }
 
+// GetIssue handles GET /api/v1/issues/{issue_identifier} by returning the full
+// issue detail including runtime state, retry info, workspace path, history,
+// and recent events. Falls back to tracker data if the issue is not in memory.
 func (s *Server) GetIssue(w http.ResponseWriter, r *http.Request) {
 	identifier := chi.URLParam(r, "issue_identifier")
 	snapshot := s.orchestrator.Snapshot()
@@ -404,6 +421,9 @@ func (s *Server) GetIssue(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK,response)
 }
 
+// PatchIssue handles PATCH /api/v1/issues/{issue_identifier} by applying
+// partial updates to an issue. When the state is changed to "Review" or "Done",
+// an auto-commit is triggered on the associated project.
 func (s *Server) PatchIssue(w http.ResponseWriter, r *http.Request) {
 	identifier := chi.URLParam(r, "issue_identifier")
 	var updates map[string]any
@@ -439,6 +459,8 @@ func (s *Server) PatchIssue(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK,issue)
 }
 
+// GetIssueHistory handles GET /api/v1/issues/{issue_identifier}/history by
+// returning the run history for the identified issue.
 func (s *Server) GetIssueHistory(w http.ResponseWriter, r *http.Request) {
 	identifier := chi.URLParam(r, "issue_identifier")
 	runtime, ok := s.orchestrator.LookupIssue(identifier)
@@ -465,6 +487,8 @@ func (s *Server) GetIssueHistory(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK,map[string]any{"history": history})
 }
 
+// GetIssueLogs handles GET /api/v1/issues/{issue_identifier}/logs by serving
+// the most recent log file for the identified issue as plain text.
 func (s *Server) GetIssueLogs(w http.ResponseWriter, r *http.Request) {
 	identifier := chi.URLParam(r, "issue_identifier")
 	runtime, ok := s.orchestrator.LookupIssue(identifier)
@@ -519,6 +543,8 @@ func (s *Server) GetIssueLogs(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, logPath)
 }
 
+// GetArtifacts handles GET /api/v1/issues/{issue_identifier}/artifacts by
+// listing all artifacts produced during runs of the identified issue.
 func (s *Server) GetArtifacts(w http.ResponseWriter, r *http.Request) {
 	identifier := chi.URLParam(r, "issue_identifier")
 	provider := r.URL.Query().Get("provider")
@@ -531,6 +557,8 @@ func (s *Server) GetArtifacts(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK,map[string]any{"artifacts": artifacts})
 }
 
+// GetArtifactContent handles GET /api/v1/issues/{issue_identifier}/artifacts/*
+// by returning the raw content of a specific artifact file.
 func (s *Server) GetArtifactContent(w http.ResponseWriter, r *http.Request) {
 	identifier := chi.URLParam(r, "issue_identifier")
 	relPath := chi.URLParam(r, "*")
@@ -551,6 +579,10 @@ func (s *Server) GetArtifactContent(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(content)
 }
 
+// GetIssueDiff handles GET /api/v1/issues/{issue_identifier}/diff by computing
+// and returning the git diff for the issue's workspace. It checks the project
+// directory first for uncommitted and recent changes, then falls back to the
+// workspace-based diff.
 func (s *Server) GetIssueDiff(w http.ResponseWriter, r *http.Request) {
 	identifier := chi.URLParam(r, "issue_identifier")
 	provider := r.URL.Query().Get("provider")
@@ -627,6 +659,8 @@ func (s *Server) GetIssueDiff(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(diff))
 }
 
+// GetAgentConfig handles GET /api/v1/config/agents by returning the current
+// agent command mappings, default provider, and max turns setting.
 func (s *Server) GetAgentConfig(w http.ResponseWriter, _ *http.Request) {
 	commands, provider := s.orchestrator.GetAgentConfig()
 	writeJSON(w, http.StatusOK,map[string]any{
@@ -636,6 +670,8 @@ func (s *Server) GetAgentConfig(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+// PatchAgentConfig handles PATCH /api/v1/config/agents by updating the
+// max_turns setting (must be between 1 and 100).
 func (s *Server) PatchAgentConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		MaxTurns *int `json:"max_turns"`
@@ -660,6 +696,9 @@ func (s *Server) PatchAgentConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// DeleteIssueSession handles DELETE /api/v1/issues/{issue_identifier}/session
+// by stopping the active agent session(s) for the identified issue and resetting
+// the issue state to "Todo".
 func (s *Server) DeleteIssueSession(w http.ResponseWriter, r *http.Request) {
 	identifier := chi.URLParam(r, "issue_identifier")
 	provider := r.URL.Query().Get("provider")
@@ -701,6 +740,8 @@ func (s *Server) DeleteIssueSession(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// DeleteIssue handles DELETE /api/v1/issues/{issue_identifier} by permanently
+// deleting the identified issue from the tracker.
 func (s *Server) DeleteIssue(w http.ResponseWriter, r *http.Request) {
 	identifier := chi.URLParam(r, "issue_identifier")
 	if err := s.orchestrator.DeleteIssue(r.Context(), identifier); err != nil {
@@ -716,6 +757,8 @@ func (s *Server) DeleteIssue(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// GetAgents handles GET /api/v1/agents by returning the list of configured
+// agent providers.
 func (s *Server) GetAgents(w http.ResponseWriter, _ *http.Request) {
 	providers := s.orchestrator.GetProviders()
 	writeJSON(w, http.StatusOK,map[string]any{
@@ -723,6 +766,8 @@ func (s *Server) GetAgents(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+// GetAgentConfigs handles GET /api/v1/config/agents/items by listing all
+// discovered agent configuration files, optionally filtered by project_id.
 func (s *Server) GetAgentConfigs(w http.ResponseWriter, r *http.Request) {
 	projectID := r.URL.Query().Get("project_id")
 	configs, err := s.orchestrator.ListAgentConfigs(projectID)
@@ -736,6 +781,8 @@ func (s *Server) GetAgentConfigs(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// PostAgentConfigNew handles POST /api/v1/config/agents/new by creating a new
+// agent configuration resource (core config, skill, or MCP server definition).
 func (s *Server) PostAgentConfigNew(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Provider string `json:"provider"`
@@ -759,6 +806,8 @@ func (s *Server) PostAgentConfigNew(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated,map[string]string{"path": path})
 }
 
+// PostAgentConfigUpdate handles POST /api/v1/config/agents/items by updating
+// the content of an existing agent configuration file at the specified path.
 func (s *Server) PostAgentConfigUpdate(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Path    string `json:"path"`
@@ -777,6 +826,8 @@ func (s *Server) PostAgentConfigUpdate(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// PostAgentConfig handles POST /api/v1/config/agents by replacing the agent
+// command mappings and default provider in the orchestrator.
 func (s *Server) PostAgentConfig(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Commands      map[string]string `json:"commands"`
@@ -791,6 +842,8 @@ func (s *Server) PostAgentConfig(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// GetMCPTools handles GET /api/v1/mcp/tools by listing all tools available
+// from connected MCP servers.
 func (s *Server) GetMCPTools(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	mcpReg := s.orchestrator.GetMCPRegistry()
@@ -810,6 +863,8 @@ func (s *Server) GetMCPTools(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetMCPServers handles GET /api/v1/mcp/servers by listing all registered
+// MCP server entries from the database.
 func (s *Server) GetMCPServers(w http.ResponseWriter, r *http.Request) {
 	servers, err := s.db.ListMCPServers(r.Context())
 	if err != nil {
@@ -819,6 +874,8 @@ func (s *Server) GetMCPServers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK,map[string]any{"servers": servers})
 }
 
+// PostMCPServer handles POST /api/v1/mcp/servers by creating a new MCP server
+// entry and hot-reloading the MCP registry in the orchestrator.
 func (s *Server) PostMCPServer(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Name    string `json:"name"`
@@ -851,6 +908,9 @@ func (s *Server) PostMCPServer(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated,server)
 }
 
+// DeleteMCPServer handles DELETE /api/v1/mcp/servers/{id} by removing the MCP
+// server entry and rebuilding the MCP registry from the remaining database
+// entries and static configuration.
 func (s *Server) DeleteMCPServer(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := s.db.DeleteMCPServer(r.Context(), id); err != nil {

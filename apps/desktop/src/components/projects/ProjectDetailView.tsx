@@ -34,6 +34,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 
+/** Props for the {@link ProjectDetailView} component. */
 interface ProjectDetailViewProps {
     project: Project
     stats?: ProjectStats
@@ -55,6 +56,10 @@ interface ProjectDetailViewProps {
 
 type ProjectTab = 'overview' | 'files' | 'git'
 
+/**
+ * Full-page detail view for a single project, with tabs for overview,
+ * file browser, git history, and issue kanban board scoped to the project.
+ */
 export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     project,
     stats,

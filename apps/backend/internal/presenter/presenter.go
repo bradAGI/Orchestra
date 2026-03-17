@@ -1,3 +1,4 @@
+// Package presenter transforms orchestrator snapshots into API response payloads.
 package presenter
 
 import (
@@ -7,6 +8,8 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/orchestrator"
 )
 
+// StatePayload converts an orchestrator Snapshot into a map suitable for JSON
+// serialization as an API response, including running issues, retry queue, and totals.
 func StatePayload(snapshot orchestrator.Snapshot) map[string]any {
 	running := make([]map[string]any, 0, len(snapshot.Running))
 	for _, entry := range snapshot.Running {
@@ -56,6 +59,8 @@ func StatePayload(snapshot orchestrator.Snapshot) map[string]any {
 	}
 }
 
+// IssuePayload extracts the runtime state for a specific issue from the snapshot
+// and returns it as a map. Returns false if the issue is not found.
 func IssuePayload(snapshot orchestrator.Snapshot, issueIdentifier string) (map[string]any, bool) {
 	runtime, ok := lookupRuntime(snapshot, issueIdentifier)
 	if !ok {

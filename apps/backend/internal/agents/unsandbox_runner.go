@@ -18,6 +18,7 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/unsandbox"
 )
 
+// ProviderUnsandbox identifies the Unsandbox remote container execution backend.
 const ProviderUnsandbox Provider = "UNSANDBOX"
 
 // UnsandboxRunner executes agent turns inside unsandbox.com containers.
@@ -51,6 +52,9 @@ func (r *UnsandboxRunner) WithNetwork(network string) *UnsandboxRunner {
 	return r
 }
 
+// RunTurn creates an Unsandbox container session, bootstraps it with credentials
+// and project files, executes the agent command, retrieves session artifacts, and
+// returns the result.
 func (r *UnsandboxRunner) RunTurn(ctx context.Context, request TurnRequest, onEvent EventHandler) (TurnResult, error) {
 	sessionID := request.SessionID
 	if sessionID == "" {

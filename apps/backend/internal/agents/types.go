@@ -1,3 +1,6 @@
+// Package agents provides runner implementations for dispatching work to
+// machine-learning coding agents (Claude, Codex, Gemini, OpenCode, Unsandbox)
+// and a registry that maps provider names to their concrete runners.
 package agents
 
 import (
@@ -6,13 +9,18 @@ import (
 	"time"
 )
 
+// Provider identifies a machine-learning agent backend (e.g. "CLAUDE", "CODEX").
 type Provider string
 
 const (
-	ProviderCodex    Provider = "CODEX"
-	ProviderClaude   Provider = "CLAUDE"
+	// ProviderCodex identifies the OpenAI Codex agent.
+	ProviderCodex Provider = "CODEX"
+	// ProviderClaude identifies the Anthropic Claude agent.
+	ProviderClaude Provider = "CLAUDE"
+	// ProviderOpenCode identifies the OpenCode agent.
 	ProviderOpenCode Provider = "OPENCODE"
-	ProviderGemini   Provider = "GEMINI"
+	// ProviderGemini identifies the Google Gemini agent.
+	ProviderGemini Provider = "GEMINI"
 )
 
 // NormalizeProvider normalizes a provider string to UPPERCASE for backward compatibility.
@@ -20,6 +28,8 @@ func NormalizeProvider(s string) Provider {
 	return Provider(strings.ToUpper(strings.TrimSpace(s)))
 }
 
+// TurnRequest encapsulates all parameters needed to execute a single agent turn,
+// including the prompt, workspace paths, timeout, and optional tool specifications.
 type TurnRequest struct {
 	SessionID       string
 	Workspace       string
@@ -35,12 +45,17 @@ type TurnRequest struct {
 	ResourceSpecs   []map[string]any
 }
 
+// TokenUsage tracks the token consumption for a single agent turn, including
+// input tokens, output tokens, and the computed total.
 type TokenUsage struct {
 	InputTokens  int64 `json:"input_tokens"`
 	OutputTokens int64 `json:"output_tokens"`
 	TotalTokens  int64 `json:"total_tokens"`
 }
 
+// Event represents a single streaming event emitted by an agent during a turn.
+// Events carry the provider, event kind, human-readable message, raw JSON payload,
+// token usage updates, and a timestamp.
 type Event struct {
 	Provider  Provider       `json:"provider"`
 	SessionID string         `json:"session_id,omitempty"`
@@ -52,6 +67,8 @@ type Event struct {
 	Timestamp time.Time      `json:"timestamp"`
 }
 
+// TurnResult contains the outcome of a completed agent turn, including the
+// process exit code, captured output, and cumulative token usage.
 type TurnResult struct {
 	Provider  Provider   `json:"provider"`
 	SessionID string     `json:"session_id"`
@@ -60,10 +77,16 @@ type TurnResult struct {
 	Usage     TokenUsage `json:"usage"`
 }
 
+// EventHandler is a callback invoked for each streaming Event during a turn.
 type EventHandler func(Event)
 
+// ToolExecutor is a callback that executes a named tool with the given arguments
+// and returns the result as a JSON-compatible map.
 type ToolExecutor func(tool string, arguments map[string]any) map[string]any
 
+// Runner is the interface that all agent backends must implement. RunTurn
+// executes a single agent turn, streaming events via onEvent and returning
+// the final result.
 type Runner interface {
 	RunTurn(ctx context.Context, request TurnRequest, onEvent EventHandler) (TurnResult, error)
 }

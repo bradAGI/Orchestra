@@ -203,6 +203,7 @@ func (db *DB) GetUnifiedHistory(ctx context.Context, issueID string) ([]map[stri
 	return history, nil
 }
 
+// Project represents a registered codebase with optional GitHub integration credentials.
 type Project struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -214,6 +215,7 @@ type Project struct {
 	PathExists  bool   `json:"path_exists"`
 }
 
+// ProjectStats holds aggregate telemetry metrics for a project.
 type ProjectStats struct {
 	TotalSessions int64  `json:"total_sessions"`
 	TotalInput    int64  `json:"total_input"`
@@ -221,6 +223,7 @@ type ProjectStats struct {
 	LastActive    string `json:"last_active"`
 }
 
+// GetProjects returns all registered projects, ordered by name, with decrypted GitHub tokens.
 func (db *DB) GetProjects(ctx context.Context) ([]Project, error) {
 	rows, err := db.QueryContext(ctx, "SELECT id, name, root_path, remote_url, COALESCE(github_owner, ''), COALESCE(github_repo, ''), COALESCE(github_token, '') FROM projects ORDER BY name ASC")
 	if err != nil {
@@ -242,6 +245,8 @@ func (db *DB) GetProjects(ctx context.Context) ([]Project, error) {
 	return projects, rows.Err()
 }
 
+// GetProjectStats returns aggregate session count, token usage, and last-active
+// timestamp for the given project.
 func (db *DB) GetProjectStats(ctx context.Context, projectID string) (ProjectStats, error) {
 	query := `
 		SELECT 
@@ -265,6 +270,8 @@ func (db *DB) GetProjectStats(ctx context.Context, projectID string) (ProjectSta
 	return stats, nil
 }
 
+// DeleteProject removes a project and all its associated data (sessions, events,
+// runs, issues, issue_history) in a single transaction with cascading deletes.
 func (db *DB) DeleteProject(ctx context.Context, projectID string) error {
 	if projectID == "" {
 		return fmt.Errorf("project_id is required")
@@ -358,6 +365,7 @@ func (db *DB) DeleteProject(ctx context.Context, projectID string) error {
 	return tx.Commit()
 }
 
+// GetProjectByID retrieves a single project by its ID, with decrypted GitHub token.
 func (db *DB) GetProjectByID(ctx context.Context, id string) (Project, error) {
 	var p Project
 	err := db.QueryRowContext(ctx, "SELECT id, name, root_path, remote_url, COALESCE(github_owner, ''), COALESCE(github_repo, ''), COALESCE(github_token, '') FROM projects WHERE id = ?", id).
@@ -370,11 +378,13 @@ func (db *DB) GetProjectByID(ctx context.Context, id string) (Project, error) {
 	return p, err
 }
 
+// UpdateProjectGitHubInfo sets the GitHub owner and repo for an existing project.
 func (db *DB) UpdateProjectGitHubInfo(ctx context.Context, id, owner, repo string) error {
 	_, err := db.ExecContext(ctx, "UPDATE projects SET github_owner = ?, github_repo = ? WHERE id = ?", owner, repo, id)
 	return err
 }
 
+// Session represents an agent execution session linked to a project and provider.
 type Session struct {
 	ID          string `json:"id"`
 	ProjectID   string `json:"project_id"`
@@ -389,6 +399,7 @@ type Session struct {
 	TotalOutput int64  `json:"total_output"`
 }
 
+// Event represents a single agent progression event stored in the database.
 type Event struct {
 	ID           string `json:"id"`
 	SessionID    string `json:"session_id"`
@@ -400,11 +411,14 @@ type Event struct {
 	Timestamp    string `json:"timestamp"`
 }
 
+// SessionDetail combines a Session with its ordered list of Events.
 type SessionDetail struct {
 	Session
 	Events []Event `json:"events"`
 }
 
+// GetSessions returns sessions optionally filtered by project ID, with aggregated
+// token usage and last-activity timestamps. An empty projectID returns all sessions.
 func (db *DB) GetSessions(ctx context.Context, projectID string) ([]Session, error) {
 	var rows *sql.Rows
 	var err error
@@ -454,6 +468,7 @@ func (db *DB) GetSessions(ctx context.Context, projectID string) ([]Session, err
 	return sessions, rows.Err()
 }
 
+// GetSessionDetail retrieves a session and all its events by session ID.
 func (db *DB) GetSessionDetail(ctx context.Context, sessionID string) (*SessionDetail, error) {
 	var detail SessionDetail
 
@@ -509,6 +524,8 @@ func (db *DB) GetSessionDetail(ctx context.Context, sessionID string) (*SessionD
 	return &detail, nil
 }
 
+// GlobalStats holds platform-wide aggregate metrics including total tokens,
+// per-provider and per-model breakdowns, and recent sessions.
 type GlobalStats struct {
 	TotalTokens    int64            `json:"total_tokens"`
 	TotalInput     int64            `json:"total_input"`
@@ -518,6 +535,8 @@ type GlobalStats struct {
 	RecentSessions []Session        `json:"recent_sessions"`
 }
 
+// GetGlobalStats computes platform-wide token usage, per-provider and per-model
+// breakdowns, and includes the most recent 50 sessions.
 func (db *DB) GetGlobalStats(ctx context.Context) (GlobalStats, error) {
 	var stats GlobalStats
 	stats.ProviderUsage = make(map[string]int64)

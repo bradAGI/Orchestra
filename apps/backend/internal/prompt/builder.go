@@ -1,3 +1,4 @@
+// Package prompt provides workflow prompt template rendering with issue context.
 package prompt
 
 import (
@@ -10,11 +11,14 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/workflow"
 )
 
+// BuildInput holds the parameters for rendering a workflow prompt template.
 type BuildInput struct {
 	Issue   tracker.Issue
 	Attempt int64
 }
 
+// Build loads the workflow file, renders its prompt template with the given input
+// context, and returns the resulting prompt string.
 func Build(workflowFile string, input BuildInput) (string, error) {
 	doc, err := workflow.LoadFile(workflowFile)
 	if err != nil {

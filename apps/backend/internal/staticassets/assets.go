@@ -1,5 +1,9 @@
+// Package staticassets provides embedded HTML content served by the Orchestra backend,
+// including the live dashboard and error pages.
 package staticassets
 
+// DashboardHTML is the embedded HTML for the Orchestra backend live dashboard,
+// which displays running issues, retry queue, and token usage via SSE streaming.
 const DashboardHTML = `<!doctype html>
 <html lang="en">
 <head>
@@ -168,6 +172,7 @@ const DashboardHTML = `<!doctype html>
 </html>
 `
 
+// NotFoundHTML is the embedded HTML for the 404 Not Found error page.
 const NotFoundHTML = `<!doctype html>
 <html lang="en">
 <head>

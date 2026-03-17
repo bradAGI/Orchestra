@@ -46,11 +46,15 @@ import remarkGfm from 'remark-gfm'
 /*  Types & Constants                                                  */
 /* ------------------------------------------------------------------ */
 
+/** Props for the {@link AgentsDashboard} component. */
 interface AgentsDashboardProps {
+    /** Backend connection configuration, or null if not yet connected. */
     config: BackendConfig | null
+    /** Current runtime snapshot for displaying agent status. */
     snapshot: SnapshotPayload | null
 }
 
+/** Supported agent provider identifiers in lowercase form. */
 const PROVIDERS = ['claude', 'codex', 'gemini', 'opencode'] as const
 type Provider = (typeof PROVIDERS)[number]
 
@@ -80,6 +84,10 @@ function ConfigItemRow({ icon, color, name, preview, scope }: { icon: string; co
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Dashboard for managing agent configurations, provider settings (MCP servers,
+ * permissions, model config, hooks), and viewing CLAUDE.md / skill files.
+ */
 export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapshot }) => {
     /* ---------- shared state ---------- */
     const [configs, setConfigs] = useState<AgentConfig[]>([])
