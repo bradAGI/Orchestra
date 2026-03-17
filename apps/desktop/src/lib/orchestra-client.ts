@@ -905,3 +905,82 @@ export async function mergePR(config: BackendConfig, projectId: string, prNumber
 export async function fetchPRComments(config: BackendConfig, projectId: string, prNumber: number): Promise<unknown[]> {
   return requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/pulls/${prNumber}/comments`)
 }
+
+// --- Unsandbox Configuration ---
+
+export type UnsandboxConfig = {
+  configured: boolean
+  public_key: string
+  has_secret: boolean
+}
+
+export type UnsandboxStatus = {
+  configured: boolean
+  valid?: boolean
+  error?: string
+  key_info?: Record<string, unknown>
+}
+
+export async function fetchUnsandboxConfig(config: BackendConfig): Promise<UnsandboxConfig> {
+  return requestJSON<UnsandboxConfig>(config, '/api/v1/config/unsandbox')
+}
+
+export async function saveUnsandboxConfig(config: BackendConfig, publicKey: string, secretKey: string): Promise<UnsandboxConfig> {
+  return requestJSON<UnsandboxConfig>(config, '/api/v1/config/unsandbox', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ public_key: publicKey, secret_key: secretKey }),
+  })
+}
+
+export async function deleteUnsandboxConfig(config: BackendConfig): Promise<void> {
+  await requestJSON<void>(config, '/api/v1/config/unsandbox', {
+    method: 'DELETE',
+  })
+}
+
+export async function fetchUnsandboxStatus(config: BackendConfig): Promise<UnsandboxStatus> {
+  return requestJSON<UnsandboxStatus>(config, '/api/v1/unsandbox/status')
+}
+
+export type UnsandboxExecuteResult = {
+  status: string
+  output: string
+  error: string
+  job_id: string
+}
+
+export async function executeUnsandbox(
+  config: BackendConfig,
+  language: string,
+  code: string,
+  network?: string,
+): Promise<UnsandboxExecuteResult> {
+  return requestJSON<UnsandboxExecuteResult>(config, '/api/v1/unsandbox/execute', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ language, code, network: network || 'semitrusted' }),
+  })
+}
+
+export type UnsandboxSession = {
+  id: string
+  language: string
+  status: string
+  created_at?: string
+  [key: string]: unknown
+}
+
+export async function fetchUnsandboxSessions(config: BackendConfig): Promise<{ sessions: UnsandboxSession[] }> {
+  return requestJSON<{ sessions: UnsandboxSession[] }>(config, '/api/v1/unsandbox/sessions')
+}
+
+export type UnsandboxService = {
+  id: string
+  status: string
+  [key: string]: unknown
+}
+
+export async function fetchUnsandboxServices(config: BackendConfig): Promise<{ services: UnsandboxService[] }> {
+  return requestJSON<{ services: UnsandboxService[] }>(config, '/api/v1/unsandbox/services')
+}

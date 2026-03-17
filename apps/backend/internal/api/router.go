@@ -167,6 +167,17 @@ func NewRouterWithPubSub(
 	protected.Post("/api/v1/refresh", server.PostRefresh)
 	protected.Post("/api/v1/workspace/migrate", server.PostWorkspaceMigrate)
 
+	// Unsandbox remote execution
+	protected.Get("/api/v1/unsandbox/status", server.GetUnsandboxStatus)
+	protected.Post("/api/v1/unsandbox/execute", server.PostUnsandboxExecute)
+	protected.Get("/api/v1/unsandbox/sessions", server.GetUnsandboxSessions)
+	protected.Get("/api/v1/unsandbox/services", server.GetUnsandboxServices)
+
+	// Unsandbox configuration (API keys)
+	protected.Get("/api/v1/config/unsandbox", server.GetUnsandboxConfig)
+	protected.Post("/api/v1/config/unsandbox", server.PostUnsandboxConfig)
+	protected.Delete("/api/v1/config/unsandbox", server.DeleteUnsandboxConfig)
+
 	protected.Get("/api/v1/issues/{issue_identifier}", server.GetIssue)
 	protected.Get("/api/v1/issues/{issue_identifier}/logs", server.GetIssueLogs)
 	protected.Get("/api/v1/issues/{issue_identifier}/history", server.GetIssueHistory)
