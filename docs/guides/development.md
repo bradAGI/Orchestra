@@ -1,342 +1,287 @@
 # 7.2 Development Guide
 
+> **Source files:**
+> - `apps/backend/` -- Go backend (orchestrad + CLI)
+> - `apps/desktop/` -- Electron + React desktop app
+> - `apps/tui/` -- Terminal UI dashboard
+> - `Makefile` -- TUI build targets
+> - `.github/workflows/` -- CI pipelines
+> - `CLAUDE.md` -- Agent operating instructions
+
 This guide covers setting up a development environment, building and testing each component, and contributing new functionality to Orchestra.
 
-## Repository Structure Overview
+---
+
+### Repository Structure
 
 ```
 Orchestra/
-├── apps/
-│   ├── backend/              # Go backend: API server, orchestrator, agent runners
-│   │   ├── cmd/
-│   │   │   └── orchestrad/   # Daemon entry point (main.go)
-│   │   └── internal/         # All business logic
-│   │       ├── agents/       # Agent registry, runners, config discovery
-│   │       ├── api/          # HTTP handlers and Chi router
-│   │       ├── app/          # Application bootstrap (Run function)
-│   │       ├── config/       # Environment variable loading and config types
-│   │       ├── db/           # SQLite database layer
-│   │       ├── mcp/          # Model Context Protocol server registry
-│   │       ├── observability/# PubSub event bus for SSE streaming
-│   │       ├── orchestrator/ # Core orchestration service
-│   │       ├── prompt/       # Prompt construction for agents
-│   │       ├── telemetry/    # Agent telemetry collection
-│   │       ├── terminal/     # PTY/WebSocket terminal manager
-│   │       ├── tools/        # Built-in tool implementations
-│   │       ├── tracker/      # Issue tracker backends (memory, sqlite, github)
-│   │       ├── unfirehose/   # Session logging
-│   │       ├── unsandbox/    # Remote execution support
-│   │       ├── utils/        # Git and GitHub utilities
-│   │       ├── workflow/     # WORKFLOW.md parser
-│   │       └── workspace/    # Workspace lifecycle management
-│   ├── desktop/              # Electron + React frontend
-│   │   ├── electron/         # Main process, preload script, IPC bridge
-│   │   ├── src/              # React app, components, state management
-│   │   ├── scripts/          # Build and smoke test scripts
-│   │   └── resources/        # Bundled assets (backend binary for dist)
-│   └── tui/                  # Terminal UI (Go + Bubble Tea)
-├── packages/
-│   └── protocol/             # Shared JSON schemas for API contracts
-├── ops/
-│   └── docker/               # Dockerfile for backend container
-├── docs/                     # Documentation (DeepWiki format)
-└── .github/
-    ├── workflows/            # CI/CD pipelines
-    └── actions/              # Reusable composite actions (setup-go-cached)
+  apps/
+    backend/             # Go backend server and CLI
+      cmd/orchestrad/    # Server entry point
+      cmd/orchestra/     # CLI entry point
+      internal/          # Internal packages (api, config, db, etc.)
+    desktop/             # Electron + React desktop app
+      electron/          # Main process + preload
+      src/               # React frontend source
+        components/      # UI components by section
+        lib/             # Client, sync, store modules
+        widgets/         # Complex widget modules
+    tui/                 # Terminal UI dashboard (Bubble Tea)
+  ops/
+    docker/              # Dockerfiles
+  .github/
+    workflows/           # CI/CD pipelines
+    actions/             # Composite actions
 ```
 
-## Setting Up the Development Environment
+---
 
-### 1. Clone the repository
+### Development Prerequisites
 
-```bash
-git clone https://github.com/Traves-Theberge/Orchestra.git
-cd Orchestra
-```
+| Tool | Version | Install |
+|------|---------|---------|
+| Go | 1.24+ | [go.dev/dl](https://go.dev/dl/) |
+| Node.js | 20+ | [nodejs.org](https://nodejs.org/) |
+| npm | 10+ | Included with Node.js |
+| Git | 2.x+ | System package manager |
 
-### 2. Install Go dependencies
+---
+
+### Backend Development
+
+#### Building
 
 ```bash
 cd apps/backend
-go mod download
+
+# Build both binaries
+go build -o orchestrad ./cmd/orchestrad
+go build -o orchestra ./cmd/orchestra
 ```
 
-### 3. Install Node.js dependencies
+#### Running
 
 ```bash
-cd apps/desktop
-npm install
+export ORCHESTRA_SERVER_HOST=127.0.0.1
+export ORCHESTRA_SERVER_PORT=4010
+./orchestrad
 ```
 
-### 4. Install agent CLIs (at least one)
-
-```bash
-npm install -g @openai/codex          # Codex
-npm install -g @anthropic-ai/claude-code  # Claude Code
-```
-
-### 5. Verify your setup
-
-```bash
-# Backend compiles
-cd apps/backend && go build ./...
-
-# Frontend type-checks
-cd apps/desktop && npx tsc --noEmit
-
-# TUI compiles
-cd apps/tui && go build .
-```
-
-## Building and Testing the Backend (Go)
-
-### Build
+#### Testing
 
 ```bash
 cd apps/backend
-go build -o orchestrad ./cmd/orchestrad/
-```
 
-### Run tests
-
-```bash
-# Unit and integration tests
+# Run all tests
 go test ./...
 
-# With coverage
+# Run tests with coverage
 go test -coverprofile=coverage.out ./...
 
-# Race detector
+# Run tests with race detector
 go test -race ./...
-```
 
-### Formatting and linting
+# Verify formatting
+test -z "$(gofmt -l ./cmd ./internal)"
 
-CI enforces `gofmt` on the `cmd/` and `internal/` directories:
-
-```bash
-# Check formatting (should produce no output)
-gofmt -l ./cmd ./internal
-
-# Fix formatting
-gofmt -w ./cmd ./internal
-
-# Vet for suspicious constructs
+# Run static analysis
 go vet ./...
 ```
 
-### Key dependencies
+#### Binary Restart Protocol
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| `go-chi/chi/v5` | v5.2.5 | HTTP router |
-| `rs/zerolog` | v1.34.0 | Structured logging |
-| `modernc.org/sqlite` | v1.46.2 | Pure-Go SQLite driver |
-| `gorilla/websocket` | v1.5.3 | WebSocket for terminals |
-| `google/go-github/v69` | v69.2.0 | GitHub API client |
-| `creack/pty` | v1.1.24 | PTY allocation for agent processes |
-| `pelletier/go-toml/v2` | v2.2.4 | TOML parsing (Codex configs) |
+When modifying Go source that produces a running binary (e.g., `orchestrad`), always:
 
-## Building and Testing the Frontend (React/Electron)
+1. Check if the binary is currently running: `pgrep -af orchestrad`
+2. Rebuild: `go build -o orchestrad ./cmd/orchestrad/` from `apps/backend/`
+3. Kill the old process and start the new binary
+4. Verify the new process is running
 
-### Development mode
+---
+
+### Desktop Development
+
+#### Setup
 
 ```bash
 cd apps/desktop
+npm ci
+```
+
+#### Development Mode
+
+```bash
+# Start both Vite dev server and Electron
 npm run dev
+
+# This runs:
+# 1. vite --port 5173 --strictPort
+# 2. electron electron/main.cjs (with VITE_DEV_SERVER_URL=http://localhost:5173)
 ```
 
-This runs Vite on port 5173 and opens an Electron window connected to it. Hot module replacement is active.
+In development mode, the desktop app connects to a separately running `orchestrad` instance. Start the backend first.
 
-### Type checking
-
-```bash
-npm run typecheck
-```
-
-### Running tests
+#### Testing
 
 ```bash
-# Full test suite
+cd apps/desktop
+
+# Run all tests
 npm test
 
-# Smoke test (renderer)
-npm run test:smoke-renderer
+# Run specific test suites
+npm run test:smoke-renderer   # App smoke test
+npm run smoke:ops             # Operational smoke test
+npm run smoke:ops:go          # Smoke test with Go backend
+npm run smoke:ops:go:auth     # Smoke test with authentication
 
-# Integration smoke test (spawns backend)
-npm run smoke:ops:go
+# Type checking
+npm run typecheck
+
+# Parity verification (frontend/backend API alignment)
+npm run parity:verify
 ```
 
-### Production build
+#### Building
 
 ```bash
-npm run build         # Vite production build only
-npm run dist:desktop  # Full distributable (builds + packages with electron-builder)
+# Build frontend only (Vite)
+npm run build
+
+# Build and stage backend binary
+npm run dist:prep
+
+# Package for distribution
+npm run dist:desktop
 ```
 
-### Key frontend dependencies
+---
 
-| Package | Purpose |
-|---------|---------|
-| React 19 | UI framework |
-| Vite 8 | Build tool and dev server |
-| Electron 41 | Desktop shell |
-| Tailwind CSS 3 | Utility-first styling |
-| Radix UI | Accessible UI primitives (Dialog, Tooltip, etc.) |
-| xterm | Terminal emulator component |
-| Recharts | Data visualization charts |
-| react-mosaic-component | Tiling window manager for panels |
-| cmdk | Command palette (Cmd+K) |
+### TUI Development
 
-## Code Style and Conventions
+```bash
+cd apps/tui
 
-### Go
+# Run directly
+go run .
 
-- **Formatting**: `gofmt` is enforced in CI. No exceptions.
-- **Naming**: Standard Go conventions. Exported types have doc comments.
-- **Error handling**: Wrap errors with `fmt.Errorf("context: %w", err)`.
-- **Logging**: Use `zerolog.Logger` injected from the application root. Do not use `log.Println`.
-- **Testing**: Table-driven tests preferred. Tests live alongside the code they test (`*_test.go`).
-- **Module path**: `github.com/orchestra/orchestra/apps/backend`.
+# Run tests
+go test ./...
 
-### TypeScript/React
-
-- **Type checking**: Strict TypeScript with `tsc --noEmit` in CI.
-- **Testing**: Vitest with React Testing Library.
-- **Styling**: Tailwind CSS utility classes; `clsx` and `tailwind-merge` for conditional classes.
-- **Components**: Functional components with hooks. Radix UI for accessible primitives.
-
-## Adding a New Agent Runner
-
-Agent runners live in `apps/backend/internal/agents/`. Each runner implements the `Runner` interface:
-
-### 1. Define the provider constant
-
-In `apps/backend/internal/agents/types.go` (or wherever `Provider` is defined), add your provider:
-
-```go
-const ProviderMyAgent Provider = "MYAGENT"
+# Build binary
+cd /path/to/Orchestra
+make build      # outputs ./orchestra-dash
+make install    # installs to /usr/local/bin/orchestra-dash
 ```
 
-### 2. Implement the Runner interface
+---
 
-Create `apps/backend/internal/agents/runner_myagent.go`:
+### Code Style
 
-```go
-package agents
+#### Go
 
-import "context"
+- Standard `gofmt` formatting enforced in CI
+- `go vet` for static analysis
+- Race detector tests run separately
+- Prefer "defect" over "bug" in comments and messages
 
-type MyAgentRunner struct {
-    command string
-}
+#### TypeScript/React
 
-func (r *MyAgentRunner) RunTurn(ctx context.Context, req TurnRequest, onEvent EventHandler) (TurnResult, error) {
-    // 1. Build the CLI command from r.command and req
-    // 2. Execute the process, streaming output
-    // 3. Call onEvent() with events as they arrive
-    // 4. Return the final TurnResult
-}
+- Vite + TypeScript strict mode
+- Radix UI / shadcn/ui primitives for UI components
+- Tailwind CSS for styling
+- Lucide React for icons
+- Type checking via `tsc --noEmit`
+
+---
+
+### Testing Strategy
+
+```mermaid
+flowchart TD
+    subgraph Backend
+        UNIT_B[Unit Tests<br>go test ./...]
+        RACE[Race Tests<br>go test -race ./...]
+        VET[Static Analysis<br>go vet ./...]
+        FMT[Format Check<br>gofmt -l]
+    end
+
+    subgraph Desktop
+        UNIT_D[Unit Tests<br>vitest run]
+        SMOKE_R[Renderer Smoke<br>App.smoke.test.tsx]
+        SMOKE_O[Ops Smoke<br>smoke-ops-flow.mjs]
+        PARITY[Parity Check<br>parity-report.mjs]
+        TYPE[Type Check<br>tsc --noEmit]
+    end
+
+    subgraph TUI
+        UNIT_T[Unit Tests<br>go test ./...]
+        MAKE[Build Check<br>make build]
+    end
 ```
 
-### 3. Register in the registry
+---
 
-In `apps/backend/internal/agents/registry.go`, update the `SetCommand` method (or equivalent) to recognize your provider and instantiate `MyAgentRunner`.
+### PR Workflow
 
-### 4. Add the default command template
+1. **Branch**: Create a feature branch from `main`
+2. **Develop**: Make changes, run local tests
+3. **PR Description**: Must include structured sections -- the `pr-description-lint` workflow validates format using `orchestra check-pr-body`
+4. **CI**: All relevant workflows must pass:
+   - `orchestra-backend` (if backend changed)
+   - `orchestra-desktop-smoke` (if frontend or backend changed)
+   - `make-all` (if TUI changed)
+   - `pr-description-lint` (all PRs)
+5. **Review**: Code review required
+6. **Merge**: Squash merge to `main`
 
-In `apps/backend/internal/config/load.go`, add the default command to `agentCommandsDefault`:
+#### PR Description Format
 
-```go
-"MYAGENT": "myagent run {{prompt}} --json",
+PR descriptions are validated programmatically. They must follow the project's structured format -- the `orchestra check-pr-body` command checks for required sections.
+
+---
+
+### Release Process
+
+1. Create an annotated Git tag with release notes containing `## Summary` and `## Validation` sections:
+
+```bash
+git tag -a v1.0.0 -m "$(cat <<'EOF'
+v1.0.0
+
+## Summary
+- Feature X added
+- Defect Y fixed
+
+## Validation
+- All CI checks pass
+- Smoke tests verified on macOS, Linux, Windows
+EOF
+)"
 ```
 
-And add the environment variable:
+2. Push the tag: `git push origin v1.0.0`
 
-```go
-agentCommandMyAgent := getenvOrEmpty("ORCHESTRA_AGENT_COMMAND_MYAGENT")
-```
+3. The CI automatically:
+   - Validates release notes format
+   - Builds desktop installers for all platforms (Linux, macOS, Windows)
+   - Publishes a GitHub release with all artifacts
+   - Builds and pushes the Docker image to GHCR
 
-### 5. Add agent metadata for config discovery
+---
 
-In `apps/backend/internal/agents/config.go`, add an entry to `AgentMeta`:
+### Useful Commands Reference
 
-```go
-"myagent": {
-    GlobalPaths: []string{".myagent/config.json"},
-    LocalPaths:  []string{".myagent/config.json"},
-    Format:      "json",
-    SkillPaths:  []string{".myagent/skills"},
-},
-```
-
-## Adding a New API Endpoint
-
-The API uses the Chi router, defined in `apps/backend/internal/api/router.go`.
-
-### 1. Add the handler method
-
-Create or edit a handler file in `apps/backend/internal/api/`:
-
-```go
-// apps/backend/internal/api/handle_myfeature.go
-package api
-
-import "net/http"
-
-func (s *Server) GetMyFeature(w http.ResponseWriter, r *http.Request) {
-    // Access shared deps via s.orchestrator, s.db, s.logger, etc.
-    result := map[string]string{"status": "ok"}
-    writeJSON(w, http.StatusOK, result)
-}
-```
-
-### 2. Register the route
-
-In `router.go`, add the route to the appropriate group:
-
-```go
-// Public (no auth required)
-r.Get("/api/v1/myfeature", server.GetMyFeature)
-
-// Protected (requires bearer token when ORCHESTRA_API_TOKEN is set)
-protected.Post("/api/v1/myfeature", server.PostMyFeature)
-```
-
-Routes follow the pattern `/api/v1/<resource>`. Use Chi URL parameters for resource identifiers: `/api/v1/issues/{issue_identifier}`.
-
-### 3. Write tests
-
-```go
-// apps/backend/internal/api/handle_myfeature_test.go
-package api_test
-
-func TestGetMyFeature(t *testing.T) {
-    // Set up test server with NewRouter()
-    // Make HTTP request
-    // Assert response status and body
-}
-```
-
-### 4. Utility functions
-
-Use the existing helpers in `router.go`:
-
-- `writeJSON(w, status, v)` -- encode a response as JSON
-- `writeJSONError(w, status, code, message)` -- structured error response
-- `chi.URLParam(r, "param")` -- extract URL parameters
-
-## CI/CD Pipelines
-
-GitHub Actions workflows in `.github/workflows/`:
-
-| Workflow | Trigger | What it does |
-|----------|---------|--------------|
-| `orchestra-backend.yml` | Changes to `apps/backend/` | Runs `gofmt` check, `go vet`, unit tests, race tests, naming guard |
-| `make-all.yml` | Changes to `apps/tui/` | TUI tests, `make build` verification |
-| `orchestra-desktop-smoke.yml` | Changes to `apps/desktop/` | Desktop smoke tests |
-| `orchestra-container-publish.yml` | Releases | Docker image build and push to GHCR |
-| `orchestra-release-artifacts.yml` | Releases | Build release artifacts |
-| `orchestra-desktop-release.yml` | Releases | Desktop app distribution packages |
-
-All workflows use a reusable `.github/actions/setup-go-cached` composite action for consistent Go toolchain setup with module caching.
+| Task | Command | Working Directory |
+|------|---------|-------------------|
+| Start backend | `./orchestrad` | `apps/backend/` |
+| Start desktop (dev) | `npm run dev` | `apps/desktop/` |
+| Start TUI | `go run .` | `apps/tui/` |
+| Backend tests | `go test ./...` | `apps/backend/` |
+| Desktop tests | `npm test` | `apps/desktop/` |
+| TUI tests | `go test ./...` | `apps/tui/` |
+| Type check frontend | `npm run typecheck` | `apps/desktop/` |
+| Parity check | `npm run parity:verify` | `apps/desktop/` |
+| Build Docker image | `docker build -f ops/docker/Dockerfile.backend .` | repo root |
+| Package desktop | `npm run dist:desktop` | `apps/desktop/` |

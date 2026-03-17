@@ -1,57 +1,45 @@
 # 4.5 Tool System
 
-> **Source files:** `apps/backend/internal/tools/linear_executor.go`, `apps/backend/internal/tools/linear_executor_test.go`
+> **Source files:**
+> - `apps/backend/internal/tools/linear_executor.go`
+> - `apps/backend/internal/tracker/types.go`
+> - `apps/backend/internal/tracker/sqlite/client.go`
+> - `apps/backend/internal/tracker/github/client.go`
 
-The tool system provides built-in tools that agents can invoke during execution. These tools are injected into agent sessions as MCP-compatible tool specifications and executed via the `ToolExecutor` callback pattern. The primary implementation is the `LinearToolExecutor`, which bridges agent tool calls to issue tracker operations.
+The tool system bridges agent tool calls to tracker operations, providing agents with the ability to query issues, update issue state, and request handoffs to other agent providers. Tools are defined as MCP-compatible specifications and executed through the `LinearToolExecutor`.
 
-## 4.5.1 Tool Executor Pattern
+---
 
-The tool system follows a dispatcher pattern: a single `Execute` method receives a tool name and argument map, switches on the name, delegates to the backing `tracker.Client`, and returns a standardized response envelope.
+## Architecture
+
+```mermaid
+flowchart TD
+    A[Agent Tool Call] --> B[LinearToolExecutor.Execute]
+    B --> C{Tool Name?}
+    C -->|tracker_query| D[Tracker Query Operations]
+    C -->|update_issue| E[Issue Updates]
+    C -->|request_handoff| F[Agent Handoff]
+    C -->|unknown| G[Error Response]
+
+    D --> H[tracker.Client Interface]
+    E --> H
+    F --> H
+
+    H --> I[SQLite Client]
+    H --> J[GitHub Client]
+```
+
+---
+
+## LinearToolExecutor
+
+The `LinearToolExecutor` is the primary tool dispatcher. It wraps a `tracker.Client` and routes tool calls by name.
 
 ```go
 type LinearToolExecutor struct {
     tracker tracker.Client
 }
-
-func (e *LinearToolExecutor) Execute(tool string, arguments map[string]any) map[string]any
 ```
-
-Key design decisions:
-
-- **Single dispatch point** -- All tool calls route through `Execute`, which normalizes the tool name, validates the tracker is available, and delegates to the appropriate handler via `switch`.
-- **Stateless execution** -- The executor holds no mutable state; all persistence is delegated to the `tracker.Client`.
-- **Fail-closed** -- If the tracker is `nil` or the tool name is unrecognized, the executor returns a failure response rather than silently succeeding.
-
-### Response Envelope
-
-All tool responses follow a consistent structure compatible with the Codex app-server protocol:
-
-| Field | Type | Description |
-|---|---|---|
-| `success` | `bool` | Whether the tool call succeeded |
-| `contentItems` | `[]map` | Array containing a single `inputText` item with JSON-encoded payload |
-
-**Success example:**
-```json
-{
-  "success": true,
-  "contentItems": [{"type": "inputText", "text": "{\"issues\": [...]}"}]
-}
-```
-
-**Failure example:**
-```json
-{
-  "success": false,
-  "contentItems": [{"type": "inputText", "text": "{\"error\": {\"message\": \"...\"}}"}]
-}
-```
-
-The payload is JSON-encoded with indentation inside the `text` field. This format is designed for the Codex app-server's `item/tool/call` response protocol.
-
-## 4.5.2 LinearExecutor for Linear Issue Tracking Integration
-
-The `LinearToolExecutor` exposes three tools that allow agents to query and mutate issue tracker state. Despite its name (a historical artifact from early Linear API integration), it operates against the generic `tracker.Client` interface, supporting memory, SQLite, and GitHub backends.
 
 ### Construction
 
@@ -59,121 +47,162 @@ The `LinearToolExecutor` exposes three tools that allow agents to query and muta
 executor := tools.NewLinearToolExecutor(trackerClient)
 ```
 
-### Registered Tools
+### Execution Pattern
 
-The `TrackerToolSpecs()` function returns MCP-compatible tool definitions injected into agent sessions:
+`Execute(tool, arguments)` follows a consistent pattern:
 
-#### tracker_query
+1. **Validate** the tool name (empty name returns error)
+2. **Check** that the tracker client is available (returns `"tracker unavailable"` if nil)
+3. **Dispatch** to the appropriate handler based on tool name
+4. **Return** a response map with `success` (bool) and `contentItems` (array of text items)
 
-Queries the issue tracker for dispatch candidates, issue states, or issue details.
+---
 
-| Parameter | Type | Description |
-|---|---|---|
-| `mode` | `string` | Query mode (see table below) |
-| `issue_ids` | `[]string` | Issue IDs to look up |
-| `states` | `[]string` | States to filter by |
-| `active_states` | `[]string` | Active states for candidate lookup |
-| `query` | `string` | Search query string |
+## Tool Specifications
 
-**Query modes:**
+`TrackerToolSpecs()` returns MCP-compatible tool definitions. These are injected into agent system prompts so agents know which tools are available.
 
-| Mode | Description | Required Parameters |
-|---|---|---|
-| `issue_states_by_ids` | Returns a map of issue ID to current state | `issue_ids` |
-| `issues_by_ids` | Returns full issue objects by ID | `issue_ids` |
-| `issues_by_states` | Returns issues in specified states | `states` |
-| _(default)_ | Fetches candidate issues for dispatch | `active_states` |
+### tracker_query
 
-#### update_issue
-
-Updates an issue's state, priority, or assignee. Allows agents to transition issues through the workflow.
+Queries issue tracker state for dispatch and refresh operations.
 
 | Parameter | Type | Required | Description |
-|---|---|---|---|
-| `identifier` | `string` | Yes | Issue identifier (e.g. `OPS-123`) |
-| `state` | `string` | No | New state (e.g. `In Progress`, `In Review`, `Done`) |
-| `assignee_id` | `string` | No | Agent or user to assign (e.g. `agent-claude`) |
-| `priority` | `integer` | No | Priority level (0-4) |
+|-----------|------|----------|-------------|
+| `mode` | string | No | Query mode: `issue_states_by_ids`, `issues_by_ids`, `issues_by_states`, or default (candidates) |
+| `issue_ids` | string[] | No | Issue IDs to query (for `issue_states_by_ids` and `issues_by_ids` modes) |
+| `states` | string[] | No | States to filter by (for `issues_by_states` mode) |
+| `active_states` | string[] | No | Active states for candidate query (default mode) |
+| `query` | string | No | Search query text |
 
-#### request_handoff
+#### Query Modes
 
-Enables agent-initiated handoffs to a different provider. When an agent determines the task requires capabilities it lacks (e.g. larger context window, better reasoning), it can request reassignment.
+| Mode | Method Called | Description |
+|------|-------------|-------------|
+| `issue_states_by_ids` | `FetchIssueStatesByIDs` | Returns a map of issue ID to current state |
+| `issues_by_ids` | `FetchIssuesByIDs` | Returns full issue objects by ID |
+| `issues_by_states` | `FetchIssuesByStates` | Returns issues filtered by state |
+| *(default)* | `FetchCandidateIssues` | Returns issues in active states, ready for dispatch |
+
+### update_issue
+
+Updates an issue's state, priority, or assignee.
 
 | Parameter | Type | Required | Description |
-|---|---|---|---|
-| `provider` | `string` | Yes | Target provider (e.g. `claude`, `gemini`, `codex`) |
-| `reason` | `string` | Yes | Explanation for the handoff |
-| `identifier` | `string` | Yes | Issue identifier (e.g. `OPS-123`) |
+|-----------|------|----------|-------------|
+| `identifier` | string | Yes | Issue identifier (e.g. `OPS-123`) |
+| `state` | string | No | New state (e.g. `In Progress`, `Done`) |
+| `assignee_id` | string | No | Agent or user ID to assign (e.g. `agent-claude`) |
+| `priority` | integer | No | Priority level (0-4) |
 
-The handoff is implemented by updating the issue's `assignee_id` to `agent-{provider}`. The orchestrator picks up the change on the next reconciliation cycle and dispatches to the new provider.
+### request_handoff
 
-## 4.5.3 GitHub Tool Integration
+Requests transfer of the current task to another agent provider.
 
-The tool system integrates with GitHub Issues through the `tracker.Client` interface. When the tracker backend is configured as the GitHub client (`tracker/github`), all tool calls flow through the same `LinearToolExecutor` dispatch path. The GitHub tracker maps Orchestra states to GitHub's `open`/`closed` binary and uses the REST API v3 for mutations. See [Section 4.2: Issue Trackers](tracker.md) for GitHub client details.
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `provider` | string | Yes | Target agent provider (e.g. `claude`, `gemini`, `codex`) |
+| `reason` | string | Yes | Explanation for the handoff |
+| `identifier` | string | Yes | Issue identifier for the handoff |
 
-## 4.5.4 Tool Registration and Invocation Flow
+The handoff sets `assignee_id` to `agent-<provider>` on the issue. The orchestrator picks up the reassignment on the next turn cycle.
 
-Tools are made available to agents through two mechanisms:
+---
 
-1. **Tool specs injection** -- `TrackerToolSpecs()` returns the tool definitions that are written to `tools.json` in the workspace or passed as `dynamicTools` to the Codex app-server.
-2. **ToolExecutor callback** -- The `TurnRequest.ToolExecutor` field is set to `executor.Execute`, which the `CodexAppServerRunner` calls when it receives an `item/tool/call` message from the agent.
+## Response Format
 
-For non-Codex agents (Claude, Gemini, OpenCode), the tool specs are written as a JSON file in the workspace. The agent reads this file and can invoke tools through its own mechanism, though the callback-based execution is specific to the Codex app-server protocol.
+All tool responses follow a consistent structure:
 
-### Architecture
-
-```mermaid
-graph TD
-    A[Agent Process] -->|tool/call: tracker_query| O[Orchestrator]
-    A -->|tool/call: update_issue| O
-    A -->|tool/call: request_handoff| O
-
-    O --> TE[LinearToolExecutor]
-    TE --> TC[tracker.Client]
-
-    TC --> M[Memory Tracker]
-    TC --> S[SQLite Tracker]
-    TC --> G[GitHub Tracker]
+```json
+{
+  "success": true,
+  "contentItems": [
+    {
+      "type": "inputText",
+      "text": "{ ... JSON payload ... }"
+    }
+  ]
+}
 ```
 
-### Execution Flow
+The payload within `contentItems[0].text` is a pretty-printed JSON string containing the operation result or error details.
 
-```mermaid
-sequenceDiagram
-    participant Agent
-    participant AppServer as Codex App Server
-    participant Orchestrator
-    participant Executor as LinearToolExecutor
-    participant Tracker as tracker.Client
+---
 
-    Agent->>AppServer: Use tool: update_issue
-    AppServer->>Orchestrator: item/tool/call {tool, arguments}
-    Orchestrator->>Executor: Execute("update_issue", args)
+## Tracker Backends
 
-    alt tracker is nil
-        Executor-->>Orchestrator: {success: false, error: "tracker unavailable"}
-    else tool name unrecognized
-        Executor-->>Orchestrator: {success: false, error: "tool unsupported"}
-    else valid tool call
-        Executor->>Tracker: UpdateIssue(ctx, identifier, updates)
-        Tracker-->>Executor: *Issue / error
-        alt success
-            Executor-->>Orchestrator: {success: true, contentItems: [...]}
-        else error
-            Executor-->>Orchestrator: {success: false, contentItems: [{error}]}
-        end
-    end
+The `tracker.Client` interface defines the contract for issue tracking operations. Orchestra ships with two implementations:
 
-    Orchestrator-->>AppServer: {id, result: {...}}
-    AppServer-->>Agent: Tool result
-```
+### SQLite Client
 
-### Helper Functions
+> **Source file:** `apps/backend/internal/tracker/sqlite/client.go`
 
-| Function | Purpose |
-|---|---|
-| `successResponse(payload)` | Wraps payload in success envelope with `contentItems` |
-| `failureResponse(payload)` | Wraps payload in failure envelope with `contentItems` |
-| `encodePayload(payload)` | JSON-marshals payload with indentation |
-| `toStringSlice(value)` | Converts `[]any` or `[]string` to `[]string`, trimming whitespace |
-| `isObjectOrNil(value)` | Type-checks for `map[string]any` or `nil` |
+The default local tracker that persists issues in the Orchestra SQLite database. Features:
+
+- Auto-generated identifiers based on project prefix (e.g. `FETCH-1`, `OPS-42`)
+- Column whitelist for updates to prevent SQL injection
+- Worker assignment detection via `workerAssigneeIDs` set
+- Transactional deletion that cascades to runs, history, and session references
+- LIKE-based text search across titles, identifiers, and IDs
+
+### GitHub Client
+
+> **Source file:** `apps/backend/internal/tracker/github/client.go`
+
+A GitHub Issues-backed tracker that maps Orchestra operations to the GitHub REST API:
+
+- Maps internal states to GitHub `open`/`closed` states
+- Uses `repo-number` format for identifiers (e.g. `orchestra-123`)
+- `DeleteIssue` closes the issue rather than deleting (GitHub does not support true deletion)
+- `SearchIssues` and `CreateIssue` are not yet implemented
+
+---
+
+## tracker.Client Interface
+
+The `tracker.Client` interface defines the full contract for issue tracking backends:
+
+| Method | Description |
+|--------|-------------|
+| `FetchCandidateIssues(ctx, activeStates)` | Returns issues in actionable states |
+| `FetchIssuesByIDs(ctx, issueIDs)` | Returns issues matching given IDs |
+| `FetchIssuesByStates(ctx, states)` | Returns issues filtered by state |
+| `FetchIssueStatesByIDs(ctx, issueIDs)` | Returns ID-to-state map |
+| `FetchIssues(ctx, filter)` | Returns issues matching filter criteria |
+| `SearchIssues(ctx, query)` | Full-text search across issues |
+| `FetchIssueByIdentifier(ctx, identifier)` | Returns a single issue by identifier or ID |
+| `CreateIssue(ctx, ...)` | Creates a new issue |
+| `UpdateIssue(ctx, identifier, updates)` | Applies field updates |
+| `DeleteIssue(ctx, identifier)` | Removes an issue |
+
+---
+
+## Issue Data Model
+
+The `tracker.Issue` struct represents a work item across all backends:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ID` | string | Unique identifier (UUID or GitHub number) |
+| `Identifier` | string | Human-readable identifier (e.g. `OPS-123`) |
+| `Title` | string | Issue title |
+| `Description` | string | Full description |
+| `State` | string | Current workflow state |
+| `Priority` | int | Priority level (0-4) |
+| `AssigneeID` | string | Assigned agent or user |
+| `AssignedToWorker` | bool | Whether assigned to a known worker agent |
+| `ProjectID` | string | Associated project |
+| `BranchName` | string | Git branch for this issue |
+| `Labels` | []string | Applied labels |
+| `BlockedBy` | []Blocker | Issues blocking this one |
+| `Provider` | string | Agent provider preference |
+| `DisabledTools` | []string | Tools disabled for this issue |
+| `BaseSHA` | string | Git base commit SHA |
+
+---
+
+## Cross-References
+
+- [4.3 Configuration & Environment](config.md) -- Tracker type and agent provider configuration
+- [4.4 MCP Server Integration](mcp.md) -- MCP tool specs complement the tracker tools
+- [4.7 Workspace Management](workspace.md) -- Workspaces are provisioned per-issue
+- [4.8 Database Layer](database.md) -- SQLite schema for `issues`, `runs`, and `issue_history` tables

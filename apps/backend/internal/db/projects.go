@@ -524,6 +524,8 @@ func (db *DB) GetSessionDetail(ctx context.Context, sessionID string) (*SessionD
 	return &detail, nil
 }
 
+// GlobalStats holds platform-wide aggregate metrics including total tokens,
+// per-provider and per-model breakdowns, and recent sessions.
 type GlobalStats struct {
 	TotalTokens    int64            `json:"total_tokens"`
 	TotalInput     int64            `json:"total_input"`
@@ -533,6 +535,8 @@ type GlobalStats struct {
 	RecentSessions []Session        `json:"recent_sessions"`
 }
 
+// GetGlobalStats computes platform-wide token usage, per-provider and per-model
+// breakdowns, and includes the most recent 50 sessions.
 func (db *DB) GetGlobalStats(ctx context.Context) (GlobalStats, error) {
 	var stats GlobalStats
 	stats.ProviderUsage = make(map[string]int64)

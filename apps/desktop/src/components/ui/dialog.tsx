@@ -66,6 +66,7 @@ const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => <DialogPrimitive.Title ref={ref} className={cn('text-lg font-semibold', className)} {...props} />)
 DialogTitle.displayName = DialogPrimitive.Title.displayName
 
+/** Muted description text beneath the dialog title. */
 const DialogDescription = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Description>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
