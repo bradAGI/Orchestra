@@ -9,6 +9,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
+/**
+ * Modal dialog for registering a new project by selecting or entering
+ * its root filesystem path. Supports native folder picker via the desktop bridge.
+ */
 export function CreateProjectDialog({
   open,
   onOpenChange,

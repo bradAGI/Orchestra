@@ -15,11 +15,17 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 
+/** Props for an individual project card in the grid or list view. */
 interface ProjectCardProps {
+    /** The project record to display. */
     project: Project
+    /** Optional statistics for the project. */
     stats?: ProjectStats
+    /** Whether the card is in a loading/skeleton state. */
     loading?: boolean
+    /** Callback invoked when the card is clicked. */
     onClick: (id: string) => void
+    /** Optional callback to delete this project. */
     onDelete?: (project: Project) => void
 }
 
@@ -230,6 +236,10 @@ const LOADING_PROJECT_PLACEHOLDER: Project = {
     remote_url: '',
 }
 
+/**
+ * Displays a grid (or list) of project cards with search, sorting, and pagination.
+ * Supports toggling between grid and list layout modes.
+ */
 export const ProjectGrid: React.FC<ProjectGridProps> = ({
     projects,
     stats,
