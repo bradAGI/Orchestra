@@ -1368,6 +1368,7 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
   const [publicKey, setPublicKey] = useState('')
   const [secretKey, setSecretKey] = useState('')
   const [saving, setSaving] = useState(false)
+  const [showSecret, setShowSecret] = useState(false)
   const [status, setStatus] = useState<UnsandboxStatus | null>(null)
   const [unsandboxConfig, setUnsandboxConfig] = useState<UnsandboxConfig | null>(null)
   const [message, setMessage] = useState('')
@@ -1480,14 +1481,24 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
             <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
               Secret Key {isConfigured && <span className="text-muted-foreground/60">(leave blank to keep current)</span>}
             </label>
-            <input
-              type="password"
-              value={secretKey}
-              onChange={(e) => setSecretKey(e.target.value)}
-              placeholder={isConfigured ? '••••••••' : 'sk_...'}
-              disabled={disabled || saving}
-              className="w-full rounded-lg border border-border/40 bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground/40 focus:border-primary focus:outline-none disabled:opacity-50"
-            />
+            <div className="relative">
+              <input
+                type={showSecret ? 'text' : 'password'}
+                value={secretKey}
+                onChange={(e) => setSecretKey(e.target.value)}
+                placeholder={isConfigured ? '••••••••' : 'sk_...'}
+                disabled={disabled || saving}
+                className="w-full rounded-lg border border-border/40 bg-background px-3 pr-9 py-2 text-sm font-mono placeholder:text-muted-foreground/40 focus:border-primary focus:outline-none disabled:opacity-50"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSecret(!showSecret)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-all"
+                title={showSecret ? 'Hide key' : 'Reveal key'}
+              >
+                {showSecret ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              </button>
+            </div>
           </div>
         </div>
 
