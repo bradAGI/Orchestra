@@ -35,5 +35,8 @@ jobs:
           go-version-file: apps/tui/go.mod
           cache-dependency-path: apps/tui/go.sum
 
+      - name: Run TUI tests
+        run: cd apps/tui && go test ./...
+
       - name: Verify make build
         run: make build
