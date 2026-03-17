@@ -1,172 +1,215 @@
 # 4.6 Telemetry & Log Watching
 
-> **Source files:** `apps/backend/internal/telemetry/watcher.go`
+> **Source files:**
+> - `apps/backend/internal/telemetry/watcher.go`
 
-The telemetry system watches external agent log directories on a 10-second polling interval, ingesting session events from Claude, Codex, Gemini, and OpenCode into Orchestra's SQLite database. It provides unified token usage tracking, session discovery, and health monitoring across all agent providers.
+The telemetry package provides a file watcher that continuously ingests session logs from external agent providers (Claude, Codex, Gemini, OpenCode) and records events and sessions into the local SQLite database. It runs as a background goroutine on a 10-second polling interval, tracking file offsets for incremental processing.
 
-### Architecture
+---
+
+## Architecture
 
 ```mermaid
-graph TD
-    W[StartWatcher - 10s ticker] --> H[History Files]
-    W --> C[Claude Logs]
-    W --> X[Codex Logs]
-    W --> O[OpenCode Logs]
-    W --> G[Gemini Logs]
+flowchart TD
+    subgraph Agent Log Directories
+        CL["~/.claude/projects/**/*.jsonl"]
+        CO["~/.codex/sessions/**/*.jsonl"]
+        GE["~/.gemini/tmp/*/chats/*.json"]
+        OC["~/.local/share/opencode/opencode.db"]
+    end
 
-    H -->|processHistoryFile| DB[(SQLite)]
-    C -->|scanDirectory| DB
-    X -->|scanDirectory| DB
-    O -->|scanDirectory + scanOpenCodeSQLite| DB
-    G -->|scanDirectory + scanGeminiJSON| DB
+    W[StartWatcher goroutine<br/>10s ticker] --> CL
+    W --> CO
+    W --> GE
+    W --> OC
 
-    DB --> S[Sessions Table]
-    DB --> E[Events Table]
-    DB --> IO[Ingest Offsets Table]
+    W --> DB[(SQLite Database)]
+
+    subgraph DB Tables
+        S[sessions]
+        E[events]
+        IO[ingest_offsets]
+    end
+
+    DB --> S
+    DB --> E
+    DB --> IO
 ```
 
-### Watcher Configuration
+---
 
-| Option | Type | Description |
-|---|---|---|
-| `Providers` | `[]string` | Which providers to watch (default: all four) |
-| `StoreRawPayload` | `bool` | Whether to store raw JSON event payloads (default: `false`) |
+## StartWatcher
 
-The watcher is started via `StartWatcher(ctx, database, manualRoots, opts, logger)` and runs until the context is cancelled.
+`StartWatcher(ctx, database, manualRoots, opts, logger)` launches the background watcher loop. It accepts:
 
-### Provider Log Sources
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `ctx` | `context.Context` | Cancellation context for graceful shutdown |
+| `database` | `*db.DB` | SQLite database handle for recording sessions/events |
+| `manualRoots` | `[]string` | Additional project root directories for project matching |
+| `opts` | `Options` | Watcher configuration (providers, raw payload storage) |
+| `logger` | `zerolog.Logger` | Structured logger |
 
-| Provider | Log Directories | Additional Sources |
-|---|---|---|
-| Claude | `~/.claude/projects/`, `~/.claude/logs/` | `~/.claude/history.jsonl` |
-| Codex | `~/.codex/sessions/`, `~/.codex/log/` | `~/.codex/history.jsonl` |
-| OpenCode | `~/.opencode/logs/`, `~/.opencode/sessions/` | `~/.local/share/opencode/opencode.db` (SQLite) |
-| Gemini | `~/.gemini/logs/`, `~/.gemini/sessions/` | `~/.gemini/tmp/*/chats/session-*.json`, `~/.gemini/tmp/*/logs.json`, `~/.gemini/history.jsonl` |
+### Options
 
-### Ingestion Flow
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `Providers` | `[]string` | `[claude, codex, gemini, opencode]` | Which providers to scan |
+| `StoreRawPayload` | `bool` | `false` | Whether to persist raw JSON payloads in event records |
+
+---
+
+## Provider Scan Paths
+
+Each tick of the watcher scans the following directories per provider:
+
+| Provider | Scan Targets |
+|----------|-------------|
+| **Claude** | `~/.claude/history.jsonl` (session-project linking), `~/.claude/projects/` and `~/.claude/logs/` (JSONL event files) |
+| **Codex** | `~/.codex/history.jsonl`, `~/.codex/sessions/` and `~/.codex/log/` |
+| **Gemini** | `~/.gemini/history.jsonl`, `~/.gemini/logs/`, `~/.gemini/sessions/`, `~/.gemini/tmp/*/chats/session-*.json` and `~/.gemini/tmp/*/logs.json` |
+| **OpenCode** | `~/.opencode/logs/`, `~/.opencode/sessions/`, `~/.local/share/opencode/opencode.db` (SQLite) |
+
+---
+
+## Processing Pipeline
+
+### JSONL Files (Claude, Codex)
 
 ```mermaid
 sequenceDiagram
-    participant T as Ticker (10s)
     participant W as Watcher
     participant FS as Filesystem
-    participant DB as SQLite
+    participant DB as Database
 
-    T->>W: tick
-    W->>DB: getOffset(filePath)
-    DB-->>W: lastBytesRead
-    W->>FS: Stat + Open file
-    FS-->>W: file (seek to offset)
+    W->>DB: getOffset(file_path)
+    W->>FS: Open file, seek to offset
     loop Each JSONL line
-        W->>W: Parse JSON
-        W->>W: extractTokens()
-        W->>W: sanitizePII()
-        W->>DB: RecordSession()
-        W->>DB: RecordEvent()
+        W->>W: Parse JSON entry
+        W->>W: Extract session ID, tokens, model
+        W->>W: sanitizePII(message)
+        W->>DB: RecordSession(...)
+        W->>DB: RecordEvent(...)
     end
-    W->>DB: saveOffset(filePath, newBytesRead)
+    W->>DB: saveOffset(file_path, bytes_read)
 ```
 
-### Offset Tracking
+### Gemini JSON Chat Files
 
-The `ingest_offsets` table tracks how many bytes have been read from each log file:
+Gemini stores structured chat files as full JSON documents (not JSONL). The watcher:
+
+1. Checks file modification time and size against stored checkpoints
+2. Parses the entire `geminiChatFile` structure with messages array
+3. Resolves project association via `projects.json` alias map
+4. Generates deterministic event IDs using SHA-256 hashes
+
+### OpenCode SQLite
+
+For OpenCode, the watcher reads directly from the external `opencode.db` SQLite database:
+
+1. Opens the database in read-only mode
+2. Queries `message` and `part` tables using rowid checkpoints
+3. Extracts model info from the message payload's `model.modelID` field
+4. Records events and updates checkpoints
+
+---
+
+## Offset Tracking
+
+The watcher uses the `ingest_offsets` table to track processing progress:
 
 | Column | Type | Description |
-|---|---|---|
-| `file_path` | `TEXT PRIMARY KEY` | Absolute path to the log file |
-| `bytes_read` | `INTEGER` | Last read position |
-| `updated_at` | `DATETIME` | Last update time |
+|--------|------|-------------|
+| `file_path` | TEXT (PK) | Absolute path or checkpoint key |
+| `bytes_read` | INTEGER | Byte offset (for JSONL) or rowid (for SQLite), or mtime/size (for JSON) |
+| `updated_at` | DATETIME | Last update timestamp |
 
-For JSON files (Gemini chat/logs), both `mtime` and `size` are tracked to detect changes.
+For JSONL files, the offset is a byte position. For OpenCode SQLite, it tracks rowids. For Gemini JSON files, separate keys track `<path>:mtime` and `<path>:size`.
 
-If a file shrinks (e.g. rotation), the offset is reset to 0.
+If a file shrinks (truncation detected), the offset resets to 0.
 
-### Session Event Parsing
+---
 
-#### JSONL Files (Claude, Codex)
+## PII Sanitization
 
-Each line is parsed as a `ClaudeLogEntry` with:
-- `timestamp` -- Event time
-- `type` -- Event kind (stripped of preamble prefixes like `shadow clone:`)
-- `message` -- Content (PII-sanitized)
-- `tokens.input` / `tokens.output` -- Token counts
+All event messages pass through `sanitizePII()` before storage. The function redacts:
 
-Token extraction searches multiple nesting patterns:
-1. `tokens.{input,output}` (old format)
-2. `message.usage.{input_tokens,output_tokens}` (Claude)
-3. `payload.info.last_token_usage.{input_tokens,output_tokens}` (Codex)
+| Pattern | Regex | Replacement |
+|---------|-------|-------------|
+| Email addresses | Standard email pattern | `[REDACTED:<hash>]` |
+| IP addresses | IPv4 dotted-quad pattern | `[REDACTED:<hash>]` |
+| API keys/secrets | Key names followed by long alphanumeric values | Key name preserved, value replaced with `[REDACTED:<hash>]` |
 
-#### Model Extraction
+Redaction uses truncated SHA-256 hashes (first 8 bytes, hex-encoded) for deterministic anonymization.
 
-Session model identification is provider-specific:
-- **Claude**: `type == "assistant"` -> `message.model`
-- **Codex**: `type == "turn_context"` -> `payload.model`
-- **OpenCode**: `data.model.modelID`
+---
 
-#### Gemini JSON Chats
+## Token Extraction
 
-Gemini stores structured chat files at `~/.gemini/tmp/{project-hash}/chats/session-*.json`. Each file contains a `geminiChatFile` with:
-- `sessionId`, `projectHash`, `startTime`, `lastUpdated`
-- `messages[]` with `id`, `timestamp`, `type`, `content`, `tokens`
+The watcher extracts input/output token counts from multiple provider formats:
 
-Project resolution uses `~/.gemini/projects.json` to map project hashes to filesystem paths.
+| Provider | Location in JSON |
+|----------|-----------------|
+| Claude (old) | `tokens.input`, `tokens.output` |
+| Claude (new) | `message.usage.input_tokens`, `message.usage.output_tokens` |
+| Codex | `payload.info.last_token_usage.input_tokens` / `output_tokens` |
+| OpenCode | `tokens.input`, `tokens.output` |
+| Gemini | `messages[].tokens.input`, `messages[].tokens.output` |
 
-#### OpenCode SQLite
+---
 
-OpenCode stores sessions in its own SQLite database at `~/.local/share/opencode/opencode.db`. The watcher reads:
-- `message` table -- Messages with role, summary, tokens, model
-- `part` table -- Message parts with type, text, tool references
+## Model Extraction
 
-Checkpoints use `rowid` tracking (`opencode:message:rowid`, `opencode:part:rowid`).
+Session model identifiers are extracted from provider-specific log formats:
 
-### History File Processing
+| Provider | Condition | Path |
+|----------|-----------|------|
+| Claude | `type == "assistant"` | `message.model` |
+| Codex | `type == "turn_context"` | `payload.model` |
+| OpenCode | *(any message)* | `model.modelID` |
 
-History files (`history.jsonl`) map session IDs to project directories:
-- Each line contains `sessionId`/`session_id` and `project` fields
-- The watcher matches the `project` path against existing projects in the database
-- Sessions are linked to projects via `UpdateSessionProject` -- projects are never auto-created
+---
 
-### PII Sanitization
+## Project Resolution
 
-All message content is passed through `sanitizePII()` before storage:
+The watcher matches log files to existing projects but never creates new projects automatically. Resolution follows this order:
 
-| Pattern | Replacement |
-|---|---|
-| Email addresses | `[REDACTED:{sha256_prefix}]` |
-| IP addresses | `[REDACTED:{sha256_prefix}]` |
-| API keys/secrets/passwords/tokens (16+ chars) | Key name + `[REDACTED:{sha256_prefix}]` |
+1. **Direct path match** -- Check if the log file path falls under a known project root
+2. **Derived path** -- For Claude, decode the dash-encoded project path from the log directory structure (e.g. `-home-user-myproject` becomes `/home/user/myproject`) using a greedy filesystem resolution algorithm
+3. **History files** -- Parse `history.jsonl` to link session IDs to project directories
+4. **Gemini aliases** -- Use `~/.gemini/projects.json` to map project hashes to filesystem paths
 
-The SHA-256 hash prefix (8 bytes, hex-encoded) allows correlation without exposing the original value.
+### Claude Path Decoding
 
-### Project Resolution
+Claude encodes project directories as dash-separated path segments in its log directory structure:
 
-The `deriveProjectFromPath` function reconstructs filesystem paths from Claude's encoded path segments (e.g. `-home-user-Development-project` -> `/home/user/Development/project`).
+```
+~/.claude/projects/-home-user-Development-myproject/session.jsonl
+```
 
-The `greedyResolvePath` algorithm:
-1. Splits the encoded segment on `-`
-2. Greedily tries the longest filesystem match at each level
-3. Handles double-dashes (`--`) as `. ` separators (e.g. `1--Personal` -> `1. Personal`)
-4. Verifies each candidate exists on disk before accepting
+The `greedyResolvePath` algorithm reconstructs the real filesystem path by greedily consuming dash-separated segments, checking the filesystem at each level to find the longest valid directory match. It handles edge cases like directory names containing dashes (`symphony-main`) and dots (`1. Personal`).
 
-The watcher **never creates projects** -- it only matches against existing projects in the database. Users add projects explicitly via the API.
+---
 
-### Health Monitoring
+## Health Monitoring
 
-The `telemetryHealthState` tracks per-provider metrics:
+The `HealthSnapshot` provides real-time observability into the watcher:
 
 | Metric | Description |
-|---|---|
-| `LastSuccessAt` | Timestamp of last successful scan |
-| `SourcesScanned` | Number of directories/files scanned |
-| `EventsWritten` | Total events ingested |
-| `EventsDropped` | Events skipped (e.g. duplicates) |
-| `ParseErrors` | JSON parse failures |
-| `LastScanDurationMs` | Duration of last scan cycle |
+|--------|-------------|
+| `last_tick_at` | Timestamp of the most recent scan cycle |
+| `sources_scanned` | Number of directories/files checked per provider |
+| `events_written` | Total events recorded per provider |
+| `events_dropped` | Events skipped (e.g. due to session cap) |
+| `parse_errors` | JSON parse failures per provider |
+| `last_scan_duration_ms` | Duration of the most recent scan per provider |
 
-The `Health()` function returns a `HealthSnapshot` with the last tick time and per-provider health data.
+Access the health snapshot via `telemetry.Health()`.
 
-### Preamble Stripping
+---
 
-Event types are cleaned of preamble prefixes using `stripPreamble`:
-- Patterns like `shadow clone:` or `blackops session:` are removed from event type strings
-- This normalizes event kinds across different agent configurations
+## Cross-References
+
+- [4.3 Configuration & Environment](config.md) -- `ORCHESTRA_TELEMETRY_PROVIDERS`, `ORCHESTRA_TELEMETRY_RETENTION_DAYS`, `ORCHESTRA_TELEMETRY_STORE_RAW_PAYLOAD`
+- [4.8 Database Layer](database.md) -- `sessions`, `events`, and `ingest_offsets` table schemas
+- [4.5 Tool System](tools.md) -- Sessions can be linked to issues tracked by the tool system

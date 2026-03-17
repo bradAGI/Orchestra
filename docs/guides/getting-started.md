@@ -1,218 +1,169 @@
-# 7. Getting Started
+# 7 Getting Started
 
-> **Source files:**
-> - `apps/backend/cmd/orchestrad/` -- Backend server
-> - `apps/backend/cmd/orchestra/` -- CLI tool
-> - `apps/desktop/package.json` -- Desktop app scripts
-> - `apps/desktop/electron/main.cjs` -- Managed backend lifecycle
-> - `apps/tui/` -- TUI dashboard
-> - `apps/backend/internal/config/load.go` -- Configuration loading
+> **Source files:** `README.md`, `apps/backend/cmd/orchestrad/main.go`, `apps/desktop/package.json`, `apps/backend/internal/app/run.go`
 
-This guide walks you through installing, building, and running Orchestra for the first time.
+This guide walks through setting up Orchestra from source, running each component, and verifying a working installation.
 
----
+## 7.1 Prerequisites
 
-### Prerequisites
+| Requirement | Minimum Version | Purpose |
+|-------------|----------------|---------|
+| **Go** | 1.25+ | Backend and TUI compilation |
+| **Node.js** | 22+ | Desktop app (Electron + React) |
+| **npm** | (bundled with Node) | Desktop dependency management |
+| **Git** | 2.x | Source checkout, workspace management |
+| **Agent CLI** | Any one of: `codex`, `claude`, `opencode`, `gemini` | At least one agent must be installed and on `$PATH` |
 
-| Component | Requirement | Purpose |
-|-----------|-------------|---------|
-| Go | 1.24+ | Backend and TUI compilation |
-| Node.js | 20+ | Desktop frontend |
-| npm | 10+ | Package management |
-| Git | 2.x | Version control |
+### Optional
 
-Optional:
-- Docker (for containerized deployment)
-- An agent CLI installed: `claude`, `codex`, `opencode`, or `gemini`
+| Tool | Purpose |
+|------|---------|
+| Docker | Container-based deployment (see [Section 6.2](../operations/docker.md)) |
+| Make | TUI build convenience (`make build`) |
+| Electron | Bundled via npm for desktop builds |
 
----
+## 7.2 Installation
 
-### Quick Start
-
-```mermaid
-flowchart LR
-    BUILD[Build Backend] --> RUN[Start orchestrad]
-    RUN --> DESKTOP[Launch Desktop App]
-    RUN --> TUI[Launch TUI]
-    DESKTOP --> USE[Create Projects & Tasks]
-    TUI --> USE
-```
-
----
-
-### 1. Backend Setup
-
-Clone the repository and build the backend:
+### Clone the Repository
 
 ```bash
 git clone https://github.com/Traves-Theberge/Orchestra.git
-cd Orchestra/apps/backend
-
-# Build the server and CLI
-go build -o orchestrad ./cmd/orchestrad
-go build -o orchestra ./cmd/orchestra
+cd Orchestra
 ```
 
-Start the backend server:
+### Verify Agent Availability
+
+Ensure at least one agent CLI is installed and accessible:
 
 ```bash
-# Minimal configuration for local development
-export ORCHESTRA_SERVER_HOST=127.0.0.1
-export ORCHESTRA_SERVER_PORT=4010
-export ORCHESTRA_WORKSPACE_ROOT=~/.orchestra/workspaces
-
-./orchestrad
+# Check whichever agents you have installed
+which codex    # or: which claude, which opencode, which gemini
 ```
 
-Verify it is running:
+## 7.3 Running the Backend
+
+```mermaid
+flowchart LR
+    SRC[Go source] --> BUILD[go build]
+    BUILD --> BIN[orchestrad binary]
+    BIN --> RUN[./orchestrad]
+    RUN --> API["API on 127.0.0.1:4010"]
+```
 
 ```bash
-curl http://127.0.0.1:4010/api/v1/state
+cd apps/backend
+go build -o orchestrad ./cmd/orchestrad/
+./orchestrad --workspace-root /path/to/your/project
 ```
 
-You should receive a JSON response with `generated_at`, `counts`, and other runtime state.
+The `orchestrad` daemon initializes logging via `logging.New()`, then delegates to `app.Run()` which:
 
----
+1. Loads configuration from environment variables and `WORKFLOW.md`
+2. Sets up the HTTP server with Chi router
+3. Registers agent runners, tracker, and event bus
+4. Begins listening on the configured host and port (default: `127.0.0.1:4010`)
 
-### 2. Desktop App Setup
+### Verify the Backend
 
-The desktop application provides the full GUI experience with an integrated backend sidecar.
+```bash
+curl http://127.0.0.1:4010/healthz
+```
+
+A successful response confirms the server is running.
+
+## 7.4 Running the Desktop App
 
 ```bash
 cd apps/desktop
-
-# Install dependencies
-npm ci
-
-# Option A: Development mode (connects to your running orchestrad)
+npm install
 npm run dev
+```
 
-# Option B: Build and package (bundles its own orchestrad)
-npm run dist:prep
+This starts two processes concurrently:
+
+1. **Vite dev server** on `http://localhost:5173` (React app with HMR)
+2. **Electron main process** connecting to the Vite dev server
+
+The desktop app communicates with the backend over HTTP and receives real-time events via Server-Sent Events (SSE).
+
+### Building for Distribution
+
+```bash
+# Build production assets and package
 npm run dist:desktop
 ```
 
-**Development mode** starts both the Vite dev server and Electron, connecting to your locally running `orchestrad` instance.
+This produces platform-specific installers in `apps/desktop/release/`:
 
-**Packaged mode** bundles the `orchestrad` binary and manages it automatically -- no separate backend required.
+| Platform | Output Formats |
+|----------|---------------|
+| Linux | AppImage, deb |
+| macOS | dmg, zip |
+| Windows | nsis (x64) |
 
-#### Connecting in Development
-
-When running `npm run dev`, the desktop app connects to the backend specified by environment variables:
-
-```bash
-export ORCHESTRA_BASE_URL=http://127.0.0.1:4010
-export ORCHESTRA_API_TOKEN=your-token  # optional for localhost
-npm run dev
-```
-
----
-
-### 3. TUI Setup
-
-The terminal dashboard provides a lightweight monitoring view:
+## 7.5 Running the TUI
 
 ```bash
-# Run directly
 cd apps/tui
 go run .
-
-# Or build and install
-cd /path/to/Orchestra
-make build     # outputs ./orchestra-dash
-make install   # installs to /usr/local/bin/orchestra-dash
 ```
+
+The TUI is built with Bubble Tea and provides a terminal-based interface to the same backend API.
+
+## 7.6 First-Run Walkthrough
+
+```mermaid
+flowchart TD
+    START[Start orchestrad] --> CONFIG[Config loaded from env + WORKFLOW.md]
+    CONFIG --> TRACKER[Tracker initialized: memory/sqlite/github]
+    TRACKER --> AGENTS[Agent registry populated]
+    AGENTS --> READY["API ready on :4010"]
+    READY --> DESKTOP[Connect desktop or TUI]
+    DESKTOP --> CREATE[Create or import issues]
+    CREATE --> DISPATCH[Dispatch issue to agent]
+    DISPATCH --> MONITOR[Monitor via SSE events]
+```
+
+1. **Start the backend** with your desired workspace root:
+   ```bash
+   ./orchestrad --workspace-root ~/projects/my-repo
+   ```
+
+2. **Configure your tracker** (optional). By default Orchestra uses an in-memory tracker. For persistent storage, set:
+   ```bash
+   export ORCHESTRA_TRACKER_TYPE=sqlite
+   ```
+   For GitHub Issues integration:
+   ```bash
+   export ORCHESTRA_TRACKER_TYPE=github
+   export ORCHESTRA_TRACKER_ENDPOINT=owner/repo
+   export ORCHESTRA_TRACKER_TOKEN=ghp_...
+   ```
+
+3. **Choose your agent provider:**
+   ```bash
+   export ORCHESTRA_AGENT_PROVIDER=CLAUDE   # or CODEX, OPENCODE, GEMINI
+   ```
+
+4. **Launch the desktop app** (`npm run dev` from `apps/desktop/`) or TUI (`go run .` from `apps/tui/`).
+
+5. **Create an issue** through the UI and dispatch it to an agent. Monitor progress in real time via the event stream.
+
+See [Configuration Guide](configuration.md) (Section 7.1) for the full environment variable reference.
+
+## 7.7 Troubleshooting
+
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| `orchestrad failed: invalid port` | `ORCHESTRA_SERVER_PORT` is not a valid integer (1-65535) | Set a valid port or unset to use default `4010` |
+| `connection refused` on desktop app | Backend is not running or on a different port | Start `orchestrad` first; verify port matches desktop config |
+| Agent command not found | Agent CLI not on `$PATH` | Install the agent CLI or set `ORCHESTRA_AGENT_COMMAND_<NAME>` to the full path |
+| `npm run dev` fails with port conflict | Port 5173 already in use | Stop the conflicting process or change the Vite port |
+| Blank workspace after dispatch | `ORCHESTRA_WORKSPACE_ROOT` points to nonexistent directory | Create the directory or set to an existing path |
+| Permission denied on `orchestrad` | Binary not executable | Run `chmod +x orchestrad` |
+| Desktop app shows no events | SSE connection failed | Check that backend host/port match and CORS is not blocking |
+| SQLite tracker errors | Missing write permissions | Ensure the data directory is writable by the process |
 
 ---
 
-### 4. First Run Walkthrough
-
-Once the backend and a frontend (desktop or TUI) are running:
-
-#### Step 1: Register a Project
-
-A project is a local Git repository that Orchestra manages.
-
-1. Open the **Projects** section in the desktop app
-2. Click **Add Project**
-3. Select the root directory of a Git repository
-4. The project appears in the project list
-
-Or register via the API:
-
-```bash
-curl -X POST http://127.0.0.1:4010/api/v1/projects \
-  -H "Content-Type: application/json" \
-  -d '{"root_path": "/path/to/your/repo"}'
-```
-
-#### Step 2: Create a Task
-
-Tasks (issues) are units of work assigned to machine learning agents.
-
-1. Open the **Tasks** section
-2. Click **New Task**
-3. Fill in:
-   - **Title**: A concise description of the work
-   - **Description**: Detailed instructions (Markdown supported)
-   - **Project**: The target repository
-   - **Assignee**: The agent provider (claude, codex, etc.)
-   - **State**: Set to an active state (e.g., "Todo")
-
-#### Step 3: Monitor Execution
-
-Once a task is in an active state with an assigned agent:
-
-1. The **Dashboard** shows active agents and running sessions
-2. The **Live Console** provides real-time terminal output
-3. The **Tasks** kanban board shows state transitions
-4. Click a task to open the inspector with history, diff, and logs tabs
-
----
-
-### 5. Connecting to a Project Tracker
-
-Orchestra can sync with external issue trackers. Configure the tracker in your environment:
-
-```bash
-# Linear tracker example
-export ORCHESTRA_TRACKER_TYPE=linear
-export ORCHESTRA_TRACKER_ENDPOINT=https://api.linear.app/graphql
-export ORCHESTRA_TRACKER_TOKEN=lin_api_xxxxx
-
-# Filter which issues to process
-export ORCHESTRA_ACTIVE_STATES="Todo,In Progress"
-export ORCHESTRA_TERMINAL_STATES="Done,Cancelled"
-export ORCHESTRA_TRACKER_WORKER_ASSIGNEE_IDS="user-id-1,user-id-2"
-```
-
-Restart `orchestrad` after changing environment variables. The backend will begin polling the tracker for matching issues.
-
----
-
-### 6. Agent Provider Setup
-
-Orchestra needs at least one agent CLI installed on the system. The default provider is Codex.
-
-| Provider | CLI Command | Install |
-|----------|------------|---------|
-| Codex | `codex` | `npm install -g @openai/codex` |
-| Claude | `claude` | Install from Anthropic |
-| Gemini | `gemini` | Install from Google |
-| OpenCode | `opencode` | `go install github.com/opencode-ai/opencode@latest` |
-
-Set the default provider:
-
-```bash
-export ORCHESTRA_AGENT_PROVIDER=CLAUDE
-```
-
-Custom agent commands can be configured per provider -- see the [Configuration Guide](configuration.md).
-
----
-
-### Next Steps
-
-- [7.1 Configuration Guide](configuration.md) -- Complete environment variable reference
-- [7.2 Development Guide](development.md) -- Contributing and development workflow
-- [6. Deployment & Operations](../operations/deployment.md) -- Production deployment patterns
+*Cross-references: [Configuration Guide](configuration.md) (Section 7.1), [Development Guide](development.md) (Section 7.2), [Architecture Overview](../architecture/overview.md) (Section 2)*
