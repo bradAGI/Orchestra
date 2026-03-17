@@ -14,8 +14,12 @@ on:
       - '.github/workflows/orchestra-backend.yml'
       - '.github/scripts/check-orchestra-naming.sh'
 
+permissions:
+  contents: read
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  GOWORK: 'off'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -30,13 +34,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: ./.github/actions/setup-go-cached
         with:
-          go-version-file: apps/backend/go.mod
-          cache-dependency-path: apps/backend/go.sum
+          go-mod-path: apps/backend/go.mod
+          go-sum-path: apps/backend/go.sum
 
       - name: Verify formatting
         run: |
@@ -46,7 +50,14 @@ jobs:
         run: go vet ./...
 
       - name: Run unit/integration tests
-        run: go test ./...
+        run: go test -coverprofile=coverage.out ./...
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # v7
+        with:
+          name: backend-coverage
+          path: apps/backend/coverage.out
 
   backend-race-tests:
     runs-on: ubuntu-latest
@@ -56,13 +67,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: ./.github/actions/setup-go-cached
         with:
-          go-version-file: apps/backend/go.mod
-          cache-dependency-path: apps/backend/go.sum
+          go-mod-path: apps/backend/go.mod
+          go-sum-path: apps/backend/go.sum
 
       - name: Run race tests
         run: go test -race ./...
@@ -72,10 +83,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install ripgrep
-        run: sudo apt-get update && sudo apt-get install -y ripgrep
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
 
       - name: Check Orchestra naming guard
         run: .github/scripts/check-orchestra-naming.sh
