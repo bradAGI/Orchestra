@@ -54,21 +54,21 @@ export function SidebarNav({
         <button
           type="button"
           onClick={onToggleCollapsed}
-          className="absolute left-full top-6 z-20 grid h-6 w-6 -translate-x-1/2 place-items-center rounded-full border border-border bg-card text-foreground shadow-lg transition hover:bg-muted dark:border-border dark:bg-background dark:text-foreground dark:hover:bg-muted"
+          className="absolute left-full top-6 z-20 grid h-8 w-8 -translate-x-1/2 place-items-center rounded-full border border-border bg-card text-foreground shadow-lg transition hover:bg-muted dark:border-border dark:bg-background dark:text-foreground dark:hover:bg-muted"
         >
-          {sidebarCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
+          {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </button>
       </AppTooltip>
 
       <div className="flex h-full flex-col py-3">
         <div className="mb-2 flex justify-center">
           <div className="flex items-center gap-2">
-            <span className="grid h-6 w-6 shrink-0 place-items-center text-foreground">
-              <AppMonogramIcon className="h-4 w-4" />
+            <span className="grid h-8 w-8 shrink-0 place-items-center text-foreground">
+              <AppMonogramIcon className="h-6 w-6" />
             </span>
             {!sidebarCollapsed ? (
               <div className="min-w-0">
-                <p className="truncate text-[9px] font-bold uppercase tracking-[0.15em] text-foreground dark:text-muted-foreground leading-none">Orchestra</p>
+                <p className="truncate text-sm font-black uppercase tracking-[0.15em] text-foreground dark:text-muted-foreground leading-none">Orchestra</p>
               </div>
             ) : null}
           </div>
@@ -103,22 +103,22 @@ export function SidebarNav({
                     onKeyDown={handleNavKeyDown(index)}
                     aria-current={active ? 'page' : undefined}
                     data-testid={`sidebar-nav-${item.id}`}
-                    className={`group relative flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all duration-300 ${sidebarCollapsed ? 'justify-center' : ''
+                    className={`group relative flex w-full items-center gap-3.5 rounded-xl border px-4 py-3 text-left transition-all duration-300 ${sidebarCollapsed ? 'justify-center' : ''
                       } ${active
                         ? 'border-primary/30 bg-primary/10 text-primary shadow-[0_0_15px_rgba(var(--primary),0.1)]'
                         : 'border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                       }`}
                   >
                     {active ? <span className="absolute left-0 top-1/2 h-4 w-1 -translate-y-1/2 rounded-r-full bg-primary shadow-[0_0_8px_rgba(var(--primary),0.6)]" /> : null}
-                    <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-all duration-300 ${
+                    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg transition-all duration-300 ${
                       active ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'bg-muted/50 text-muted-foreground group-hover:bg-muted group-hover:text-foreground'
                     }`}>
-                      <ItemIcon className="h-3.5 w-3.5" />
+                      <ItemIcon className="h-4 w-4" />
                     </span>
                     {!sidebarCollapsed ? (
                       <span className="min-w-0 flex-1">
-                        <span className={`block truncate text-xs font-bold tracking-tight ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}`}>{item.label}</span>
-                        <span className="block truncate text-[10px] text-muted-foreground/60 leading-tight font-medium">{item.description}</span>
+                        <span className={`block truncate text-sm font-bold tracking-tight ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}`}>{item.label}</span>
+                        <span className="block truncate text-[11px] text-muted-foreground/60 leading-tight font-medium">{item.description}</span>
                       </span>
                     ) : null}
                   </button>
