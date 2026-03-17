@@ -652,7 +652,7 @@ export function IssueDetailView({
                           return (
                             <div key={entry.idx} className="rounded-xl border border-border/20 bg-gradient-to-b from-card to-muted/10 overflow-hidden">
                               <div className="flex items-start gap-3 px-4 py-3">
-                                <div className="h-7 w-7 rounded-lg bg-primary/10 border border-primary/15 grid place-items-center shrink-0 mt-0.5"><Bot size={13} className="text-primary" /></div>
+                                <div className="h-7 w-7 rounded-lg bg-primary/10 border border-primary/15 grid place-items-center shrink-0 mt-0.5">{getAgentIcon(provider, 16)}</div>
                                 <div className="flex-1 min-w-0">
                                   <div className="prose prose-invert prose-sm max-w-none text-[12px] leading-relaxed prose-p:my-1 prose-p:text-foreground/75 prose-code:text-primary prose-code:bg-primary/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-[11px] prose-pre:bg-background prose-pre:border prose-pre:border-border/20 prose-pre:rounded-lg prose-li:text-foreground/65 prose-headings:text-foreground/90 prose-headings:text-xs prose-strong:text-foreground/85">
                                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.content}</ReactMarkdown>
