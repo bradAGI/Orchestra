@@ -4,6 +4,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 import { AppTooltip } from './tooltip-wrapper'
 
+/** Class-variance-authority variants for the Button component. */
 const buttonVariants = cva(
   'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50 !filter-none !blur-0 !backdrop-blur-none hover:!filter-none hover:!blur-0 hover:!backdrop-blur-none data-[state=closed]:!filter-none data-[state=delayed-open]:!filter-none data-[state=instant-open]:!filter-none data-[state=closed]:!blur-0 data-[state=delayed-open]:!blur-0 data-[state=instant-open]:!blur-0 data-[state=closed]:!backdrop-blur-none data-[state=delayed-open]:!backdrop-blur-none data-[state=instant-open]:!backdrop-blur-none [&_svg]:shrink-0 [&_svg]:!filter-none [&_svg]:!blur-0 [&_svg]:!backdrop-blur-none [&_svg]:transition-transform [&_svg]:duration-200 active:[&_svg]:scale-95 active:[&_.lucide-refresh-ccw]:rotate-180 active:[&_.lucide-refresh-cw]:rotate-180',
   {
@@ -29,11 +30,18 @@ const buttonVariants = cva(
   },
 )
 
+/** Props for the {@link Button} component, extending HTML button attributes with variant, size, and tooltip support. */
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
+  /** When true, renders as a Radix Slot, passing props to its child element. */
   asChild?: boolean
+  /** Optional tooltip text displayed on hover. */
   tooltip?: string
 }
 
+/**
+ * Multi-variant button component with optional tooltip wrapping.
+ * Supports default, secondary, outline, ghost, and destructive visual variants.
+ */
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({ className, variant, size, asChild = false, tooltip, type, ...props }, ref) => {
   const Comp = asChild ? Slot : 'button'
   const buttonType = asChild ? undefined : (type ?? 'button')

@@ -1,10 +1,15 @@
 import * as Tooltip from '@radix-ui/react-tooltip'
 import { type ReactNode } from 'react'
 
+/** Root tooltip provider that wraps the app and configures the global delay duration. */
 export function AppTooltipProvider({ children }: { children: ReactNode }) {
   return <Tooltip.Provider delayDuration={100}>{children}</Tooltip.Provider>
 }
 
+/**
+ * Styled tooltip wrapper using Radix UI primitives. Renders a small popover
+ * with uppercase tracking on hover/focus of the trigger element.
+ */
 export function AppTooltip({ children, content, side = 'top' }: { children: ReactNode; content: ReactNode; side?: 'top' | 'right' | 'bottom' | 'left' }) {
   return (
     <Tooltip.Root>

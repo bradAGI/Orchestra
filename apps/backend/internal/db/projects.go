@@ -378,11 +378,13 @@ func (db *DB) GetProjectByID(ctx context.Context, id string) (Project, error) {
 	return p, err
 }
 
+// UpdateProjectGitHubInfo sets the GitHub owner and repo for an existing project.
 func (db *DB) UpdateProjectGitHubInfo(ctx context.Context, id, owner, repo string) error {
 	_, err := db.ExecContext(ctx, "UPDATE projects SET github_owner = ?, github_repo = ? WHERE id = ?", owner, repo, id)
 	return err
 }
 
+// Session represents an agent execution session linked to a project and provider.
 type Session struct {
 	ID          string `json:"id"`
 	ProjectID   string `json:"project_id"`
@@ -397,6 +399,7 @@ type Session struct {
 	TotalOutput int64  `json:"total_output"`
 }
 
+// Event represents a single agent progression event stored in the database.
 type Event struct {
 	ID           string `json:"id"`
 	SessionID    string `json:"session_id"`
