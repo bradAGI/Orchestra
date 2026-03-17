@@ -654,7 +654,7 @@ export function IssueDetailView({
                               <div className="flex items-start gap-3 px-4 py-3">
                                 <div className="h-7 w-7 rounded-lg bg-primary/10 border border-primary/15 grid place-items-center shrink-0 mt-0.5">{getAgentIcon(provider, 16)}</div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="prose prose-invert prose-sm max-w-none text-[12px] leading-relaxed prose-p:my-1 prose-p:text-foreground/75 prose-code:text-primary prose-code:bg-primary/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-[11px] prose-pre:bg-background prose-pre:border prose-pre:border-border/20 prose-pre:rounded-lg prose-li:text-foreground/65 prose-headings:text-foreground/90 prose-headings:text-xs prose-strong:text-foreground/85">
+                                  <div className="prose prose-invert prose-sm max-w-none text-[12px] leading-relaxed prose-p:my-1 prose-p:text-foreground/90 prose-code:text-primary prose-code:bg-primary/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-[11px] prose-pre:bg-background prose-pre:border prose-pre:border-border/30 prose-pre:rounded-lg prose-li:text-foreground/80 prose-headings:text-foreground prose-headings:text-xs prose-strong:text-foreground">
                                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.content}</ReactMarkdown>
                                   </div>
                                 </div>
@@ -665,18 +665,18 @@ export function IssueDetailView({
                         }
                         if (entry.kind === 'thinking') {
                           return (
-                            <div key={entry.idx} className="rounded-xl border border-violet-500/10 bg-gradient-to-r from-violet-500/[0.03] to-transparent overflow-hidden transition-all hover:border-violet-500/20">
+                            <div key={entry.idx} className="rounded-xl border border-violet-500/20 bg-gradient-to-r from-violet-500/5 to-transparent overflow-hidden transition-all hover:border-violet-500/30">
                               <button onClick={toggleExpand} className="w-full flex items-center gap-3 px-4 py-2.5 text-left group">
-                                <div className="h-6 w-6 rounded-lg bg-violet-500/10 border border-violet-500/15 grid place-items-center shrink-0">
-                                  <Brain size={11} className="text-violet-400/50" />
+                                <div className="h-6 w-6 rounded-lg bg-violet-500/15 border border-violet-500/20 grid place-items-center shrink-0">
+                                  <Brain size={11} className="text-violet-400" />
                                 </div>
-                                <span className="text-[10px] font-bold text-violet-400/40 italic">Reasoning</span>
-                                <ChevronDown size={10} className={`text-violet-400/20 transition-transform ml-auto ${isExpanded ? 'rotate-180' : ''}`} />
-                                <span className="text-[8px] font-mono text-muted-foreground/15 shrink-0">{entry.ts}</span>
+                                <span className="text-[10px] font-bold text-violet-400/70 italic">Reasoning</span>
+                                <ChevronDown size={10} className={`text-violet-400/40 transition-transform ml-auto ${isExpanded ? 'rotate-180' : ''}`} />
+                                <span className="text-[8px] font-mono text-muted-foreground/40 shrink-0">{entry.ts}</span>
                               </button>
                               {isExpanded && (
                                 <div className="px-4 pb-3">
-                                  <p className="text-[11px] text-violet-300/30 leading-relaxed whitespace-pre-wrap max-h-48 overflow-auto custom-scrollbar rounded-lg bg-violet-500/[0.02] border border-violet-500/5 p-3">{entry.content.replace(/\*\*/g, '')}</p>
+                                  <p className="text-[11px] text-violet-300/60 leading-relaxed whitespace-pre-wrap max-h-48 overflow-auto custom-scrollbar rounded-lg bg-violet-500/5 border border-violet-500/10 p-3">{entry.content.replace(/\*\*/g, '')}</p>
                                 </div>
                               )}
                             </div>
@@ -684,14 +684,14 @@ export function IssueDetailView({
                         }
                         if (entry.kind === 'tool') {
                           return (
-                            <div key={entry.idx} className="group/tool rounded-xl border border-border/15 bg-gradient-to-r from-muted/10 to-transparent overflow-hidden transition-all hover:border-border/25">
+                            <div key={entry.idx} className="group/tool rounded-xl border border-border/30 bg-gradient-to-r from-muted/20 to-transparent overflow-hidden transition-all hover:border-border/50">
                               <div className="flex items-center gap-3 px-4 py-2.5">
-                                <div className="h-6 w-6 rounded-lg bg-amber-500/10 border border-amber-500/15 grid place-items-center shrink-0">
-                                  <Wrench size={11} className="text-amber-400/70" />
+                                <div className="h-6 w-6 rounded-lg bg-amber-500/15 border border-amber-500/20 grid place-items-center shrink-0">
+                                  <Wrench size={11} className="text-amber-400" />
                                 </div>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-amber-400/60 shrink-0">{entry.label}</span>
-                                <code className="text-[10px] font-mono text-foreground/30 truncate flex-1">{entry.content.replace(/"/g, '')}</code>
-                                <span className="text-[8px] font-mono text-muted-foreground/15 shrink-0">{entry.ts}</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 shrink-0">{entry.label}</span>
+                                <code className="text-[10px] font-mono text-foreground/60 truncate flex-1">{entry.content.replace(/"/g, '')}</code>
+                                <span className="text-[8px] font-mono text-muted-foreground/40 shrink-0">{entry.ts}</span>
                               </div>
                             </div>
                           )
@@ -699,19 +699,19 @@ export function IssueDetailView({
                         if (entry.kind === 'result') {
                           const isError = entry.status === 'error'
                           return (
-                            <div key={entry.idx} className={`rounded-xl border overflow-hidden transition-all ${isError ? 'border-red-500/15 bg-red-500/[0.03]' : 'border-border/10 bg-muted/[0.03] hover:border-border/20'}`}>
+                            <div key={entry.idx} className={`rounded-xl border overflow-hidden transition-all ${isError ? 'border-red-500/20 bg-red-500/5' : 'border-border/20 bg-muted/10 hover:border-border/40'}`}>
                               <button onClick={toggleExpand} className="w-full flex items-center gap-3 px-4 py-2 text-left">
-                                <div className={`h-5 w-5 rounded-md grid place-items-center shrink-0 ${isError ? 'bg-red-500/10' : 'bg-primary/10'}`}>
-                                  <CheckCircle2 size={10} className={isError ? 'text-red-400/60' : 'text-primary/40'} />
+                                <div className={`h-5 w-5 rounded-md grid place-items-center shrink-0 ${isError ? 'bg-red-500/15' : 'bg-primary/15'}`}>
+                                  <CheckCircle2 size={10} className={isError ? 'text-red-400' : 'text-primary/70'} />
                                 </div>
-                                <span className={`text-[10px] font-mono truncate flex-1 ${isError ? 'text-red-400/50' : 'text-foreground/25'}`}>
+                                <span className={`text-[10px] font-mono truncate flex-1 ${isError ? 'text-red-400/70' : 'text-foreground/50'}`}>
                                   {entry.content.slice(0, 120)}{entry.content.length > 120 ? '…' : ''}
                                 </span>
-                                {entry.content.length > 60 && <ChevronDown size={10} className={`text-muted-foreground/20 transition-transform shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />}
+                                {entry.content.length > 60 && <ChevronDown size={10} className={`text-muted-foreground/40 transition-transform shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />}
                               </button>
                               {isExpanded && (
                                 <div className="px-4 pb-3 pt-0">
-                                  <pre className="text-[10px] text-foreground/25 leading-relaxed whitespace-pre-wrap max-h-40 overflow-auto custom-scrollbar font-mono rounded-lg bg-background/50 border border-border/10 p-3">{entry.content}</pre>
+                                  <pre className="text-[10px] text-foreground/60 leading-relaxed whitespace-pre-wrap max-h-40 overflow-auto custom-scrollbar font-mono rounded-lg bg-background/50 border border-border/20 p-3">{entry.content}</pre>
                                 </div>
                               )}
                             </div>
