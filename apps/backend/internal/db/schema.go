@@ -1,5 +1,8 @@
 package db
 
+// Schema is the DDL applied on database initialization. It creates all core
+// tables (projects, sessions, events, issues, runs, ingest_offsets, mcp_servers,
+// issue_history) and their indexes using CREATE TABLE IF NOT EXISTS.
 const Schema = `
 CREATE TABLE IF NOT EXISTS projects (
 	id TEXT PRIMARY KEY,

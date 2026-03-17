@@ -1,3 +1,6 @@
+// Package db provides the SQLite-backed data layer for orchestrad, including
+// schema management, migrations, session and event recording, project tracking,
+// MCP server persistence, and token encryption.
 package db
 
 import (
@@ -10,10 +13,14 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// DB wraps a *sql.DB connection to the orchestrad SQLite warehouse database.
 type DB struct {
 	*sql.DB
 }
 
+// Connect opens (or creates) the SQLite database at dbPath, applies the schema
+// and migrations, and returns a ready-to-use DB handle. The database uses WAL
+// journal mode and foreign key enforcement.
 func Connect(dbPath string) (*DB, error) {
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
 		return nil, fmt.Errorf("create db directory: %w", err)
@@ -62,6 +69,8 @@ func Connect(dbPath string) (*DB, error) {
 	return &DB{DB: db}, nil
 }
 
+// GetEvents returns all issue_history entries for the given issue ID, ordered
+// by timestamp descending.
 func (db *DB) GetEvents(ctx context.Context, issueID string) ([]map[string]any, error) {
 	query := `
 		SELECT id, issue_id, user_id, action, old_value, new_value, timestamp

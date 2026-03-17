@@ -1,97 +1,116 @@
 # 7. Getting Started
 
+> **Source files:**
+> - `apps/backend/cmd/orchestrad/` -- Backend server
+> - `apps/backend/cmd/orchestra/` -- CLI tool
+> - `apps/desktop/package.json` -- Desktop app scripts
+> - `apps/desktop/electron/main.cjs` -- Managed backend lifecycle
+> - `apps/tui/` -- TUI dashboard
+> - `apps/backend/internal/config/load.go` -- Configuration loading
+
 This guide walks you through installing, building, and running Orchestra for the first time.
 
-## Prerequisites
+---
 
-| Requirement | Minimum Version | Purpose |
-|-------------|----------------|---------|
-| **Go** | 1.25+ | Backend daemon (`orchestrad`) and TUI |
-| **Node.js** | 22+ | Desktop app (Electron + React) |
-| **npm** | (bundled with Node.js) | Frontend dependency management |
-| **Git** | 2.x | Workspace management, project operations |
+### Prerequisites
 
-You also need at least one agent CLI installed and available on your `$PATH`:
+| Component | Requirement | Purpose |
+|-----------|-------------|---------|
+| Go | 1.24+ | Backend and TUI compilation |
+| Node.js | 20+ | Desktop frontend |
+| npm | 10+ | Package management |
+| Git | 2.x | Version control |
 
-| Agent | Install |
-|-------|---------|
-| Codex | `npm install -g @openai/codex` |
-| Claude Code | `npm install -g @anthropic-ai/claude-code` |
-| OpenCode | See [opencode.ai](https://opencode.ai) |
-| Gemini CLI | `npm install -g @google/gemini-cli` |
+Optional:
+- Docker (for containerized deployment)
+- An agent CLI installed: `claude`, `codex`, `opencode`, or `gemini`
 
-Verify your toolchain:
+---
 
-```bash
-go version          # go1.25.0 or later
-node --version      # v22.x or later
-codex --version     # or whichever agent you plan to use
+### Quick Start
+
+```mermaid
+flowchart LR
+    BUILD[Build Backend] --> RUN[Start orchestrad]
+    RUN --> DESKTOP[Launch Desktop App]
+    RUN --> TUI[Launch TUI]
+    DESKTOP --> USE[Create Projects & Tasks]
+    TUI --> USE
 ```
 
-## Installing and Building the Backend
+---
 
-Clone the repository and build the `orchestrad` daemon:
+### 1. Backend Setup
+
+Clone the repository and build the backend:
 
 ```bash
 git clone https://github.com/Traves-Theberge/Orchestra.git
 cd Orchestra/apps/backend
-go build -o orchestrad ./cmd/orchestrad/
+
+# Build the server and CLI
+go build -o orchestrad ./cmd/orchestrad
+go build -o orchestra ./cmd/orchestra
 ```
 
-This produces the `orchestrad` binary in the current directory. You can also install it system-wide:
+Start the backend server:
 
 ```bash
-go install ./cmd/orchestrad/
-```
+# Minimal configuration for local development
+export ORCHESTRA_SERVER_HOST=127.0.0.1
+export ORCHESTRA_SERVER_PORT=4010
+export ORCHESTRA_WORKSPACE_ROOT=~/.orchestra/workspaces
 
-### Starting the Backend
-
-```bash
-./orchestrad --workspace-root /path/to/your/project
-```
-
-By default the server binds to `127.0.0.1:4010`. Override this with environment variables:
-
-```bash
-ORCHESTRA_SERVER_HOST=0.0.0.0 ORCHESTRA_SERVER_PORT=8080 ./orchestrad
+./orchestrad
 ```
 
 Verify it is running:
 
 ```bash
-curl http://127.0.0.1:4010/healthz
-# {"status":"ok"}
+curl http://127.0.0.1:4010/api/v1/state
 ```
 
-## Running the Desktop App
+You should receive a JSON response with `generated_at`, `counts`, and other runtime state.
 
-The desktop app is an Electron + React application in `apps/desktop/`:
+---
+
+### 2. Desktop App Setup
+
+The desktop application provides the full GUI experience with an integrated backend sidecar.
 
 ```bash
 cd apps/desktop
-npm install
+
+# Install dependencies
+npm ci
+
+# Option A: Development mode (connects to your running orchestrad)
 npm run dev
-```
 
-This starts two processes concurrently:
-1. Vite dev server on `http://localhost:5173`
-2. Electron window loading from the Vite dev server
-
-The desktop app connects to the backend at `http://127.0.0.1:4010` by default. Make sure `orchestrad` is running before launching the desktop app.
-
-### Building for Distribution
-
-To create a distributable package:
-
-```bash
+# Option B: Build and package (bundles its own orchestrad)
+npm run dist:prep
 npm run dist:desktop
 ```
 
-This builds the React frontend, stages the backend binary into the Electron resources, and packages with `electron-builder`. Output appears in `apps/desktop/release/`.
+**Development mode** starts both the Vite dev server and Electron, connecting to your locally running `orchestrad` instance.
 
-## Running the TUI
+**Packaged mode** bundles the `orchestrad` binary and manages it automatically -- no separate backend required.
 
-Orchestra includes a terminal dashboard built with Bubble Tea:
+#### Connecting in Development
+
+When running `npm run dev`, the desktop app connects to the backend specified by environment variables:
+
+```bash
+export ORCHESTRA_BASE_URL=http://127.0.0.1:4010
+export ORCHESTRA_API_TOKEN=your-token  # optional for localhost
+npm run dev
+```
+
+---
+
+### 3. TUI Setup
+
+The terminal dashboard provides a lightweight monitoring view:
 
 ```bash
 # Run directly
@@ -99,81 +118,101 @@ cd apps/tui
 go run .
 
 # Or build and install
-make build       # produces ./orchestra-dash in repo root
-make install     # installs to /usr/local/bin/orchestra-dash
+cd /path/to/Orchestra
+make build     # outputs ./orchestra-dash
+make install   # installs to /usr/local/bin/orchestra-dash
 ```
 
-The TUI connects to the same backend API as the desktop app.
+---
 
-## First-Run Walkthrough
+### 4. First Run Walkthrough
 
-1. **Start the backend** with a workspace root pointing to a directory where agent workspaces will be created:
+Once the backend and a frontend (desktop or TUI) are running:
 
-   ```bash
-   cd apps/backend
-   ./orchestrad --workspace-root ~/orchestra-workspaces
-   ```
+#### Step 1: Register a Project
 
-   On first run, Orchestra creates the `.orchestra/` directory structure inside your workspace root, including `warehouse.db` (SQLite database) and default agent configuration files.
+A project is a local Git repository that Orchestra manages.
 
-2. **Open the desktop app** (or TUI) -- the dashboard shows an empty issue list and a healthy connection status.
+1. Open the **Projects** section in the desktop app
+2. Click **Add Project**
+3. Select the root directory of a Git repository
+4. The project appears in the project list
 
-3. **Create an issue** through the UI or via the API:
-
-   ```bash
-   curl -X POST http://127.0.0.1:4010/api/v1/issues \
-     -H "Content-Type: application/json" \
-     -d '{"title": "Hello World", "body": "Create a hello world script"}'
-   ```
-
-4. **Watch the agent work** -- Orchestra dispatches the issue to the configured agent (default: Codex), streams events in real time via SSE, and manages the workspace lifecycle automatically.
-
-5. **Review results** -- inspect agent output, diffs, and artifacts through the issue detail view.
-
-## Troubleshooting Common Issues
-
-### Backend fails to start: "invalid port"
-
-The `ORCHESTRA_SERVER_PORT` value must be a valid integer between 1 and 65535. Check for stray whitespace or non-numeric characters.
-
-### "agent provider X is not configured"
-
-The configured `ORCHESTRA_AGENT_PROVIDER` (default: `CODEX`) must have a matching command template. Ensure the agent CLI is installed and the corresponding `ORCHESTRA_AGENT_COMMAND_*` environment variable is set if using a non-default path.
-
-### "non-loopback host requires ORCHESTRA_API_TOKEN"
-
-When binding to a non-loopback address (anything other than `127.0.0.1`, `localhost`, or `::1`), Orchestra requires an API token for security. Set `ORCHESTRA_API_TOKEN` to any secret string:
+Or register via the API:
 
 ```bash
-ORCHESTRA_API_TOKEN=my-secret ORCHESTRA_SERVER_HOST=0.0.0.0 ./orchestrad
+curl -X POST http://127.0.0.1:4010/api/v1/projects \
+  -H "Content-Type: application/json" \
+  -d '{"root_path": "/path/to/your/repo"}'
 ```
 
-### Desktop app shows "connection refused"
+#### Step 2: Create a Task
 
-Make sure `orchestrad` is running and listening on the expected host/port. The desktop app defaults to `http://127.0.0.1:4010`.
+Tasks (issues) are units of work assigned to machine learning agents.
 
-### Agent CLI not found
+1. Open the **Tasks** section
+2. Click **New Task**
+3. Fill in:
+   - **Title**: A concise description of the work
+   - **Description**: Detailed instructions (Markdown supported)
+   - **Project**: The target repository
+   - **Assignee**: The agent provider (claude, codex, etc.)
+   - **State**: Set to an active state (e.g., "Todo")
 
-Orchestra shells out to agent CLIs using the command templates in configuration. Verify the CLI is on your `$PATH`:
+#### Step 3: Monitor Execution
+
+Once a task is in an active state with an assigned agent:
+
+1. The **Dashboard** shows active agents and running sessions
+2. The **Live Console** provides real-time terminal output
+3. The **Tasks** kanban board shows state transitions
+4. Click a task to open the inspector with history, diff, and logs tabs
+
+---
+
+### 5. Connecting to a Project Tracker
+
+Orchestra can sync with external issue trackers. Configure the tracker in your environment:
 
 ```bash
-which codex    # or claude, opencode, gemini
+# Linear tracker example
+export ORCHESTRA_TRACKER_TYPE=linear
+export ORCHESTRA_TRACKER_ENDPOINT=https://api.linear.app/graphql
+export ORCHESTRA_TRACKER_TOKEN=lin_api_xxxxx
+
+# Filter which issues to process
+export ORCHESTRA_ACTIVE_STATES="Todo,In Progress"
+export ORCHESTRA_TERMINAL_STATES="Done,Cancelled"
+export ORCHESTRA_TRACKER_WORKER_ASSIGNEE_IDS="user-id-1,user-id-2"
 ```
 
-Override the command path with environment variables if needed:
+Restart `orchestrad` after changing environment variables. The backend will begin polling the tracker for matching issues.
+
+---
+
+### 6. Agent Provider Setup
+
+Orchestra needs at least one agent CLI installed on the system. The default provider is Codex.
+
+| Provider | CLI Command | Install |
+|----------|------------|---------|
+| Codex | `codex` | `npm install -g @openai/codex` |
+| Claude | `claude` | Install from Anthropic |
+| Gemini | `gemini` | Install from Google |
+| OpenCode | `opencode` | `go install github.com/opencode-ai/opencode@latest` |
+
+Set the default provider:
 
 ```bash
-ORCHESTRA_AGENT_COMMAND_CODEX="/usr/local/bin/codex exec --json {{prompt}}" ./orchestrad
+export ORCHESTRA_AGENT_PROVIDER=CLAUDE
 ```
 
-### SQLite database errors
+Custom agent commands can be configured per provider -- see the [Configuration Guide](configuration.md).
 
-The warehouse database is stored at `<workspace-root>/.orchestra/warehouse.db`. If it becomes corrupted, stop the backend, delete the file, and restart. Orchestra will recreate it with empty state.
+---
 
-### Port already in use
+### Next Steps
 
-If port 4010 is occupied, choose a different port:
-
-```bash
-ORCHESTRA_SERVER_PORT=4011 ./orchestrad
-```
+- [7.1 Configuration Guide](configuration.md) -- Complete environment variable reference
+- [7.2 Development Guide](development.md) -- Contributing and development workflow
+- [6. Deployment & Operations](../operations/deployment.md) -- Production deployment patterns
