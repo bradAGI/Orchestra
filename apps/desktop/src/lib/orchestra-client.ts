@@ -480,7 +480,7 @@ export async function fetchArtifactContent(config: BackendConfig, issueIdentifie
   if (normalized === '') {
     throw new APIError('invalid_request', 'issue identifier is required')
   }
-  const url = new URL(`/api/v1/issues/${encodeURIComponent(normalized)}/artifacts/${relPath}`, config.baseUrl)
+  const url = new URL(`/api/v1/issues/${encodeURIComponent(normalized)}/artifacts/${encodeURIComponent(relPath)}`, config.baseUrl)
   if (provider) url.searchParams.set('provider', provider)
 
   const response = await fetch(url.toString(), {
@@ -529,7 +529,7 @@ export async function fetchProjectTree(config: BackendConfig, projectId: string,
 }
 
 export async function fetchProjectFileContent(config: BackendConfig, projectId: string, path: string): Promise<string> {
-  const response = await fetch(`${config.baseUrl}/api/v1/projects/${projectId}/file?path=${encodeURIComponent(path)}`, {
+  const response = await fetch(`${config.baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/file?path=${encodeURIComponent(path)}`, {
     headers: buildHeaders(config),
   })
   if (!response.ok) {
@@ -550,7 +550,7 @@ export async function fetchProjectGitStatus(config: BackendConfig, projectId: st
 
 export async function fetchProjectGitDiff(config: BackendConfig, projectId: string, hash?: string): Promise<string> {
   const query = hash ? `?hash=${encodeURIComponent(hash)}` : ''
-  const response = await fetch(`${config.baseUrl}/api/v1/projects/${projectId}/git/diff${query}`, {
+  const response = await fetch(`${config.baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/git/diff${query}`, {
     headers: buildHeaders(config),
   })
 
@@ -636,7 +636,7 @@ export async function fetchDocs(config: BackendConfig): Promise<DocItem[]> {
 }
 
 export async function fetchDocContent(config: BackendConfig, path: string): Promise<string> {
-  const response = await fetch(new URL(`/api/v1/docs/${path}`, config.baseUrl).toString(), {
+  const response = await fetch(new URL(`/api/v1/docs/${encodeURIComponent(path)}`, config.baseUrl).toString(), {
     headers: buildHeaders(config),
   })
   if (!response.ok) {
@@ -713,7 +713,7 @@ export async function fetchProjectGitHubPulls(config: BackendConfig, projectId: 
 }
 
 export async function fetchProjectGitHubPullDiff(config: BackendConfig, projectId: string, number: number): Promise<string> {
-  const response = await fetch(`${config.baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/github/pulls/${number}/diff`, {
+  const response = await fetch(`${config.baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/github/pulls/${encodeURIComponent(String(number))}/diff`, {
     headers: buildHeaders(config),
   })
   return response.text()

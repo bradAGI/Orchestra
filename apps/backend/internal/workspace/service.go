@@ -80,7 +80,10 @@ func (s Service) RemoveIssueWorkspaces(issueIdentifier string, provider string, 
 	}
 
 	if hooks.BeforeRemove != "" {
-		_, _ = RunHook("before_remove", hooks.BeforeRemove, path, s.timeoutOrDefault())
+		if _, err := RunHook("before_remove", hooks.BeforeRemove, path, s.timeoutOrDefault()); err != nil {
+			// Log warning but continue with removal — hook failure should not block cleanup
+			fmt.Fprintf(os.Stderr, "WARN: before_remove hook failed for %s: %v\n", path, err)
+		}
 	}
 
 	if err := ValidateWorkspacePath(s.Root, path); err != nil {
@@ -105,8 +108,7 @@ func (s Service) RunAfterRunHook(workspacePath string, hooks Hooks) (HookResult,
 	if hooks.AfterRun == "" {
 		return HookResult{}, nil
 	}
-	res, _ := RunHook("after_run", hooks.AfterRun, workspacePath, s.timeoutOrDefault())
-	return res, nil
+	return RunHook("after_run", hooks.AfterRun, workspacePath, s.timeoutOrDefault())
 }
 
 func (s Service) ListArtifacts(issueIdentifier string, provider string) ([]string, error) {

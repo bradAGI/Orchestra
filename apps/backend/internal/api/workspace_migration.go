@@ -39,13 +39,11 @@ func (s *Server) PostWorkspaceMigrate(w http.ResponseWriter, r *http.Request) {
 
 	result, err := workspace.ExecuteWorkspaceMigration(from, to, dryRun)
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "workspace_migration_failed", err.Error())
+		writeJSONError(w, http.StatusBadRequest, "workspace_migration_failed", "workspace migration failed")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, http.StatusAccepted, map[string]any{
 		"from":    filepath.Clean(from),
 		"to":      filepath.Clean(to),
 		"dry_run": dryRun,
@@ -66,13 +64,11 @@ func (s *Server) GetWorkspaceMigrationPlan(w http.ResponseWriter, r *http.Reques
 
 	result, err := workspace.PlanWorkspaceMigration(from, to)
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "workspace_migration_plan_failed", err.Error())
+		writeJSONError(w, http.StatusBadRequest, "workspace_migration_plan_failed", "workspace migration plan failed")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, http.StatusOK,map[string]any{
 		"from":   filepath.Clean(from),
 		"to":     filepath.Clean(to),
 		"result": result,

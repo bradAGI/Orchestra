@@ -17,8 +17,7 @@ import (
 func (s *Server) GetUnsandboxConfig(w http.ResponseWriter, r *http.Request) {
 	pk, sk := loadUnsandboxKeys()
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, http.StatusOK,map[string]any{
 		"configured": pk != "" && sk != "",
 		"public_key": pk,
 		"has_secret": sk != "",
@@ -49,12 +48,11 @@ func (s *Server) PostUnsandboxConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := saveUnsandboxKeys(pk, sk); err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "save_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "save_failed", "failed to save configuration")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, http.StatusOK,map[string]any{
 		"configured": true,
 		"public_key": pk,
 		"has_secret": true,
@@ -66,13 +64,12 @@ func (s *Server) PostUnsandboxConfig(w http.ResponseWriter, r *http.Request) {
 func (s *Server) DeleteUnsandboxConfig(w http.ResponseWriter, r *http.Request) {
 	csvPath, err := unsandboxCSVPath()
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "path_error", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "path_error", "failed to resolve path")
 		return
 	}
 	_ = os.Remove(csvPath)
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, http.StatusOK,map[string]any{
 		"configured": false,
 	})
 }

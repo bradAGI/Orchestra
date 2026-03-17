@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/go-github/v69/github"
+	"github.com/orchestra/orchestra/apps/backend/internal/db"
 	"golang.org/x/oauth2"
 	githuboauth "golang.org/x/oauth2/github"
 )
@@ -108,7 +109,11 @@ func (s *Server) HandleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) updateProjectGitHubToken(ctx context.Context, projectID, token string) error {
-	_, err := s.db.ExecContext(ctx, "UPDATE projects SET github_token = ? WHERE id = ?", token, projectID)
+	encrypted, err := db.EncryptToken(token)
+	if err != nil {
+		return fmt.Errorf("encrypt token: %w", err)
+	}
+	_, err = s.db.ExecContext(ctx, "UPDATE projects SET github_token = ? WHERE id = ?", encrypted, projectID)
 	return err
 }
 
@@ -136,7 +141,5 @@ func (s *Server) HandleGitHubDisconnect(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
+	writeJSON(w, http.StatusOK,map[string]any{"ok": true})
 }

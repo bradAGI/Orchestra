@@ -185,6 +185,23 @@ func StashPop(ctx context.Context, dir string) error {
 	return nil
 }
 
+// DefaultBranch detects the default branch for the remote (e.g. "main" or "master").
+// Falls back to "main" if detection fails.
+func DefaultBranch(ctx context.Context, dir string) string {
+	cmd := exec.CommandContext(ctx, "git", "symbolic-ref", "refs/remotes/origin/HEAD")
+	cmd.Dir = dir
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	if err := cmd.Run(); err == nil {
+		ref := strings.TrimSpace(stdout.String())
+		// ref is like "refs/remotes/origin/main"
+		if parts := strings.Split(ref, "/"); len(parts) > 0 {
+			return parts[len(parts)-1]
+		}
+	}
+	return "main"
+}
+
 // Merge merges the given branch into the current branch with --no-ff
 func Merge(ctx context.Context, dir, branch string) error {
 	cmd := exec.CommandContext(ctx, "git", "merge", branch, "--no-ff", "-m",

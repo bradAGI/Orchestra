@@ -16,16 +16,13 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { periodFilters, type TimelineItem } from '@/components/app-shell/types'
 import {
-  applyWorkspaceMigration,
   fetchAgentConfig,
   fetchAgents,
-  fetchIssueDetail,
   fetchIssues,
   fetchProjectStats,
   fetchProjects,
   fetchState,
   fetchWarehouseStats,
-  fetchWorkspaceMigrationPlan,
   isUnauthorizedError,
   normalizeEventEnvelope,
   normalizeSnapshotPayload,
@@ -48,7 +45,6 @@ import {
   type IssueCreatePayload,
   type IssueUpdatePayload,
   type IssueListItem,
-  type WorkspaceMigrationResult,
 } from '@/lib/orchestra-client'
 import { startRuntimeSync } from '@/lib/runtime-sync'
 import { appendTimelineEvent, applySnapshotUpdate } from '@/lib/runtime-store'
@@ -74,13 +70,8 @@ import type { IssueDetailResult, ToolSummary } from '@widgets/issue-detail/types
 import { Command } from 'cmdk'
 import type { BackendConfig } from '@/lib/orchestra-client'
 import { AppTooltipProvider } from '@/components/ui/tooltip-wrapper'
-
-type BackendProfile = {
-  id: string
-  name: string
-  baseUrl: string
-  apiToken: string
-}
+import { SectionErrorBoundary } from '@/components/ui/section-error-boundary'
+import { useBackendConfig, useNotifications, useIssueLookup, useWorkspaceMigration } from '@/hooks'
 
 export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -91,16 +82,26 @@ export default function App() {
     return stored === 'light' ? 'light' : 'dark'
   })
 
-  const [config, setConfig] = useState<BackendConfig | null>(null)
+  // Extracted hooks
+  const {
+    config, setConfig,
+    loadingConfig, savingConfig, setSavingConfig,
+    backendProfiles, setBackendProfiles,
+    activeProfileId, setActiveProfileId,
+    profilesPending, setProfilesPending,
+    errorMessage, setErrorMessage,
+  } = useBackendConfig()
+  const {
+    notifSound, setNotifSound,
+    notifMuted, setNotifMuted,
+    notifVolume, setNotifVolume,
+    playNotification,
+  } = useNotifications()
+
   const [snapshot, setSnapshot] = useState<SnapshotPayload | null>(null)
   const [timeline, setTimeline] = useState<TimelineItem[]>([])
   const [boardIssues, setBoardIssues] = useState<IssueListItem[]>([])
   const [githubBacklogIssues, setGithubBacklogIssues] = useState<IssueListItem[]>([])
-  const [loadingConfig, setLoadingConfig] = useState(false)
-  const [savingConfig, setSavingConfig] = useState(false)
-  const [profilesPending, setProfilesPending] = useState(false)
-  const [backendProfiles, setBackendProfiles] = useState<BackendProfile[]>([])
-  const [activeProfileId, setActiveProfileId] = useState('')
   const [agentConfig, setAgentConfig] = useState<{ commands: Record<string, string>; agent_provider: string; max_turns: number } | null>(null)
   const [availableAgents, setAvailableAgents] = useState<string[]>([])
   const [allTools, setAllTools] = useState<ToolSummary[]>([])
@@ -109,21 +110,33 @@ export default function App() {
   const syncControls = useRef<{ startPolling: () => void; stopPolling: () => void } | null>(null)
   const lastIssueFetchRef = useRef(0)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
-  const [migrationFrom, setMigrationFrom] = useState('')
-  const [migrationTo, setMigrationTo] = useState('')
-  const [migrationPlan, setMigrationPlan] = useState<WorkspaceMigrationResult | null>(null)
-  const [migrationPending, setMigrationPending] = useState(false)
-  const [issueLookupId, setIssueLookupId] = useState('')
-  const [issueLookupPending, setIssueLookupPending] = useState(false)
-  const [issueLookupResult, setIssueLookupResult] = useState<IssueDetailResult | null>(null)
 
-  // Notification settings (persisted in localStorage)
-  const [notifSound, setNotifSound] = useState(() => localStorage.getItem('orchestra_notif_sound') || 'chime')
-  const [notifMuted, setNotifMuted] = useState(() => localStorage.getItem('orchestra_notif_muted') === 'true')
-  const [notifVolume, setNotifVolume] = useState(() => parseFloat(localStorage.getItem('orchestra_notif_volume') || '0.3'))
-  const [issueLookupError, setIssueLookupError] = useState('')
+  const setOperatorError = (prefix: string, err: unknown) => {
+    const message = toDisplayError(err)
+    setErrorMessage(`${prefix}: ${message}`)
+    if (isUnauthorizedError(err) || message.startsWith('unauthorized:')) {
+      setStatusMessage('Protected host detected. Add bearer token in Settings -> Backend Configuration.')
+    }
+  }
+
+  const {
+    issueLookupId, setIssueLookupId,
+    issueLookupPending, setIssueLookupPending,
+    issueLookupResult, setIssueLookupResult,
+    issueLookupError, setIssueLookupError,
+    executeIssueLookup,
+  } = useIssueLookup(config, setStatusMessage)
+
+  const {
+    migrationFrom, setMigrationFrom,
+    migrationTo, setMigrationTo,
+    migrationPlan, setMigrationPlan,
+    migrationPending,
+    handleMigrationPlan,
+    handleMigrationApply,
+  } = useWorkspaceMigration(config, setStatusMessage, setOperatorError)
+
   const [sessionLookupResult, setSessionLookupResult] = useState<SessionDetail | null>(null)
   const [sessionLookupPending, setSessionLookupPending] = useState(false)
   const [sessionLookupError, setSessionLookupError] = useState('')
@@ -259,51 +272,6 @@ export default function App() {
     }
     mediaQuery.addEventListener('change', handleChange)
     return () => mediaQuery.removeEventListener('change', handleChange)
-  }, [])
-
-  useEffect(() => {
-    let mounted = true
-    const desktopBridge = window.orchestraDesktop
-    if (!desktopBridge || typeof desktopBridge.getBackendConfig !== 'function') {
-      setErrorMessage('desktop bridge unavailable: preload API not found')
-      setLoadingConfig(false)
-      return () => {
-        mounted = false
-      }
-    }
-
-    desktopBridge
-      .getBackendConfig()
-      .then((value) => {
-        if (mounted) {
-          setConfig(value)
-        }
-      })
-      .then(async () => {
-        if (!mounted || typeof desktopBridge.getBackendProfiles !== 'function') {
-          return
-        }
-        const payload = await desktopBridge.getBackendProfiles()
-        if (!mounted) {
-          return
-        }
-        setBackendProfiles(payload.profiles)
-        setActiveProfileId(payload.activeProfileId)
-      })
-      .catch((err: unknown) => {
-        if (mounted) {
-          setErrorMessage(`config load failed: ${toDisplayError(err)}`)
-        }
-      })
-      .finally(() => {
-        if (mounted) {
-          setLoadingConfig(false)
-        }
-      })
-
-    return () => {
-      mounted = false
-    }
   }, [])
 
   useEffect(() => {
@@ -460,54 +428,7 @@ export default function App() {
                   },
                 ]
               })
-              // Play notification sound (respects settings)
-              if (!notifMuted) {
-                try {
-                  const ctx = new AudioContext()
-                  const gain = ctx.createGain()
-                  gain.connect(ctx.destination)
-                  gain.gain.setValueAtTime(notifVolume, ctx.currentTime)
-                  gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5)
-
-                  if (notifSound === 'bell') {
-                    const osc = ctx.createOscillator()
-                    osc.type = 'sine'
-                    osc.connect(gain)
-                    osc.frequency.setValueAtTime(1047, ctx.currentTime)
-                    osc.frequency.exponentialRampToValueAtTime(523, ctx.currentTime + 0.3)
-                    osc.start(ctx.currentTime)
-                    osc.stop(ctx.currentTime + 0.5)
-                    osc.onended = () => ctx.close()
-                  } else if (notifSound === 'pulse') {
-                    const osc = ctx.createOscillator()
-                    osc.type = 'square'
-                    osc.connect(gain)
-                    osc.frequency.setValueAtTime(440, ctx.currentTime)
-                    osc.frequency.setValueAtTime(440, ctx.currentTime + 0.05)
-                    osc.frequency.setValueAtTime(0, ctx.currentTime + 0.1)
-                    osc.frequency.setValueAtTime(440, ctx.currentTime + 0.15)
-                    osc.start(ctx.currentTime)
-                    osc.stop(ctx.currentTime + 0.3)
-                    osc.onended = () => ctx.close()
-                  } else {
-                    // Default: chime (ascending tones)
-                    const osc = ctx.createOscillator()
-                    osc.connect(gain)
-                    osc.frequency.setValueAtTime(880, ctx.currentTime)
-                    osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1)
-                    osc.frequency.setValueAtTime(1320, ctx.currentTime + 0.2)
-                    osc.start(ctx.currentTime)
-                    osc.stop(ctx.currentTime + 0.4)
-                    osc.onended = () => ctx.close()
-                  }
-                } catch { /* ignore audio errors */ }
-              }
-              // Show browser notification
-              if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification('Agent Completed', { body: `${issueIdentifier} has been moved to Review.`, icon: '/favicon.ico' })
-              } else if ('Notification' in window && Notification.permission !== 'denied') {
-                void Notification.requestPermission()
-              }
+              playNotification(issueIdentifier)
             }
           }
         },
@@ -542,22 +463,6 @@ export default function App() {
     }
   }, [config])
 
-  useEffect(() => {
-    if (!config || backendProfiles.length > 0) {
-      return
-    }
-
-    setBackendProfiles([
-      {
-        id: 'active',
-        name: 'Active',
-        baseUrl: config.baseUrl,
-        apiToken: config.apiToken,
-      },
-    ])
-    setActiveProfileId('active')
-  }, [config, backendProfiles.length])
-
   const metrics = useMemo(() => {
     if (!snapshot) {
       return {
@@ -578,15 +483,6 @@ export default function App() {
 
   const generatedAt = snapshot?.generated_at ? new Date(snapshot.generated_at).toLocaleString() : 'waiting for first snapshot'
 
-  const setOperatorError = (prefix: string, err: unknown) => {
-    const message = toDisplayError(err)
-    setErrorMessage(`${prefix}: ${message}`)
-    if (isUnauthorizedError(err) || message.startsWith('unauthorized:')) {
-      setStatusMessage('Protected host detected. Add bearer token in Settings -> Backend Configuration.')
-    }
-  }
-
-
   const handleRefresh = async () => {
     if (!config) {
       return
@@ -602,74 +498,6 @@ export default function App() {
     } finally {
       setRefreshPending(false)
     }
-  }
-
-  const handleMigrationPlan = async () => {
-    if (!config) {
-      return
-    }
-    setMigrationPending(true)
-    setErrorMessage('')
-    try {
-      const plan = await fetchWorkspaceMigrationPlan(config, migrationFrom, migrationTo)
-      setMigrationPlan(plan)
-      setStatusMessage('Migration plan loaded.')
-    } catch (err) {
-      setOperatorError('migration plan failed', err)
-    } finally {
-      setMigrationPending(false)
-    }
-  }
-
-  const handleMigrationApply = async () => {
-    if (!config) {
-      return
-    }
-    setMigrationPending(true)
-    setErrorMessage('')
-    try {
-      const result = await applyWorkspaceMigration(config, migrationFrom, migrationTo)
-      setMigrationPlan(result)
-      setStatusMessage('Migration apply request accepted.')
-    } catch (err) {
-      setOperatorError('migration apply failed', err)
-    } finally {
-      setMigrationPending(false)
-    }
-  }
-
-  const executeIssueLookup = async (identifier: string) => {
-    if (!config) {
-      return
-    }
-
-    const normalized = identifier.trim()
-    if (normalized === '') {
-      setIssueLookupError('Issue identifier is required.')
-      setIssueLookupResult(null)
-      return
-    }
-
-    setIssueLookupPending(true)
-    setIssueLookupError('')
-    try {
-      const result = await fetchIssueDetail(config, normalized)
-      setIssueLookupResult(result)
-      setStatusMessage(`Issue lookup loaded: ${normalized}`)
-    } catch (err) {
-      const message = toDisplayError(err)
-      setIssueLookupError(message)
-      if (isUnauthorizedError(err) || message.startsWith('unauthorized:')) {
-        setStatusMessage('Protected host detected. Add bearer token in Settings -> Backend Configuration.')
-      }
-      setIssueLookupResult(null)
-    } finally {
-      setIssueLookupPending(false)
-    }
-  }
-
-  const handleIssueLookup = async () => {
-    await executeIssueLookup(issueLookupId)
   }
 
   const handleIssueUpdate = async (identifier: string, updates: IssueUpdatePayload) => {
@@ -1172,6 +1000,7 @@ export default function App() {
       >
         <div className="mt-4 flex flex-col flex-1 min-w-0 min-h-0 h-full">
               {sectionVisibility.showProjects ? (
+                <SectionErrorBoundary name="Projects">
                 <section className="flex-1 flex flex-col min-h-0">
                   {selectedProjectID && projects.find(p => p.id === selectedProjectID) ? (
                     <ProjectDetailView
@@ -1203,15 +1032,19 @@ export default function App() {
                     />
                   )}
                 </section>
+                </SectionErrorBoundary>
               ) : null}
 
               {sectionVisibility.showAgents ? (
+                <SectionErrorBoundary name="Agents">
                 <section className="flex-1 flex flex-col min-h-0">
                   <AgentsDashboard config={config} snapshot={snapshot} />
                 </section>
+                </SectionErrorBoundary>
               ) : null}
 
               {sectionVisibility.showWarehouse ? (
+                <SectionErrorBoundary name="Analytics">
                 <section className="flex-1 flex flex-col min-h-0">
                   <AnalyticsDashboard
                     stats={warehouseStats}
@@ -1221,9 +1054,11 @@ export default function App() {
                     onCloneSession={handleCloneSession}
                   />
                 </section>
+                </SectionErrorBoundary>
               ) : null}
 
               {sectionVisibility.showIssueBoard ? (
+                <SectionErrorBoundary name="Kanban Board">
                 <section className="flex-1 flex flex-col min-h-0">
                   <KanbanBoard
                     loadingState={loadingState}
@@ -1239,15 +1074,19 @@ export default function App() {
                     onCreateIssue={handleCreateIssue}
                   />
                 </section>
+                </SectionErrorBoundary>
               ) : null}
 
               {sectionVisibility.showDocs ? (
+                <SectionErrorBoundary name="Documentation">
                 <section className="flex-1 flex flex-col min-h-0">
                   <DocsDashboard config={config} />
                 </section>
+                </SectionErrorBoundary>
               ) : null}
 
               {sectionVisibility.showConsole && config ? (
+                <SectionErrorBoundary name="Console">
                 <section className="flex-1 flex flex-col min-h-0 border border-border rounded-xl overflow-hidden shadow-2xl">
                   <TerminalMultiplexer
                     activeTerminals={openTerminals}
@@ -1257,15 +1096,19 @@ export default function App() {
                     theme={theme}
                   />
                 </section>
+                </SectionErrorBoundary>
               ) : null}
 
               {sectionVisibility.showSandbox ? (
+                <SectionErrorBoundary name="Sandbox">
                 <section className="col-span-12 flex flex-col">
                   <SandboxDashboard config={config} />
                 </section>
+                </SectionErrorBoundary>
               ) : null}
 
               {sectionVisibility.showSettings ? (
+                <SectionErrorBoundary name="Settings">
                 <section className="flex-1 flex flex-col min-h-0">
                   <SettingsCard
                     loadingConfig={loadingConfig}
@@ -1296,6 +1139,7 @@ export default function App() {
                     onNotifVolumeChange={setNotifVolume}
                   />
                 </section>
+                </SectionErrorBoundary>
               ) : null}
         </div>
       </AppShell>

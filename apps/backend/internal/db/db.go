@@ -37,19 +37,10 @@ func Connect(dbPath string) (*DB, error) {
 		return nil, fmt.Errorf("apply schema: %w", err)
 	}
 
-	// Manual Migrations
-	_, _ = db.Exec("ALTER TABLE issues ADD COLUMN disabled_tools TEXT")
-	_, _ = db.Exec("ALTER TABLE issues ADD COLUMN branch_name TEXT")
-	_, _ = db.Exec("ALTER TABLE issues ADD COLUMN url TEXT")
-	_, _ = db.Exec("ALTER TABLE issues ADD COLUMN labels TEXT")
-	_, _ = db.Exec("ALTER TABLE issues ADD COLUMN blocked_by TEXT")
-	_, _ = db.Exec("ALTER TABLE issues ADD COLUMN provider TEXT")
-	_, _ = db.Exec("ALTER TABLE issues ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP")
-	_, _ = db.Exec("ALTER TABLE runs ADD COLUMN provider TEXT")
-	_, _ = db.Exec("ALTER TABLE runs ADD COLUMN issue_identifier TEXT")
-	_, _ = db.Exec("ALTER TABLE sessions ADD COLUMN issue_id TEXT")
-	_, _ = db.Exec("ALTER TABLE issues ADD COLUMN base_sha TEXT")
-	_, _ = db.Exec("ALTER TABLE sessions ADD COLUMN model TEXT")
+	// Schema migrations with proper error handling
+	if err := runMigrations(db); err != nil {
+		return nil, fmt.Errorf("run migrations: %w", err)
+	}
 
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS issue_history (
 		id TEXT PRIMARY KEY,

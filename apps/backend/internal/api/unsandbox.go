@@ -13,7 +13,7 @@ import (
 func (s *Server) PostUnsandboxExecute(w http.ResponseWriter, r *http.Request) {
 	client, err := unsandbox.NewClientFromEnv()
 	if err != nil {
-		writeJSONError(w, http.StatusServiceUnavailable, "unsandbox_not_configured", err.Error())
+		writeJSONError(w, http.StatusServiceUnavailable, "unsandbox_not_configured", "unsandbox is not configured")
 		return
 	}
 
@@ -36,12 +36,11 @@ func (s *Server) PostUnsandboxExecute(w http.ResponseWriter, r *http.Request) {
 
 	result, err := client.ExecuteWithOpts(r.Context(), body.Language, body.Code, body.Network)
 	if err != nil {
-		writeJSONError(w, http.StatusBadGateway, "execution_failed", err.Error())
+		writeJSONError(w, http.StatusBadGateway, "execution_failed", "execution failed")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, http.StatusOK,map[string]any{
 		"status": result.Status,
 		"output": result.Output,
 		"error":  result.Error,
@@ -54,18 +53,17 @@ func (s *Server) PostUnsandboxExecute(w http.ResponseWriter, r *http.Request) {
 func (s *Server) GetUnsandboxSessions(w http.ResponseWriter, r *http.Request) {
 	client, err := unsandbox.NewClientFromEnv()
 	if err != nil {
-		writeJSONError(w, http.StatusServiceUnavailable, "unsandbox_not_configured", err.Error())
+		writeJSONError(w, http.StatusServiceUnavailable, "unsandbox_not_configured", "unsandbox is not configured")
 		return
 	}
 
 	sessions, err := client.ListSessions(r.Context())
 	if err != nil {
-		writeJSONError(w, http.StatusBadGateway, "list_failed", err.Error())
+		writeJSONError(w, http.StatusBadGateway, "list_failed", "failed to list items")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, http.StatusOK,map[string]any{
 		"sessions": sessions,
 	})
 }
@@ -75,18 +73,17 @@ func (s *Server) GetUnsandboxSessions(w http.ResponseWriter, r *http.Request) {
 func (s *Server) GetUnsandboxServices(w http.ResponseWriter, r *http.Request) {
 	client, err := unsandbox.NewClientFromEnv()
 	if err != nil {
-		writeJSONError(w, http.StatusServiceUnavailable, "unsandbox_not_configured", err.Error())
+		writeJSONError(w, http.StatusServiceUnavailable, "unsandbox_not_configured", "unsandbox is not configured")
 		return
 	}
 
 	services, err := client.ListServices(r.Context())
 	if err != nil {
-		writeJSONError(w, http.StatusBadGateway, "list_failed", err.Error())
+		writeJSONError(w, http.StatusBadGateway, "list_failed", "failed to list items")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, http.StatusOK,map[string]any{
 		"services": services,
 	})
 }
@@ -96,8 +93,7 @@ func (s *Server) GetUnsandboxServices(w http.ResponseWriter, r *http.Request) {
 func (s *Server) GetUnsandboxStatus(w http.ResponseWriter, r *http.Request) {
 	client, err := unsandbox.NewClientFromEnv()
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		writeJSON(w, http.StatusOK,map[string]any{
 			"configured": false,
 			"error":      err.Error(),
 		})
@@ -106,8 +102,7 @@ func (s *Server) GetUnsandboxStatus(w http.ResponseWriter, r *http.Request) {
 
 	keyInfo, err := client.ValidateKeys(r.Context())
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		writeJSON(w, http.StatusOK,map[string]any{
 			"configured": true,
 			"valid":      false,
 			"error":      err.Error(),
@@ -115,8 +110,7 @@ func (s *Server) GetUnsandboxStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, http.StatusOK,map[string]any{
 		"configured": true,
 		"valid":      true,
 		"key_info":   keyInfo,

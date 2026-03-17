@@ -6,6 +6,7 @@ import {
   DialogContent,
 } from '@/components/ui/dialog'
 import { getWhisperClient, type WhisperStatus } from '@/lib/whisper-client'
+import { validateTaskTitle, validateTaskDescription } from '@/lib/validation'
 import {
   type BackendConfig,
   type IssueCreatePayload,
@@ -43,6 +44,8 @@ export function CreateTaskDialog({
   const [disabledTools, setDisabledTools] = useState<string[]>([])
   const [projectID, setProjectID] = useState(initialProjectID || (projects.length > 0 ? projects[0].id : ''))
   const [pending, setPending] = useState(false)
+  const [titleError, setTitleError] = useState('')
+  const [descError, setDescError] = useState('')
   const [submitError, setSubmitError] = useState('')
   const [recording, setRecording] = useState(false)
   const [whisperStatus, setWhisperStatus] = useState<WhisperStatus>({ state: 'idle' })
@@ -86,7 +89,11 @@ export function CreateTaskDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title.trim()) return
+    const tErr = validateTaskTitle(title)
+    const dErr = validateTaskDescription(description)
+    setTitleError(tErr)
+    setDescError(dErr)
+    if (tErr || dErr) return
     setPending(true)
     setSubmitError('')
     try {
@@ -158,17 +165,19 @@ export function CreateTaskDialog({
               className="w-full bg-transparent border-none outline-none text-xl font-bold placeholder:text-muted-foreground/20 focus:ring-0 focus:outline-none p-0 selection:bg-primary/30"
               placeholder="What needs to be done?"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => { setTitle(e.target.value); setTitleError('') }}
               onFocus={() => { activeFieldRef.current = 'title' }}
               required
             />
+            {titleError && <p className="text-xs text-red-400 -mt-2">{titleError}</p>}
             <textarea
               className="w-full bg-transparent border-none outline-none text-sm text-foreground/70 placeholder:text-muted-foreground/15 focus:ring-0 focus:outline-none p-0 resize-none min-h-[80px] selection:bg-primary/20 leading-relaxed"
               placeholder="Describe the task for the agent..."
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => { setDescription(e.target.value); setDescError('') }}
               onFocus={() => { activeFieldRef.current = 'description' }}
             />
+            {descError && <p className="text-xs text-red-400 -mt-2">{descError}</p>}
           </div>
 
           {submitError && (
