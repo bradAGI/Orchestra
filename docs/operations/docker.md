@@ -1,185 +1,161 @@
 # 6.2 Container Build
 
 > **Source files:**
-> [`ops/docker/Dockerfile.backend`](../../ops/docker/Dockerfile.backend) |
-> [`ops/docker/compose.yml`](../../ops/docker/compose.yml) |
-> [`.github/workflows/orchestra-container-publish.yml`](../../.github/workflows/orchestra-container-publish.yml)
+> - `ops/docker/Dockerfile.backend` -- Multi-stage Dockerfile for the Orchestra backend
+> - `.github/workflows/orchestra-container-publish.yml` -- CI pipeline for building and pushing
 
-The Orchestra backend ships as a minimal, statically-linked container image built with a multi-stage Dockerfile and published to GitHub Container Registry (GHCR).
+The Orchestra backend is containerized using a multi-stage Docker build that produces a minimal, distroless image containing the `orchestrad` server and `orchestra` CLI.
 
 ---
 
-## Dockerfile Stages
+### Dockerfile Breakdown
 
 ```mermaid
 flowchart TD
-    subgraph "Stage 1: build"
-        A[golang:1.24] --> B[Copy go.mod + go.sum]
-        B --> C[go mod download]
-        C --> D[Copy source]
-        D --> E["Build orchestrad + orchestra<br/>CGO_ENABLED=0 GOOS=linux GOARCH=amd64"]
+    subgraph Stage1["Stage 1: Build (golang:1.24)"]
+        COPY_MOD[Copy go.mod + go.sum]
+        DL[go mod download]
+        COPY_SRC[Copy source code]
+        BUILD_D[Build orchestrad]
+        BUILD_C[Build orchestra CLI]
     end
 
-    subgraph "Stage 2: runtime"
-        F[distroless/static-debian12] --> G[Copy binaries from build]
-        G --> H[USER nonroot:nonroot]
-        H --> I[HEALTHCHECK orchestra healthz]
-        I --> J["ENTRYPOINT orchestrad"]
+    subgraph Stage2["Stage 2: Runtime (distroless)"]
+        COPY_BIN[Copy binaries from build stage]
+        SET_USER[Run as nonroot]
+        EXPOSE[Expose port 4010]
+        HEALTH[HEALTHCHECK via orchestra healthz]
+        ENTRY[ENTRYPOINT orchestrad]
     end
 
-    E --> G
+    Stage1 --> Stage2
 ```
 
-### Stage 1 -- Build
+#### Stage 1: Build
 
-| Step | Purpose |
-|------|---------|
-| `FROM golang:1.24 AS build` | Full Go toolchain for compilation |
-| Copy `go.mod` / `go.sum` first | Layer caching -- dependency downloads are cached unless the module files change |
-| `go mod download` | Pre-fetch all dependencies |
-| Copy `apps/backend` source | Only invalidates the build layer when source changes |
-| `go build` (x2) | Produces `/out/orchestrad` (daemon) and `/out/orchestra` (CLI) as static linux/amd64 binaries |
+| Layer | Instruction | Purpose |
+|-------|-------------|---------|
+| Base | `golang:1.24` | Official Go toolchain |
+| Module cache | Copy `go.mod` + `go.sum`, then `go mod download` | Separates dependency download from source compilation for layer caching |
+| Compile | `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build` | Static binary, no CGo dependencies |
+| Output | Two binaries in `/out/` | `orchestrad` (server) and `orchestra` (CLI) |
 
-Build flags:
+#### Stage 2: Runtime
 
-| Flag | Value | Effect |
-|------|-------|--------|
-| `CGO_ENABLED` | `0` | Pure Go binary, no C dependencies |
-| `GOOS` | `linux` | Target operating system |
-| `GOARCH` | `amd64` | Target architecture |
-
-### Stage 2 -- Runtime
-
-| Layer | Detail |
-|-------|--------|
-| Base image | `gcr.io/distroless/static-debian12` -- no shell, no package manager, minimal CVE surface |
-| User | `nonroot:nonroot` -- drops all root privileges |
-| Binaries | `orchestrad` and `orchestra` copied to `/usr/local/bin/` |
-| Working directory | `/app` |
-| Entrypoint | `/usr/local/bin/orchestrad` |
+| Layer | Instruction | Purpose |
+|-------|-------------|---------|
+| Base | `gcr.io/distroless/static-debian12` | Minimal base image -- no shell, no package manager, no libc |
+| Security | `USER nonroot:nonroot` | Runs as non-root user |
+| Binaries | Copied to `/usr/local/bin/` | Both `orchestrad` and `orchestra` available |
+| Config | `ORCHESTRA_SERVER_HOST=0.0.0.0` | Binds to all interfaces (required for container networking) |
+| Port | `EXPOSE 4010` | Default Orchestra API port |
+| Health | `HEALTHCHECK` with `orchestra healthz` | Container orchestrator health monitoring |
+| Entry | `ENTRYPOINT ["/usr/local/bin/orchestrad"]` | Runs the backend server |
 
 ---
 
-## Build Arguments & Environment
+### Build Commands
 
-### Environment Variables Set in Image
+#### Local Build
 
-| Variable | Value | Description |
-|----------|-------|-------------|
-| `ORCHESTRA_SERVER_HOST` | `0.0.0.0` | Bind to all interfaces inside the container |
-| `ORCHESTRA_SERVER_PORT` | `4010` | Default listen port |
+```bash
+# From repository root
+docker build -f ops/docker/Dockerfile.backend -t orchestra-backend .
 
-### Exposed Ports
-
-| Port | Protocol | Service |
-|------|----------|---------|
-| `4010` | TCP | Orchestra HTTP API |
-
----
-
-## Container Runtime Configuration (Compose)
-
-The `ops/docker/compose.yml` file provides a ready-to-use local runtime:
-
-```yaml
-services:
-  orchestra-backend:
-    build:
-      context: ../../
-      dockerfile: ops/docker/Dockerfile.backend
-    image: orchestra-backend:latest
-    container_name: orchestra-backend
-    ports:
-      - "4010:4010"
-    volumes:
-      - orchestra-workspaces:/var/lib/orchestra/workspaces
-    restart: unless-stopped
+# Run the container
+docker run -d \
+  --name orchestra \
+  -p 4010:4010 \
+  -e ORCHESTRA_API_TOKEN=your-secret \
+  -e ORCHESTRA_WORKSPACE_ROOT=/data/workspaces \
+  -v /path/to/workspaces:/data/workspaces \
+  orchestra-backend
 ```
 
-| Setting | Value | Purpose |
-|---------|-------|---------|
-| Build context | Repository root (`../../`) | Dockerfile copies from `apps/backend/` relative to repo root |
-| Image name | `orchestra-backend:latest` | Local tag for composed builds |
-| Volume | `orchestra-workspaces` at `/var/lib/orchestra/workspaces` | Persistent workspace storage across container restarts |
-| Restart policy | `unless-stopped` | Automatic restart on failure; stops only on explicit `docker compose down` |
+#### CI Build (GHCR)
 
-### Runtime Environment (Compose)
+The `orchestra-container-publish.yml` workflow builds and pushes to GitHub Container Registry on `v*` tags:
 
-| Variable | Value |
-|----------|-------|
-| `ORCHESTRA_SERVER_HOST` | `0.0.0.0` |
-| `ORCHESTRA_SERVER_PORT` | `4010` |
-| `ORCHESTRA_WORKSPACE_ROOT` | `/var/lib/orchestra/workspaces` |
+```bash
+# Pull from GHCR
+docker pull ghcr.io/<owner>/orchestra-backend:latest
+```
 
 ---
 
-## Health Check
+### Runtime Configuration
 
-The Dockerfile includes a built-in health probe:
+All configuration is passed via environment variables. Key settings for containerized deployment:
+
+| Variable | Default | Container Note |
+|----------|---------|----------------|
+| `ORCHESTRA_SERVER_HOST` | `0.0.0.0` | Set in Dockerfile, required for container networking |
+| `ORCHESTRA_SERVER_PORT` | `4010` | Set in Dockerfile |
+| `ORCHESTRA_API_TOKEN` | -- | **Required** (non-loopback host) |
+| `ORCHESTRA_WORKSPACE_ROOT` | `/app` | Mount a persistent volume |
+
+---
+
+### Health Check Configuration
+
+The container includes a built-in health check:
 
 ```dockerfile
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD ["/usr/local/bin/orchestra", "healthz"]
 ```
 
-The `orchestra healthz` command calls the daemon's health endpoint and returns a non-zero exit code on failure. Docker reports container status as `healthy`, `unhealthy`, or `starting` based on probe results.
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `interval` | 30s | Time between health checks |
+| `timeout` | 3s | Maximum time for a health check response |
+| `start-period` | 5s | Grace period for container startup |
+| `retries` | 3 | Consecutive failures before marking unhealthy |
 
 ---
 
-## Image Registry (GHCR)
+### Image Properties
 
-Container images are published by the [`orchestra-container-publish`](../../.github/workflows/orchestra-container-publish.yml) workflow.
-
-```mermaid
-flowchart LR
-    A["v* tag push"] --> B[Checkout]
-    B --> C["docker/login-action<br/>ghcr.io"]
-    C --> D["docker/metadata-action<br/>compute tags + labels"]
-    D --> E["docker/build-push-action<br/>build & push"]
-    E --> F["ghcr.io/&lt;owner&gt;/orchestra-backend"]
-```
-
-### Tag Strategy
-
-| Type | Pattern | Example for `v1.2.3` |
-|------|---------|----------------------|
-| Full semver | `{{version}}` | `1.2.3` |
-| Minor semver | `{{major}}.{{minor}}` | `1.2` |
-| Commit SHA | `sha-<short>` | `sha-a1b2c3d` |
-
-This produces three tags per release, allowing consumers to pin at any granularity.
-
-### Pulling the Image
-
-```bash
-docker pull ghcr.io/<owner>/orchestra-backend:1.2.3
-docker pull ghcr.io/<owner>/orchestra-backend:1.2
-docker pull ghcr.io/<owner>/orchestra-backend:sha-a1b2c3d
-```
-
-### Authentication
-
-The workflow authenticates to GHCR using `GITHUB_TOKEN` with `packages: write` permission. No external secrets are required.
+| Property | Value |
+|----------|-------|
+| Base image | `gcr.io/distroless/static-debian12` |
+| Architecture | `linux/amd64` |
+| User | `nonroot:nonroot` |
+| Shell | None (distroless) |
+| Package manager | None |
+| Image size | Minimal (Go static binaries + distroless base) |
 
 ---
 
-## Building Locally
+### Security Features
 
-```bash
-# Build only
-docker build -f ops/docker/Dockerfile.backend -t orchestra-backend:dev .
-
-# Build and run via Compose
-cd ops/docker
-docker compose up --build
-
-# Verify health
-docker inspect --format='{{.State.Health.Status}}' orchestra-backend
-```
+1. **Distroless base**: No shell, no package manager, no unnecessary system utilities -- reduces attack surface
+2. **Non-root execution**: Runs as the `nonroot` user, not `root`
+3. **Static binaries**: `CGO_ENABLED=0` produces fully static binaries with no dynamic library dependencies
+4. **Layer separation**: Module download is cached separately from source compilation, preventing dependency leaks in build layers
 
 ---
 
-## Cross-References
+### Docker Compose Example
 
-- [6. Deployment & Operations](deployment.md) -- deployment modes, environment setup, and production guidance.
-- [6.1 CI/CD Pipelines](ci-cd.md) -- the `orchestra-container-publish` workflow that builds and pushes this image.
+```yaml
+services:
+  orchestra:
+    image: ghcr.io/<owner>/orchestra-backend:latest
+    ports:
+      - "4010:4010"
+    environment:
+      ORCHESTRA_API_TOKEN: "${ORCHESTRA_API_TOKEN}"
+      ORCHESTRA_WORKSPACE_ROOT: /data/workspaces
+      ORCHESTRA_AGENT_PROVIDER: CLAUDE
+    volumes:
+      - orchestra-workspaces:/data/workspaces
+    healthcheck:
+      test: ["/usr/local/bin/orchestra", "healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  orchestra-workspaces:
+```

@@ -1,6 +1,11 @@
 import type { SnapshotPayload } from '@/lib/orchestra-types'
 import type { TimelineItem } from '@/components/app-shell/types'
 
+/**
+ * Produces a JSON string fingerprint of a snapshot for change detection.
+ * @param snapshot - The snapshot to fingerprint.
+ * @returns A JSON string representation.
+ */
 function snapshotFingerprint(snapshot: SnapshotPayload): string {
   return JSON.stringify(snapshot)
 }

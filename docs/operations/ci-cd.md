@@ -1,209 +1,209 @@
 # 6.1 CI/CD Pipelines
 
 > **Source files:**
-> [`.github/workflows/orchestra-backend.yml`](../../.github/workflows/orchestra-backend.yml) |
-> [`.github/workflows/orchestra-container-publish.yml`](../../.github/workflows/orchestra-container-publish.yml) |
-> [`.github/workflows/orchestra-desktop-release.yml`](../../.github/workflows/orchestra-desktop-release.yml) |
-> [`.github/workflows/orchestra-desktop-smoke.yml`](../../.github/workflows/orchestra-desktop-smoke.yml) |
-> [`.github/workflows/orchestra-release-artifacts.yml`](../../.github/workflows/orchestra-release-artifacts.yml) |
-> [`.github/workflows/pr-description-lint.yml`](../../.github/workflows/pr-description-lint.yml) |
-> [`.github/workflows/make-all.yml`](../../.github/workflows/make-all.yml) |
-> [`.github/actions/setup-go-cached/action.yml`](../../.github/actions/setup-go-cached/action.yml) |
-> [`.github/actions/setup-node-cached/action.yml`](../../.github/actions/setup-node-cached/action.yml) |
-> [`.github/scripts/check-orchestra-naming.sh`](../../.github/scripts/check-orchestra-naming.sh)
+> - `.github/workflows/orchestra-backend.yml` -- Backend Go tests, vet, formatting
+> - `.github/workflows/orchestra-desktop-smoke.yml` -- Frontend tests and build validation
+> - `.github/workflows/make-all.yml` -- TUI tests and Makefile build
+> - `.github/workflows/orchestra-desktop-release.yml` -- Cross-platform desktop packaging and GitHub release
+> - `.github/workflows/orchestra-container-publish.yml` -- Docker image build and GHCR publish
+> - `.github/workflows/orchestra-release-artifacts.yml` -- Backend binary artifact builds
+> - `.github/workflows/pr-description-lint.yml` -- PR description format validation
+> - `.github/actions/setup-go-cached/action.yml` -- Composite action for Go setup
+> - `.github/actions/setup-node-cached/action.yml` -- Composite action for Node.js setup
 
-All CI/CD for Orchestra runs on GitHub Actions. Workflows are organized by concern: backend quality gates, desktop smoke tests and releases, container publishing, and repository hygiene. Every workflow uses concurrency groups with `cancel-in-progress: true` to avoid redundant runs.
-
----
-
-## Workflow Overview
-
-```mermaid
-flowchart TD
-    PR[Pull Request] --> BE[orchestra-backend]
-    PR --> DS[orchestra-desktop-smoke]
-    PR --> MA[make-all]
-    PR --> PL[pr-description-lint]
-
-    PUSH[Push to main] --> BE
-    PUSH --> DS
-    PUSH --> MA
-
-    TAG[v* tag push] --> CP[orchestra-container-publish]
-    TAG --> DR[orchestra-desktop-release]
-
-    MANUAL[workflow_dispatch] --> RA[orchestra-release-artifacts]
-    MANUAL --> CP
-    MANUAL --> DR
-
-    CRON[Daily 07:00 UTC] --> DS
-```
+Orchestra uses GitHub Actions for continuous integration and release automation. All workflows use pinned action versions (commit SHA) and apply concurrency controls to cancel in-progress runs on the same branch.
 
 ---
 
-## Workflows
-
-### orchestra-backend
-
-**Trigger:** PR or push to `main` when `apps/backend/**` changes.
-
-Runs three parallel jobs:
-
-| Job | Purpose | Key command |
-|-----|---------|-------------|
-| `backend-tests` | Format check, `go vet`, unit/integration tests with coverage | `go test -coverprofile=coverage.out ./...` |
-| `backend-race-tests` | Data-race detection | `go test -race ./...` |
-| `naming-guard` | Prevents reintroduction of legacy "Symphony" symbols | `.github/scripts/check-orchestra-naming.sh` |
-
-**Artifacts:** `backend-coverage` (coverage.out).
-
----
-
-### orchestra-desktop-smoke
-
-**Trigger:** PR or push to `main` when `apps/desktop/**` or `apps/backend/**` changes, daily cron at 07:00 UTC, or manual dispatch.
-
-| Step | Description |
-|------|-------------|
-| Setup Node + Go | Via reusable composite actions |
-| `npm ci` | Install desktop dependencies |
-| `npm run release:gate` | Run the desktop release gate checks |
-
-**Artifacts:** `orchestra-desktop-parity-report` (always uploaded, even on failure).
-
----
-
-### orchestra-container-publish
-
-**Trigger:** `v*` tag push or manual dispatch.
-
-**Permissions:** `contents: read`, `packages: write`.
+### Pipeline Overview
 
 ```mermaid
 flowchart LR
-    A[Checkout] --> B[Login to GHCR]
-    B --> C[Extract metadata]
-    C --> D[Build & push image]
+    subgraph CI["CI (Pull Requests & Push)"]
+        BE[orchestra-backend]
+        DS[orchestra-desktop-smoke]
+        MA[make-all]
+        PR[pr-description-lint]
+    end
+
+    subgraph Release["Release (Tags & Dispatch)"]
+        DR[orchestra-desktop-release]
+        CP[orchestra-container-publish]
+        RA[orchestra-release-artifacts]
+    end
+
+    BE -->|"Go test + vet"| PASS1[Pass]
+    DS -->|"npm run release:gate"| PASS2[Pass]
+    MA -->|"go test + make build"| PASS3[Pass]
+    PR -->|"check-pr-body"| PASS4[Pass]
+
+    DR -->|"v* tag"| GH_RELEASE[GitHub Release]
+    CP -->|"v* tag"| GHCR[GHCR Image]
+    RA -->|"dispatch"| ARTIFACTS[Build Artifacts]
 ```
-
-| Detail | Value |
-|--------|-------|
-| Registry | `ghcr.io` |
-| Image name | `<owner>/orchestra-backend` |
-| Tag strategy | `semver {{version}}`, `semver {{major}}.{{minor}}`, `sha` |
-| Dockerfile | `ops/docker/Dockerfile.backend` |
-
-Uses `docker/metadata-action` to derive OCI labels and `docker/build-push-action` to build and push in a single step.
 
 ---
 
-### orchestra-desktop-release
+### CI Workflows
 
-**Trigger:** `v*` tag push or manual dispatch (requires `release_title` and `release_notes` inputs).
+#### orchestra-backend.yml
 
-**Permissions:** `contents: write` (creates GitHub Releases).
+**Triggers:** Pull requests and pushes to `main` affecting `apps/backend/**`
+
+| Job | Steps | Purpose |
+|-----|-------|---------|
+| `backend-tests` | `gofmt -l`, `go vet`, `go test -coverprofile` | Format verification, static analysis, unit/integration tests with coverage |
+| `backend-race-tests` | `go test -race` | Data race detection under the Go race detector |
+| `naming-guard` | `.github/scripts/check-orchestra-naming.sh` | Ensures Orchestra naming conventions are followed |
+
+Coverage reports are uploaded as artifacts.
+
+#### orchestra-desktop-smoke.yml
+
+**Triggers:** Pull requests and pushes affecting `apps/desktop/**` or `apps/backend/**`, daily schedule (7:00 UTC), manual dispatch
+
+| Job | Steps | Purpose |
+|-----|-------|---------|
+| `desktop-smoke` | `npm ci`, `npm run release:gate` | Installs deps, runs parity verification twice, then release readiness checks |
+
+The `release:gate` script chains:
+1. `parity:verify` (x2) -- Validates frontend/backend API parity
+2. `release:readiness` -- Checks build health and completeness
+
+Parity reports are uploaded as artifacts.
+
+#### make-all.yml
+
+**Triggers:** Pull requests and pushes affecting `apps/tui/**` or `Makefile`
+
+| Job | Steps | Purpose |
+|-----|-------|---------|
+| `make-all` | `go test -coverprofile`, `make build` | TUI unit tests with coverage, Makefile build verification |
+
+#### pr-description-lint.yml
+
+**Triggers:** Pull request opened, edited, reopened, synchronized, or marked ready for review
+
+| Job | Steps | Purpose |
+|-----|-------|---------|
+| `validate-pr-description` | Write PR body to file, `go run ./apps/backend/cmd/orchestra check-pr-body` | Validates PR description format using the Orchestra CLI's built-in checker |
+
+---
+
+### Release Workflows
+
+#### orchestra-desktop-release.yml
+
+**Triggers:** Push of `v*` tags, manual dispatch with release title and notes
 
 ```mermaid
 flowchart TD
-    V[validate-release-message] --> P[package-desktop]
-    P --> R[publish-release]
+    VR[validate-release-message] --> PD[package-desktop]
+    PD --> PUB[publish-release]
 
-    subgraph package-desktop
-        L[Linux build]
-        W[Windows build]
-        M[macOS build]
+    VR -->|"Validates"| NOTES["## Summary + ## Validation required"]
+
+    subgraph PD["package-desktop (matrix)"]
+        LINUX[ubuntu-latest]
+        WIN[windows-latest]
+        MAC[macos-latest]
     end
+
+    PUB -->|"gh release create"| GH[GitHub Release]
 ```
 
-**Jobs:**
+**Release validation requirements:**
+- Release title must not be empty
+- Release notes must contain `## Summary` and `## Validation` sections
+- For tag pushes, notes are extracted from the annotated tag message
+- For manual dispatch, notes are provided via the workflow input
 
-| Job | Details |
-|-----|---------|
-| `validate-release-message` | Ensures release notes contain `## Summary` and `## Validation` sections. For tag pushes, reads the annotated tag message; for manual dispatch, uses workflow inputs. |
-| `package-desktop` | Matrix build across `ubuntu-latest`, `windows-latest`, `macos-latest`. Builds the Go backend sidecar for each platform, then runs `npm run dist:desktop` to produce installers. |
-| `publish-release` | Downloads all platform artifacts and uploads them to the GitHub Release via `gh release create` / `gh release upload --clobber`. Only runs on tag pushes. |
+**Cross-platform build matrix:**
 
-**Artifacts:** `orchestra-desktop-Linux`, `orchestra-desktop-Windows`, `orchestra-desktop-macOS`.
+| OS | Backend Sidecar Path | Desktop Output |
+|----|---------------------|----------------|
+| Linux (x64) | `resources/backend/linux-x64/orchestrad` | AppImage, deb |
+| Windows (x64) | `resources/backend/win32-x64/orchestrad.exe` | NSIS installer |
+| macOS | `resources/backend/darwin-<arch>/orchestrad` | DMG, zip |
+
+Each platform job:
+1. Sets up Node.js and Go
+2. Installs desktop dependencies
+3. Builds the `orchestrad` sidecar for the target platform
+4. Runs `npm run dist:desktop` (electron-builder)
+5. Uploads packaged artifacts
+
+The `publish-release` job downloads all platform artifacts and uploads them to a GitHub release.
+
+#### orchestra-container-publish.yml
+
+**Triggers:** Push of `v*` tags, manual dispatch
+
+| Step | Action | Purpose |
+|------|--------|---------|
+| Login | `docker/login-action` | Authenticate to GHCR |
+| Metadata | `docker/metadata-action` | Generate semver + SHA tags |
+| Build & Push | `docker/build-push-action` | Multi-stage build from `ops/docker/Dockerfile.backend` |
+
+**Image tags generated:**
+- `<version>` (e.g., `1.2.3`)
+- `<major>.<minor>` (e.g., `1.2`)
+- `sha-<commit>` (e.g., `sha-abc1234`)
+
+**Registry:** `ghcr.io/<owner>/orchestra-backend`
+
+#### orchestra-release-artifacts.yml
+
+**Triggers:** Manual dispatch only
+
+Builds `orchestrad` and `orchestra` binaries for Linux (amd64) and uploads them as workflow artifacts. Used for ad-hoc artifact builds outside the release cycle.
 
 ---
 
-### orchestra-release-artifacts
+### Composite Actions
 
-**Trigger:** Manual dispatch only.
+Two reusable composite actions standardize toolchain setup:
 
-Builds the backend Go binaries (`orchestrad` and `orchestra`) and uploads them as `orchestra-backend-artifacts`. Useful for producing build artifacts without a full release.
+#### setup-go-cached
 
----
-
-### pr-description-lint
-
-**Trigger:** Pull request opened, edited, reopened, synchronized, or marked ready for review.
-
-Validates the PR body format by writing it to a temp file and running:
-
-```bash
-go run ./apps/backend/cmd/orchestra check-pr-body /tmp/pr_body.md
-```
-
-Enforces a consistent PR description structure across the repository.
-
----
-
-### make-all
-
-**Trigger:** PR or push to `main` when `apps/tui/**` or `Makefile` changes.
-
-| Step | Command |
-|------|---------|
-| TUI tests | `cd apps/tui && go test -coverprofile=coverage.out ./...` |
-| Build verification | `make build` |
-
-**Artifacts:** `tui-coverage` (coverage.out).
-
----
-
-## Reusable Composite Actions
-
-Both actions live under `.github/actions/` and are referenced with `uses: ./.github/actions/<name>`.
-
-### setup-go-cached
-
-Installs Go (version derived from `go.mod`) with module cache keyed on `go.sum`.
+**Location:** `.github/actions/setup-go-cached/action.yml`
 
 | Input | Required | Description |
 |-------|----------|-------------|
-| `go-mod-path` | Yes | Path to `go.mod` |
-| `go-sum-path` | Yes | Path to `go.sum` |
+| `go-mod-path` | Yes | Path to `go.mod` for version detection |
+| `go-sum-path` | Yes | Path to `go.sum` for cache key |
 
-### setup-node-cached
+Uses `actions/setup-go` with automatic Go version detection from `go.mod` and module cache keyed on `go.sum`.
 
-Installs Node.js with npm cache keyed on `package-lock.json`.
+#### setup-node-cached
+
+**Location:** `.github/actions/setup-node-cached/action.yml`
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `node-version` | No | `20` | Node.js major version |
-| `cache-dependency-path` | Yes | -- | Path to `package-lock.json` |
+| `node-version` | No | `20` | Node.js version |
+| `cache-dependency-path` | Yes | -- | Path to `package-lock.json` for cache key |
+
+Uses `actions/setup-node` with npm caching.
 
 ---
 
-## Naming Guard Script
+### Concurrency Controls
 
-`.github/scripts/check-orchestra-naming.sh` uses `rg` (ripgrep) to scan `apps/backend` and `packages/protocol` for any occurrence of the legacy name "Symphony" (case-insensitive). Test files and docs directories are excluded. The script exits non-zero if forbidden symbols are found, enforcing a clean namespace.
+All workflows use concurrency groups to cancel in-progress runs:
 
----
+```yaml
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+```
 
-## Common Patterns
-
-All workflows share these conventions:
-
-- **Pinned actions:** Every third-party action is pinned to a full commit SHA with a version comment.
-- **`FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true`:** Set as a global env to ensure JavaScript-based actions run on Node 24.
-- **Concurrency groups:** `${{ github.workflow }}-${{ github.ref }}` with `cancel-in-progress: true`.
-- **`contents: read` by default:** Least-privilege permissions; only the desktop release workflow requests `contents: write`.
+This prevents resource waste when multiple commits are pushed in quick succession.
 
 ---
 
-## Cross-References
+### Environment Variables
 
-- [6. Deployment & Operations](deployment.md) -- high-level deployment options and environment variables.
-- [6.2 Container Build](docker.md) -- Dockerfile stages and runtime configuration.
+All workflows set `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true` for Node.js action compatibility.
+
+The backend workflows set `GOWORK: 'off'` to disable Go workspace mode, ensuring isolated module resolution.

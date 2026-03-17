@@ -21,6 +21,10 @@ function IconButton({ icon, title, onClick, className = '' }: { icon: ReactNode;
   )
 }
 
+/**
+ * Main operations hub dashboard showing fleet metrics, active projects,
+ * and runtime event streams. Serves as the landing page for the app.
+ */
 export function DashboardOverview({
   projects,
   issues,
@@ -170,6 +174,10 @@ export function DashboardOverview({
   )
 }
 
+/**
+ * A styled metric card displaying a single KPI with title, large value, hint text, and an icon.
+ * Used in the dashboard overview for fleet-level statistics.
+ */
 export function MetricCard({ title, value, hint, icon }: { title: string; value: string; hint: string; icon: ReactNode }) {
   return (
     <Card className="group relative overflow-hidden border border-border/60 bg-gradient-to-br from-card via-card/95 to-muted/20 shadow-lg shadow-primary/5 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/10 hover:border-primary/30 hover:-translate-y-1">
