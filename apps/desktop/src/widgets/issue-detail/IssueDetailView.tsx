@@ -614,119 +614,103 @@ export function IssueDetailView({
                     )
                   }
 
-                  return parsed.map((entry) => {
-                    const isExpanded = expandedOutputEntries.has(entry.idx)
-                    const toggleExpand = () => setExpandedOutputEntries(prev => {
-                      const next = new Set(prev)
-                      if (next.has(entry.idx)) next.delete(entry.idx)
-                      else next.add(entry.idx)
-                      return next
-                    })
+                  return (
+                    <div className="p-4 space-y-3">
+                      {parsed.map((entry) => {
+                        const isExpanded = expandedOutputEntries.has(entry.idx)
+                        const toggleExpand = () => setExpandedOutputEntries(prev => {
+                          const next = new Set(prev)
+                          if (next.has(entry.idx)) next.delete(entry.idx)
+                          else next.add(entry.idx)
+                          return next
+                        })
 
-                    if (entry.kind === 'session') {
-                      return (
-                        <div key={entry.idx} className="flex items-center gap-3 px-5 py-3 bg-primary/5 border-b border-primary/10">
-                          <Zap size={14} className="text-primary shrink-0" />
-                          <span className="text-xs font-bold uppercase tracking-widest text-primary">Session Started</span>
-                          {entry.label && <span className="text-[10px] font-mono text-primary/50 bg-primary/10 px-2 py-0.5 rounded">{entry.label}</span>}
-                          <span className="text-[10px] font-mono text-muted-foreground/40 ml-auto">{entry.ts}</span>
-                        </div>
-                      )
-                    }
-                    if (entry.kind === 'lifecycle') {
-                      return (
-                        <div key={entry.idx} className="flex items-center gap-2 px-5 py-2 border-b border-border/10">
-                          <Play size={10} className="text-muted-foreground/40 shrink-0" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">{entry.label}</span>
-                          {entry.content && <span className="text-[10px] text-muted-foreground/30">{entry.content}</span>}
-                          <span className="text-[10px] font-mono text-muted-foreground/30 ml-auto">{entry.ts}</span>
-                        </div>
-                      )
-                    }
-                    if (entry.kind === 'prompt') {
-                      return (
-                        <div key={entry.idx} className="px-5 py-2 border-b border-border/10 bg-muted/5">
-                          <button onClick={toggleExpand} className="flex items-center gap-2 w-full text-left group">
-                            <ChevronRight size={12} className={`text-primary/50 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                            <span className="text-[11px] font-bold uppercase tracking-widest text-primary/50 group-hover:text-primary transition-colors">System Prompt</span>
-                            <span className="text-[10px] font-mono text-muted-foreground/30 ml-auto">{entry.ts}</span>
-                          </button>
-                          {isExpanded && (
-                            <p className="text-xs text-foreground/40 leading-relaxed mt-2 ml-6 max-h-40 overflow-auto custom-scrollbar whitespace-pre-wrap">{entry.content}</p>
-                          )}
-                        </div>
-                      )
-                    }
-                    if (entry.kind === 'agent') {
-                      return (
-                        <div key={entry.idx} className="px-5 py-4 border-b border-border/20 hover:bg-primary/[0.02] transition-colors">
-                          <div className="flex items-start gap-3">
-                            <div className="h-7 w-7 rounded-xl bg-primary/10 border border-primary/15 grid place-items-center shrink-0 mt-0.5"><Bot size={14} className="text-primary" /></div>
-                            <div className="flex-1 min-w-0">
-                              <div className="prose prose-invert prose-sm max-w-none text-[13px] leading-relaxed prose-p:my-1.5 prose-p:text-foreground/80 prose-code:text-primary prose-code:bg-primary/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[12px] prose-pre:bg-background prose-pre:border prose-pre:border-border/30 prose-pre:rounded-xl prose-li:text-foreground/70 prose-headings:text-foreground prose-headings:text-sm prose-strong:text-foreground">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.content}</ReactMarkdown>
+                        if (entry.kind === 'session') {
+                          return (
+                            <div key={entry.idx} className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-primary/5 border border-primary/10">
+                              <div className="h-6 w-6 rounded-lg bg-primary/15 grid place-items-center"><Zap size={12} className="text-primary" /></div>
+                              <span className="text-[10px] font-black uppercase tracking-widest text-primary">Session</span>
+                              {entry.label && <span className="text-[9px] font-mono text-primary/50 bg-primary/10 px-2 py-0.5 rounded-md border border-primary/10">{entry.label}</span>}
+                              <span className="text-[9px] font-mono text-muted-foreground/30 ml-auto">{entry.ts}</span>
+                            </div>
+                          )
+                        }
+                        if (entry.kind === 'lifecycle') return null
+                        if (entry.kind === 'prompt') {
+                          return (
+                            <button key={entry.idx} onClick={toggleExpand} className="w-full flex items-center gap-2 px-4 py-2 rounded-lg bg-muted/20 border border-border/20 text-left group hover:border-border/40 transition-all">
+                              <ChevronRight size={11} className={`text-muted-foreground/30 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                              <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40 group-hover:text-muted-foreground/60">System Prompt</span>
+                              <span className="text-[9px] font-mono text-muted-foreground/20 ml-auto">{entry.ts}</span>
+                              {isExpanded && (
+                                <p className="text-[11px] text-foreground/30 leading-relaxed mt-2 whitespace-pre-wrap max-h-40 overflow-auto custom-scrollbar w-full" onClick={e => e.stopPropagation()}>{entry.content}</p>
+                              )}
+                            </button>
+                          )
+                        }
+                        if (entry.kind === 'agent') {
+                          return (
+                            <div key={entry.idx} className="rounded-xl border border-border/20 bg-gradient-to-b from-card to-muted/10 overflow-hidden">
+                              <div className="flex items-start gap-3 px-4 py-3">
+                                <div className="h-7 w-7 rounded-lg bg-primary/10 border border-primary/15 grid place-items-center shrink-0 mt-0.5"><Bot size={13} className="text-primary" /></div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="prose prose-invert prose-sm max-w-none text-[12px] leading-relaxed prose-p:my-1 prose-p:text-foreground/75 prose-code:text-primary prose-code:bg-primary/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-[11px] prose-pre:bg-background prose-pre:border prose-pre:border-border/20 prose-pre:rounded-lg prose-li:text-foreground/65 prose-headings:text-foreground/90 prose-headings:text-xs prose-strong:text-foreground/85">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.content}</ReactMarkdown>
+                                  </div>
+                                </div>
+                                <span className="text-[8px] font-mono text-muted-foreground/20 shrink-0 mt-1">{entry.ts}</span>
                               </div>
                             </div>
-                            <span className="text-[9px] font-mono text-muted-foreground/25 shrink-0 mt-1">{entry.ts}</span>
-                          </div>
-                        </div>
-                      )
-                    }
-                    if (entry.kind === 'thinking') {
-                      return (
-                        <div key={entry.idx} className="px-5 py-2 border-b border-border/10 bg-violet-500/[0.03]">
-                          <button onClick={toggleExpand} className="flex items-center gap-2 w-full text-left group">
-                            <Brain size={12} className="text-violet-400/60" />
-                            <span className="text-[11px] text-violet-300/50 italic group-hover:text-violet-300/80 transition-colors">
-                              {isExpanded ? 'Thinking' : 'Thinking...'}
-                            </span>
-                            <ChevronDown size={12} className={`text-violet-400/30 transition-transform ml-auto ${isExpanded ? 'rotate-180' : ''}`} />
-                            <span className="text-[10px] font-mono text-muted-foreground/25 shrink-0">{entry.ts}</span>
-                          </button>
-                          {isExpanded && (
-                            <p className="text-xs text-violet-200/40 leading-relaxed mt-2 ml-6 whitespace-pre-wrap max-h-60 overflow-auto custom-scrollbar">{entry.content.replace(/\*\*/g, '')}</p>
-                          )}
-                        </div>
-                      )
-                    }
-                    if (entry.kind === 'tool') {
-                      return (
-                        <div key={entry.idx} className="flex items-center gap-2.5 px-5 py-1.5 border-b border-border/10">
-                          <div className="h-5 w-5 rounded-md bg-amber-500/10 border border-amber-500/15 grid place-items-center shrink-0"><Wrench size={10} className="text-amber-400" /></div>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-amber-400/70 shrink-0">{entry.label}</span>
-                          <code className="text-[10px] font-mono text-foreground/30 truncate flex-1">{entry.content}</code>
-                          <span className="text-[9px] font-mono text-muted-foreground/20 shrink-0">{entry.ts}</span>
-                        </div>
-                      )
-                    }
-                    if (entry.kind === 'result') {
-                      const isError = entry.status === 'error'
-                      return (
-                        <div key={entry.idx} className={`px-5 py-1.5 border-b border-border/10 ${isError ? 'bg-red-500/5' : ''}`}>
-                          <button onClick={toggleExpand} className="flex items-center gap-2 w-full text-left group">
-                            <CheckCircle2 size={12} className={isError ? 'text-red-400/60' : 'text-emerald-500/40'} />
-                            <span className={`text-[11px] truncate flex-1 ${isError ? 'text-red-400/60' : 'text-foreground/30'} ${!isExpanded ? 'line-clamp-1' : ''}`}>
-                              {isExpanded ? '' : entry.content}
-                            </span>
-                            {entry.content.length > 60 && <ChevronDown size={10} className={`text-muted-foreground/30 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />}
-                            <span className="text-[10px] font-mono text-muted-foreground/25 shrink-0">{entry.ts}</span>
-                          </button>
-                          {isExpanded && (
-                            <pre className="text-[11px] text-foreground/30 leading-relaxed mt-2 ml-6 whitespace-pre-wrap max-h-40 overflow-auto custom-scrollbar font-mono">{entry.content}</pre>
-                          )}
-                        </div>
-                      )
-                    }
-                    if (entry.kind === 'error') {
-                      return (
-                        <div key={entry.idx} className="flex items-center gap-3 px-5 py-2.5 border-b border-red-500/10 bg-red-500/5">
-                          <Zap size={14} className="text-red-400 shrink-0" />
-                          <span className="text-xs font-mono text-red-400/80 flex-1">{entry.content}</span>
-                        </div>
-                      )
-                    }
-                    return null
-                  })
+                          )
+                        }
+                        if (entry.kind === 'thinking') {
+                          return (
+                            <button key={entry.idx} onClick={toggleExpand} className="w-full flex items-center gap-2 px-4 py-2 rounded-lg border border-violet-500/10 bg-violet-500/[0.03] text-left group hover:border-violet-500/20 transition-all">
+                              <Brain size={11} className="text-violet-400/40 shrink-0" />
+                              <span className="text-[9px] font-bold text-violet-400/40 italic">Thinking{isExpanded ? '' : '...'}</span>
+                              <ChevronDown size={10} className={`text-violet-400/20 transition-transform ml-auto ${isExpanded ? 'rotate-180' : ''}`} />
+                              {isExpanded && (
+                                <p className="text-[11px] text-violet-300/30 leading-relaxed mt-2 whitespace-pre-wrap max-h-48 overflow-auto custom-scrollbar w-full" onClick={e => e.stopPropagation()}>{entry.content.replace(/\*\*/g, '')}</p>
+                              )}
+                            </button>
+                          )
+                        }
+                        if (entry.kind === 'tool') {
+                          return (
+                            <div key={entry.idx} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/10 border border-border/10">
+                              <div className="h-5 w-5 rounded-md bg-amber-500/10 grid place-items-center shrink-0"><Wrench size={9} className="text-amber-400/60" /></div>
+                              <span className="text-[9px] font-black uppercase tracking-widest text-amber-400/50 shrink-0">{entry.label}</span>
+                              <code className="text-[9px] font-mono text-foreground/25 truncate flex-1">{entry.content.replace(/"/g, '')}</code>
+                            </div>
+                          )
+                        }
+                        if (entry.kind === 'result') {
+                          const isError = entry.status === 'error'
+                          return (
+                            <button key={entry.idx} onClick={toggleExpand} className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-left transition-all ${isError ? 'bg-red-500/5 border border-red-500/10' : 'bg-muted/5 border border-border/5 hover:border-border/15'}`}>
+                              <CheckCircle2 size={10} className={isError ? 'text-red-400/50 shrink-0' : 'text-primary/30 shrink-0'} />
+                              <span className={`text-[9px] font-mono truncate flex-1 ${isError ? 'text-red-400/50' : 'text-foreground/20'}`}>
+                                {entry.content.slice(0, 120)}{entry.content.length > 120 ? '...' : ''}
+                              </span>
+                              {entry.content.length > 60 && <ChevronDown size={9} className={`text-muted-foreground/20 transition-transform shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />}
+                              {isExpanded && (
+                                <pre className="text-[10px] text-foreground/20 leading-relaxed mt-2 whitespace-pre-wrap max-h-32 overflow-auto custom-scrollbar font-mono w-full" onClick={e => e.stopPropagation()}>{entry.content}</pre>
+                              )}
+                            </button>
+                          )
+                        }
+                        if (entry.kind === 'error') {
+                          return (
+                            <div key={entry.idx} className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/15 bg-red-500/5">
+                              <Zap size={12} className="text-red-400/60 shrink-0" />
+                              <span className="text-[10px] font-mono text-red-400/70 flex-1">{entry.content}</span>
+                            </div>
+                          )
+                        }
+                        return null
+                      })}
+                    </div>
+                  )
                 })()}
               </div>
             ) : (
