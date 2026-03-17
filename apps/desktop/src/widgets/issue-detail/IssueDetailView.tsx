@@ -138,7 +138,7 @@ export function IssueDetailView({
   const [localAssignee, setLocalAssignee] = useState((typed.assignee_id as string) || '')
   const [localTitle, setLocalTitle] = useState(title)
   const [localDescription, setLocalDescription] = useState(description)
-  const [bottomTab, setBottomTab] = useState<'details' | 'plan' | 'activity' | 'output' | 'changes'>('details')
+  const [bottomTab, setBottomTab] = useState<'details' | 'plan' | 'output' | 'changes'>('details')
 
   const [issueHistory, setIssueHistory] = useState<IssueHistoryEntry[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
@@ -272,8 +272,7 @@ export function IssueDetailView({
   const tabItems = [
     { id: 'details' as const, label: 'Details', icon: Info, count: undefined },
     { id: 'plan' as const, label: 'Plan', icon: CheckCircle2, count: planItems.length > 0 ? planItems.length : undefined },
-    { id: 'activity' as const, label: 'Activity', icon: History, count: undefined },
-    { id: 'output' as const, label: 'Output', icon: Terminal, count: undefined },
+    { id: 'output' as const, label: 'Session', icon: Terminal, count: undefined },
     { id: 'changes' as const, label: 'Changes', icon: FileText, count: diffFiles.length > 0 ? diffFiles.length : undefined },
   ]
 
@@ -503,62 +502,9 @@ export function IssueDetailView({
         )}
 
         {/* Activity */}
-        {bottomTab === 'activity' && (
-          <div className="h-full">
-            {historyLoading ? (
-              <div className="h-full flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary/30" /></div>
-            ) : (() => {
-              // Only show events that matter to a human orchestrator
-              const allowedKinds = new Set([
-                'state_change', 'assignee_change',          // user actions
-                'run_started', 'run_succeeded', 'run_failed', 'run_continues', // lifecycle
-                'retry_scheduled',                           // retries
-                'hook_started', 'hook_completed', 'hook_failed', // hooks
-              ])
-              const meaningfulEvents = issueHistory.filter(item => {
-                const kind = item.kind?.toLowerCase() ?? ''
-                // Always show explicitly allowed events
-                if (allowedKinds.has(kind)) return true
-                // Show agent message events from any provider
-                if ((kind === 'message' || kind === 'agent_message' || kind === 'item.completed' || kind === 'assistant' || kind === 'result/end_turn') && typeof item.message === 'string' && item.message.length > 10) return true
-                return false
-              })
-              return meaningfulEvents.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-muted-foreground/20 gap-3">
-                <History size={36} />
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em]">No events recorded</p>
-              </div>
-            ) : (
-              <div>
-                {meaningfulEvents.map((item, idx) => (
-                  <div key={item.id || idx} className={`flex items-start gap-3 px-4 py-3 hover:bg-muted/10 transition-colors ${idx % 2 === 1 ? 'bg-muted/5' : 'bg-transparent'}`}>
-                    <div className="mt-0.5 grid h-5 w-5 place-items-center rounded-full bg-muted/30 shrink-0">
-                      {getEventIcon(item.kind)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-foreground capitalize">{item.kind.replace(/_/g, ' ')}</span>
-                        {item.provider && (
-                          <span className="text-[9px] text-muted-foreground/40 flex items-center gap-1">{getAgentIcon(item.provider, 10)} {item.provider}</span>
-                        )}
-                      </div>
-                      {item.message && typeof item.message === 'string' && (
-                        <p className="text-[11px] text-muted-foreground/60 mt-0.5 line-clamp-1">{item.message}</p>
-                      )}
-                    </div>
-                    <span className="text-[9px] text-muted-foreground/30 font-mono shrink-0 mt-0.5">
-                      {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )})()}
-          </div>
-        )}
-
         {/* Output */}
         {bottomTab === 'output' && (
-          <div className="h-full bg-background">
+          <div className="h-full bg-gradient-to-b from-card via-card to-muted/10">
             {logsLoading ? (
               <div className="h-full flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary/30" /></div>
             ) : logs && !logs.includes('# No logs available') ? (
@@ -713,15 +659,15 @@ export function IssueDetailView({
                     }
                     if (entry.kind === 'agent') {
                       return (
-                        <div key={entry.idx} className="px-5 py-4 border-b border-border/10 hover:bg-muted/5 transition-colors">
+                        <div key={entry.idx} className="px-5 py-4 border-b border-border/20 hover:bg-primary/[0.02] transition-colors">
                           <div className="flex items-start gap-3">
-                            <div className="h-6 w-6 rounded-lg bg-emerald-500/15 grid place-items-center shrink-0 mt-0.5"><Bot size={14} className="text-emerald-400" /></div>
+                            <div className="h-7 w-7 rounded-xl bg-primary/10 border border-primary/15 grid place-items-center shrink-0 mt-0.5"><Bot size={14} className="text-primary" /></div>
                             <div className="flex-1 min-w-0">
-                              <div className="prose prose-invert prose-sm max-w-none text-[13px] leading-relaxed prose-p:my-1.5 prose-p:text-foreground/80 prose-code:text-primary prose-code:bg-primary/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[12px] prose-pre:bg-card prose-pre:border prose-pre:border-border/30 prose-li:text-foreground/70 prose-headings:text-foreground prose-headings:text-sm prose-strong:text-foreground">
+                              <div className="prose prose-invert prose-sm max-w-none text-[13px] leading-relaxed prose-p:my-1.5 prose-p:text-foreground/80 prose-code:text-primary prose-code:bg-primary/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[12px] prose-pre:bg-background prose-pre:border prose-pre:border-border/30 prose-pre:rounded-xl prose-li:text-foreground/70 prose-headings:text-foreground prose-headings:text-sm prose-strong:text-foreground">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.content}</ReactMarkdown>
                               </div>
                             </div>
-                            <span className="text-[10px] font-mono text-muted-foreground/30 shrink-0 mt-1">{entry.ts}</span>
+                            <span className="text-[9px] font-mono text-muted-foreground/25 shrink-0 mt-1">{entry.ts}</span>
                           </div>
                         </div>
                       )
@@ -745,11 +691,11 @@ export function IssueDetailView({
                     }
                     if (entry.kind === 'tool') {
                       return (
-                        <div key={entry.idx} className="flex items-center gap-2 px-4 py-1 border-b border-border/[0.03]">
-                          <Wrench size={9} className="text-amber-500/40 shrink-0" />
-                          <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 shrink-0">{entry.label}</span>
-                          <code className="text-[11px] font-mono text-foreground/40 truncate flex-1">{entry.content}</code>
-                          <span className="text-[10px] font-mono text-muted-foreground/30 shrink-0">{entry.ts}</span>
+                        <div key={entry.idx} className="flex items-center gap-2.5 px-5 py-1.5 border-b border-border/10">
+                          <div className="h-5 w-5 rounded-md bg-amber-500/10 border border-amber-500/15 grid place-items-center shrink-0"><Wrench size={10} className="text-amber-400" /></div>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-amber-400/70 shrink-0">{entry.label}</span>
+                          <code className="text-[10px] font-mono text-foreground/30 truncate flex-1">{entry.content}</code>
+                          <span className="text-[9px] font-mono text-muted-foreground/20 shrink-0">{entry.ts}</span>
                         </div>
                       )
                     }
