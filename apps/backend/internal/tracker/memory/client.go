@@ -1,3 +1,5 @@
+// Package memory provides an in-memory implementation of the tracker.Client interface,
+// suitable for testing and lightweight operation without external storage.
 package memory
 
 import (
@@ -10,6 +12,7 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
 )
 
+// Client is an in-memory tracker that stores issues in a map protected by a read-write mutex.
 type Client struct {
 	mu     sync.RWMutex
 	issues map[string]tracker.Issue

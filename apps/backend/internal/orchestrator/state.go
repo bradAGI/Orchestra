@@ -1,3 +1,6 @@
+// Package orchestrator manages the lifecycle of agent execution runs, including
+// dispatch scheduling, concurrency control, retry logic, and real-time state
+// tracking for issues being processed by machine learning agents.
 package orchestrator
 
 import (
@@ -23,6 +26,7 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/workspace"
 )
 
+// CodexTotals holds cumulative token usage and wall-clock time across all completed runs.
 type CodexTotals struct {
 	InputTokens  int64   `json:"input_tokens"`
 	OutputTokens int64   `json:"output_tokens"`
@@ -30,6 +34,8 @@ type CodexTotals struct {
 	SecondsRun   float64 `json:"seconds_running"`
 }
 
+// RunningEntry represents an issue currently being executed by an agent, including
+// its session metadata, token usage, and the most recent event received.
 type RunningEntry struct {
 	IssueID         string   `json:"issue_id"`
 	IssueIdentifier string   `json:"issue_identifier"`
@@ -54,6 +60,7 @@ type RunningEntry struct {
 	} `json:"tokens"`
 }
 
+// RetryEntry represents a failed run that is scheduled for a future retry attempt.
 type RetryEntry struct {
 	IssueID         string   `json:"issue_id"`
 	IssueIdentifier string   `json:"issue_identifier"`
@@ -66,6 +73,8 @@ type RetryEntry struct {
 	Error           string   `json:"error"`
 }
 
+// Snapshot is a point-in-time view of the orchestrator state, including all
+// running entries, pending retries, cumulative totals, and MCP server status.
 type Snapshot struct {
 	GeneratedAt string            `json:"generated_at"`
 	Counts      SnapshotCount     `json:"counts"`
