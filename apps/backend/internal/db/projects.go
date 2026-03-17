@@ -234,6 +234,9 @@ func (db *DB) GetProjects(ctx context.Context) ([]Project, error) {
 		if err := rows.Scan(&p.ID, &p.Name, &p.RootPath, &p.RemoteURL, &p.GitHubOwner, &p.GitHubRepo, &p.GitHubToken); err != nil {
 			return nil, err
 		}
+		if dec, err := DecryptToken(p.GitHubToken); err == nil {
+			p.GitHubToken = dec
+		}
 		projects = append(projects, p)
 	}
 	return projects, rows.Err()
@@ -359,6 +362,11 @@ func (db *DB) GetProjectByID(ctx context.Context, id string) (Project, error) {
 	var p Project
 	err := db.QueryRowContext(ctx, "SELECT id, name, root_path, remote_url, COALESCE(github_owner, ''), COALESCE(github_repo, ''), COALESCE(github_token, '') FROM projects WHERE id = ?", id).
 		Scan(&p.ID, &p.Name, &p.RootPath, &p.RemoteURL, &p.GitHubOwner, &p.GitHubRepo, &p.GitHubToken)
+	if err == nil {
+		if dec, decErr := DecryptToken(p.GitHubToken); decErr == nil {
+			p.GitHubToken = dec
+		}
+	}
 	return p, err
 }
 

@@ -274,7 +274,8 @@ func (s *Server) GetSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	projectID := r.URL.Query().Get("project_id")
+	query := r.URL.Query()
+	projectID := query.Get("project_id")
 	sessions, err := s.db.GetSessions(r.Context(), projectID)
 	if err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Msg("failed to get sessions")
@@ -282,8 +283,25 @@ func (s *Server) GetSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(sessions)
+	// Optional pagination via limit/offset query params
+	total := len(sessions)
+	if offStr := query.Get("offset"); offStr != "" {
+		off, parseErr := strconv.Atoi(offStr)
+		if parseErr == nil && off >= 0 {
+			if off >= total {
+				sessions = nil
+			} else {
+				sessions = sessions[off:]
+			}
+		}
+	}
+	if limStr := query.Get("limit"); limStr != "" {
+		if lim, parseErr := strconv.Atoi(limStr); parseErr == nil && lim > 0 && lim < len(sessions) {
+			sessions = sessions[:lim]
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"sessions": sessions, "total": total})
 }
 
 func (s *Server) GetSessionDetail(w http.ResponseWriter, r *http.Request) {

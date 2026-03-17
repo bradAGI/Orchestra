@@ -66,6 +66,7 @@ func NewRouterWithPubSub(
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 	r.Use(RequestLogger(logger))
+	r.Use(RateLimit(20, 60)) // 20 req/s sustained, 60 burst
 	r.Use(contentTypeGuard)
 	r.Use(middleware.Timeout(30 * time.Second))
 	r.Use(cors.Handler(cors.Options{

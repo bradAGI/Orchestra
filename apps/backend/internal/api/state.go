@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -150,7 +151,25 @@ func (s *Server) GetIssues(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK,map[string]any{"issues": issues})
+	// Optional pagination via limit/offset query params
+	total := len(issues)
+	if offsetStr := query.Get("offset"); offsetStr != "" {
+		off, parseErr := strconv.Atoi(offsetStr)
+		if parseErr == nil && off >= 0 {
+			if off >= total {
+				issues = nil
+			} else {
+				issues = issues[off:]
+			}
+		}
+	}
+	if limitStr := query.Get("limit"); limitStr != "" {
+		if lim, parseErr := strconv.Atoi(limitStr); parseErr == nil && lim > 0 && lim < len(issues) {
+			issues = issues[:lim]
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"issues": issues, "total": total})
 }
 
 func (s *Server) GetSearch(w http.ResponseWriter, r *http.Request) {

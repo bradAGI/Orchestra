@@ -74,6 +74,7 @@ import type { IssueDetailResult, ToolSummary } from '@widgets/issue-detail/types
 import { Command } from 'cmdk'
 import type { BackendConfig } from '@/lib/orchestra-client'
 import { AppTooltipProvider } from '@/components/ui/tooltip-wrapper'
+import { SectionErrorBoundary } from '@/components/ui/section-error-boundary'
 
 type BackendProfile = {
   id: string
@@ -1172,6 +1173,7 @@ export default function App() {
       >
         <div className="mt-4 flex flex-col flex-1 min-w-0 min-h-0 h-full">
               {sectionVisibility.showProjects ? (
+                <SectionErrorBoundary name="Projects">
                 <section className="flex-1 flex flex-col min-h-0">
                   {selectedProjectID && projects.find(p => p.id === selectedProjectID) ? (
                     <ProjectDetailView
@@ -1203,15 +1205,19 @@ export default function App() {
                     />
                   )}
                 </section>
+                </SectionErrorBoundary>
               ) : null}
 
               {sectionVisibility.showAgents ? (
+                <SectionErrorBoundary name="Agents">
                 <section className="flex-1 flex flex-col min-h-0">
                   <AgentsDashboard config={config} snapshot={snapshot} />
                 </section>
+                </SectionErrorBoundary>
               ) : null}
 
               {sectionVisibility.showWarehouse ? (
+                <SectionErrorBoundary name="Analytics">
                 <section className="flex-1 flex flex-col min-h-0">
                   <AnalyticsDashboard
                     stats={warehouseStats}
@@ -1221,9 +1227,11 @@ export default function App() {
                     onCloneSession={handleCloneSession}
                   />
                 </section>
+                </SectionErrorBoundary>
               ) : null}
 
               {sectionVisibility.showIssueBoard ? (
+                <SectionErrorBoundary name="Kanban Board">
                 <section className="flex-1 flex flex-col min-h-0">
                   <KanbanBoard
                     loadingState={loadingState}
@@ -1239,15 +1247,19 @@ export default function App() {
                     onCreateIssue={handleCreateIssue}
                   />
                 </section>
+                </SectionErrorBoundary>
               ) : null}
 
               {sectionVisibility.showDocs ? (
+                <SectionErrorBoundary name="Documentation">
                 <section className="flex-1 flex flex-col min-h-0">
                   <DocsDashboard config={config} />
                 </section>
+                </SectionErrorBoundary>
               ) : null}
 
               {sectionVisibility.showConsole && config ? (
+                <SectionErrorBoundary name="Console">
                 <section className="flex-1 flex flex-col min-h-0 border border-border rounded-xl overflow-hidden shadow-2xl">
                   <TerminalMultiplexer
                     activeTerminals={openTerminals}
@@ -1257,15 +1269,19 @@ export default function App() {
                     theme={theme}
                   />
                 </section>
+                </SectionErrorBoundary>
               ) : null}
 
               {sectionVisibility.showSandbox ? (
+                <SectionErrorBoundary name="Sandbox">
                 <section className="col-span-12 flex flex-col">
                   <SandboxDashboard config={config} />
                 </section>
+                </SectionErrorBoundary>
               ) : null}
 
               {sectionVisibility.showSettings ? (
+                <SectionErrorBoundary name="Settings">
                 <section className="flex-1 flex flex-col min-h-0">
                   <SettingsCard
                     loadingConfig={loadingConfig}
@@ -1296,6 +1312,7 @@ export default function App() {
                     onNotifVolumeChange={setNotifVolume}
                   />
                 </section>
+                </SectionErrorBoundary>
               ) : null}
         </div>
       </AppShell>
