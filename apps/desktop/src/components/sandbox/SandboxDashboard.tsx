@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Loader2, Play, Terminal, Globe, Trash2, RefreshCcw } from 'lucide-react'
+import { CustomDropdown } from '@/components/app-shell/shared/controls'
 import type { BackendConfig } from '@/lib/orchestra-client'
 import {
   executeUnsandbox,
@@ -127,27 +128,21 @@ export function SandboxDashboard({ config }: { config: BackendConfig | null }) {
         <div className="flex items-center gap-3">
           <div className="space-y-1 flex-1">
             <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Language</label>
-            <select
+            <CustomDropdown
+              className="w-full"
               value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="w-full rounded-lg border border-border/40 bg-background px-3 py-1.5 text-sm focus:border-primary focus:outline-none"
-            >
-              {LANGUAGES.map((l) => (
-                <option key={l} value={l}>{l}</option>
-              ))}
-            </select>
+              options={LANGUAGES.map((l) => ({ label: l, value: l }))}
+              onChange={setLanguage}
+            />
           </div>
           <div className="space-y-1 flex-1">
             <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Network</label>
-            <select
+            <CustomDropdown
+              className="w-full"
               value={network}
-              onChange={(e) => setNetwork(e.target.value)}
-              className="w-full rounded-lg border border-border/40 bg-background px-3 py-1.5 text-sm focus:border-primary focus:outline-none"
-            >
-              {NETWORKS.map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
+              options={NETWORKS.map((n) => ({ label: n, value: n }))}
+              onChange={setNetwork}
+            />
           </div>
         </div>
 
