@@ -203,6 +203,7 @@ func (db *DB) GetUnifiedHistory(ctx context.Context, issueID string) ([]map[stri
 	return history, nil
 }
 
+// Project represents a registered codebase with optional GitHub integration credentials.
 type Project struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`

@@ -4,20 +4,27 @@ import type { TimelineItem } from '@/components/app-shell/types'
 
 /** A single file entry extracted from a unified diff. */
 export type DiffFile = {
+  /** File path from the diff header. */
   path: string
+  /** Full diff content for this file (including headers and hunks). */
   content: string
 }
 
 /** Descriptor for a lifecycle hook that runs around issue processing. */
 export type IssueHook = {
+  /** Hook type identifier (e.g. "after_create", "before_run"). */
   id: string
+  /** Human-readable label for display. */
   label: string
+  /** Short description of the hook's purpose. */
   description: string
 }
 
 /** A single checkbox item from an agent's operational plan. */
 export type PlanItem = {
+  /** The plan step description text. */
   text: string
+  /** Whether this step has been completed. */
   done: boolean
 }
 

@@ -1,177 +1,222 @@
 # 4.3 Configuration & Environment
 
-> **Source files:** `apps/backend/internal/config/load.go`, `apps/backend/internal/config/types.go`
+> **Source files:**
+> - `apps/backend/internal/config/types.go`
+> - `apps/backend/internal/config/load.go`
+> - `apps/backend/internal/agents/config.go`
 
-The configuration system loads settings from environment variables with fallback to a `WORKFLOW.md` file. Environment variables always take precedence over workflow file values. The `Config` struct is the single source of truth consumed by all backend subsystems.
+Orchestra's backend configuration is resolved through a layered system: environment variables take highest priority, followed by WORKFLOW.md overrides, followed by compiled defaults. The `agents` package provides a parallel config discovery system that locates and aggregates agent-specific configuration files across global and project scopes.
 
-### Config Struct
+---
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `Host` | `string` | `127.0.0.1` | Server bind address |
-| `Port` | `int` | `4010` | Server port |
-| `WorkspaceRoot` | `string` | `~/.orchestra/workspaces` | Root directory for issue workspaces |
-| `APIToken` | `string` | `""` | Bearer token for API authentication |
-| `WorkflowFile` | `string` | `WORKFLOW.md` | Path to workflow configuration file |
-| `AgentProvider` | `string` | `CODEX` | Default agent provider |
-| `AgentCommands` | `map[string]string` | See below | Provider-to-command mapping |
-| `AgentMaxTurns` | `int` | `10` | Maximum turns per agent execution |
-| `TrackerType` | `string` | `""` | Tracker backend type (`sqlite`, `github`, or empty for memory) |
-| `TrackerEndpoint` | `string` | `""` | Tracker API endpoint (for GitHub: `owner/repo`) |
-| `TrackerToken` | `string` | `""` | Tracker authentication token |
-| `TrackerWorkerAssigneeIDs` | `[]string` | `[]` | Assignee IDs recognized as workers |
-| `ActiveStates` | `[]string` | `["Todo", "In Progress"]` | States eligible for agent dispatch |
-| `TerminalStates` | `[]string` | `["Done", "Cancelled", "Canceled", "Closed", "Duplicate"]` | States that end processing |
-| `MaxConcurrent` | `int` | `16` | Maximum concurrent agent sessions |
-| `MaxConcurrentByState` | `map[string]int` | `{}` | Per-state concurrency limits |
-| `WorkspaceHooks` | `workspace.Hooks` | `{}` | Lifecycle hook scripts |
-| `ProjectRoots` | `[]string` | `[]` | Allowed project root directories |
-| `GitHubClientID` | `string` | `""` | GitHub OAuth client ID |
-| `GitHubClientSecret` | `string` | `""` | GitHub OAuth client secret |
-| `MCPServers` | `map[string]string` | `{}` | MCP server name-to-command mapping |
-| `TelemetryProviders` | `[]string` | `["CLAUDE", "CODEX", "GEMINI", "OPENCODE"]` | Providers to watch for telemetry |
-| `TelemetryRetentionDays` | `int` | `7` | Days to retain telemetry events |
-| `TelemetryStoreRawPayload` | `bool` | `false` | Store raw JSON payloads in events |
-| `STTWhisperBin` | `string` | `""` | Path to Whisper STT binary |
-| `STTWhisperModelPath` | `string` | `""` | Path to Whisper model file |
-| `STTWhisperThreads` | `int` | `0` | Whisper thread count |
-| `STTWhisperLanguage` | `string` | `en` | Whisper language |
+## Configuration Loading
+
+The `config.Load()` function builds a `Config` struct by reading environment variables, then falling back to values extracted from the workflow file (`WORKFLOW.md` by default), and finally applying hardcoded defaults.
+
+```mermaid
+flowchart TD
+    A[Environment Variables] -->|highest priority| D[Merged Config]
+    B[WORKFLOW.md Overrides] -->|second priority| D
+    C[Compiled Defaults] -->|lowest priority| D
+    D --> E[config.Config struct]
+```
+
+### Resolution Order
+
+For each configuration field, `Load()` follows this precedence:
+
+1. **Environment variable** -- read via `os.LookupEnv`
+2. **Workflow file** -- parsed from a structured Markdown document via `workflow.LoadFile()`
+3. **Default value** -- hardcoded in `load.go`
+
+---
+
+## Environment Variables
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `ORCHESTRA_SERVER_HOST` | string | `127.0.0.1` | HTTP server bind address |
+| `ORCHESTRA_SERVER_PORT` | int | `4010` | HTTP server port |
+| `ORCHESTRA_WORKSPACE_ROOT` | string | `~/.orchestra/workspaces` | Root directory for issue workspaces |
+| `ORCHESTRA_API_TOKEN` | string | *(empty)* | Bearer token for API authentication |
+| `ORCHESTRA_WORKFLOW_FILE` | string | `WORKFLOW.md` | Path to the workflow definition file |
+| `ORCHESTRA_AGENT_PROVIDER` | string | `CODEX` | Default agent provider (CODEX, CLAUDE, OPENCODE, GEMINI) |
+| `ORCHESTRA_AGENT_MAX_TURNS` | int | `10` | Maximum agent execution turns per run |
+| `ORCHESTRA_AGENT_COMMAND_CODEX` | string | `codex exec ...` | Shell command template for Codex agent |
+| `ORCHESTRA_AGENT_COMMAND_CLAUDE` | string | `claude -p ...` | Shell command template for Claude agent |
+| `ORCHESTRA_AGENT_COMMAND_OPENCODE` | string | `opencode run ...` | Shell command template for OpenCode agent |
+| `ORCHESTRA_AGENT_COMMAND_GEMINI` | string | `gemini -p ...` | Shell command template for Gemini agent |
+| `ORCHESTRA_AGENT_COMMAND_UNSANDBOX` | string | *(empty)* | Shell command template for Unsandbox agent |
+| `ORCHESTRA_TRACKER_TYPE` | string | *(empty)* | Tracker backend type (e.g. `sqlite`, `github`) |
+| `ORCHESTRA_TRACKER_ENDPOINT` | string | *(empty)* | External tracker API endpoint |
+| `ORCHESTRA_TRACKER_TOKEN` | string | *(empty)* | Authentication token for external tracker |
+| `ORCHESTRA_TRACKER_WORKER_ASSIGNEE_IDS` | CSV | *(empty)* | Comma-separated assignee IDs that represent worker agents |
+| `ORCHESTRA_ACTIVE_STATES` | CSV | `Todo,In Progress` | Issue states considered actionable |
+| `ORCHESTRA_TERMINAL_STATES` | CSV | `Done,Cancelled,Canceled,Closed,Duplicate` | Issue states considered terminal |
+| `ORCHESTRA_MAX_CONCURRENT` | int | `16` | Global maximum concurrent agent runs |
+| `ORCHESTRA_MAX_CONCURRENT_BY_STATE` | CSV | *(empty)* | Per-state concurrency limits (format: `state:limit,state:limit`) |
+| `ORCHESTRA_WORKSPACE_AFTER_CREATE` | string | *(empty)* | Shell hook run after workspace creation |
+| `ORCHESTRA_WORKSPACE_BEFORE_REMOVE` | string | *(empty)* | Shell hook run before workspace removal |
+| `ORCHESTRA_WORKSPACE_BEFORE_RUN` | string | *(empty)* | Shell hook run before each agent run |
+| `ORCHESTRA_WORKSPACE_AFTER_RUN` | string | *(empty)* | Shell hook run after each agent run |
+| `ORCHESTRA_PROJECT_ROOTS` | CSV | *(empty)* | Allowed project root directories |
+| `ORCHESTRA_GITHUB_CLIENT_ID` | string | *(empty)* | GitHub OAuth client ID |
+| `ORCHESTRA_GITHUB_CLIENT_SECRET` | string | *(empty)* | GitHub OAuth client secret |
+| `ORCHESTRA_MCP_SERVERS` | CSV | *(empty)* | MCP server definitions (format: `name=command,name=command`) |
+| `ORCHESTRA_TELEMETRY_PROVIDERS` | CSV | `CLAUDE,CODEX,GEMINI,OPENCODE` | Telemetry providers to watch |
+| `ORCHESTRA_TELEMETRY_RETENTION_DAYS` | int | `7` | Days to retain telemetry events before pruning |
+| `ORCHESTRA_TELEMETRY_STORE_RAW_PAYLOAD` | bool | `false` | Whether to persist raw event payloads |
+| `ORCHESTRA_STT_WHISPER_BIN` | string | *(empty)* | Path to Whisper binary for speech-to-text |
+| `ORCHESTRA_STT_WHISPER_MODEL` | string | *(empty)* | Path to Whisper model file |
+| `ORCHESTRA_STT_WHISPER_THREADS` | int | `0` | Number of Whisper threads |
+| `ORCHESTRA_STT_WHISPER_LANGUAGE` | string | `en` | Whisper language code |
 
 ### Default Agent Commands
 
+Each agent provider has a built-in command template using `{{prompt}}` as a placeholder:
+
 | Provider | Default Command |
-|---|---|
-| `CODEX` | `codex exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox --json {{prompt}}` |
-| `CLAUDE` | `claude -p {{prompt}} --output-format stream-json --verbose --dangerously-skip-permissions` |
-| `OPENCODE` | `opencode run {{prompt}} --format json` |
-| `GEMINI` | `gemini -p {{prompt}} --output-format stream-json --approval-mode yolo` |
+|----------|----------------|
+| CODEX | `codex exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox --json {{prompt}}` |
+| CLAUDE | `claude -p {{prompt}} --output-format stream-json --verbose --dangerously-skip-permissions` |
+| OPENCODE | `opencode run {{prompt}} --format json` |
+| GEMINI | `gemini -p {{prompt}} --output-format stream-json --approval-mode yolo` |
 
-### Environment Variables
+---
+
+## Config Struct
+
+The `Config` struct in `types.go` holds all resolved configuration. Key fields:
+
+```go
+type Config struct {
+    Host                     string
+    Port                     int
+    WorkspaceRoot            string
+    APIToken                 string
+    WorkflowFile             string
+    AgentProvider            string
+    AgentCommands            map[string]string
+    AgentMaxTurns            int
+    TrackerType              string
+    MaxConcurrent            int
+    MaxConcurrentByState     map[string]int
+    WorkspaceHooks           workspace.Hooks
+    MCPServers               map[string]string
+    TelemetryProviders       []string
+    TelemetryRetentionDays   int
+    TelemetryStoreRawPayload bool
+    // ... additional fields
+}
+```
+
+---
+
+## AgentMeta Configuration Map
+
+> **Source file:** `apps/backend/internal/agents/config.go`
+
+The `AgentMeta` map defines the filesystem layout for each supported agent provider. It maps agent names to their configuration file paths (global and project-local), config format, and skill/sub-agent discovery directories.
+
+| Agent | Global Paths | Local Paths | Format | Skill Paths |
+|-------|-------------|-------------|--------|-------------|
+| `claude` | `~/.claude/settings.json`, `~/.claude.json` | `.claude/settings.json`, `.claude/settings.local.json` | JSON | `.claude/agents` |
+| `codex` | `~/.codex/config.toml` | `.codex/config.toml`, `AGENTS.md` | TOML | `.codex/skills` |
+| `gemini` | `~/.gemini/settings.json` | `.gemini/settings.json` | JSON | `.gemini/agents`, `.gemini/skills` |
+| `opencode` | `~/.config/opencode/opencode.json` | `opencode.json` | JSON | `.config/opencode/agents`, `.config/opencode/skills`, `.config/opencode/tools` |
+
+### Config Scope
+
+Each discovered configuration is tagged with a scope:
+
+- **`GLOBAL`** -- User-wide configuration (e.g. `~/.claude/settings.json`)
+- **`PROJECT`** -- Project-local configuration (e.g. `<project>/.claude/settings.json`)
+
+And a category:
+
+- **`CORE`** -- Primary agent configuration files
+- **`SKILL`** -- Sub-agent, skill, or tool definition files
+
+---
+
+## Config Discovery
+
+The `ListAgentConfigs(workspaceRoot, projectRoot)` function performs a three-phase scan:
 
 ```mermaid
-graph TD
-    E[Environment Variables] --> C[Config]
-    W[WORKFLOW.md] --> C
-    E -->|overrides| W
+flowchart TD
+    A["1. Orchestra Internal Configs"] --> D[Consolidated AgentConfig list]
+    B["2. Real Agent Configs<br/>(Global + Project)"] --> D
+    C["3. Skill/Sub-Agent Discovery"] --> D
 
-    subgraph Server
-        ORCHESTRA_SERVER_HOST
-        ORCHESTRA_SERVER_PORT
+    subgraph "Phase 1"
+        A1[".orchestra/agents/.claude"]
+        A2[".orchestra/agents/.gemini"]
+        A3[".orchestra/agents/.opencode"]
+        A4[".orchestra/agents/.codex"]
+        A5[".orchestra/agents/workspace.json"]
+        A1 & A2 & A3 & A4 & A5 --> A
     end
 
-    subgraph Agent
-        ORCHESTRA_AGENT_PROVIDER
-        ORCHESTRA_AGENT_MAX_TURNS
-        ORCHESTRA_AGENT_COMMAND_CLAUDE
-        ORCHESTRA_AGENT_COMMAND_CODCEX["ORCHESTRA_AGENT_COMMAND_CODCEX"]
-        ORCHESTRA_AGENT_COMMAND_OPENCODE
-        ORCHESTRA_AGENT_COMMAND_GEMINI
-        ORCHESTRA_AGENT_COMMAND_UNSANDBOX
+    subgraph "Phase 2"
+        B1["Global: ~/.<agent>/settings.json"]
+        B2["Project: <root>/.<agent>/settings.json"]
+        B1 & B2 --> B
     end
 
-    subgraph Tracker
-        ORCHESTRA_TRACKER_TYPE
-        ORCHESTRA_TRACKER_ENDPOINT
-        ORCHESTRA_TRACKER_TOKEN
-        ORCHESTRA_TRACKER_WORKER_ASSIGNEE_IDS
-    end
-
-    subgraph States
-        ORCHESTRA_ACTIVE_STATES
-        ORCHESTRA_TERMINAL_STATES
-        ORCHESTRA_MAX_CONCURRENT
-        ORCHESTRA_MAX_CONCURRENT_BY_STATE
+    subgraph "Phase 3"
+        C1["Walk skill directories"]
+        C2["Pick up .json, .toml, .md, .yaml"]
+        C1 --> C2 --> C
     end
 ```
 
-| Variable | Maps to | Notes |
-|---|---|---|
-| `ORCHESTRA_SERVER_HOST` | `Host` | Bind address |
-| `ORCHESTRA_SERVER_PORT` | `Port` | Must be 1-65535 |
-| `ORCHESTRA_WORKSPACE_ROOT` | `WorkspaceRoot` | Workspace directory root |
-| `ORCHESTRA_API_TOKEN` | `APIToken` | Bearer auth token |
-| `ORCHESTRA_WORKFLOW_FILE` | `WorkflowFile` | Path to WORKFLOW.md |
-| `ORCHESTRA_AGENT_PROVIDER` | `AgentProvider` | Uppercased |
-| `ORCHESTRA_AGENT_MAX_TURNS` | `AgentMaxTurns` | Must be > 0 |
-| `ORCHESTRA_AGENT_COMMAND_CLAUDE` | `AgentCommands["CLAUDE"]` | |
-| `ORCHESTRA_AGENT_COMMAND_CODCEX` | `AgentCommands["CODEX"]` | Note: env var has typo |
-| `ORCHESTRA_AGENT_COMMAND_OPENCODE` | `AgentCommands["OPENCODE"]` | |
-| `ORCHESTRA_AGENT_COMMAND_GEMINI` | `AgentCommands["GEMINI"]` | |
-| `ORCHESTRA_AGENT_COMMAND_UNSANDBOX` | `AgentCommands["UNSANDBOX"]` | |
-| `ORCHESTRA_TRACKER_TYPE` | `TrackerType` | `sqlite`, `github`, or empty |
-| `ORCHESTRA_TRACKER_ENDPOINT` | `TrackerEndpoint` | GitHub: `owner/repo` |
-| `ORCHESTRA_TRACKER_TOKEN` | `TrackerToken` | |
-| `ORCHESTRA_TRACKER_WORKER_ASSIGNEE_IDS` | `TrackerWorkerAssigneeIDs` | Comma-separated |
-| `ORCHESTRA_ACTIVE_STATES` | `ActiveStates` | Comma-separated |
-| `ORCHESTRA_TERMINAL_STATES` | `TerminalStates` | Comma-separated |
-| `ORCHESTRA_MAX_CONCURRENT` | `MaxConcurrent` | |
-| `ORCHESTRA_MAX_CONCURRENT_BY_STATE` | `MaxConcurrentByState` | Format: `state1:limit1,state2:limit2` |
-| `ORCHESTRA_WORKSPACE_AFTER_CREATE` | `WorkspaceHooks.AfterCreate` | Shell script |
-| `ORCHESTRA_WORKSPACE_BEFORE_REMOVE` | `WorkspaceHooks.BeforeRemove` | Shell script |
-| `ORCHESTRA_WORKSPACE_BEFORE_RUN` | `WorkspaceHooks.BeforeRun` | Shell script |
-| `ORCHESTRA_WORKSPACE_AFTER_RUN` | `WorkspaceHooks.AfterRun` | Shell script |
-| `ORCHESTRA_PROJECT_ROOTS` | `ProjectRoots` | Comma-separated paths |
-| `ORCHESTRA_GITHUB_CLIENT_ID` | `GitHubClientID` | |
-| `ORCHESTRA_GITHUB_CLIENT_SECRET` | `GitHubClientSecret` | |
-| `ORCHESTRA_MCP_SERVERS` | `MCPServers` | Format: `name1=cmd1,name2=cmd2` |
-| `ORCHESTRA_TELEMETRY_PROVIDERS` | `TelemetryProviders` | Comma-separated |
-| `ORCHESTRA_TELEMETRY_RETENTION_DAYS` | `TelemetryRetentionDays` | |
-| `ORCHESTRA_TELEMETRY_STORE_RAW_PAYLOAD` | `TelemetryStoreRawPayload` | `true`/`false`/`1`/`0` |
-| `ORCHESTRA_STT_WHISPER_BIN` | `STTWhisperBin` | |
-| `ORCHESTRA_STT_WHISPER_MODEL` | `STTWhisperModelPath` | |
-| `ORCHESTRA_STT_WHISPER_THREADS` | `STTWhisperThreads` | |
-| `ORCHESTRA_STT_WHISPER_LANGUAGE` | `STTWhisperLanguage` | Default: `en` |
+**Phase 1 -- Orchestra Internal Configs:** Reads (or creates with defaults) files in `<workspaceRoot>/.orchestra/agents/`. These include `.claude`, `.gemini`, `.opencode`, `.codex`, and `workspace.json`.
 
-### Loading Priority
+**Phase 2 -- Real Agent Configs:** For each agent in `AgentMeta`, reads global config paths from `$HOME` and project-local paths from the project root. The first readable global path wins.
 
-```mermaid
-graph LR
-    D[Defaults] -->|overridden by| W[WORKFLOW.md]
-    W -->|overridden by| E[Environment Variables]
-    E --> F[Final Config]
+**Phase 3 -- Deep Discovery:** Walks each agent's `SkillPaths` directories (both global and project-scoped) to find skill/sub-agent definitions. Only files with extensions `.json`, `.toml`, `.md`, `.yaml`, or dotfiles are collected.
+
+---
+
+## workspace.json Pointers System
+
+The `workspace.json` file in `.orchestra/agents/` supports a **pointers** mechanism that overrides the default global config paths for any agent:
+
+```json
+{
+  "pointers": {
+    "claude": {
+      "global": "~/custom-path/claude-settings.json"
+    },
+    "gemini": {
+      "global": "/etc/orchestra/gemini.json"
+    }
+  },
+  "settings": {
+    "theme": "dark"
+  }
+}
 ```
 
-1. **Hardcoded defaults** -- Built-in values (host `127.0.0.1`, port `4010`, etc.)
-2. **Workflow file** -- YAML/Markdown config parsed from `WORKFLOW.md` via nested key lookup (e.g. `server.host`, `agent.provider`)
-3. **Environment variables** -- Always take final precedence
+When a pointer is defined for an agent, `ListAgentConfigs` reads from the pointer path instead of scanning the default `AgentMeta.GlobalPaths`. This allows workspace-level redirection of agent configuration without modifying the agent's own config directory. Paths prefixed with `~/` are resolved to the user's home directory.
 
-### Workflow File Config Paths
+---
 
-The workflow file uses nested YAML configuration under these paths:
+## Configuration Updates
 
-| Config Path | Maps to |
-|---|---|
-| `server.host` | Host |
-| `server.port` | Port |
-| `server.api_token` | APIToken |
-| `workspace.root` | WorkspaceRoot |
-| `workspace.after_create` | WorkspaceHooks.AfterCreate |
-| `workspace.before_remove` | WorkspaceHooks.BeforeRemove |
-| `workspace.before_run` | WorkspaceHooks.BeforeRun |
-| `workspace.after_run` | WorkspaceHooks.AfterRun |
-| `workspace.project_roots` | ProjectRoots |
-| `agent.provider` | AgentProvider |
-| `agent.max_turns` | AgentMaxTurns |
-| `agent.max_concurrent` | MaxConcurrent |
-| `agent.max_concurrent_by_state` | MaxConcurrentByState |
-| `agent.commands.codex` | AgentCommands["CODEX"] |
-| `agent.commands.claude` | AgentCommands["CLAUDE"] |
-| `agent.commands.opencode` | AgentCommands["OPENCODE"] |
-| `agent.commands.gemini` | AgentCommands["GEMINI"] |
-| `tracker.type` | TrackerType |
-| `tracker.endpoint` | TrackerEndpoint |
-| `tracker.token` | TrackerToken |
-| `tracker.worker_assignee_ids` | TrackerWorkerAssigneeIDs |
-| `tracker.active_states` | ActiveStates |
-| `tracker.terminal_states` | TerminalStates |
-| `github.client_id` | GitHubClientID |
-| `github.client_secret` | GitHubClientSecret |
-| `mcp.servers` | MCPServers |
+Four functions support runtime config operations:
 
-### Tracker Type Selection
+- **`UpdateConfigByPath(path, content)`** -- Writes content to any absolute path, creating intermediate directories
+- **`UpdateGlobalAgentConfig(workspaceRoot, name, content)`** -- Writes to `.orchestra/agents/<name>`
+- **`GetGlobalConfigMap(workspaceRoot, name)`** -- Reads a JSON config file and returns it as `map[string]any`
+- **`LoadGlobalWorkspaceDefaults(workspaceRoot)`** -- Convenience wrapper that reads `workspace.json`
 
-| `TrackerType` Value | Backend | Requirements |
-|---|---|---|
-| `""` (empty) | Memory | None (ephemeral) |
-| `sqlite` | SQLite | Database path via `db.Connect` |
-| `github` | GitHub Issues | `TrackerEndpoint` as `owner/repo`, `TrackerToken` |
+---
+
+## Cross-References
+
+- [4.4 MCP Server Integration](mcp.md) -- MCP server definitions from `MCPServers` config field
+- [4.5 Tool System](tools.md) -- Agent command templates and tool execution
+- [4.7 Workspace Management](workspace.md) -- Workspace hooks and root directory configuration
+- [4.6 Telemetry & Log Watching](telemetry.md) -- Telemetry provider and retention configuration

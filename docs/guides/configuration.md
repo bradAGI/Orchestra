@@ -1,237 +1,224 @@
 # 7.1 Configuration Guide
 
+> **Source files:**
+> - `apps/backend/internal/config/load.go` -- Configuration loading and parsing
+> - `apps/backend/internal/config/load_test.go` -- Configuration tests with example values
+> - `apps/desktop/electron/main.cjs` -- Desktop-specific environment variables
+
 Orchestra is configured through environment variables, with optional overrides from a `WORKFLOW.md` file. Environment variables take highest precedence, followed by workflow file values, followed by built-in defaults.
 
-## Environment Variables
+---
 
-### Server
+### Configuration Precedence
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ORCHESTRA_SERVER_HOST` | IP address / hostname to bind the HTTP server | `127.0.0.1` |
-| `ORCHESTRA_SERVER_PORT` | Port number for the HTTP server | `4010` |
-| `ORCHESTRA_API_TOKEN` | Bearer token for API authentication. Required when binding to a non-loopback address. | _(none)_ |
-| `ORCHESTRA_WORKFLOW_FILE` | Path to `WORKFLOW.md` for declarative config overrides | `WORKFLOW.md` |
+```mermaid
+flowchart TD
+    ENV[Environment Variables] -->|Highest priority| MERGED[Final Config]
+    WF[WORKFLOW.md file] -->|Medium priority| MERGED
+    DEF[Built-in Defaults] -->|Lowest priority| MERGED
+```
 
-### Workspace
+The `WORKFLOW.md` file is a Markdown document with YAML code blocks that define configuration. Its path is set by `ORCHESTRA_WORKFLOW_FILE` (default: `WORKFLOW.md` in the working directory).
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ORCHESTRA_WORKSPACE_ROOT` | Root directory where agent workspaces are created and managed | `~/.orchestra/workspaces` |
-| `ORCHESTRA_WORKSPACE_AFTER_CREATE` | Shell command to run after a workspace directory is created | _(none)_ |
-| `ORCHESTRA_WORKSPACE_BEFORE_REMOVE` | Shell command to run before a workspace directory is removed | _(none)_ |
-| `ORCHESTRA_WORKSPACE_BEFORE_RUN` | Shell command to run before each agent turn | _(none)_ |
-| `ORCHESTRA_WORKSPACE_AFTER_RUN` | Shell command to run after each agent turn | _(none)_ |
-| `ORCHESTRA_PROJECT_ROOTS` | Comma-separated list of directories to scan for projects | _(none)_ |
+---
 
-### Agent
+### Server Configuration
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ORCHESTRA_AGENT_PROVIDER` | Default agent provider (`CODEX`, `CLAUDE`, `OPENCODE`, `GEMINI`, `UNSANDBOX`) | `CODEX` |
-| `ORCHESTRA_AGENT_MAX_TURNS` | Maximum number of turns per agent session | `10` |
-| `ORCHESTRA_MAX_CONCURRENT` | Maximum number of concurrent agent sessions | `16` |
-| `ORCHESTRA_MAX_CONCURRENT_BY_STATE` | Per-state concurrency limits, comma-separated `state:limit` pairs (e.g. `Todo:4,In Progress:2`) | _(none)_ |
-| `ORCHESTRA_AGENT_COMMAND_CODEX` | Command template for Codex agent | `codex exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox --json {{prompt}}` |
-| `ORCHESTRA_AGENT_COMMAND_CLAUDE` | Command template for Claude agent | `claude -p {{prompt}} --output-format stream-json --verbose --dangerously-skip-permissions` |
-| `ORCHESTRA_AGENT_COMMAND_OPENCODE` | Command template for OpenCode agent | `opencode run {{prompt}} --format json` |
-| `ORCHESTRA_AGENT_COMMAND_GEMINI` | Command template for Gemini agent | `gemini -p {{prompt}} --output-format stream-json --approval-mode yolo` |
-| `ORCHESTRA_AGENT_COMMAND_UNSANDBOX` | Command template for Unsandbox remote agent | _(none)_ |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ORCHESTRA_SERVER_HOST` | `127.0.0.1` | HTTP bind address |
+| `ORCHESTRA_SERVER_PORT` | `4010` | HTTP listen port |
+| `ORCHESTRA_API_TOKEN` | _(empty)_ | Bearer token for API authentication. **Required** when host is non-loopback |
+| `ORCHESTRA_WORKSPACE_ROOT` | `~/.orchestra/workspaces` | Root directory for agent workspaces |
+| `ORCHESTRA_WORKFLOW_FILE` | `WORKFLOW.md` | Path to the workflow configuration file |
 
-### Issue Tracker
+---
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ORCHESTRA_TRACKER_TYPE` | Issue tracker backend: `memory`, `sqlite`, or `github` | `memory` |
-| `ORCHESTRA_TRACKER_ENDPOINT` | Endpoint URL for the tracker (GitHub API base, etc.) | _(none)_ |
-| `ORCHESTRA_TRACKER_TOKEN` | Authentication token for the tracker API | _(none)_ |
-| `ORCHESTRA_TRACKER_WORKER_ASSIGNEE_IDS` | Comma-separated GitHub user IDs to filter assigned issues | _(none)_ |
-| `ORCHESTRA_ACTIVE_STATES` | Comma-separated issue states that trigger agent work | `Todo,In Progress` |
-| `ORCHESTRA_TERMINAL_STATES` | Comma-separated issue states considered finished | `Done,Cancelled,Canceled,Closed,Duplicate` |
+### Agent Configuration
 
-### GitHub OAuth
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ORCHESTRA_AGENT_PROVIDER` | `CODEX` | Default agent provider (`CLAUDE`, `CODEX`, `GEMINI`, `OPENCODE`) |
+| `ORCHESTRA_AGENT_MAX_TURNS` | `10` | Maximum conversation turns per agent session |
+| `ORCHESTRA_AGENT_COMMAND_CLAUDE` | `claude -p {{prompt}} --output-format stream-json --verbose --dangerously-skip-permissions` | Command template for Claude |
+| `ORCHESTRA_AGENT_COMMAND_CODEX` | `codex exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox --json {{prompt}}` | Command template for Codex |
+| `ORCHESTRA_AGENT_COMMAND_OPENCODE` | `opencode run {{prompt}} --format json` | Command template for OpenCode |
+| `ORCHESTRA_AGENT_COMMAND_GEMINI` | `gemini -p {{prompt}} --output-format stream-json --approval-mode yolo` | Command template for Gemini |
+| `ORCHESTRA_AGENT_COMMAND_UNSANDBOX` | _(empty)_ | Command template for Unsandbox agent |
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ORCHESTRA_GITHUB_CLIENT_ID` | GitHub OAuth app client ID (for login flow) | _(none)_ |
-| `ORCHESTRA_GITHUB_CLIENT_SECRET` | GitHub OAuth app client secret | _(none)_ |
+The `{{prompt}}` placeholder in command templates is replaced with the task prompt at runtime.
 
-### MCP (Model Context Protocol)
+---
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ORCHESTRA_MCP_SERVERS` | Comma-separated `name=command` pairs defining MCP servers (e.g. `filesystem=/usr/bin/mcp-fs,git=/usr/bin/mcp-git`) | _(none)_ |
+### Concurrency Controls
 
-### Telemetry
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ORCHESTRA_MAX_CONCURRENT` | `16` | Maximum total concurrent agent sessions |
+| `ORCHESTRA_MAX_CONCURRENT_BY_STATE` | _(empty)_ | Per-state concurrency limits. Format: `State1:N,State2:M` (e.g., `Todo:1,In Progress:2`) |
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ORCHESTRA_TELEMETRY_PROVIDERS` | Comma-separated list of providers to collect telemetry from | `CLAUDE,CODEX,GEMINI,OPENCODE` |
-| `ORCHESTRA_TELEMETRY_RETENTION_DAYS` | Number of days to retain telemetry data | `7` |
-| `ORCHESTRA_TELEMETRY_STORE_RAW_PAYLOAD` | Store full raw payloads (`true`/`false`) | `false` |
+---
+
+### Tracker Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ORCHESTRA_TRACKER_TYPE` | _(empty)_ | Issue tracker type (e.g., `linear`) |
+| `ORCHESTRA_TRACKER_ENDPOINT` | _(empty)_ | Tracker API endpoint URL |
+| `ORCHESTRA_TRACKER_TOKEN` | _(empty)_ | Tracker API authentication token |
+| `ORCHESTRA_TRACKER_WORKER_ASSIGNEE_IDS` | _(empty)_ | Comma-separated list of user IDs whose issues to process |
+| `ORCHESTRA_ACTIVE_STATES` | `Todo, In Progress` | Comma-separated issue states that trigger agent work |
+| `ORCHESTRA_TERMINAL_STATES` | `Done, Cancelled, Canceled, Closed, Duplicate` | Comma-separated issue states considered complete |
+
+---
+
+### Workspace Hooks
+
+Hooks are shell commands executed at specific points in the workspace lifecycle:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ORCHESTRA_WORKSPACE_AFTER_CREATE` | _(empty)_ | Run after workspace directory is created |
+| `ORCHESTRA_WORKSPACE_BEFORE_REMOVE` | _(empty)_ | Run before workspace directory is removed |
+| `ORCHESTRA_WORKSPACE_BEFORE_RUN` | _(empty)_ | Run before each agent session starts |
+| `ORCHESTRA_WORKSPACE_AFTER_RUN` | _(empty)_ | Run after each agent session completes |
+
+---
+
+### Project Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ORCHESTRA_PROJECT_ROOTS` | _(empty)_ | Comma-separated list of directories to auto-register as projects |
+
+---
+
+### GitHub Integration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ORCHESTRA_GITHUB_CLIENT_ID` | _(empty)_ | GitHub OAuth app client ID |
+| `ORCHESTRA_GITHUB_CLIENT_SECRET` | _(empty)_ | GitHub OAuth app client secret |
+
+---
+
+### MCP Server Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ORCHESTRA_MCP_SERVERS` | _(empty)_ | Comma-separated MCP server definitions. Format: `name=command,name2=command2` |
+
+---
+
+### Telemetry Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ORCHESTRA_TELEMETRY_PROVIDERS` | `CLAUDE, CODEX, GEMINI, OPENCODE` | Comma-separated list of providers to collect telemetry from |
+| `ORCHESTRA_TELEMETRY_RETENTION_DAYS` | `7` | Number of days to retain telemetry data |
+| `ORCHESTRA_TELEMETRY_STORE_RAW_PAYLOAD` | `false` | Whether to store raw telemetry payloads (boolean: `true`/`false`/`1`/`0`) |
+
+---
 
 ### Speech-to-Text (Whisper)
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ORCHESTRA_STT_WHISPER_BIN` | Path to the whisper.cpp binary | _(none)_ |
-| `ORCHESTRA_STT_WHISPER_MODEL` | Path to the Whisper model file | _(none)_ |
-| `ORCHESTRA_STT_WHISPER_THREADS` | Number of CPU threads for Whisper inference | `0` (auto) |
-| `ORCHESTRA_STT_WHISPER_LANGUAGE` | Language code for speech recognition | `en` |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ORCHESTRA_STT_WHISPER_BIN` | _(empty)_ | Path to the Whisper binary |
+| `ORCHESTRA_STT_WHISPER_MODEL` | _(empty)_ | Path to the Whisper model file |
+| `ORCHESTRA_STT_WHISPER_THREADS` | `0` (auto) | Number of CPU threads for Whisper inference |
+| `ORCHESTRA_STT_WHISPER_LANGUAGE` | `en` | Default language for speech recognition |
 
-## WORKFLOW.md Overrides
+---
 
-Instead of (or in addition to) environment variables, you can place a `WORKFLOW.md` file in your project root. Orchestra parses structured YAML/config blocks from this file to populate the same settings. Environment variables always take precedence over workflow file values.
+### Security
 
-The workflow file supports nested keys that map to environment variables:
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ORCHESTRA_TOKEN_KEY` | _(empty)_ | 32-byte AES key (any string) for encrypting stored agent tokens at rest. If not set, tokens are stored in plaintext |
+
+---
+
+### Desktop-Specific Variables
+
+These environment variables affect only the Electron desktop application:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ORCHESTRA_BASE_URL` | `http://127.0.0.1:4010` | Backend URL (used when no managed backend) |
+| `ORCHESTRA_MANAGED_BACKEND` | _(auto)_ | `1` to force managed backend, `0` to disable, auto-detect otherwise |
+| `ORCHESTRA_BACKEND_BIN` | _(auto)_ | Override path to the `orchestrad` binary for the managed sidecar |
+| `VITE_DEV_SERVER_URL` | _(empty)_ | Vite dev server URL (development mode only) |
+
+---
+
+### WORKFLOW.md Configuration
+
+The workflow file uses YAML blocks nested under configuration keys. Example:
+
+```markdown
+# My Orchestra Workflow
+
+## Config
 
 ```yaml
 server:
-  host: "127.0.0.1"
-  port: "4010"
-  api_token: "my-token"
+  host: 0.0.0.0
+  port: 4010
+  api_token: my-secret-token
 
 workspace:
-  root: "/home/user/workspaces"
-  after_create: "git init"
-  before_run: "git checkout main && git pull"
-  project_roots: "/home/user/projects,/opt/repos"
+  root: /data/workspaces
+  after_create: "git clone $REPO_URL ."
+  before_run: "git pull origin main"
 
 agent:
-  provider: "CLAUDE"
-  max_turns: "20"
-  max_concurrent: "8"
+  provider: CLAUDE
+  max_turns: 15
+  max_concurrent: 8
   commands:
-    codex: "codex exec --json {{prompt}}"
     claude: "claude -p {{prompt}} --output-format stream-json"
 
 tracker:
-  type: "github"
-  endpoint: "https://api.github.com"
-  token: "ghp_..."
-  active_states: ["Todo", "In Progress"]
-  terminal_states: ["Done", "Closed"]
-
-github:
-  client_id: "Iv1.abc123"
-  client_secret: "secret"
+  type: linear
+  endpoint: https://api.linear.app/graphql
+  token: lin_api_xxxxx
+  active_states:
+    - Todo
+    - In Progress
+  terminal_states:
+    - Done
+    - Cancelled
+```
 ```
 
-## Agent Configuration Files and Discovery
+Supported WORKFLOW.md configuration paths:
 
-Orchestra discovers agent configuration files from three sources, in order:
-
-### 1. Internal Orchestra configs
-
-Located at `<workspace-root>/.orchestra/agents/`. Orchestra auto-creates these on first run:
-
-| File | Purpose |
+| Path | Maps To |
 |------|---------|
-| `.claude` | Runtime configuration for Claude Code |
-| `.codex` | Runtime configuration for Codex (TOML format) |
-| `.gemini` | Runtime configuration for Gemini |
-| `.opencode` | Runtime configuration for OpenCode |
-| `workspace.json` | Shared workspace settings and pointer overrides |
-
-### 2. Real agent configs (global and project-scoped)
-
-Orchestra scans standard agent config paths for each provider:
-
-| Agent | Global paths (relative to `$HOME`) | Project paths (relative to project root) | Format |
-|-------|-----------------------------------|------------------------------------------|--------|
-| Claude | `.claude/settings.json`, `.claude.json` | `.claude/settings.json`, `.claude/settings.local.json` | JSON |
-| Codex | `.codex/config.toml` | `.codex/config.toml`, `AGENTS.md` | TOML |
-| Gemini | `.gemini/settings.json` | `.gemini/settings.json` | JSON |
-| OpenCode | `.config/opencode/opencode.json` | `opencode.json` | JSON |
-
-### 3. Skill and sub-agent discovery
-
-Orchestra recursively walks skill directories for `.json`, `.toml`, `.md`, and `.yaml` files:
-
-| Agent | Skill directories |
-|-------|-------------------|
-| Claude | `.claude/agents` |
-| Codex | `.codex/skills` |
-| Gemini | `.gemini/agents`, `.gemini/skills` |
-| OpenCode | `.config/opencode/agents`, `.config/opencode/skills`, `.config/opencode/tools` |
-
-Both global (`$HOME/<path>`) and project-local variants are scanned.
-
-## workspace.json Structure
-
-The `workspace.json` file at `<workspace-root>/.orchestra/agents/workspace.json` serves as the central settings hub:
-
-```json
-{
-  "pointers": {
-    "claude": {
-      "global": "~/custom-path/.claude/settings.json"
-    },
-    "codex": {
-      "global": "~/.codex/config.toml"
-    }
-  },
-  "settings": {
-    "theme": "dark"
-  }
-}
-```
-
-### Fields
-
-- **`pointers`** -- Override the default global config path for any agent. Each key is an agent name, with a nested `"global"` key pointing to an absolute or `~/`-prefixed path.
-- **`settings`** -- Shared UI and workspace settings (e.g., theme preference).
-
-When a pointer is defined for an agent, Orchestra reads the config from that path instead of scanning the default global paths.
-
-## Global vs. Project Scope
-
-Orchestra distinguishes two configuration scopes:
-
-| Scope | Location | Purpose |
-|-------|----------|---------|
-| **GLOBAL** | `$HOME/<agent-paths>` or `<workspace-root>/.orchestra/agents/` | User-wide settings that apply across all projects |
-| **PROJECT** | `<project-root>/<agent-paths>` | Project-specific overrides that only apply when working in that project |
-
-Project-scoped configs are only loaded when a `projectRoot` is provided to the agent config discovery system.
-
-## Example Configurations
-
-### Minimal: In-memory tracker with Codex
-
-```bash
-./orchestrad --workspace-root ~/workspaces
-```
-
-Uses all defaults: memory tracker, Codex agent, localhost:4010.
-
-### GitHub tracker with Claude
-
-```bash
-export ORCHESTRA_TRACKER_TYPE=github
-export ORCHESTRA_TRACKER_ENDPOINT=https://api.github.com
-export ORCHESTRA_TRACKER_TOKEN=ghp_your_token_here
-export ORCHESTRA_AGENT_PROVIDER=CLAUDE
-export ORCHESTRA_WORKSPACE_ROOT=~/orchestra-workspaces
-./orchestrad
-```
-
-### Production with authentication
-
-```bash
-export ORCHESTRA_SERVER_HOST=0.0.0.0
-export ORCHESTRA_SERVER_PORT=8080
-export ORCHESTRA_API_TOKEN=strong-random-token
-export ORCHESTRA_TRACKER_TYPE=sqlite
-export ORCHESTRA_AGENT_PROVIDER=CLAUDE
-export ORCHESTRA_MAX_CONCURRENT=4
-export ORCHESTRA_WORKSPACE_ROOT=/var/lib/orchestra/workspaces
-./orchestrad
-```
-
-### Multiple MCP servers
-
-```bash
-export ORCHESTRA_MCP_SERVERS="filesystem=/usr/bin/mcp-filesystem,git=/usr/bin/mcp-git,search=/usr/bin/mcp-search"
-./orchestrad
-```
+| `server.host` | `ORCHESTRA_SERVER_HOST` |
+| `server.port` | `ORCHESTRA_SERVER_PORT` |
+| `server.api_token` | `ORCHESTRA_API_TOKEN` |
+| `workspace.root` | `ORCHESTRA_WORKSPACE_ROOT` |
+| `workspace.after_create` | `ORCHESTRA_WORKSPACE_AFTER_CREATE` |
+| `workspace.before_remove` | `ORCHESTRA_WORKSPACE_BEFORE_REMOVE` |
+| `workspace.before_run` | `ORCHESTRA_WORKSPACE_BEFORE_RUN` |
+| `workspace.after_run` | `ORCHESTRA_WORKSPACE_AFTER_RUN` |
+| `workspace.project_roots` | `ORCHESTRA_PROJECT_ROOTS` |
+| `agent.provider` | `ORCHESTRA_AGENT_PROVIDER` |
+| `agent.max_turns` | `ORCHESTRA_AGENT_MAX_TURNS` |
+| `agent.max_concurrent` | `ORCHESTRA_MAX_CONCURRENT` |
+| `agent.max_concurrent_by_state` | `ORCHESTRA_MAX_CONCURRENT_BY_STATE` |
+| `agent.commands.codex` | `ORCHESTRA_AGENT_COMMAND_CODEX` |
+| `agent.commands.claude` | `ORCHESTRA_AGENT_COMMAND_CLAUDE` |
+| `agent.commands.opencode` | `ORCHESTRA_AGENT_COMMAND_OPENCODE` |
+| `agent.commands.gemini` | `ORCHESTRA_AGENT_COMMAND_GEMINI` |
+| `tracker.type` | `ORCHESTRA_TRACKER_TYPE` |
+| `tracker.endpoint` | `ORCHESTRA_TRACKER_ENDPOINT` |
+| `tracker.token` | `ORCHESTRA_TRACKER_TOKEN` |
+| `tracker.worker_assignee_ids` | `ORCHESTRA_TRACKER_WORKER_ASSIGNEE_IDS` |
+| `tracker.active_states` | `ORCHESTRA_ACTIVE_STATES` |
+| `tracker.terminal_states` | `ORCHESTRA_TERMINAL_STATES` |
+| `github.client_id` | `ORCHESTRA_GITHUB_CLIENT_ID` |
+| `github.client_secret` | `ORCHESTRA_GITHUB_CLIENT_SECRET` |
+| `mcp.servers` | `ORCHESTRA_MCP_SERVERS` |
