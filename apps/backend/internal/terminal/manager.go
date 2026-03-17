@@ -1,3 +1,5 @@
+// Package terminal provides pseudo-terminal session management for running
+// interactive shell processes with output broadcasting and handler registration.
 package terminal
 
 import (
@@ -10,6 +12,8 @@ import (
 	"github.com/creack/pty"
 )
 
+// Session represents an active pseudo-terminal session with an underlying process,
+// output buffering, and handler-based output broadcasting.
 type Session struct {
 	ID            string
 	PTY           *os.File
@@ -22,17 +26,22 @@ type Session struct {
 	Closed        bool
 }
 
+// Manager maintains a registry of active terminal sessions and provides
+// methods to create, retrieve, and close them.
 type Manager struct {
 	sessions map[string]*Session
 	mu       sync.RWMutex
 }
 
+// NewManager creates a new terminal Manager with an empty session registry.
 func NewManager() *Manager {
 	return &Manager{
 		sessions: make(map[string]*Session),
 	}
 }
 
+// CreateSession starts a new pseudo-terminal session running the given command
+// in the specified directory. Returns the existing session if one with the same ID is still open.
 func (m *Manager) CreateSession(id string, dir string, command string, args ...string) (*Session, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -79,10 +88,13 @@ func (m *Manager) CreateSession(id string, dir string, command string, args ...s
 	return session, nil
 }
 
+// GetOrCreateSession returns an existing session by ID or creates a new bash session
+// in the given directory.
 func (m *Manager) GetOrCreateSession(id string, dir string) (*Session, error) {
 	return m.CreateSession(id, dir, "/bin/bash")
 }
 
+// GetSession returns the session with the given ID, or nil if not found.
 func (m *Manager) GetSession(id string) *Session {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -108,6 +120,8 @@ func (s *Session) broadcast(data []byte) {
 	}
 }
 
+// AddHandler registers a callback that receives terminal output data and returns
+// a handler ID for later removal. The handler immediately receives any buffered output.
 func (s *Session) AddHandler(h func([]byte)) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -121,12 +135,14 @@ func (s *Session) AddHandler(h func([]byte)) int {
 	return id
 }
 
+// RemoveHandler unregisters the output handler with the given ID.
 func (s *Session) RemoveHandler(id int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.Handlers, id)
 }
 
+// CloseSession closes and removes the session with the given ID.
 func (m *Manager) CloseSession(id string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -136,16 +152,19 @@ func (m *Manager) CloseSession(id string) {
 	}
 }
 
+// Write sends input data to the terminal's pseudo-terminal.
 func (s *Session) Write(data []byte) (int, error) {
 	return s.PTY.Write(data)
 }
 
+// GetCleanOutput returns the buffered terminal output with ANSI escape sequences stripped.
 func (s *Session) GetCleanOutput() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return stripansi.Strip(string(s.LogBuffer))
 }
 
+// Resize changes the terminal window size to the given dimensions.
 func (s *Session) Resize(rows, cols uint16) error {
 	return pty.Setsize(s.PTY, &pty.Winsize{
 		Rows: rows,
@@ -153,6 +172,7 @@ func (s *Session) Resize(rows, cols uint16) error {
 	})
 }
 
+// Close terminates the session by closing the PTY, killing the process, and closing the output channel.
 func (s *Session) Close() {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -1,3 +1,4 @@
+// Package runtime provides runtime identity constants and network configuration helpers.
 package runtime
 
 import (
@@ -6,10 +7,14 @@ import (
 )
 
 const (
+	// ServiceOrchestrator is the service identity for the orchestrator component.
 	ServiceOrchestrator = "orchestra.orchestrator"
-	ServiceDashboard    = "orchestra.dashboard"
+	// ServiceDashboard is the service identity for the dashboard component.
+	ServiceDashboard = "orchestra.dashboard"
 )
 
+// HostRequiresToken returns true if the given host address requires API token
+// authentication. Localhost and loopback addresses are exempt.
 func HostRequiresToken(host string) bool {
 	trimmed := strings.TrimSpace(strings.Trim(host, "[]"))
 	if trimmed == "" {

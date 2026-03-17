@@ -1,3 +1,5 @@
+// Package git provides helper functions for common git operations including
+// branching, committing, pushing, pulling, and remote URL parsing.
 package git
 
 import (
@@ -10,6 +12,7 @@ import (
 )
 
 // ProjectInfo extracts the top-level repository path and the remote origin URL
+// for the git repository containing the given directory.
 func ProjectInfo(ctx context.Context, dir string) (rootPath string, remoteURL string, err error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()

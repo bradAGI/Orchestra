@@ -892,6 +892,12 @@ export async function fetchAgentConfigs(config: BackendConfig, projectID?: strin
   return data.configs || []
 }
 
+/**
+ * Updates the content of a specific agent configuration file by its filesystem path.
+ * @param config - Backend connection configuration.
+ * @param path - Absolute path to the configuration file.
+ * @param content - New file content to write.
+ */
 export async function updateAgentConfigByPath(config: BackendConfig, path: string, content: string): Promise<void> {
   await requestJSON<void>(config, '/api/v1/config/agents/items', {
     method: 'POST',
@@ -900,6 +906,12 @@ export async function updateAgentConfigByPath(config: BackendConfig, path: strin
   })
 }
 
+/**
+ * Creates a new agent resource file (skill, hook, etc.) on disk.
+ * @param config - Backend connection configuration.
+ * @param payload - Resource creation fields (provider, type, name, scope, optional project ID).
+ * @returns The filesystem path of the newly created resource.
+ */
 export async function createAgentResource(config: BackendConfig, payload: { provider: string, type: string, name: string, scope: string, project_id?: string }): Promise<{ path: string }> {
   return requestJSON<{ path: string }>(config, '/api/v1/config/agents/new', {
     method: 'POST',
@@ -908,11 +920,22 @@ export async function createAgentResource(config: BackendConfig, payload: { prov
   })
 }
 
+/**
+ * Fetches the documentation tree structure.
+ * @param config - Backend connection configuration.
+ * @returns Array of doc tree items (files and folders).
+ */
 export async function fetchDocs(config: BackendConfig): Promise<DocItem[]> {
   const data = await requestJSON<{ docs: DocItem[] }>(config, '/api/v1/docs')
   return data.docs || []
 }
 
+/**
+ * Fetches the rendered content of a documentation file.
+ * @param config - Backend connection configuration.
+ * @param path - Relative path of the document within the docs tree.
+ * @returns The document content as a string.
+ */
 export async function fetchDocContent(config: BackendConfig, path: string): Promise<string> {
   const response = await fetch(new URL(`/api/v1/docs/${encodeURIComponent(path)}`, config.baseUrl).toString(), {
     headers: buildHeaders(config),
@@ -923,16 +946,33 @@ export async function fetchDocContent(config: BackendConfig, path: string): Prom
   return response.text()
 }
 
+/**
+ * Fetches all tools exposed by registered MCP servers.
+ * @param config - Backend connection configuration.
+ * @returns Array of MCP tool records.
+ */
 export async function fetchMCPTools(config: BackendConfig): Promise<MCPTool[]> {
   const data = await requestJSON<{ tools: MCPTool[] }>(config, '/api/v1/mcp/tools')
   return data.tools || []
 }
 
+/**
+ * Fetches all registered MCP servers.
+ * @param config - Backend connection configuration.
+ * @returns Array of MCP server records.
+ */
 export async function fetchMCPServers(config: BackendConfig): Promise<MCPServer[]> {
   const data = await requestJSON<{ servers: MCPServer[] }>(config, '/api/v1/mcp/servers')
   return data.servers || []
 }
 
+/**
+ * Registers a new MCP server with the orchestrator.
+ * @param config - Backend connection configuration.
+ * @param name - Display name for the server.
+ * @param command - Shell command to launch the server process.
+ * @returns The created MCP server record.
+ */
 export async function createMCPServer(config: BackendConfig, name: string, command: string): Promise<MCPServer> {
   return requestJSON<MCPServer>(config, '/api/v1/mcp/servers', {
     method: 'POST',
@@ -941,12 +981,18 @@ export async function createMCPServer(config: BackendConfig, name: string, comma
   })
 }
 
+/**
+ * Deletes an MCP server registration.
+ * @param config - Backend connection configuration.
+ * @param id - The MCP server UUID to delete.
+ */
 export async function deleteMCPServer(config: BackendConfig, id: string): Promise<void> {
   await requestJSON<void>(config, `/api/v1/mcp/servers/${id}`, {
     method: 'DELETE',
   })
 }
 
+/** A GitHub issue retrieved through the orchestrator's GitHub integration. */
 export type GitHubIssue = {
   number: number
   title: string
@@ -959,6 +1005,7 @@ export type GitHubIssue = {
   user?: { login: string; avatar_url: string }
 }
 
+/** A GitHub pull request retrieved through the orchestrator's GitHub integration. */
 export type GitHubPR = {
   number: number
   title: string
@@ -973,23 +1020,50 @@ export type GitHubPR = {
   merged_at: string | null
 }
 
+/** Current branch and list of all branches in a project repository. */
 export type GitBranches = {
   current: string
   branches: string[]
 }
 
+/**
+ * Fetches GitHub issues for a project via the orchestrator's GitHub integration.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param state - Issue state filter (defaults to "open").
+ * @returns Array of GitHub issue records.
+ */
 export async function fetchProjectGitHubIssues(config: BackendConfig, projectId: string, state: string = 'open'): Promise<GitHubIssue[]> {
   return requestJSON<GitHubIssue[]>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/issues?state=${state}`)
 }
 
+/**
+ * Fetches the current branch and all branch names for a project.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @returns The current branch and list of all branches.
+ */
 export async function fetchProjectGitBranches(config: BackendConfig, projectId: string): Promise<GitBranches> {
   return requestJSON<GitBranches>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/branches`)
 }
 
+/**
+ * Fetches GitHub pull requests for a project.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @returns Array of GitHub PR records.
+ */
 export async function fetchProjectGitHubPulls(config: BackendConfig, projectId: string): Promise<GitHubPR[]> {
   return requestJSON<GitHubPR[]>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/pulls`)
 }
 
+/**
+ * Fetches the unified diff for a specific GitHub pull request.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param number - PR number.
+ * @returns The PR diff as a string.
+ */
 export async function fetchProjectGitHubPullDiff(config: BackendConfig, projectId: string, number: number): Promise<string> {
   const response = await fetch(`${config.baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/github/pulls/${encodeURIComponent(String(number))}/diff`, {
     headers: buildHeaders(config),
@@ -997,6 +1071,13 @@ export async function fetchProjectGitHubPullDiff(config: BackendConfig, projectI
   return response.text()
 }
 
+/**
+ * Creates a new GitHub issue for a project.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param payload - Issue creation fields (title, body, optional labels).
+ * @returns The created GitHub issue record.
+ */
 export async function createProjectGitHubIssue(config: BackendConfig, projectId: string, payload: { title: string; body: string; labels?: string[] }): Promise<GitHubIssue> {
   return requestJSON<GitHubIssue>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/issues`, {
     method: 'POST',
@@ -1005,6 +1086,14 @@ export async function createProjectGitHubIssue(config: BackendConfig, projectId:
   })
 }
 
+/**
+ * Updates an existing GitHub issue for a project.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param number - GitHub issue number.
+ * @param payload - Fields to update (title, body, state).
+ * @returns The updated GitHub issue record.
+ */
 export async function updateProjectGitHubIssue(config: BackendConfig, projectId: string, number: number, payload: { title?: string; body?: string; state?: string }): Promise<GitHubIssue> {
   return requestJSON<GitHubIssue>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/issues/${number}`, {
     method: 'PATCH',
@@ -1013,6 +1102,13 @@ export async function updateProjectGitHubIssue(config: BackendConfig, projectId:
   })
 }
 
+/**
+ * Creates a new GitHub pull request for a project.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param payload - PR creation fields (title, body, head branch, base branch).
+ * @returns The created PR URL and number.
+ */
 export async function createProjectGitHubPull(config: BackendConfig, projectId: string, payload: { title: string; body: string; head: string; base: string }): Promise<{ html_url: string; number: number }> {
   return requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/pulls`, {
     method: 'POST',
@@ -1021,12 +1117,18 @@ export async function createProjectGitHubPull(config: BackendConfig, projectId: 
   })
 }
 
+/**
+ * Disconnects a project from its GitHub repository integration.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ */
 export async function disconnectProjectGitHub(config: BackendConfig, projectId: string): Promise<void> {
   await requestJSON<void>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/disconnect`, {
     method: 'POST',
   })
 }
 
+/** An MCP server configured for a specific provider (e.g. Claude, Codex). */
 export type ProviderMCPServer = {
     name: string
     command: string
@@ -1037,11 +1139,24 @@ export type ProviderMCPServer = {
     enabled: boolean
 }
 
+/**
+ * Fetches MCP servers configured for a specific provider.
+ * @param config - Backend connection configuration.
+ * @param provider - Provider name (e.g. "CLAUDE").
+ * @param projectId - Optional project ID to scope the query.
+ * @returns Array of provider-specific MCP server records.
+ */
 export async function fetchProviderMCPServers(config: BackendConfig, provider: string, projectId?: string): Promise<ProviderMCPServer[]> {
     const params = projectId ? `?project_id=${encodeURIComponent(projectId)}` : ''
     return requestJSON<ProviderMCPServer[]>(config, `/api/v1/agents/${encodeURIComponent(provider)}/mcp${params}`)
 }
 
+/**
+ * Adds an MCP server to a specific provider's configuration.
+ * @param config - Backend connection configuration.
+ * @param provider - Provider name.
+ * @param server - Server definition (name, command, optional args).
+ */
 export async function addProviderMCPServer(config: BackendConfig, provider: string, server: { name: string; command: string; args?: string[] }): Promise<void> {
     await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/mcp`, {
         method: 'POST',
@@ -1050,10 +1165,17 @@ export async function addProviderMCPServer(config: BackendConfig, provider: stri
     })
 }
 
+/**
+ * Removes an MCP server from a specific provider's configuration.
+ * @param config - Backend connection configuration.
+ * @param provider - Provider name.
+ * @param name - Name of the MCP server to remove.
+ */
 export async function deleteProviderMCPServer(config: BackendConfig, provider: string, name: string): Promise<void> {
     await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/mcp/${encodeURIComponent(name)}`, { method: 'DELETE' })
 }
 
+/** Permission and tool access configuration for a provider. */
 export type ProviderPermissions = {
     approval_mode: string
     allow: string[]
@@ -1064,12 +1186,14 @@ export type ProviderPermissions = {
     sandbox?: string
 }
 
+/** Model selection and inference parameters for a provider. */
 export type ProviderModelConfig = {
     model: string
     effort: string
     temperature: number | null
 }
 
+/** A lifecycle hook configured for a provider (e.g. pre-run, post-run scripts). */
 export type ProviderHook = {
     event: string
     matcher?: string
@@ -1078,11 +1202,24 @@ export type ProviderHook = {
     timeout?: number
 }
 
+/**
+ * Fetches the permission configuration for a specific provider.
+ * @param config - Backend connection configuration.
+ * @param provider - Provider name.
+ * @param projectId - Optional project ID for project-scoped permissions.
+ * @returns The provider's permission settings.
+ */
 export async function fetchProviderPermissions(config: BackendConfig, provider: string, projectId?: string): Promise<ProviderPermissions> {
     const params = projectId ? `?project_id=${encodeURIComponent(projectId)}` : ''
     return requestJSON<ProviderPermissions>(config, `/api/v1/agents/${encodeURIComponent(provider)}/permissions${params}`)
 }
 
+/**
+ * Updates the permission configuration for a specific provider.
+ * @param config - Backend connection configuration.
+ * @param provider - Provider name.
+ * @param perms - The full permissions object to set.
+ */
 export async function updateProviderPermissions(config: BackendConfig, provider: string, perms: ProviderPermissions): Promise<void> {
     await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/permissions`, {
         method: 'POST',
@@ -1091,10 +1228,22 @@ export async function updateProviderPermissions(config: BackendConfig, provider:
     })
 }
 
+/**
+ * Fetches the model configuration for a specific provider.
+ * @param config - Backend connection configuration.
+ * @param provider - Provider name.
+ * @returns The provider's model settings (model name, effort, temperature).
+ */
 export async function fetchProviderModel(config: BackendConfig, provider: string): Promise<ProviderModelConfig> {
     return requestJSON<ProviderModelConfig>(config, `/api/v1/agents/${encodeURIComponent(provider)}/model`)
 }
 
+/**
+ * Updates the model configuration for a specific provider.
+ * @param config - Backend connection configuration.
+ * @param provider - Provider name.
+ * @param model - The model configuration to set.
+ */
 export async function updateProviderModel(config: BackendConfig, provider: string, model: ProviderModelConfig): Promise<void> {
     await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/model`, {
         method: 'POST',
@@ -1103,10 +1252,22 @@ export async function updateProviderModel(config: BackendConfig, provider: strin
     })
 }
 
+/**
+ * Fetches lifecycle hooks configured for a specific provider.
+ * @param config - Backend connection configuration.
+ * @param provider - Provider name.
+ * @returns Array of hook definitions.
+ */
 export async function fetchProviderHooks(config: BackendConfig, provider: string): Promise<ProviderHook[]> {
     return requestJSON<ProviderHook[]>(config, `/api/v1/agents/${encodeURIComponent(provider)}/hooks`)
 }
 
+/**
+ * Replaces all lifecycle hooks for a specific provider.
+ * @param config - Backend connection configuration.
+ * @param provider - Provider name.
+ * @param hooks - The full array of hooks to set.
+ */
 export async function updateProviderHooks(config: BackendConfig, provider: string, hooks: ProviderHook[]): Promise<void> {
     await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/hooks`, {
         method: 'POST',
@@ -1115,10 +1276,22 @@ export async function updateProviderHooks(config: BackendConfig, provider: strin
     })
 }
 
+/**
+ * Checks the health status of the speech-to-text subsystem.
+ * @param config - Backend connection configuration.
+ * @returns STT health status including readiness and model info.
+ */
 export async function fetchSTTHealth(config: BackendConfig): Promise<STTHealth> {
   return requestJSON<STTHealth>(config, '/api/v1/stt/health')
 }
 
+/**
+ * Sends an audio recording to the backend for speech-to-text transcription.
+ * @param config - Backend connection configuration.
+ * @param audio - Audio blob to transcribe (typically WebM format).
+ * @param language - Optional language hint for the transcription model.
+ * @returns Transcription result with text and timing info.
+ */
 export async function transcribeAudio(config: BackendConfig, audio: Blob, language?: string): Promise<STTTranscriptionResult> {
   const form = new FormData()
   form.append('audio', audio, 'recording.webm')
@@ -1132,26 +1305,62 @@ export async function transcribeAudio(config: BackendConfig, audio: Blob, langua
   })
 }
 
+/**
+ * Checks out a git branch in a project workspace.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param branch - Branch name to check out.
+ */
 export async function gitCheckout(config: BackendConfig, projectId: string, branch: string): Promise<void> {
   await requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/checkout`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ branch }) })
 }
 
+/**
+ * Creates a new git branch in a project workspace.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param name - Name of the new branch.
+ */
 export async function gitCreateBranch(config: BackendConfig, projectId: string, name: string): Promise<void> {
   await requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/branches`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
 }
 
+/**
+ * Deletes a git branch from a project workspace.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param branch - Branch name to delete.
+ */
 export async function gitDeleteBranch(config: BackendConfig, projectId: string, branch: string): Promise<void> {
   await requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/branches/${encodeURIComponent(branch)}`, { method: 'DELETE' })
 }
 
+/**
+ * Stages files for the next git commit in a project workspace.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param files - Array of file paths to stage.
+ */
 export async function gitStage(config: BackendConfig, projectId: string, files: string[]): Promise<void> {
   await requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/stage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ files }) })
 }
 
+/**
+ * Unstages files from the git index in a project workspace.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param files - Array of file paths to unstage.
+ */
 export async function gitUnstage(config: BackendConfig, projectId: string, files: string[]): Promise<void> {
   await requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/unstage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ files }) })
 }
 
+/**
+ * Merges a branch into the current branch in a project workspace.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param branch - Branch name to merge.
+ */
 export async function gitMerge(config: BackendConfig, projectId: string, branch: string): Promise<void> {
   await requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/merge`, {
     method: 'POST',
@@ -1160,38 +1369,79 @@ export async function gitMerge(config: BackendConfig, projectId: string, branch:
   })
 }
 
+/**
+ * Stashes uncommitted changes in a project workspace.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ */
 export async function gitStash(config: BackendConfig, projectId: string): Promise<void> {
   await requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/stash`, { method: 'POST' })
 }
 
+/**
+ * Pops the most recent stash entry in a project workspace.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ */
 export async function gitStashPop(config: BackendConfig, projectId: string): Promise<void> {
   await requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/stash/pop`, { method: 'POST' })
 }
 
+/**
+ * Fetches reviews for a GitHub pull request.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param prNumber - The PR number.
+ * @returns Array of review objects.
+ */
 export async function fetchPRReviews(config: BackendConfig, projectId: string, prNumber: number): Promise<unknown[]> {
   return requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/pulls/${prNumber}/reviews`)
 }
 
+/**
+ * Submits a review on a GitHub pull request.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param prNumber - The PR number.
+ * @param body - Review body text.
+ * @param event - Review event type (e.g. "APPROVE", "REQUEST_CHANGES", "COMMENT").
+ */
 export async function submitPRReview(config: BackendConfig, projectId: string, prNumber: number, body: string, event: string): Promise<void> {
   await requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/pulls/${prNumber}/reviews`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body, event }) })
 }
 
+/**
+ * Merges a GitHub pull request.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param prNumber - The PR number.
+ * @param method - Merge method (e.g. "merge", "squash", "rebase").
+ */
 export async function mergePR(config: BackendConfig, projectId: string, prNumber: number, method: string): Promise<void> {
   await requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/pulls/${prNumber}/merge`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ method }) })
 }
 
+/**
+ * Fetches comments on a GitHub pull request.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param prNumber - The PR number.
+ * @returns Array of comment objects.
+ */
 export async function fetchPRComments(config: BackendConfig, projectId: string, prNumber: number): Promise<unknown[]> {
   return requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/pulls/${prNumber}/comments`)
 }
 
 // --- Unsandbox Configuration ---
 
+/** Configuration state for the Unsandbox remote execution integration. */
 export type UnsandboxConfig = {
   configured: boolean
   public_key: string
   has_secret: boolean
 }
 
+/** Runtime status of the Unsandbox integration (validity, errors). */
 export type UnsandboxStatus = {
   configured: boolean
   valid?: boolean
@@ -1199,10 +1449,22 @@ export type UnsandboxStatus = {
   key_info?: Record<string, unknown>
 }
 
+/**
+ * Fetches the current Unsandbox API key configuration.
+ * @param config - Backend connection configuration.
+ * @returns The Unsandbox configuration state.
+ */
 export async function fetchUnsandboxConfig(config: BackendConfig): Promise<UnsandboxConfig> {
   return requestJSON<UnsandboxConfig>(config, '/api/v1/config/unsandbox')
 }
 
+/**
+ * Saves Unsandbox API keys to the backend configuration.
+ * @param config - Backend connection configuration.
+ * @param publicKey - Unsandbox public API key.
+ * @param secretKey - Unsandbox secret API key.
+ * @returns The updated Unsandbox configuration.
+ */
 export async function saveUnsandboxConfig(config: BackendConfig, publicKey: string, secretKey: string): Promise<UnsandboxConfig> {
   return requestJSON<UnsandboxConfig>(config, '/api/v1/config/unsandbox', {
     method: 'POST',
@@ -1211,16 +1473,26 @@ export async function saveUnsandboxConfig(config: BackendConfig, publicKey: stri
   })
 }
 
+/**
+ * Deletes the stored Unsandbox API keys from the backend.
+ * @param config - Backend connection configuration.
+ */
 export async function deleteUnsandboxConfig(config: BackendConfig): Promise<void> {
   await requestJSON<void>(config, '/api/v1/config/unsandbox', {
     method: 'DELETE',
   })
 }
 
+/**
+ * Fetches the current Unsandbox integration status (whether keys are valid).
+ * @param config - Backend connection configuration.
+ * @returns The Unsandbox runtime status.
+ */
 export async function fetchUnsandboxStatus(config: BackendConfig): Promise<UnsandboxStatus> {
   return requestJSON<UnsandboxStatus>(config, '/api/v1/unsandbox/status')
 }
 
+/** Result of executing code in the Unsandbox remote environment. */
 export type UnsandboxExecuteResult = {
   status: string
   output: string
@@ -1228,6 +1500,14 @@ export type UnsandboxExecuteResult = {
   job_id: string
 }
 
+/**
+ * Executes code in the Unsandbox remote sandbox environment.
+ * @param config - Backend connection configuration.
+ * @param language - Programming language (e.g. "python", "bash").
+ * @param code - Source code to execute.
+ * @param network - Network access level (defaults to "semitrusted").
+ * @returns Execution result with output, errors, and job ID.
+ */
 export async function executeUnsandbox(
   config: BackendConfig,
   language: string,

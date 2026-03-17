@@ -1,136 +1,69 @@
 # 5. Component Architecture
 
 > **Source files:**
-> - `apps/desktop/src/App.tsx` — Root application component and state orchestration
-> - `apps/desktop/src/app/routes/sections.ts` — Section routing, SectionID enum, sidebar items
-> - `apps/desktop/src/components/app-shell/` — Shell layout, sidebar, top bar, shared controls
-> - `apps/desktop/src/components/ui/` — Radix UI primitive wrappers
-> - `apps/desktop/src/components/dashboard/` — Operations hub dashboard
-> - `apps/desktop/src/components/agents/` — Agent configuration views
-> - `apps/desktop/src/components/projects/` — Project management views
-> - `apps/desktop/src/components/warehouse/` — Analytics and session archive views
-> - `apps/desktop/src/components/sandbox/` — Remote code execution sandbox
-> - `apps/desktop/src/components/settings/` — Backend configuration settings
-> - `apps/desktop/src/components/terminal/` — Multi-agent terminal multiplexer
-> - `apps/desktop/src/components/tasks/` — Task creation dialog
-> - `apps/desktop/src/components/docs/` — Documentation browser
-> - `apps/desktop/src/components/diagrams/` — D3-based architecture visualizations
+> - `apps/desktop/src/App.tsx` -- Root application shell and state orchestration
+> - `apps/desktop/src/app/routes/sections.ts` -- Section routing and visibility
+> - `apps/desktop/src/components/app-shell/sidebar-nav.tsx` -- Sidebar navigation
+> - `apps/desktop/src/components/app-shell/panels.tsx` -- Panel re-exports
+> - `apps/desktop/src/components/app-shell/types.ts` -- Shared UI types
+> - `apps/desktop/src/components/ui/*` -- Radix UI primitives
 
-The Orchestra desktop frontend is a React application rendered inside an Electron shell. The component tree follows a top-level App shell pattern where a single `App` component manages global state, delegates section visibility to a routing system based on `SectionID`, and renders domain-specific views conditionally.
+The Orchestra desktop frontend is a single-page React application rendered inside an Electron shell. The component hierarchy follows a **shell + section** pattern: a persistent app shell (sidebar, top bar) wraps a content area that swaps between discrete section views based on a `SectionID` enum.
+
+---
+
+### Section Routing
+
+All navigation is driven by the `SectionID` type defined in `apps/desktop/src/app/routes/sections.ts`. There is no client-side router -- the active section is held in React state and toggled by the sidebar.
+
+| SectionID | Label | Category | Description |
+|-----------|-------|----------|-------------|
+| `DASHBOARD` | Operations | Operations | Fleet monitoring and command hub |
+| `RUNNING` | Running | Operations | Live running task queue |
+| `ISSUES` | Tasks | Tracker | Task board and inspector |
+| `PROJECTS` | Projects | Workspace | Local workspace grouping |
+| `AGENTS` | Agents | Compute | Global agent configurations |
+| `WAREHOUSE` | Analytics | Analytics | Token usage and session archives |
+| `SANDBOX` | Sandbox | Compute | Remote code execution via unsandbox |
+| `SETTINGS` | Settings | System | Backend and migration controls |
+| `DOCS` | Documentation | Knowledge | User and engineering guides |
+| `CONSOLE` | Live Console | Runtime | Multi-agent terminal dock |
+
+The `getSectionVisibility()` function returns a `SectionVisibility` record mapping each section to a boolean, used by `App.tsx` to conditionally render the appropriate view component.
 
 ---
 
 ### App Shell Layout
 
-The root `App` component in `App.tsx` acts as the central orchestrator. It:
-
-1. Initializes backend configuration via `useBackendConfig()` hook (IPC bridge to Electron)
-2. Establishes real-time sync with the backend via `startRuntimeSync()`
-3. Maintains global state: `snapshot`, `timeline`, `boardIssues`, `agentConfig`, `availableAgents`
-4. Delegates rendering to section-specific components based on the active `SectionID`
-
-The visual shell is composed of three regions:
-
 ```mermaid
 graph LR
-    subgraph AppShell
-        SB[Sidebar Navigation] --> MC[Main Content Area]
-        TB[Top Bar] --> MC
+    subgraph AppShell["App Shell (App.tsx)"]
+        SB[SidebarNav]
+        TB[TopBar]
+        CA[Content Area]
     end
-    MC --> DASH[Dashboard]
-    MC --> ISSUES[Kanban Board]
-    MC --> PROJ[Project Views]
-    MC --> AGENTS[Agent Config]
-    MC --> WH[Analytics]
-    MC --> SANDBOX[Sandbox]
-    MC --> SETTINGS[Settings]
-    MC --> DOCS[Documentation]
-    MC --> CONSOLE[Live Console]
+
+    SB -->|"SectionID"| CA
+    TB -->|"Status / Controls"| CA
+
+    CA --> DASH[DashboardOverview]
+    CA --> RUN[OperationsQueueCard]
+    CA --> ISS[KanbanBoard + IssueDetailView]
+    CA --> PROJ[ProjectGrid / ProjectDetailView]
+    CA --> AGT[AgentsDashboard]
+    CA --> WH[AnalyticsDashboard]
+    CA --> SBX[SandboxDashboard]
+    CA --> SET[SettingsCard]
+    CA --> DOC[DocsDashboard]
+    CA --> CON[TerminalMultiplexer]
 ```
 
-| Shell Component | File | Purpose |
-|---|---|---|
-| `AppShell` | `@app/layout/AppShell` | Outer layout wrapper with sidebar + content |
-| `SidebarNav` | `components/app-shell/sidebar-nav.tsx` | Collapsible icon sidebar |
-| `TopBar` | `components/app-shell/top-bar.tsx` | Section title, breadcrumb, status |
-| `panels` | `components/app-shell/panels.tsx` | Re-exports: IssueDetailView, CreateTaskDialog, CreateProjectDialog, SettingsCard |
+The `App.tsx` component is the root orchestrator. It:
 
----
-
-### Sidebar Navigation
-
-The sidebar is driven by a static configuration array in `sections.ts`:
-
-```mermaid
-graph TD
-    SI[sidebarItems array] --> |defines| NAV[Sidebar Navigation]
-    NAV --> ISSUES[Tasks - ListTodo icon]
-    NAV --> PROJECTS[Projects - FolderTree icon]
-    NAV --> CONSOLE[Live Console - Terminal icon]
-    NAV --> AGENTS[Agents - Cpu icon]
-    NAV --> WAREHOUSE[Analytics - Database icon]
-    NAV --> SANDBOX[Sandbox - Globe icon]
-    NAV --> SETTINGS[Settings - Settings2 icon]
-    NAV --> DOCS[Documentation - FileText icon]
-```
-
-Each sidebar item maps to a `SectionID` and uses a Lucide icon:
-
-| SectionID | Label | Icon | Description |
-|---|---|---|---|
-| `ISSUES` | Tasks | `ListTodo` | Task board and inspector |
-| `PROJECTS` | Projects | `FolderTree` | Local workspace grouping |
-| `CONSOLE` | Live Console | `Terminal` | Multi-agent terminal dock |
-| `AGENTS` | Agents | `Cpu` | Global agent configurations |
-| `WAREHOUSE` | Analytics | `Database` | Token usage and session archives |
-| `SANDBOX` | Sandbox | `Globe` | Remote code execution via unsandbox |
-| `SETTINGS` | Settings | `Settings2` | Backend and migration controls |
-| `DOCS` | Documentation | `FileText` | User and engineering guides |
-
----
-
-### Section Routing (SectionID Enum)
-
-Orchestra does not use a traditional router. Instead, section visibility is computed from a single `activeSection: SectionID` state variable. The `SectionID` type is a string union:
-
-```typescript
-type SectionID =
-  | 'DASHBOARD' | 'RUNNING' | 'ISSUES' | 'PROJECTS'
-  | 'AGENTS'    | 'WAREHOUSE' | 'SANDBOX' | 'SETTINGS'
-  | 'DOCS'      | 'CONSOLE'
-```
-
-The function `getSectionVisibility(activeSection)` returns a `SectionVisibility` record of booleans. Each section component checks its corresponding flag to determine render:
-
-```mermaid
-flowchart LR
-    A[activeSection state] --> B[getSectionVisibility]
-    B --> C{SectionVisibility flags}
-    C -->|showDashboard| D[DashboardOverview]
-    C -->|showIssueBoard| E[KanbanBoard]
-    C -->|showProjects| F[ProjectGrid / ProjectDetailView]
-    C -->|showAgents| G[AgentsDashboard]
-    C -->|showWarehouse| H[AnalyticsDashboard]
-    C -->|showSandbox| I[SandboxDashboard]
-    C -->|showSettings| J[SettingsCard]
-    C -->|showDocs| K[DocsDashboard]
-    C -->|showConsole| L[TerminalMultiplexer]
-```
-
-Each section also carries metadata (label and title) accessed via `getCurrentSectionMeta()`:
-
-| SectionID | Label | Title |
-|---|---|---|
-| `DASHBOARD` | Operations | Dashboard |
-| `RUNNING` | Operations | Running |
-| `ISSUES` | Tracker | Tasks |
-| `PROJECTS` | Workspace | Projects |
-| `AGENTS` | Compute | Agents |
-| `WAREHOUSE` | Analytics | Analytics |
-| `SANDBOX` | Compute | Sandbox |
-| `SETTINGS` | System | Settings |
-| `DOCS` | Knowledge | Documentation |
-| `CONSOLE` | Runtime | Live Console |
+1. Loads backend configuration via `window.orchestraDesktop.getBackendConfig()` (Electron IPC) or falls back to environment variables for web mode.
+2. Bootstraps runtime sync (SSE + polling) via `startRuntimeSync()`.
+3. Maintains all top-level state: snapshot, issues, projects, agents, timeline, warehouse stats.
+4. Renders the sidebar, top bar, and a conditional content area based on `activeSection`.
 
 ---
 
@@ -139,87 +72,125 @@ Each section also carries metadata (label and title) accessed via `getCurrentSec
 #### Dashboard (`components/dashboard/`)
 
 | Component | File | Purpose |
-|---|---|---|
-| `DashboardOverview` | `DashboardOverview.tsx` | Operations hub with metric cards, project grid, runtime events panel |
-| `MetricCard` | `DashboardOverview.tsx` | Reusable card showing title/value/hint with hover animations |
+|-----------|------|---------|
+| `DashboardOverview` | `DashboardOverview.tsx` | Operations hub with metric cards, active projects grid, runtime events |
+| `MetricCard` | `DashboardOverview.tsx` | Reusable stat card (active agents, throughput, project load) |
 
-#### Tasks / Issues (`widgets/issue-detail/`, `components/tasks/`)
+#### Tasks (`widgets/kanban/`, `widgets/issue-detail/`, `components/tasks/`)
 
 | Component | File | Purpose |
-|---|---|---|
-| `IssueDetailView` | `widgets/issue-detail/IssueDetailView.tsx` | Full-screen issue inspector with tabs |
-| `CreateTaskDialog` | `widgets/issue-detail/CreateTaskDialog.tsx` | Dialog for creating new tasks |
-| `KanbanBoard` | `@widgets/kanban` | Drag-and-drop Kanban board for issue states |
+|-----------|------|---------|
+| `KanbanBoard` | `widgets/kanban/KanbanBoard.tsx` | Drag-and-drop task board with column grouping by state |
+| `IssueDetailView` | `widgets/issue-detail/IssueDetailView.tsx` | Full inspector with tabs: overview, history, diff, logs, PR |
+| `CreateTaskDialog` | `components/tasks/CreateTaskDialog.tsx` | Modal for creating new tasks |
 
 #### Projects (`components/projects/`)
 
 | Component | File | Purpose |
-|---|---|---|
-| `ProjectGrid` | `ProjectGrid.tsx` | Card grid of all registered projects |
-| `ProjectDetailView` | `ProjectDetailView.tsx` | Single project view: file tree, git tab, Kanban sub-board, GitHub integration |
-| `CreateProjectDialog` | `CreateProjectDialog.tsx` | Dialog for registering new project roots |
+|-----------|------|---------|
+| `ProjectGrid` | `ProjectGrid.tsx` | Grid/list view of all registered projects with stats |
+| `ProjectDetailView` | `ProjectDetailView.tsx` | Single project inspector: overview, file tree, git tab |
+| `CreateProjectDialog` | `CreateProjectDialog.tsx` | Dialog to register a new project by root path |
 
 #### Agents (`components/agents/`)
 
 | Component | File | Purpose |
-|---|---|---|
-| `AgentsDashboard` | `AgentsDashboard.tsx` | Multi-provider config editor: permissions, model, hooks, MCP servers |
+|-----------|------|---------|
+| `AgentsDashboard` | `AgentsDashboard.tsx` | Per-provider config editor: model, permissions, MCP servers, hooks |
 
-#### Analytics / Warehouse (`components/warehouse/`)
+Supported providers: `claude`, `codex`, `gemini`, `opencode`.
+
+#### Warehouse / Analytics (`components/warehouse/`)
 
 | Component | File | Purpose |
-|---|---|---|
-| `AnalyticsDashboard` | `AnalyticsDashboard.tsx` | Token usage statistics, provider/model breakdown, session list |
-| `SessionDetailView` | `SessionDetailView.tsx` | Individual session inspector with event timeline |
+|-----------|------|---------|
+| `AnalyticsDashboard` | `AnalyticsDashboard.tsx` | Token usage charts, session archives, global stats |
+| `SessionDetailView` | `SessionDetailView.tsx` | Individual session inspector |
 
 #### Sandbox (`components/sandbox/`)
 
 | Component | File | Purpose |
-|---|---|---|
-| `SandboxDashboard` | `SandboxDashboard.tsx` | Unsandbox remote code execution interface |
+|-----------|------|---------|
+| `SandboxDashboard` | `SandboxDashboard.tsx` | Remote code execution UI via unsandbox platform |
 
 #### Settings (`components/settings/`)
 
 | Component | File | Purpose |
-|---|---|---|
-| `SettingsCard` | `SettingsCard.tsx` | Backend URL/token config, profile management, workspace migration |
+|-----------|------|---------|
+| `SettingsCard` | `SettingsCard.tsx` | Backend URL config, API token, workspace migration controls |
 
-#### Terminal (`components/terminal/`)
-
-| Component | File | Purpose |
-|---|---|---|
-| `TerminalMultiplexer` | `TerminalMultiplexer.tsx` | Multi-pane terminal dock for watching agent sessions |
-| `TerminalView` | `TerminalView.tsx` | Single terminal pane rendering agent log output |
-
-#### Documentation (`components/docs/`)
+#### Terminal / Console (`components/terminal/`)
 
 | Component | File | Purpose |
-|---|---|---|
-| `DocsDashboard` | `DocsDashboard.tsx` | Browsable documentation tree with markdown rendering |
+|-----------|------|---------|
+| `TerminalMultiplexer` | `TerminalMultiplexer.tsx` | Multi-pane terminal dock for concurrent agent sessions |
+| `TerminalView` | `TerminalView.tsx` | Single terminal instance |
+
+#### Docs (`components/docs/`)
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| `DocsDashboard` | `DocsDashboard.tsx` | Markdown documentation viewer |
 
 #### Diagrams (`components/diagrams/`)
 
 | Component | File | Purpose |
-|---|---|---|
-| `D3ArchitectureGraph` | `D3ArchitectureGraph.tsx` | D3.js force-directed architecture graph visualization |
+|-----------|------|---------|
+| `D3ArchitectureGraph` | `D3ArchitectureGraph.tsx` | Interactive D3-based architecture visualization |
 
 ---
 
-### Radix UI Primitives Usage
+### Sidebar Navigation
 
-The `components/ui/` directory wraps Radix UI primitives with Orchestra-specific styling using Tailwind CSS. These are used throughout all sections:
+The sidebar is defined declaratively in `sections.ts` via the `sidebarItems` array. Each entry maps an `id` (SectionID), a human-readable `label`, a `description`, and a Lucide icon. The `SidebarNav` component renders these items with keyboard navigation support (arrow keys) and a collapsible rail mode.
 
-| Component | File | Radix Primitive |
-|---|---|---|
-| `Badge` | `badge.tsx` | Custom (no Radix) |
-| `Button` | `button.tsx` | Custom (no Radix) |
-| `Card` | `card.tsx` | Custom container |
-| `Chart` | `chart.tsx` | Recharts integration |
-| `Dialog` | `dialog.tsx` | `@radix-ui/react-dialog` |
-| `ScrollArea` | `scroll-area.tsx` | `@radix-ui/react-scroll-area` |
-| `Skeleton` | `skeleton.tsx` | Animated loading placeholder |
-| `Table` | `table.tsx` | HTML table wrappers |
-| `AppTooltip` | `tooltip-wrapper.tsx` | `@radix-ui/react-tooltip` |
-| `SectionErrorBoundary` | `section-error-boundary.tsx` | React error boundary per section |
+```mermaid
+graph TD
+    SI[sidebarItems array] --> SN[SidebarNav component]
+    SN -->|onClick| ASS[activeSection state]
+    ASS --> GSV[getSectionVisibility]
+    GSV --> CV[Conditional view rendering]
+```
 
-All UI primitives follow the shadcn/ui pattern: thin wrapper components that compose Radix headless primitives with Tailwind utility classes, exported for use across the application.
+---
+
+### Radix UI Primitives
+
+The `components/ui/` directory contains thin wrappers around Radix UI and shadcn/ui primitives used throughout the application:
+
+| Primitive | File | Base |
+|-----------|------|------|
+| `Badge` | `badge.tsx` | Custom styled badge |
+| `Button` | `button.tsx` | Radix slot-compatible button |
+| `Card` | `card.tsx` | Card layout (header, content, footer) |
+| `Chart` | `chart.tsx` | Recharts wrapper |
+| `Dialog` | `dialog.tsx` | Radix Dialog (modal) |
+| `ScrollArea` | `scroll-area.tsx` | Radix ScrollArea |
+| `Skeleton` | `skeleton.tsx` | Loading placeholder |
+| `Table` | `table.tsx` | HTML table with styled variants |
+| `TooltipWrapper` | `tooltip-wrapper.tsx` | App-wide tooltip component (`AppTooltip`) |
+| `SectionErrorBoundary` | `section-error-boundary.tsx` | Error boundary per section with recovery |
+
+---
+
+### Panel Re-exports
+
+The `components/app-shell/panels.tsx` file acts as a barrel export for top-level view components, keeping imports in `App.tsx` clean:
+
+```typescript
+export { DashboardOverview, MetricCard } from '@/components/dashboard/DashboardOverview'
+export { SettingsCard } from '@/components/settings/SettingsCard'
+export { CreateProjectDialog } from '@/components/projects/CreateProjectDialog'
+export { CreateTaskDialog } from '@/components/tasks/CreateTaskDialog'
+export { IssueDetailView } from '@widgets/issue-detail/IssueDetailView'
+export { KanbanBoard } from '@widgets/kanban/KanbanBoard'
+export { OperationsQueueCard } from '@widgets/running/OperationsQueueCard'
+```
+
+### Shared Types
+
+The `app-shell/types.ts` module defines two core types used across the component tree:
+
+- **`TimelineItem`** -- `{ type: string; at: string; data: Record<string, unknown> }` representing an SSE event rendered in the timeline.
+- **`SidebarItem`** -- `{ id: string; label: string; description: string; icon: LucideIcon }` for sidebar navigation entries.
+- **`periodFilters`** -- `['Today', 'Week', 'Month']` tuple for time-scoped data filtering.

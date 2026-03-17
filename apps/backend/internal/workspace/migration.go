@@ -21,6 +21,8 @@ type MigrationResult struct {
 	Actions []MigrationAction `json:"actions"`
 }
 
+// PlanWorkspaceMigration computes the actions needed to migrate workspace entries
+// from oldRoot to newRoot without executing them.
 func PlanWorkspaceMigration(oldRoot string, newRoot string) (MigrationResult, error) {
 	result := MigrationResult{Applied: false, Actions: []MigrationAction{}}
 
@@ -81,6 +83,8 @@ func PlanWorkspaceMigration(oldRoot string, newRoot string) (MigrationResult, er
 	return result, nil
 }
 
+// ExecuteWorkspaceMigration plans and optionally executes the migration of workspace
+// entries from oldRoot to newRoot. If dryRun is true, actions are planned but not applied.
 func ExecuteWorkspaceMigration(oldRoot string, newRoot string, dryRun bool) (MigrationResult, error) {
 	plan, err := PlanWorkspaceMigration(oldRoot, newRoot)
 	if err != nil {

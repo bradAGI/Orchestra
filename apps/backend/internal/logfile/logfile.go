@@ -1,3 +1,5 @@
+// Package logfile provides functions for writing and managing agent session log files
+// within workspace directories.
 package logfile
 
 import (
@@ -8,6 +10,8 @@ import (
 	"time"
 )
 
+// WriteSessionLog writes the complete session output to a log file under the workspace
+// logs directory and updates the latest.log symlink. Returns the file path.
 func WriteSessionLog(workspaceRoot string, issueIdentifier string, sessionID string, output string) (string, error) {
 	if strings.TrimSpace(workspaceRoot) == "" {
 		return "", fmt.Errorf("workspace root is required")
@@ -34,6 +38,8 @@ func WriteSessionLog(workspaceRoot string, issueIdentifier string, sessionID str
 	return filePath, nil
 }
 
+// AppendToSessionLog appends a chunk of output to an existing session log file,
+// creating it if necessary. Returns the file path.
 func AppendToSessionLog(workspaceRoot string, issueIdentifier string, sessionID string, chunk string) (string, error) {
 	if strings.TrimSpace(workspaceRoot) == "" {
 		return "", fmt.Errorf("workspace root is required")
@@ -64,6 +70,8 @@ func AppendToSessionLog(workspaceRoot string, issueIdentifier string, sessionID 
 	return filePath, nil
 }
 
+// ResetLatestLog updates the latest.log symlink to point to the session log file
+// for the given session ID.
 func ResetLatestLog(workspaceRoot string, issueIdentifier string, sessionID string) error {
 	logsDir := filepath.Join(workspaceRoot, "_logs", Sanitize(issueIdentifier))
 	latestPath := filepath.Join(logsDir, "latest.log")
@@ -73,6 +81,8 @@ func ResetLatestLog(workspaceRoot string, issueIdentifier string, sessionID stri
 	return os.Symlink(sessionLogName, latestPath)
 }
 
+// Sanitize replaces filesystem-unsafe characters in the given value with underscores,
+// returning "unknown" for empty input.
 func Sanitize(value string) string {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {

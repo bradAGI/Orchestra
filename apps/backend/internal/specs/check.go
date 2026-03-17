@@ -1,3 +1,5 @@
+// Package specs provides validation checks for Orchestra configuration and
+// pull request body formatting.
 package specs
 
 import (
@@ -8,6 +10,8 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/workflow"
 )
 
+// Check validates the Orchestra configuration by verifying that the agent provider,
+// agent command, and workflow prompt are all properly configured.
 func Check() error {
 	cfg, err := config.Load()
 	if err != nil {

@@ -13,6 +13,8 @@ var prTemplateCandidates = []string{
 	"../.github/pull_request_template.md",
 }
 
+// CheckPRBody validates that the PR body in the given file conforms to the repository's
+// pull request template, checking for required headings, section content, and proper ordering.
 func CheckPRBody(filePath string) error {
 	if strings.TrimSpace(filePath) == "" {
 		return fmt.Errorf("missing required --file path")

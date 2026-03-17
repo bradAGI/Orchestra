@@ -89,6 +89,8 @@ func writeEventEnvelope(w http.ResponseWriter, eventType string, data any) {
 	_, _ = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", eventType, string(encoded))
 }
 
+// normalizeEventEnvelope coerces data into an observability.Event, filling in
+// the Type and Timestamp fields if they are missing.
 func normalizeEventEnvelope(eventType string, data any) observability.Event {
 	switch typed := data.(type) {
 	case observability.Event:
