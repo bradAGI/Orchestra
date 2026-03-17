@@ -665,38 +665,56 @@ export function IssueDetailView({
                         }
                         if (entry.kind === 'thinking') {
                           return (
-                            <button key={entry.idx} onClick={toggleExpand} className="w-full flex items-center gap-2 px-4 py-2 rounded-lg border border-violet-500/10 bg-violet-500/[0.03] text-left group hover:border-violet-500/20 transition-all">
-                              <Brain size={11} className="text-violet-400/40 shrink-0" />
-                              <span className="text-[9px] font-bold text-violet-400/40 italic">Thinking{isExpanded ? '' : '...'}</span>
-                              <ChevronDown size={10} className={`text-violet-400/20 transition-transform ml-auto ${isExpanded ? 'rotate-180' : ''}`} />
+                            <div key={entry.idx} className="rounded-xl border border-violet-500/10 bg-gradient-to-r from-violet-500/[0.03] to-transparent overflow-hidden transition-all hover:border-violet-500/20">
+                              <button onClick={toggleExpand} className="w-full flex items-center gap-3 px-4 py-2.5 text-left group">
+                                <div className="h-6 w-6 rounded-lg bg-violet-500/10 border border-violet-500/15 grid place-items-center shrink-0">
+                                  <Brain size={11} className="text-violet-400/50" />
+                                </div>
+                                <span className="text-[10px] font-bold text-violet-400/40 italic">Reasoning</span>
+                                <ChevronDown size={10} className={`text-violet-400/20 transition-transform ml-auto ${isExpanded ? 'rotate-180' : ''}`} />
+                                <span className="text-[8px] font-mono text-muted-foreground/15 shrink-0">{entry.ts}</span>
+                              </button>
                               {isExpanded && (
-                                <p className="text-[11px] text-violet-300/30 leading-relaxed mt-2 whitespace-pre-wrap max-h-48 overflow-auto custom-scrollbar w-full" onClick={e => e.stopPropagation()}>{entry.content.replace(/\*\*/g, '')}</p>
+                                <div className="px-4 pb-3">
+                                  <p className="text-[11px] text-violet-300/30 leading-relaxed whitespace-pre-wrap max-h-48 overflow-auto custom-scrollbar rounded-lg bg-violet-500/[0.02] border border-violet-500/5 p-3">{entry.content.replace(/\*\*/g, '')}</p>
+                                </div>
                               )}
-                            </button>
+                            </div>
                           )
                         }
                         if (entry.kind === 'tool') {
                           return (
-                            <div key={entry.idx} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/10 border border-border/10">
-                              <div className="h-5 w-5 rounded-md bg-amber-500/10 grid place-items-center shrink-0"><Wrench size={9} className="text-amber-400/60" /></div>
-                              <span className="text-[9px] font-black uppercase tracking-widest text-amber-400/50 shrink-0">{entry.label}</span>
-                              <code className="text-[9px] font-mono text-foreground/25 truncate flex-1">{entry.content.replace(/"/g, '')}</code>
+                            <div key={entry.idx} className="group/tool rounded-xl border border-border/15 bg-gradient-to-r from-muted/10 to-transparent overflow-hidden transition-all hover:border-border/25">
+                              <div className="flex items-center gap-3 px-4 py-2.5">
+                                <div className="h-6 w-6 rounded-lg bg-amber-500/10 border border-amber-500/15 grid place-items-center shrink-0">
+                                  <Wrench size={11} className="text-amber-400/70" />
+                                </div>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-amber-400/60 shrink-0">{entry.label}</span>
+                                <code className="text-[10px] font-mono text-foreground/30 truncate flex-1">{entry.content.replace(/"/g, '')}</code>
+                                <span className="text-[8px] font-mono text-muted-foreground/15 shrink-0">{entry.ts}</span>
+                              </div>
                             </div>
                           )
                         }
                         if (entry.kind === 'result') {
                           const isError = entry.status === 'error'
                           return (
-                            <button key={entry.idx} onClick={toggleExpand} className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-left transition-all ${isError ? 'bg-red-500/5 border border-red-500/10' : 'bg-muted/5 border border-border/5 hover:border-border/15'}`}>
-                              <CheckCircle2 size={10} className={isError ? 'text-red-400/50 shrink-0' : 'text-primary/30 shrink-0'} />
-                              <span className={`text-[9px] font-mono truncate flex-1 ${isError ? 'text-red-400/50' : 'text-foreground/20'}`}>
-                                {entry.content.slice(0, 120)}{entry.content.length > 120 ? '...' : ''}
-                              </span>
-                              {entry.content.length > 60 && <ChevronDown size={9} className={`text-muted-foreground/20 transition-transform shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />}
+                            <div key={entry.idx} className={`rounded-xl border overflow-hidden transition-all ${isError ? 'border-red-500/15 bg-red-500/[0.03]' : 'border-border/10 bg-muted/[0.03] hover:border-border/20'}`}>
+                              <button onClick={toggleExpand} className="w-full flex items-center gap-3 px-4 py-2 text-left">
+                                <div className={`h-5 w-5 rounded-md grid place-items-center shrink-0 ${isError ? 'bg-red-500/10' : 'bg-primary/10'}`}>
+                                  <CheckCircle2 size={10} className={isError ? 'text-red-400/60' : 'text-primary/40'} />
+                                </div>
+                                <span className={`text-[10px] font-mono truncate flex-1 ${isError ? 'text-red-400/50' : 'text-foreground/25'}`}>
+                                  {entry.content.slice(0, 120)}{entry.content.length > 120 ? '…' : ''}
+                                </span>
+                                {entry.content.length > 60 && <ChevronDown size={10} className={`text-muted-foreground/20 transition-transform shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />}
+                              </button>
                               {isExpanded && (
-                                <pre className="text-[10px] text-foreground/20 leading-relaxed mt-2 whitespace-pre-wrap max-h-32 overflow-auto custom-scrollbar font-mono w-full" onClick={e => e.stopPropagation()}>{entry.content}</pre>
+                                <div className="px-4 pb-3 pt-0">
+                                  <pre className="text-[10px] text-foreground/25 leading-relaxed whitespace-pre-wrap max-h-40 overflow-auto custom-scrollbar font-mono rounded-lg bg-background/50 border border-border/10 p-3">{entry.content}</pre>
+                                </div>
                               )}
-                            </button>
+                            </div>
                           )
                         }
                         if (entry.kind === 'error') {
