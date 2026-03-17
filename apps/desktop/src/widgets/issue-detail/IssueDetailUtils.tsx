@@ -174,6 +174,10 @@ function parsePlanItemsFromText(text: string): PlanItem[] {
   return []
 }
 
+/**
+ * Collects agent messages from the timeline that may contain operational plan
+ * items (thoughts, plans, numbered lists, or checkbox items).
+ */
 function collectCandidateMessages(timeline: TimelineItem[], issueId: string, issueIdentifier: string): string[] {
   const relevant = timeline.filter((item) => {
     const eventIssueID = typeof item.data?.issue_id === 'string' ? item.data.issue_id : ''

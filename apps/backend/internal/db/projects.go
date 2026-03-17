@@ -215,6 +215,7 @@ type Project struct {
 	PathExists  bool   `json:"path_exists"`
 }
 
+// ProjectStats holds aggregate telemetry metrics for a project.
 type ProjectStats struct {
 	TotalSessions int64  `json:"total_sessions"`
 	TotalInput    int64  `json:"total_input"`
@@ -222,6 +223,7 @@ type ProjectStats struct {
 	LastActive    string `json:"last_active"`
 }
 
+// GetProjects returns all registered projects, ordered by name, with decrypted GitHub tokens.
 func (db *DB) GetProjects(ctx context.Context) ([]Project, error) {
 	rows, err := db.QueryContext(ctx, "SELECT id, name, root_path, remote_url, COALESCE(github_owner, ''), COALESCE(github_repo, ''), COALESCE(github_token, '') FROM projects ORDER BY name ASC")
 	if err != nil {
@@ -243,6 +245,8 @@ func (db *DB) GetProjects(ctx context.Context) ([]Project, error) {
 	return projects, rows.Err()
 }
 
+// GetProjectStats returns aggregate session count, token usage, and last-active
+// timestamp for the given project.
 func (db *DB) GetProjectStats(ctx context.Context, projectID string) (ProjectStats, error) {
 	query := `
 		SELECT 
@@ -266,6 +270,8 @@ func (db *DB) GetProjectStats(ctx context.Context, projectID string) (ProjectSta
 	return stats, nil
 }
 
+// DeleteProject removes a project and all its associated data (sessions, events,
+// runs, issues, issue_history) in a single transaction with cascading deletes.
 func (db *DB) DeleteProject(ctx context.Context, projectID string) error {
 	if projectID == "" {
 		return fmt.Errorf("project_id is required")
@@ -359,6 +365,7 @@ func (db *DB) DeleteProject(ctx context.Context, projectID string) error {
 	return tx.Commit()
 }
 
+// GetProjectByID retrieves a single project by its ID, with decrypted GitHub token.
 func (db *DB) GetProjectByID(ctx context.Context, id string) (Project, error) {
 	var p Project
 	err := db.QueryRowContext(ctx, "SELECT id, name, root_path, remote_url, COALESCE(github_owner, ''), COALESCE(github_repo, ''), COALESCE(github_token, '') FROM projects WHERE id = ?", id).
