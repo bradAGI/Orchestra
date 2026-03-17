@@ -1521,6 +1521,7 @@ export async function executeUnsandbox(
   })
 }
 
+/** An active or completed Unsandbox execution session. */
 export type UnsandboxSession = {
   id: string
   language: string
@@ -1529,16 +1530,27 @@ export type UnsandboxSession = {
   [key: string]: unknown
 }
 
+/**
+ * Fetches all Unsandbox execution sessions.
+ * @param config - Backend connection configuration.
+ * @returns Object containing array of session records.
+ */
 export async function fetchUnsandboxSessions(config: BackendConfig): Promise<{ sessions: UnsandboxSession[] }> {
   return requestJSON<{ sessions: UnsandboxSession[] }>(config, '/api/v1/unsandbox/sessions')
 }
 
+/** A service running within the Unsandbox environment. */
 export type UnsandboxService = {
   id: string
   status: string
   [key: string]: unknown
 }
 
+/**
+ * Fetches all services running in the Unsandbox environment.
+ * @param config - Backend connection configuration.
+ * @returns Object containing array of service records.
+ */
 export async function fetchUnsandboxServices(config: BackendConfig): Promise<{ services: UnsandboxService[] }> {
   return requestJSON<{ services: UnsandboxService[] }>(config, '/api/v1/unsandbox/services')
 }

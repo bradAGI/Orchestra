@@ -1825,6 +1825,7 @@ func (s *Service) GetMCPRegistry() *mcp.Registry {
 	return s.mcpRegistry
 }
 
+// GetHistory returns a unified timeline of issue metadata changes and agent events.
 func (s *Service) GetHistory(ctx context.Context, issueID string) ([]map[string]any, error) {
 	if s.db == nil {
 		return []map[string]any{}, nil

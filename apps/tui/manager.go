@@ -12,15 +12,21 @@ import (
 	"time"
 )
 
+// ServiceStatus represents the lifecycle state of a managed service.
 type ServiceStatus int
 
 const (
+	// StatusStopped indicates the service is not running.
 	StatusStopped ServiceStatus = iota
+	// StatusStarting indicates the service is in the process of starting.
 	StatusStarting
+	// StatusRunning indicates the service is actively running.
 	StatusRunning
+	// StatusError indicates the service encountered an error.
 	StatusError
 )
 
+// String returns the human-readable name of the service status.
 func (s ServiceStatus) String() string {
 	switch s {
 	case StatusStopped:
@@ -36,6 +42,8 @@ func (s ServiceStatus) String() string {
 	}
 }
 
+// Service represents a managed subprocess with lifecycle control, log capture,
+// and event notification for the TUI dashboard.
 type Service struct {
 	Name    string
 	Cmd     string
@@ -49,6 +57,8 @@ type Service struct {
 	onEvent func()
 }
 
+// Start launches the service subprocess in the background. The onEvent callback
+// is invoked whenever the service state changes or new log output is received.
 func (s *Service) Start(onEvent func()) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -126,6 +136,8 @@ func (s *Service) run(ctx context.Context) {
 	s.onEvent()
 }
 
+// Stop terminates the service subprocess by sending SIGTERM followed by SIGKILL
+// after a grace period.
 func (s *Service) Stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()

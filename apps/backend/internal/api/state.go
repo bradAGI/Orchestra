@@ -874,6 +874,8 @@ func (s *Server) GetMCPServers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK,map[string]any{"servers": servers})
 }
 
+// PostMCPServer handles POST /api/v1/mcp/servers by creating a new MCP server
+// entry and hot-reloading the MCP registry in the orchestrator.
 func (s *Server) PostMCPServer(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Name    string `json:"name"`
@@ -906,6 +908,9 @@ func (s *Server) PostMCPServer(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated,server)
 }
 
+// DeleteMCPServer handles DELETE /api/v1/mcp/servers/{id} by removing the MCP
+// server entry and rebuilding the MCP registry from the remaining database
+// entries and static configuration.
 func (s *Server) DeleteMCPServer(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := s.db.DeleteMCPServer(r.Context(), id); err != nil {

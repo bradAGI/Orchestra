@@ -2,6 +2,10 @@ package orchestrator
 
 import "strings"
 
+// ReconcileRunningStates removes running entries whose tracker state has moved
+// to a terminal or inactive state. Entries whose issue ID is not present in the
+// refreshed map are retained unchanged. Claimed entries that are removed also
+// have their claims cleaned up.
 func (s *Service) ReconcileRunningStates(activeStates []string, terminalStates []string, refreshed map[string]string) {
 	active := normalizeStateSet(activeStates)
 	terminal := normalizeStateSet(terminalStates)
@@ -42,6 +46,8 @@ func (s *Service) ReconcileRunningStates(activeStates []string, terminalStates [
 	}
 }
 
+// normalizeStateSet converts a slice of state strings into a set of
+// lowercased, trimmed keys for efficient membership testing.
 func normalizeStateSet(states []string) map[string]struct{} {
 	out := map[string]struct{}{}
 	for _, state := range states {
@@ -54,6 +60,8 @@ func normalizeStateSet(states []string) map[string]struct{} {
 	return out
 }
 
+// normalizeState returns the lowercased, trimmed form of a state string for
+// case-insensitive comparison.
 func normalizeState(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
 }

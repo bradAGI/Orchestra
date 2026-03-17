@@ -11,6 +11,9 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/workspace"
 )
 
+// Load reads configuration from environment variables and the workflow file,
+// applying defaults where values are not explicitly set, and returns a
+// fully resolved Config.
 func Load() (Config, error) {
 	workspaceDefault := filepath.Join(os.Getenv("HOME"), ".orchestra", "workspaces")
 	if os.Getenv("HOME") == "" {

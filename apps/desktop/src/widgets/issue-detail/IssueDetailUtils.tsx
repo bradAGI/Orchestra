@@ -2,22 +2,26 @@ import { Activity, AlertCircle, CheckCircle2, Code, Database, File, FileText, La
 
 import type { TimelineItem } from '@/components/app-shell/types'
 
+/** A single file entry extracted from a unified diff. */
 export type DiffFile = {
   path: string
   content: string
 }
 
+/** Descriptor for a lifecycle hook that runs around issue processing. */
 export type IssueHook = {
   id: string
   label: string
   description: string
 }
 
+/** A single checkbox item from an agent's operational plan. */
 export type PlanItem = {
   text: string
   done: boolean
 }
 
+/** Registry of known lifecycle hooks displayed in the issue detail view. */
 export const ISSUE_HOOKS: IssueHook[] = [
   { id: 'after_create', label: 'Workspace Setup', description: 'Provisioning environment and dependencies' },
   { id: 'before_run', label: 'Pre-run Hook', description: 'Preparing context for agent execution' },
@@ -28,6 +32,7 @@ function asEventData(event: TimelineItem): Record<string, unknown> {
   return (event.data && typeof event.data === 'object') ? (event.data as Record<string, unknown>) : {}
 }
 
+/** Parses a unified diff string into an array of per-file diff entries. */
 export function parseDiff(rawDiff: string): DiffFile[] {
   const files: DiffFile[] = []
   const lines = rawDiff.split('\n')
@@ -54,6 +59,7 @@ export function parseDiff(rawDiff: string): DiffFile[] {
   return files
 }
 
+/** Collects the output text of completed or failed hooks for a given issue from the timeline. */
 export function extractHookOutputs(timeline: TimelineItem[], issueId: string, issueIdentifier: string): Record<string, string> {
   const relevant = timeline.filter((event) => {
     const data = asEventData(event)
@@ -73,6 +79,7 @@ export function extractHookOutputs(timeline: TimelineItem[], issueId: string, is
   return outputs
 }
 
+/** Derives the current status of a specific hook type (`pending`, `active`, `completed`, or `failed`) from the timeline. */
 export function getHookStatus(timeline: TimelineItem[], issueId: string, issueIdentifier: string, type: string) {
   const relevant = timeline.filter((event) => {
     const data = asEventData(event)
@@ -87,6 +94,7 @@ export function getHookStatus(timeline: TimelineItem[], issueId: string, issueId
   return 'pending'
 }
 
+/** Returns a small colored icon element appropriate for the given event kind. */
 export function getEventIcon(kind: string) {
   const normalizedKind = kind.toLowerCase()
   if (normalizedKind.includes('started') || normalizedKind.includes('init')) {
@@ -107,6 +115,7 @@ export function getEventIcon(kind: string) {
   return <Activity size={12} className="text-muted-foreground/40" />
 }
 
+/** Returns a file-type icon element based on the file extension. */
 export function getFileIcon(path: string, active: boolean) {
   const ext = path.split('.').pop()?.toLowerCase()
   const color = active ? 'text-primary' : 'text-muted-foreground/40 group-hover:text-muted-foreground/60'
@@ -130,6 +139,7 @@ export function getFileIcon(path: string, active: boolean) {
   }
 }
 
+/** Extracts markdown checkbox items from free-form text into structured plan items. */
 export function extractPlanFromText(text: string): PlanItem[] {
   return parsePlanItemsFromText(text)
 }
@@ -203,6 +213,10 @@ function collectCandidateMessages(timeline: TimelineItem[], issueId: string, iss
   return messages
 }
 
+/**
+ * Searches timeline events for agent plan messages and extracts checkbox items.
+ * Falls back to parsing the issue description if no plan is found in the timeline.
+ */
 export function extractOperationalPlanItems(timeline: TimelineItem[], issueId: string, issueIdentifier: string, description: string): PlanItem[] {
   const messages = collectCandidateMessages(timeline, issueId, issueIdentifier)
 

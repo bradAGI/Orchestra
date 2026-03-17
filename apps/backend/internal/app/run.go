@@ -40,6 +40,9 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Run initializes all subsystems (database, orchestrator, tracker, MCP, telemetry),
+// wires up the HTTP API, and starts the orchestrad server with graceful shutdown
+// handling. It blocks until the server exits.
 func Run(logger zerolog.Logger) error {
 	cfg, err := config.Load()
 	if err != nil {
