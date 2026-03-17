@@ -251,8 +251,8 @@ func TestEventsEndpointStreamsPubSubEvent(t *testing.T) {
 
 	router.ServeHTTP(res, req)
 	body := res.Body.String()
-	if !strings.Contains(body, "event: run_event") {
-		t.Fatalf("expected run_event in SSE stream, got %q", body)
+	if !strings.Contains(body, "event: RUN_EVENT") {
+		t.Fatalf("expected RUN_EVENT in SSE stream, got %q", body)
 	}
 }
 
@@ -280,13 +280,13 @@ func TestEventsEndpointPublishesImmediateSnapshotAfterPubSubEvent(t *testing.T) 
 
 	router.ServeHTTP(res, req)
 	body := res.Body.String()
-	if !strings.Contains(body, "event: run_event") {
-		t.Fatalf("expected run_event in stream, got %q", body)
+	if !strings.Contains(body, "event: RUN_EVENT") {
+		t.Fatalf("expected RUN_EVENT in stream, got %q", body)
 	}
-	runEventIndex := strings.Index(body, "event: run_event")
+	runEventIndex := strings.Index(body, "event: RUN_EVENT")
 	snapshotAfterRunEventIndex := strings.Index(body[runEventIndex+1:], "event: snapshot")
 	if runEventIndex < 0 || snapshotAfterRunEventIndex < 0 {
-		t.Fatalf("expected immediate snapshot after run_event, got %q", body)
+		t.Fatalf("expected immediate snapshot after RUN_EVENT, got %q", body)
 	}
 	if !strings.Contains(body, "\"rate_limits\":{\"remaining\":4}") {
 		t.Fatalf("expected immediate snapshot with updated rate limits, got %q", body)
@@ -311,11 +311,11 @@ func TestEventsEndpointStreamsLifecycleEvents(t *testing.T) {
 
 	router.ServeHTTP(res, req)
 	body := res.Body.String()
-	if !strings.Contains(body, "event: run_started") {
-		t.Fatalf("expected run_started in SSE stream, got %q", body)
+	if !strings.Contains(body, "event: RUN_STARTED") {
+		t.Fatalf("expected RUN_STARTED in SSE stream, got %q", body)
 	}
-	if !strings.Contains(body, "event: retry_scheduled") {
-		t.Fatalf("expected retry_scheduled in SSE stream, got %q", body)
+	if !strings.Contains(body, "event: RETRY_SCHEDULED") {
+		t.Fatalf("expected RETRY_SCHEDULED in SSE stream, got %q", body)
 	}
 	if !strings.Contains(body, "\"due_at\":\"2026-01-01T00:00:00Z\"") {
 		t.Fatalf("expected lifecycle payload in SSE stream, got %q", body)
@@ -339,11 +339,11 @@ func TestEventsEndpointDoesNotSynthesizeRetryScheduled(t *testing.T) {
 
 	router.ServeHTTP(res, req)
 	body := res.Body.String()
-	if !strings.Contains(body, "event: run_failed") {
-		t.Fatalf("expected run_failed in SSE stream, got %q", body)
+	if !strings.Contains(body, "event: RUN_FAILED") {
+		t.Fatalf("expected RUN_FAILED in SSE stream, got %q", body)
 	}
-	if strings.Contains(body, "event: retry_scheduled") {
-		t.Fatalf("did not expect retry_scheduled in SSE stream when unpublished, got %q", body)
+	if strings.Contains(body, "event: RETRY_SCHEDULED") {
+		t.Fatalf("did not expect RETRY_SCHEDULED in SSE stream when unpublished, got %q", body)
 	}
 }
 
@@ -365,11 +365,11 @@ func TestEventsEndpointStreamsRefreshLifecyclePair(t *testing.T) {
 
 	router.ServeHTTP(res, req)
 	body := res.Body.String()
-	if !strings.Contains(body, "event: run_failed") {
-		t.Fatalf("expected run_failed in SSE stream, got %q", body)
+	if !strings.Contains(body, "event: RUN_FAILED") {
+		t.Fatalf("expected RUN_FAILED in SSE stream, got %q", body)
 	}
-	if !strings.Contains(body, "event: retry_scheduled") {
-		t.Fatalf("expected retry_scheduled in SSE stream, got %q", body)
+	if !strings.Contains(body, "event: RETRY_SCHEDULED") {
+		t.Fatalf("expected RETRY_SCHEDULED in SSE stream, got %q", body)
 	}
 	if !strings.Contains(body, "\"source\":\"refresh\"") {
 		t.Fatalf("expected refresh source marker in SSE lifecycle payloads, got %q", body)
