@@ -1,252 +1,190 @@
 # 4.7 Workspace Management
 
 > **Source files:**
-> - [`apps/backend/internal/workspace/service.go`](../../apps/backend/internal/workspace/service.go)
-> - [`apps/backend/internal/workspace/hooks.go`](../../apps/backend/internal/workspace/hooks.go)
-> - [`apps/backend/internal/workspace/path_guard.go`](../../apps/backend/internal/workspace/path_guard.go)
-> - [`apps/backend/internal/workspace/migration.go`](../../apps/backend/internal/workspace/migration.go)
+> - `apps/backend/internal/workspace/service.go`
+> - `apps/backend/internal/workspace/hooks.go`
+> - `apps/backend/internal/workspace/path_guard.go`
+> - `apps/backend/internal/workspace/migration.go`
 
-The `workspace` package provides isolated working directories for each issue-agent combination, with path traversal protection, lifecycle hooks, and migration support. Each dispatched issue gets its own workspace directory where the agent operates, preventing cross-issue interference.
+The workspace package manages per-issue working directories where agents execute tasks. It handles directory provisioning, lifecycle hooks, artifact listing, git diff retrieval, path safety validation, and workspace migration between root directories.
 
 ---
 
-## 4.7.1 WorkspaceService Struct and Operations
+## WorkspaceService
 
-The central type is `Service`, which anchors all workspace operations to a configured root directory.
+The `Service` struct is the primary entry point for workspace operations:
 
 ```go
 type Service struct {
-    Root        string        // Base directory for all workspaces
-    HookTimeout time.Duration // Timeout for hook scripts (default: 60s)
+    Root        string         // Base directory for all workspaces
+    HookTimeout time.Duration  // Timeout for hook scripts (default: 60s)
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `Root` | `string` | Absolute path to the top-level workspace directory. All issue directories are created beneath this root. |
-| `HookTimeout` | `time.Duration` | Maximum duration for any lifecycle hook. Defaults to **60 seconds** if unset or zero. |
-
-### Operations Summary
-
-| Method | Signature | Purpose |
-|--------|-----------|---------|
-| `EnsureIssueWorkspace` | `(issueIdentifier, provider string, hooks Hooks) (string, bool, HookResult, error)` | Creates or verifies a workspace directory for an issue; runs `after_create` hook if newly created. Returns path, created flag, and hook result. |
-| `RemoveIssueWorkspaces` | `(issueIdentifier, provider string, hooks Hooks) error` | Deletes a workspace directory, running the `before_remove` hook first. |
-| `RunBeforeRunHook` | `(workspacePath string, hooks Hooks) (HookResult, error)` | Executes the `before_run` hook in an existing workspace. |
-| `RunAfterRunHook` | `(workspacePath string, hooks Hooks) (HookResult, error)` | Executes the `after_run` hook in an existing workspace. |
-| `ListArtifacts` | `(issueIdentifier, provider string) ([]string, error)` | Returns relative paths of all files in a workspace, excluding `.git/` and `.orchestra`. |
-| `GetArtifactContent` | `(issueIdentifier, provider, relPath string) ([]byte, error)` | Reads and returns the content of a single file within the workspace (path-validated). |
-| `GetDiff` | `(issueIdentifier, provider string) (string, error)` | Returns `git diff HEAD` output for the workspace, or empty string if not a git repo. |
+All workspaces are created as subdirectories of `Root`, named by a sanitized combination of issue identifier and provider.
 
 ---
 
-## 4.7.2 Directory Provisioning for Agent Runs
+## Directory Provisioning
 
-Workspace directories are provisioned by `EnsureIssueWorkspace`. The path is derived from the issue identifier and provider using `WorkspacePath()`.
+### EnsureIssueWorkspace
 
-### Path Construction
-
-```
-<Root>/<sanitized_identifier>-<provider>
-```
-
-- The issue identifier is sanitized via regex `[^a-zA-Z0-9._-]` (non-matching characters replaced with `_`).
-- If a provider is supplied, it is appended in lowercase with a `-` separator.
-- The resulting path is validated against the root to prevent directory traversal and symlink escapes.
-
-**Example:** issue `OPS-123` with provider `CLAUDE` produces `~/.orchestra/workspaces/OPS-123-claude/`
-
-### Provisioning Logic
-
-`EnsureIssueWorkspace` handles three cases:
-
-| Condition | Action | Returns |
-|-----------|--------|---------|
-| Path exists and is a directory | Validates it is within root | `created=false` |
-| Path exists but is not a directory | Removes the stale entry, creates the directory | `created=true` |
-| Path does not exist | Creates the directory tree via `MkdirAll` | `created=true` |
-
-When a workspace is newly created and an `AfterCreate` hook is configured, the hook runs immediately and its result is returned to the caller.
-
-### Marker File
-
-`MarkerPath(path)` returns `{path}/.orchestra`, used as a marker file to identify Orchestra-managed workspace directories. This file is excluded from artifact listings.
-
----
-
-## 4.7.3 Git Operations
-
-### Diff Retrieval
-
-The `GetDiff` method provides git diff retrieval for workspaces that are git repositories:
-
-1. Checks if a `.git` directory exists in the workspace.
-2. Runs `git diff HEAD` to capture changes against the last commit.
-3. Falls back to `git diff` (no HEAD) for new repositories without an initial commit.
-4. Returns an empty string for non-git workspaces.
-
-### Branch and Clone via Hooks
-
-Git clone, branch creation, and checkout operations are not built into the service directly. Instead, they are performed through lifecycle hooks:
-
-| Operation | Typical Hook | Example Script |
-|-----------|-------------|----------------|
-| Clone repository | `AfterCreate` | `git clone $REPO_URL .` |
-| Create feature branch | `BeforeRun` | `git checkout -b issue/$ID` |
-| Pull latest changes | `BeforeRun` | `git pull origin main` |
-| Commit and push | `AfterRun` | `git add . && git commit -m "..." && git push` |
-
-This design keeps the workspace service decoupled from any particular git workflow while enabling full git operations through configurable shell scripts.
-
----
-
-## 4.7.4 Lifecycle Hooks
-
-Hooks are shell scripts executed at defined points in the workspace lifecycle. They are configured via the `Hooks` struct:
-
-```go
-type Hooks struct {
-    AfterCreate  string  // Shell script run after workspace creation
-    BeforeRemove string  // Shell script run before workspace deletion
-    BeforeRun    string  // Shell script run before agent execution
-    AfterRun     string  // Shell script run after agent execution
-}
-```
-
-| Hook | Trigger | Failure Behavior | Use Case |
-|------|---------|-----------------|----------|
-| `AfterCreate` | Workspace directory is newly created | Error propagated to caller | Clone repo, initialize project |
-| `BeforeRemove` | Before workspace deletion | Warning logged; removal proceeds | Backup artifacts, clean up |
-| `BeforeRun` | Before agent execution starts | Error propagated to caller | Pull latest code, reset state |
-| `AfterRun` | After agent execution completes | Error propagated to caller | Commit changes, run tests |
-
-### Execution Model
-
-Hooks are executed by `RunHook()` in `hooks.go`:
-
-- Runs the script via `sh -lc {script}` (login shell) with `cwd` set to the workspace directory.
-- Uses `context.WithTimeout` for enforcement; a `DeadlineExceeded` error produces a distinct `workspace hook timeout` message.
-- Returns a `HookResult{Output string}` containing the combined stdout/stderr output.
-
----
-
-## 4.7.5 Path Safety and Validation
-
-The `path_guard.go` module enforces workspace path security through two validators.
-
-### WorkspacePath Validation
-
-`ValidateWorkspacePath(root, candidate)` checks:
-
-| Check | Error Message |
-|-------|--------------|
-| Candidate equals root | `workspace equals root` |
-| Candidate resolves outside root (via `filepath.Rel`) | `workspace escapes root` |
-| Symlink target resolves outside root (via `EvalSymlinks`) | `workspace symlink escape` |
-
-### Project Path Validation
-
-`ValidateProjectPath(candidate, allowedRoots)` ensures a project path is within an approved set of directories:
-
-- If `allowedRoots` is populated, the candidate must fall within at least one.
-- If `allowedRoots` is empty, the candidate must be within the user's home directory.
-
----
-
-## 4.7.6 Workspace Migration
-
-The `migration.go` module handles relocating workspace directories when the configured root changes.
-
-### MigrationAction Types
-
-| Action Type | Description |
-|-------------|-------------|
-| `rename_root` | Old root directory is renamed to the new root (when new root does not exist). |
-| `move_entry` | Individual workspace entry is moved from old root into existing new root. |
-| `skip_conflict` | Entry skipped because a target with the same name already exists in the new root. |
-
-### Migration Functions
-
-| Function | Description |
-|----------|-------------|
-| `PlanWorkspaceMigration(oldRoot, newRoot)` | Computes migration actions without executing them. Returns `MigrationResult` with `Applied=false`. |
-| `ExecuteWorkspaceMigration(oldRoot, newRoot, dryRun)` | Plans and optionally applies migration. When `dryRun=true`, behaves identically to plan-only. |
-
-### Migration Result
-
-```go
-type MigrationResult struct {
-    Applied bool              `json:"applied"`
-    Actions []MigrationAction `json:"actions"`
-}
-```
-
----
-
-## 4.7.7 Workspace Lifecycle Diagram
-
-```mermaid
-stateDiagram-v2
-    [*] --> CheckPath: EnsureIssueWorkspace()
-
-    CheckPath --> Exists: Directory exists
-    CheckPath --> StaleEntry: Non-directory exists at path
-    CheckPath --> NotFound: Path not found
-
-    Exists --> ValidatePath: Validate within root
-    StaleEntry --> RemoveStale: Remove stale entry
-    RemoveStale --> CreateDir: MkdirAll
-    NotFound --> CreateDir: MkdirAll
-
-    ValidatePath --> Ready: Valid
-    ValidatePath --> Error: Escape detected
-
-    CreateDir --> AfterCreateHook: Run after_create hook
-    AfterCreateHook --> Ready
-
-    Ready --> BeforeRunHook: Agent run starts
-    BeforeRunHook --> AgentExecution: Hook passes
-    AgentExecution --> AfterRunHook: Agent run ends
-    AfterRunHook --> Ready: Idle
-
-    Ready --> BeforeRemoveHook: RemoveIssueWorkspaces()
-    BeforeRemoveHook --> RemoveAll: os.RemoveAll
-    RemoveAll --> [*]
-```
-
-### Migration Decision Flow
+`EnsureIssueWorkspace(issueIdentifier, provider, hooks)` creates or verifies a workspace directory:
 
 ```mermaid
 flowchart TD
-    START[PlanWorkspaceMigration] --> A{oldRoot == newRoot?}
-    A -->|Yes| NOOP[No action]
-    A -->|No| B{Old root exists?}
-    B -->|No| NOOP
-    B -->|Yes| C{New root exists?}
-    C -->|No| D[rename_root: mv old new]
-    C -->|Yes| E[Iterate entries in old root]
-    E --> F{Target exists in new root?}
-    F -->|Yes| G[skip_conflict]
-    F -->|No| H[move_entry]
+    A[EnsureIssueWorkspace] --> B{Directory exists?}
+    B -->|"Yes, is dir"| C[Validate path safety]
+    B -->|"Yes, is file"| D[Remove stale file<br/>Create directory]
+    B -->|No| E[Create directory]
+
+    C --> F[Return path, created=false]
+    D --> G{after_create hook?}
+    E --> G
+    G -->|Yes| H[Run hook]
+    G -->|No| I[Return path, created=true]
+    H --> I
+```
+
+**Returns:** `(path string, created bool, hookResult HookResult, err error)`
+
+### Workspace Path Format
+
+The `WorkspacePath(root, issueIdentifier, provider)` function computes the directory path:
+
+```
+<root>/<sanitized_identifier>-<lowercase_provider>
+```
+
+The issue identifier is sanitized by replacing any character not in `[a-zA-Z0-9._-]` with underscores.
+
+**Examples:**
+- Issue `OPS-123`, provider `claude` -> `<root>/OPS-123-claude`
+- Issue `FETCH/42`, provider `CODEX` -> `<root>/FETCH_42-codex`
+
+---
+
+## Lifecycle Hooks
+
+Four hook points are available throughout the workspace lifecycle:
+
+| Hook | When | Failure Behavior |
+|------|------|-----------------|
+| `AfterCreate` | After a new workspace directory is created | Error propagated to caller |
+| `BeforeRemove` | Before a workspace is deleted | Warning logged, removal continues |
+| `BeforeRun` | Before an agent run starts in the workspace | Error propagated to caller |
+| `AfterRun` | After an agent run completes | Error propagated to caller |
+
+### Hook Execution
+
+> **Source file:** `apps/backend/internal/workspace/hooks.go`
+
+Hooks are shell scripts executed via `sh -lc <script>` with the workspace path as the working directory. Each hook runs with a configurable timeout (default: 60 seconds).
+
+```go
+type HookResult struct {
+    Output string  // Combined stdout/stderr
+}
+```
+
+If a hook exceeds its timeout, it returns a `"workspace hook timeout"` error. The `BeforeRemove` hook is special: its failure is logged as a warning but does not prevent workspace removal.
+
+---
+
+## Workspace Operations
+
+| Method | Description |
+|--------|-------------|
+| `EnsureIssueWorkspace(id, provider, hooks)` | Creates or verifies workspace directory |
+| `RemoveIssueWorkspaces(id, provider, hooks)` | Deletes workspace after running `BeforeRemove` hook |
+| `RunBeforeRunHook(path, hooks)` | Executes the `BeforeRun` hook script |
+| `RunAfterRunHook(path, hooks)` | Executes the `AfterRun` hook script |
+| `ListArtifacts(id, provider)` | Returns relative paths of all workspace files |
+| `GetArtifactContent(id, provider, relPath)` | Reads a file within the workspace |
+| `GetDiff(id, provider)` | Returns `git diff HEAD` output from workspace |
+
+### Artifact Listing
+
+`ListArtifacts` walks the workspace directory and returns relative paths, excluding:
+- `.git` directories (skipped entirely via `filepath.SkipDir`)
+- The `.orchestra` marker file
+
+### Git Diff
+
+`GetDiff` returns the output of `git diff HEAD` within the workspace. If `HEAD` does not exist (new repository), falls back to plain `git diff`. Returns an empty string if the workspace is not a git repository (no `.git` directory).
+
+---
+
+## Path Safety
+
+> **Source file:** `apps/backend/internal/workspace/path_guard.go`
+
+### ValidateWorkspacePath
+
+Ensures a candidate path is a proper subdirectory of the workspace root:
+
+1. Resolves both paths to absolute form
+2. Rejects if candidate equals root
+3. Verifies the candidate is within root using `filepath.Rel` (rejects `..` prefixes)
+4. If the path already exists on disk, evaluates symlinks to detect symlink escapes
+
+### ValidateProjectPath
+
+Ensures a project path falls within allowed boundaries:
+
+- If `allowedRoots` are configured, checks if the candidate is within any of them
+- If no roots are configured, allows any path under the user's home directory
+- Returns a descriptive error with the list of allowed roots if validation fails
+
+---
+
+## Workspace Migration
+
+> **Source file:** `apps/backend/internal/workspace/migration.go`
+
+When the workspace root directory changes, the migration system moves existing workspaces to the new location.
+
+```mermaid
+flowchart TD
+    A[PlanWorkspaceMigration] --> B{Old root exists?}
+    B -->|No| C[No actions needed]
+    B -->|Yes| D{New root exists?}
+    D -->|No| E["Plan: rename_root<br/>(atomic rename)"]
+    D -->|Yes| F[Scan old root entries]
+    F --> G{Target exists<br/>in new root?}
+    G -->|Yes| H["Plan: skip_conflict"]
+    G -->|No| I["Plan: move_entry"]
+```
+
+### Migration Actions
+
+| Action Type | Description |
+|-------------|-------------|
+| `rename_root` | Old root does not exist at new location; rename the entire directory |
+| `move_entry` | Move an individual workspace entry to the new root |
+| `skip_conflict` | Target already exists in new root; entry is skipped with a note |
+
+### API
+
+- **`PlanWorkspaceMigration(oldRoot, newRoot)`** -- computes actions without executing; returns `MigrationResult` with `applied: false`
+- **`ExecuteWorkspaceMigration(oldRoot, newRoot, dryRun)`** -- plans and optionally applies the migration; sets `applied: true` on success
+
+---
+
+## Marker File
+
+Each workspace can contain an `.orchestra` marker file at its root. This file is excluded from artifact listings and serves as a workspace identification marker.
+
+```go
+func MarkerPath(path string) string {
+    return filepath.Join(path, ".orchestra")
+}
 ```
 
 ---
 
-## 4.7.8 Artifact Management
+## Cross-References
 
-`ListArtifacts` walks the workspace directory tree and returns relative paths of all files, applying two exclusion rules:
-
-| Exclusion | Reason |
-|-----------|--------|
-| `.git/` directories | Internal git metadata, not user artifacts |
-| `.orchestra` marker file | Internal Orchestra metadata |
-
-`GetArtifactContent` reads a single file by relative path, validating the resolved path against the workspace root before reading to prevent path traversal attacks.
-
----
-
-## See Also
-
-- [4.2 Issue Trackers](tracker.md) -- tracker interface and implementations
-- [4.3 Configuration](config.md) -- workspace root and hook configuration
-- [4.5 Orchestrator](orchestrator.md) -- dispatches issues to workspaces
+- [4.3 Configuration & Environment](config.md) -- `ORCHESTRA_WORKSPACE_ROOT` and hook environment variables (`ORCHESTRA_WORKSPACE_AFTER_CREATE`, etc.)
+- [4.5 Tool System](tools.md) -- Agents execute within provisioned workspaces
+- [4.8 Database Layer](database.md) -- Issues reference workspaces via `branch_name` and workspace state
