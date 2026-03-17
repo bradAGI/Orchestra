@@ -1,85 +1,168 @@
-# Architecture Overview
+# 2. Architecture Overview
 
-Symphony is a three-layer system: a Go backend control plane, an Electron desktop app, and a Bubble Tea TUI.
+> **Source files:** `apps/backend/cmd/orchestrad/`, `apps/backend/internal/`, `apps/desktop/`, `apps/tui/`
 
-## System Layers
+Orchestra follows a classic client-server architecture with a single Go backend serving multiple frontends. The backend owns all orchestration logic -- dispatching issues to agents, tracking state, and broadcasting events -- while frontends are thin consumers that render state and accept user input.
 
+---
+
+### High-Level System Diagram
+
+```mermaid
+graph TB
+    subgraph Frontends
+        DESKTOP["Desktop App<br/><small>Electron + React</small>"]
+        TUI["TUI Dashboard<br/><small>Bubble Tea</small>"]
+    end
+
+    subgraph Backend ["orchestrad (Go)"]
+        API["API Layer<br/><small>Chi Router</small>"]
+        ORCH["Orchestrator<br/><small>State Machine</small>"]
+        PUBSUB["PubSub<br/><small>Event Bus</small>"]
+        AGENTS["Agent Registry<br/><small>Runner Pool</small>"]
+        TRACKER["Tracker<br/><small>Issue Store</small>"]
+        DB["Warehouse DB<br/><small>SQLite</small>"]
+        WORKSPACE["Workspace<br/><small>File + Git</small>"]
+        MCP_PKG["MCP Client<br/><small>Tool Server</small>"]
+    end
+
+    subgraph External
+        CLAUDE["Claude"]
+        GEMINI["Gemini"]
+        CODEX["Codex"]
+        OPENCODE["OpenCode"]
+        UNSANDBOX["Unsandbox"]
+        GITHUB["GitHub API"]
+        MCP_SRV["MCP Servers"]
+    end
+
+    DESKTOP -- "HTTP REST / SSE" --> API
+    TUI -- "Process Manager" --> API
+
+    API --> ORCH
+    API --> PUBSUB
+    ORCH --> AGENTS
+    ORCH --> TRACKER
+    ORCH --> DB
+    ORCH --> WORKSPACE
+    AGENTS --> MCP_PKG
+
+    AGENTS --> CLAUDE
+    AGENTS --> GEMINI
+    AGENTS --> CODEX
+    AGENTS --> OPENCODE
+    AGENTS --> UNSANDBOX
+    TRACKER --> GITHUB
+    MCP_PKG --> MCP_SRV
 ```
-┌─────────────────────────────────┐
-│  Desktop App (Electron/React)   │  Operator UI: Kanban, Inspector, Agents, Projects
-├─────────────────────────────────┤
-│  TUI Dashboard (Bubble Tea)     │  Terminal control surface: start/stop services
-├─────────────────────────────────┤
-│  Backend (Go + chi + SQLite)    │  API server, orchestration, telemetry, GitHub sync
-└─────────────────────────────────┘
+
+---
+
+### Component Responsibilities
+
+| Component | Package | Responsibility |
+|-----------|---------|----------------|
+| **API Server** | `internal/api` | HTTP routing, SSE streaming, auth, rate limiting, WebSocket terminals |
+| **Orchestrator** | `internal/orchestrator` | Central state machine -- tracks running/retrying issues, dispatches agents, reconciles states |
+| **Agent Registry** | `internal/agents` | Provider abstraction -- registers runners for Claude, Gemini, Codex, OpenCode, Unsandbox |
+| **Tracker** | `internal/tracker` | Pluggable issue storage (memory, SQLite, GitHub Issues) |
+| **PubSub** | `internal/observability` | In-process event bus -- fan-out lifecycle events to SSE subscribers |
+| **Warehouse DB** | `internal/db` | SQLite database for sessions, projects, token usage, MCP server configs |
+| **Workspace** | `internal/workspace` | Manages working directories, git operations, workspace migration, path guards |
+| **MCP Client** | `internal/mcp` | Model Context Protocol client for connecting to external tool servers |
+| **Config** | `internal/config` | Loads configuration from environment variables and config files |
+| **Telemetry** | `internal/telemetry` | Watches agent log files for token usage and session events |
+| **Terminal** | `internal/terminal` | WebSocket-based terminal sessions for the desktop app |
+| **Prompt** | `internal/prompt` | Builds system prompts for agent runners |
+| **Workflow** | `internal/workflow` | Frontmatter parsing and workflow definition store |
+| **Presenter** | `internal/presenter` | Formats orchestrator state for API responses |
+| **Unsandbox** | `internal/unsandbox` | Client for remote execution on the Unsandbox platform |
+
+---
+
+### Communication Patterns
+
+Orchestra uses three communication channels between backend and frontends:
+
+```mermaid
+graph LR
+    FE["Frontend"]
+    BE["Backend"]
+
+    FE -- "1. HTTP REST<br/><small>CRUD, commands</small>" --> BE
+    BE -- "2. SSE<br/><small>events + snapshots</small>" --> FE
+    FE -- "3. WebSocket<br/><small>terminal I/O</small>" --> BE
+
+    style FE fill:#0f3460,stroke:#533483,color:#fff
+    style BE fill:#1a1a2e,stroke:#e94560,color:#fff
 ```
 
-## Backend: Go + chi + SQLite
+| Channel | Protocol | Direction | Use Case |
+|---------|----------|-----------|----------|
+| **REST API** | HTTP/JSON | Client -> Server | Issue CRUD, project management, git operations, config, agent control |
+| **SSE** | `text/event-stream` | Server -> Client | Real-time snapshot broadcasts, lifecycle events (run started/failed/succeeded) |
+| **WebSocket** | WS | Bidirectional | Interactive terminal sessions (`/api/v1/terminal/{session_id}`) |
 
-Entry point: `apps/backend/cmd/orchestrad/main.go`
+---
 
-The backend is a single Go binary (`orchestrad`) that:
-- Serves the HTTP/SSE/WebSocket API on port 4010
-- Manages agent lifecycle (provision workspace, dispatch agent, collect telemetry)
-- Stores all state in SQLite (`~/.orchestra/workspaces/.orchestra/warehouse.db`)
-- Syncs bidirectionally with GitHub (issues, PRs)
-- Watches for telemetry output from all 4 agent providers
+### Data Flow: Issue Creation to Resolution
 
-Key packages:
-- `internal/api/` -- chi router, all HTTP handlers
-- `internal/orchestrator/` -- core orchestration logic
-- `internal/db/` -- SQLite schema, migrations, queries
-- `internal/config/` -- environment-based configuration
-- `internal/terminal/` -- WebSocket PTY sessions
+```mermaid
+sequenceDiagram
+    participant User
+    participant Desktop
+    participant API
+    participant Orchestrator
+    participant AgentRegistry
+    participant Agent
+    participant Tracker
+    participant PubSub
 
-## Frontend: React + TypeScript + Electron + Vite
+    User->>Desktop: Create issue
+    Desktop->>API: POST /api/v1/issues
+    API->>Orchestrator: Dispatch(issue)
+    Orchestrator->>Tracker: Store issue
+    Orchestrator->>AgentRegistry: Claim & run
+    AgentRegistry->>Agent: Execute (Claude/Gemini/...)
+    Agent-->>AgentRegistry: Stream progress
+    AgentRegistry-->>Orchestrator: Update state
+    Orchestrator->>PubSub: Publish(RUN_STARTED)
+    PubSub-->>API: Fan-out event
+    API-->>Desktop: SSE: RUN_STARTED + snapshot
+    Agent-->>AgentRegistry: Completion
+    AgentRegistry-->>Orchestrator: Mark done
+    Orchestrator->>PubSub: Publish(RUN_SUCCEEDED)
+    Orchestrator->>Tracker: Update state
+    PubSub-->>API: Fan-out event
+    API-->>Desktop: SSE: RUN_SUCCEEDED + snapshot
+    Desktop-->>User: Show result
+```
 
-Entry point: `apps/desktop/src/main.tsx`
+---
 
-The desktop app provides:
-- **Kanban board** -- 5-column task management (Backlog, Todo, In Progress, Review, Done)
-- **Issue Inspector** -- Details, Plan, Activity, Output, Changes tabs
-- **Project views** -- Git integration with Commits, Issues, PRs sub-tabs
-- **Agent management** -- Per-provider config editing (instructions, permissions, model, hooks, MCP, skills, sub-agents)
-- **Terminal multiplexer** -- Up to 16 tiled PTY sessions
-- **Settings** -- Backend profiles, GitHub OAuth, theme
+### Technology Choices
 
-## TUI: Bubble Tea
+| Layer | Technology | Rationale |
+|-------|-----------|-----------|
+| Backend language | **Go 1.22+** | Fast compilation, strong concurrency primitives, single binary deployment |
+| HTTP router | **Chi** (`go-chi/chi/v5`) | Lightweight, idiomatic middleware chain, URL parameters |
+| Logging | **zerolog** (`rs/zerolog`) | Zero-allocation structured JSON logging |
+| CORS | **go-chi/cors** | Chi-native CORS middleware |
+| Desktop framework | **Electron** | Cross-platform desktop with web technologies |
+| UI library | **React 19** | Component model, hooks, concurrent rendering |
+| Build tool | **Vite** | Fast HMR, ESM-native bundling |
+| Styling | **Tailwind CSS** | Utility-first, no CSS files to manage |
+| Component primitives | **Radix UI** | Accessible, unstyled component primitives |
+| Charts | **Recharts** | React-native charting built on D3 |
+| TUI framework | **Bubble Tea** | Elm-architecture TUI framework for Go |
+| Database | **SQLite** | Zero-config embedded database, single file |
+| ID generation | **UUID v4** (`google/uuid`) | Globally unique, no coordination needed |
 
-Entry point: `apps/tui/main.go`
+---
 
-A terminal dashboard for starting/stopping the backend and desktop services. Launched via `make dash`.
+### Cross-References
 
-## Key API Endpoints
-
-| Group | Endpoints |
-|---|---|
-| **Runtime** | `GET /api/v1/state`, `GET /api/v1/events` (SSE), `POST /api/v1/refresh` |
-| **Issues** | CRUD on `/api/v1/issues`, plus `/history`, `/logs`, `/diff`, `/artifacts` |
-| **Projects** | CRUD on `/api/v1/projects`, plus `/tree`, `/file`, `/git/*` |
-| **Agents** | `GET /api/v1/agents`, per-provider: `/permissions`, `/model`, `/hooks`, `/mcp` |
-| **GitHub** | `/github/login`, `/github/callback`, per-project: `/github/issues`, `/github/pulls`, `/git/branches` |
-| **Sessions** | `GET /api/v1/sessions`, `GET /api/v1/sessions/{id}` |
-| **MCP** | `/mcp/tools`, `/mcp/servers` (CRUD) |
-| **Telemetry** | `GET /api/v1/telemetry/health`, `GET /api/v1/warehouse/stats` |
-| **Terminal** | `GET /api/v1/terminal/{session_id}` (WebSocket) |
-
-Full spec: `docs/openapi.yaml` (also served at `GET /api/v1/openapi.yaml`)
-
-## Bidirectional GitHub Sync
-
-When a project is connected to GitHub:
-1. **Inbound** -- GitHub issues are fetched and added to the Backlog column
-2. **Outbound** -- Status changes, comments, and PR creation sync back to GitHub
-3. **Issue CRUD** -- Create, read, update GitHub issues directly from the desktop UI
-4. **Pull Requests** -- List, create, and view diffs for PRs
-
-## Telemetry Watcher
-
-The backend watches for telemetry output from all 4 agent providers:
-- **Claude** -- Session JSON files
-- **Codex** -- Session logs
-- **Gemini** -- JSON stream output
-- **OpenCode** -- SQLite session database
-
-Telemetry is ingested into the warehouse for unified analytics, token tracking, and cost estimation. Health status is available at `GET /api/v1/telemetry/health`.
+- [2.1 Backend Architecture](backend.md) -- Package-level internals of `orchestrad`
+- [2.2 Desktop Frontend](desktop.md) -- Electron + React component structure
+- [2.3 TUI Architecture](tui.md) -- Terminal dashboard details
+- [2.4 Data Flow & Events](data-flow.md) -- SSE event types, PubSub, retry logic
