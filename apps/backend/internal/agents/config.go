@@ -19,8 +19,8 @@ type AgentConfig struct {
 	Name     string      `json:"name"`     // e.g. "claude", "gemini", "workspace.json"
 	Content  string      `json:"content"`  // File content
 	Path     string      `json:"path"`     // Full absolute path
-	Category string      `json:"category"` // "core" or "skill"
-	Scope    ConfigScope `json:"scope"`    // "global" or "project"
+	Category string      `json:"category"` // "CORE" or "SKILL"
+	Scope    ConfigScope `json:"scope"`    // "GLOBAL" or "PROJECT"
 }
 
 // AgentMeta defines where each agent looks for its configs

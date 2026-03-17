@@ -384,10 +384,10 @@ func TestWriteEventEnvelopeWrapsRawPayloadWithTypeDataAndTimestamp(t *testing.T)
 	writeEventEnvelope(res, "RUN_EVENT", map[string]any{"issue_id": "1"})
 	body := res.Body.String()
 
-	if !strings.Contains(body, "event: run_event") {
-		t.Fatalf("expected run_event SSE frame, got %q", body)
+	if !strings.Contains(body, "event: RUN_EVENT") {
+		t.Fatalf("expected RUN_EVENT SSE frame, got %q", body)
 	}
-	if !strings.Contains(body, "\"type\":\"run_event\"") {
+	if !strings.Contains(body, "\"type\":\"RUN_EVENT\"") {
 		t.Fatalf("expected wrapped type field, got %q", body)
 	}
 	if !strings.Contains(body, "\"data\":{\"issue_id\":\"1\"}") {

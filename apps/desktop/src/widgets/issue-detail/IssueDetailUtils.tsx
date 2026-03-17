@@ -167,14 +167,6 @@ function collectCandidateMessages(timeline: TimelineItem[], issueId: string, iss
 
   const messages: string[] = []
   for (const event of relevant) {
-    if (event.type === 'thought') {
-      const directMessage = typeof event.data?.message === 'string' ? event.data.message : ''
-      if (directMessage) {
-        messages.push(directMessage)
-      }
-      continue
-    }
-
     if (event.type !== 'RUN_EVENT') {
       continue
     }
