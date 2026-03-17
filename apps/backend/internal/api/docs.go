@@ -33,13 +33,11 @@ func (s *Server) GetDocs(w http.ResponseWriter, r *http.Request) {
 
 	docs, err := walkDocs(absRoot, "")
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "docs_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "docs_failed", "failed to load documentation")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, http.StatusOK,map[string]any{
 		"docs": docs,
 	})
 }

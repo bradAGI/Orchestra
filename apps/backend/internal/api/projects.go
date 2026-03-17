@@ -47,7 +47,7 @@ func (s *Server) PostGitCommit(w http.ResponseWriter, r *http.Request) {
 
 	if err := git.Commit(r.Context(), project.RootPath, req.Message); err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git commit failed")
-		writeJSONError(w, http.StatusInternalServerError, "git_commit_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "git_commit_failed", "git commit failed")
 		return
 	}
 
@@ -88,7 +88,7 @@ func (s *Server) PostGitPush(w http.ResponseWriter, r *http.Request) {
 		current, err := git.CurrentBranch(r.Context(), project.RootPath)
 		if err != nil {
 			s.logger.Warn().Err(err).Str("project_id", projectID).Msg("failed to detect current branch, falling back to main")
-			req.Branch = "main"
+			req.Branch = git.DefaultBranch(r.Context(), project.RootPath)
 		} else {
 			req.Branch = current
 		}
@@ -96,7 +96,7 @@ func (s *Server) PostGitPush(w http.ResponseWriter, r *http.Request) {
 
 	if err := git.Push(r.Context(), project.RootPath, req.Remote, req.Branch); err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git push failed")
-		writeJSONError(w, http.StatusInternalServerError, "git_push_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "git_push_failed", "git push failed")
 		return
 	}
 
@@ -136,7 +136,7 @@ func (s *Server) PostGitPull(w http.ResponseWriter, r *http.Request) {
 		current, err := git.CurrentBranch(r.Context(), project.RootPath)
 		if err != nil {
 			s.logger.Warn().Err(err).Str("project_id", projectID).Msg("failed to detect current branch, falling back to main")
-			req.Branch = "main"
+			req.Branch = git.DefaultBranch(r.Context(), project.RootPath)
 		} else {
 			req.Branch = current
 		}
@@ -144,7 +144,7 @@ func (s *Server) PostGitPull(w http.ResponseWriter, r *http.Request) {
 
 	if err := git.Pull(r.Context(), project.RootPath, req.Remote, req.Branch); err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git pull failed")
-		writeJSONError(w, http.StatusInternalServerError, "git_pull_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "git_pull_failed", "git pull failed")
 		return
 	}
 
@@ -920,7 +920,7 @@ func (s *Server) PostGitCheckout(w http.ResponseWriter, r *http.Request) {
 
 	if err := git.Checkout(r.Context(), project.RootPath, req.Branch); err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git checkout failed")
-		writeJSONError(w, http.StatusInternalServerError, "git_checkout_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "git_checkout_failed", "git checkout failed")
 		return
 	}
 
@@ -950,7 +950,7 @@ func (s *Server) PostGitMerge(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := git.Merge(r.Context(), project.RootPath, req.Branch); err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "git_merge_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "git_merge_failed", "git merge failed")
 		return
 	}
 
@@ -987,7 +987,7 @@ func (s *Server) PostGitCreateBranch(w http.ResponseWriter, r *http.Request) {
 
 	if err := git.CreateBranch(r.Context(), project.RootPath, req.Name); err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git create branch failed")
-		writeJSONError(w, http.StatusInternalServerError, "git_create_branch_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "git_create_branch_failed", "git create branch failed")
 		return
 	}
 
@@ -1019,7 +1019,7 @@ func (s *Server) DeleteGitBranch(w http.ResponseWriter, r *http.Request) {
 
 	if err := git.DeleteBranch(r.Context(), project.RootPath, branch); err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git delete branch failed")
-		writeJSONError(w, http.StatusInternalServerError, "git_delete_branch_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "git_delete_branch_failed", "git delete branch failed")
 		return
 	}
 
@@ -1056,7 +1056,7 @@ func (s *Server) PostGitStage(w http.ResponseWriter, r *http.Request) {
 
 	if err := git.Stage(r.Context(), project.RootPath, req.Files); err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git stage failed")
-		writeJSONError(w, http.StatusInternalServerError, "git_stage_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "git_stage_failed", "git stage failed")
 		return
 	}
 
@@ -1093,7 +1093,7 @@ func (s *Server) PostGitUnstage(w http.ResponseWriter, r *http.Request) {
 
 	if err := git.Unstage(r.Context(), project.RootPath, req.Files); err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git unstage failed")
-		writeJSONError(w, http.StatusInternalServerError, "git_unstage_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "git_unstage_failed", "git unstage failed")
 		return
 	}
 
@@ -1117,7 +1117,7 @@ func (s *Server) PostGitStash(w http.ResponseWriter, r *http.Request) {
 
 	if err := git.Stash(r.Context(), project.RootPath); err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git stash failed")
-		writeJSONError(w, http.StatusInternalServerError, "git_stash_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "git_stash_failed", "git stash failed")
 		return
 	}
 
@@ -1141,7 +1141,7 @@ func (s *Server) PostGitStashPop(w http.ResponseWriter, r *http.Request) {
 
 	if err := git.StashPop(r.Context(), project.RootPath); err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git stash pop failed")
-		writeJSONError(w, http.StatusInternalServerError, "git_stash_pop_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "git_stash_pop_failed", "git stash pop failed")
 		return
 	}
 

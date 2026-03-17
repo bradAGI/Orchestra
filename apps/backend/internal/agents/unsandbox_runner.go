@@ -104,7 +104,7 @@ func (r *UnsandboxRunner) RunTurn(ctx context.Context, request TurnRequest, onEv
 		if repoURL != "" {
 			// Public/SSH repo — clone it
 			emit("bootstrap", fmt.Sprintf("cloning %s", repoURL), nil)
-			cloneCmd := fmt.Sprintf("git clone '%s' '%s' 2>&1 || mkdir -p '%s'", repoURL, workDir, workDir)
+			cloneCmd := fmt.Sprintf("git clone %s %s 2>&1 || mkdir -p %s", shellQuote(repoURL), shellQuote(workDir), shellQuote(workDir))
 			if _, err := r.client.ShellSession(ctx, remoteSessionID, cloneCmd); err != nil {
 				emit("bootstrap_warning", fmt.Sprintf("git clone failed: %s", err), nil)
 			}
@@ -114,13 +114,13 @@ func (r *UnsandboxRunner) RunTurn(ctx context.Context, request TurnRequest, onEv
 			if err := r.client.InjectDirectory(ctx, remoteSessionID, request.Workspace, workDir); err != nil {
 				emit("bootstrap_warning", fmt.Sprintf("project upload failed: %s", err), nil)
 				// Create empty dir as fallback
-				r.client.ShellSession(ctx, remoteSessionID, fmt.Sprintf("mkdir -p '%s'", workDir))
+				r.client.ShellSession(ctx, remoteSessionID, fmt.Sprintf("mkdir -p %s", shellQuote(workDir)))
 			} else {
 				emit("bootstrap", "project files uploaded", nil)
 			}
 		}
 	} else {
-		r.client.ShellSession(ctx, remoteSessionID, fmt.Sprintf("mkdir -p '%s'", workDir))
+		r.client.ShellSession(ctx, remoteSessionID, fmt.Sprintf("mkdir -p %s", shellQuote(workDir)))
 	}
 
 	// Install claude CLI if needed
@@ -164,7 +164,7 @@ func (r *UnsandboxRunner) RunTurn(ctx context.Context, request TurnRequest, onEv
 	}
 
 	// Wrap in cd to workspace + PATH setup
-	agentCmd = fmt.Sprintf("export PATH=\"$HOME/.local/bin:$PATH\" && cd '%s' && %s", workDir, agentCmd)
+	agentCmd = fmt.Sprintf("export PATH=\"$HOME/.local/bin:$PATH\" && cd %s && %s", shellQuote(workDir), agentCmd)
 
 	emit("run_started", "executing agent in unsandbox", nil)
 
@@ -274,7 +274,7 @@ func syncCredentials() string {
 	b64 := base64.StdEncoding.EncodeToString(data)
 	lines := []string{
 		"umask 077 && mkdir -p ~/.claude",
-		fmt.Sprintf("echo '%s' | base64 -d > ~/.claude/.credentials.json", b64),
+		fmt.Sprintf("printf '%%s' %s | base64 -d > ~/.claude/.credentials.json", shellQuote(b64)),
 		"chmod 600 ~/.claude/.credentials.json",
 		"chmod 700 ~/.claude",
 	}
@@ -287,7 +287,7 @@ func syncCredentials() string {
 			continue
 		}
 		sB64 := base64.StdEncoding.EncodeToString(sData)
-		lines = append(lines, fmt.Sprintf("echo '%s' | base64 -d > ~/.claude/%s", sB64, name))
+		lines = append(lines, fmt.Sprintf("printf '%%s' %s | base64 -d > ~/.claude/%s", shellQuote(sB64), shellQuote(name)))
 	}
 
 	return strings.Join(lines, "\n")

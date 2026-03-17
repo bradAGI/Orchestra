@@ -118,19 +118,15 @@ func (s *Server) CreateGitHubPR(w http.ResponseWriter, r *http.Request) {
 		Base:  body.Base,
 	})
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "pr_creation_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "pr_creation_failed", "pull request creation failed")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(pr)
+	writeJSON(w, http.StatusCreated,pr)
 }
 
 func (s *Server) GetState(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(presenter.StatePayload(s.orchestrator.Snapshot()))
+	writeJSON(w, http.StatusOK,presenter.StatePayload(s.orchestrator.Snapshot()))
 }
 
 func (s *Server) GetIssues(w http.ResponseWriter, r *http.Request) {
@@ -150,13 +146,11 @@ func (s *Server) GetIssues(w http.ResponseWriter, r *http.Request) {
 
 	issues, err := s.orchestrator.ListIssues(r.Context(), filter)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "fetch_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "fetch_failed", "failed to fetch data")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]any{"issues": issues})
+	writeJSON(w, http.StatusOK,map[string]any{"issues": issues})
 }
 
 func (s *Server) GetSearch(w http.ResponseWriter, r *http.Request) {
@@ -168,13 +162,11 @@ func (s *Server) GetSearch(w http.ResponseWriter, r *http.Request) {
 
 	issues, err := s.orchestrator.SearchIssues(r.Context(), query)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "search_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "search_failed", "search failed")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]any{"issues": issues})
+	writeJSON(w, http.StatusOK,map[string]any{"issues": issues})
 }
 
 func (s *Server) PostIssue(w http.ResponseWriter, r *http.Request) {
@@ -203,21 +195,17 @@ func (s *Server) PostIssue(w http.ResponseWriter, r *http.Request) {
 	issue, err := s.orchestrator.CreateIssue(r.Context(), body.Title, body.Description, body.State, body.Priority, body.AssigneeID, body.ProjectID, body.Provider, body.DisabledTools)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("orchestrator failed to create issue")
-		writeJSONError(w, http.StatusInternalServerError, "create_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "create_failed", "creation failed")
 		return
 	}
 
 	s.logger.Info().Str("id", issue.ID).Str("identifier", issue.Identifier).Msg("issue created successfully")
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(issue)
+	writeJSON(w, http.StatusCreated,issue)
 }
 
 func (s *Server) PostRefresh(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
-	_ = json.NewEncoder(w).Encode(s.orchestrator.QueueRefresh())
+	writeJSON(w, http.StatusAccepted, s.orchestrator.QueueRefresh())
 }
 
 func (s *Server) GetIssue(w http.ResponseWriter, r *http.Request) {
@@ -233,7 +221,6 @@ func (s *Server) GetIssue(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		issue := issues[0]
-		w.Header().Set("Content-Type", "application/json")
 
 		logPath := ""
 		if wsPath, err := workspace.WorkspacePath(s.workspaceRoot, issue.Identifier, ""); err == nil {
@@ -242,7 +229,7 @@ func (s *Server) GetIssue(w http.ResponseWriter, r *http.Request) {
 
 		history, _ := s.orchestrator.GetHistory(r.Context(), issue.ID)
 
-		json.NewEncoder(w).Encode(map[string]any{
+		writeJSON(w, http.StatusOK,map[string]any{
 			"issue_id":         issue.ID,
 			"issue_identifier": issue.Identifier,
 			"title":            issue.Title,
@@ -395,9 +382,7 @@ func (s *Server) GetIssue(w http.ResponseWriter, r *http.Request) {
 		response["base_sha"] = issueDetails.BaseSHA
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(response)
+	writeJSON(w, http.StatusOK,response)
 }
 
 func (s *Server) PatchIssue(w http.ResponseWriter, r *http.Request) {
@@ -410,7 +395,7 @@ func (s *Server) PatchIssue(w http.ResponseWriter, r *http.Request) {
 
 	issue, err := s.orchestrator.UpdateIssue(r.Context(), identifier, updates)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "update_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "update_failed", "update failed")
 		return
 	}
 
@@ -432,9 +417,7 @@ func (s *Server) PatchIssue(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(issue)
+	writeJSON(w, http.StatusOK,issue)
 }
 
 func (s *Server) GetIssueHistory(w http.ResponseWriter, r *http.Request) {
@@ -456,13 +439,11 @@ func (s *Server) GetIssueHistory(w http.ResponseWriter, r *http.Request) {
 
 	history, err := s.orchestrator.GetHistory(r.Context(), issueID)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "history_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "history_failed", "failed to fetch history")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]any{"history": history})
+	writeJSON(w, http.StatusOK,map[string]any{"history": history})
 }
 
 func (s *Server) GetIssueLogs(w http.ResponseWriter, r *http.Request) {
@@ -524,13 +505,11 @@ func (s *Server) GetArtifacts(w http.ResponseWriter, r *http.Request) {
 	provider := r.URL.Query().Get("provider")
 	artifacts, err := s.orchestrator.ListArtifacts(identifier, provider)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "list_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "list_failed", "failed to list items")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]any{"artifacts": artifacts})
+	writeJSON(w, http.StatusOK,map[string]any{"artifacts": artifacts})
 }
 
 func (s *Server) GetArtifactContent(w http.ResponseWriter, r *http.Request) {
@@ -544,7 +523,7 @@ func (s *Server) GetArtifactContent(w http.ResponseWriter, r *http.Request) {
 
 	content, err := s.orchestrator.GetArtifactContent(identifier, provider, relPath)
 	if err != nil {
-		writeJSONError(w, http.StatusNotFound, "fetch_failed", err.Error())
+		writeJSONError(w, http.StatusNotFound, "fetch_failed", "failed to fetch data")
 		return
 	}
 
@@ -620,7 +599,7 @@ func (s *Server) GetIssueDiff(w http.ResponseWriter, r *http.Request) {
 	// Fallback to workspace-based diff
 	diff, err := s.orchestrator.GetDiff(identifier, provider)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "diff_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "diff_failed", "failed to compute diff")
 		return
 	}
 
@@ -631,9 +610,7 @@ func (s *Server) GetIssueDiff(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) GetAgentConfig(w http.ResponseWriter, _ *http.Request) {
 	commands, provider := s.orchestrator.GetAgentConfig()
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, http.StatusOK,map[string]any{
 		"commands":       commands,
 		"agent_provider": provider,
 		"max_turns":      s.orchestrator.GetMaxTurns(),
@@ -657,9 +634,7 @@ func (s *Server) PatchAgentConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	// Return updated config
 	commands, provider := s.orchestrator.GetAgentConfig()
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, http.StatusOK,map[string]any{
 		"commands":       commands,
 		"agent_provider": provider,
 		"max_turns":      s.orchestrator.GetMaxTurns(),
@@ -715,7 +690,7 @@ func (s *Server) DeleteIssue(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, http.StatusNotFound, "issue_not_found", "issue not found")
 			return
 		}
-		writeJSONError(w, http.StatusInternalServerError, "delete_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "delete_failed", "deletion failed")
 		return
 	}
 
@@ -724,9 +699,7 @@ func (s *Server) DeleteIssue(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) GetAgents(w http.ResponseWriter, _ *http.Request) {
 	providers := s.orchestrator.GetProviders()
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, http.StatusOK,map[string]any{
 		"agents": providers,
 	})
 }
@@ -735,13 +708,11 @@ func (s *Server) GetAgentConfigs(w http.ResponseWriter, r *http.Request) {
 	projectID := r.URL.Query().Get("project_id")
 	configs, err := s.orchestrator.ListAgentConfigs(projectID)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "configs_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "configs_failed", "failed to fetch configs")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, http.StatusOK,map[string]any{
 		"configs": configs,
 	})
 }
@@ -762,13 +733,11 @@ func (s *Server) PostAgentConfigNew(w http.ResponseWriter, r *http.Request) {
 	// Implementation detail: orchestrator resolves the directory and creates the file
 	path, err := s.orchestrator.CreateAgentResource(body.Provider, body.Type, body.Name, body.Scope, body.Project)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "create_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "create_failed", "creation failed")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(map[string]string{"path": path})
+	writeJSON(w, http.StatusCreated,map[string]string{"path": path})
 }
 
 func (s *Server) PostAgentConfigUpdate(w http.ResponseWriter, r *http.Request) {
@@ -782,7 +751,7 @@ func (s *Server) PostAgentConfigUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.orchestrator.UpdateConfigByPath(body.Path, body.Content); err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "update_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "update_failed", "update failed")
 		return
 	}
 
@@ -807,21 +776,17 @@ func (s *Server) GetMCPTools(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	mcpReg := s.orchestrator.GetMCPRegistry()
 	if mcpReg == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(map[string]any{"tools": []any{}})
+		writeJSON(w, http.StatusOK,map[string]any{"tools": []any{}})
 		return
 	}
 
 	tools, err := mcpReg.ListTools(ctx)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "mcp_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "mcp_failed", "MCP operation failed")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, http.StatusOK,map[string]any{
 		"tools": tools,
 	})
 }
@@ -829,11 +794,10 @@ func (s *Server) GetMCPTools(w http.ResponseWriter, r *http.Request) {
 func (s *Server) GetMCPServers(w http.ResponseWriter, r *http.Request) {
 	servers, err := s.db.ListMCPServers(r.Context())
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "db_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "db_failed", "database operation failed")
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"servers": servers})
+	writeJSON(w, http.StatusOK,map[string]any{"servers": servers})
 }
 
 func (s *Server) PostMCPServer(w http.ResponseWriter, r *http.Request) {
@@ -848,7 +812,7 @@ func (s *Server) PostMCPServer(w http.ResponseWriter, r *http.Request) {
 
 	server, err := s.db.CreateMCPServer(r.Context(), body.Name, body.Command)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "db_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "db_failed", "database operation failed")
 		return
 	}
 
@@ -865,15 +829,13 @@ func (s *Server) PostMCPServer(w http.ResponseWriter, r *http.Request) {
 	newReg.StartAll(r.Context())
 	s.orchestrator.SetMCPRegistry(newReg, allServers)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(server)
+	writeJSON(w, http.StatusCreated,server)
 }
 
 func (s *Server) DeleteMCPServer(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := s.db.DeleteMCPServer(r.Context(), id); err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "db_failed", err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "db_failed", "database operation failed")
 		return
 	}
 

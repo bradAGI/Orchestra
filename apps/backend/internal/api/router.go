@@ -257,12 +257,27 @@ func contentTypeGuard(next http.Handler) http.Handler {
 func writeJSONError(w http.ResponseWriter, status int, code string, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	if err := json.NewEncoder(w).Encode(map[string]any{
 		"error": map[string]string{
 			"code":    code,
 			"message": message,
 		},
-	})
+	}); err != nil {
+		// Response already started; nothing else to do but log would be ideal.
+		// Caller's logger is unavailable here; this is a best-effort path.
+		_, _ = w.Write([]byte(`{"error":{"code":"encode_error","message":"failed to encode error response"}}`))
+	}
+}
+
+// writeJSON encodes v as JSON into w with the given status code.
+// If encoding fails, a plain-text error is written instead.
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		// Header already sent; best-effort fallback
+		_, _ = w.Write([]byte(`{"error":{"code":"encode_error","message":"failed to encode response"}}`))
+	}
 }
 
 func corsAllowedOrigins(host string) []string {
