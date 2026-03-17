@@ -266,7 +266,7 @@ func (s *Server) GetIssue(w http.ResponseWriter, r *http.Request) {
 			"created_at":       issue.CreatedAt,
 			"updated_at":       issue.UpdatedAt,
 			"base_sha":         issue.BaseSHA,
-			"status":           "idle",
+			"status":           "IDLE",
 			"history":          history,
 			"attempts": map[string]any{
 				"restart_count":         0,

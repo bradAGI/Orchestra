@@ -12,49 +12,49 @@ import type { SidebarItem } from '@/components/app-shell/types'
 
 export const sidebarItems: SidebarItem[] = [
   {
-    id: 'issues',
+    id: 'ISSUES',
     label: 'Tasks',
     description: 'Task board and inspector',
     icon: ListTodo,
   },
   {
-    id: 'projects',
+    id: 'PROJECTS',
     label: 'Projects',
     description: 'Local workspace grouping',
     icon: FolderTree,
   },
   {
-    id: 'console',
+    id: 'CONSOLE',
     label: 'Live Console',
     description: 'Multi-agent terminal dock',
     icon: Terminal,
   },
   {
-    id: 'agents',
+    id: 'AGENTS',
     label: 'Agents',
     description: 'Global agent configurations',
     icon: Cpu,
   },
   {
-    id: 'warehouse',
+    id: 'WAREHOUSE',
     label: 'Analytics',
     description: 'Token usage and session archives',
     icon: Database,
   },
   {
-    id: 'sandbox',
+    id: 'SANDBOX',
     label: 'Sandbox',
     description: 'Remote code execution via unsandbox',
     icon: Globe,
   },
   {
-    id: 'settings',
+    id: 'SETTINGS',
     label: 'Settings',
     description: 'Backend and migration controls',
     icon: Settings2,
   },
   {
-    id: 'docs',
+    id: 'DOCS',
     label: 'Documentation',
     description: 'User & engineering guides',
     icon: FileText,
@@ -62,28 +62,28 @@ export const sidebarItems: SidebarItem[] = [
 ]
 
 export type SectionID =
-  | 'dashboard'
-  | 'running'
-  | 'issues'
-  | 'projects'
-  | 'agents'
-  | 'warehouse'
-  | 'sandbox'
-  | 'settings'
-  | 'docs'
-  | 'console'
+  | 'DASHBOARD'
+  | 'RUNNING'
+  | 'ISSUES'
+  | 'PROJECTS'
+  | 'AGENTS'
+  | 'WAREHOUSE'
+  | 'SANDBOX'
+  | 'SETTINGS'
+  | 'DOCS'
+  | 'CONSOLE'
 
 const SECTION_IDS: readonly SectionID[] = [
-  'dashboard',
-  'running',
-  'issues',
-  'projects',
-  'agents',
-  'warehouse',
-  'sandbox',
-  'settings',
-  'docs',
-  'console',
+  'DASHBOARD',
+  'RUNNING',
+  'ISSUES',
+  'PROJECTS',
+  'AGENTS',
+  'WAREHOUSE',
+  'SANDBOX',
+  'SETTINGS',
+  'DOCS',
+  'CONSOLE',
 ]
 
 export function isSectionID(value: string): value is SectionID {
@@ -104,33 +104,33 @@ export type SectionVisibility = {
 }
 
 const sectionMeta: Record<SectionID, { label: string; title: string }> = {
-  dashboard: { label: 'Operations', title: 'Dashboard' },
-  running: { label: 'Operations', title: 'Running' },
-  issues: { label: 'Tracker', title: 'Tasks' },
-  projects: { label: 'Workspace', title: 'Projects' },
-  agents: { label: 'Compute', title: 'Agents' },
-  warehouse: { label: 'Analytics', title: 'Analytics' },
-  sandbox: { label: 'Compute', title: 'Sandbox' },
-  settings: { label: 'System', title: 'Settings' },
-  docs: { label: 'Knowledge', title: 'Documentation' },
-  console: { label: 'Runtime', title: 'Live Console' },
+  DASHBOARD: { label: 'Operations', title: 'Dashboard' },
+  RUNNING: { label: 'Operations', title: 'Running' },
+  ISSUES: { label: 'Tracker', title: 'Tasks' },
+  PROJECTS: { label: 'Workspace', title: 'Projects' },
+  AGENTS: { label: 'Compute', title: 'Agents' },
+  WAREHOUSE: { label: 'Analytics', title: 'Analytics' },
+  SANDBOX: { label: 'Compute', title: 'Sandbox' },
+  SETTINGS: { label: 'System', title: 'Settings' },
+  DOCS: { label: 'Knowledge', title: 'Documentation' },
+  CONSOLE: { label: 'Runtime', title: 'Live Console' },
 }
 
 export function getSectionVisibility(activeSection: SectionID): SectionVisibility {
   return {
-    showDashboard: activeSection === 'dashboard',
-    showRunning: activeSection === 'running',
-    showIssueBoard: activeSection === 'issues',
-    showProjects: activeSection === 'projects',
-    showAgents: activeSection === 'agents',
-    showWarehouse: activeSection === 'warehouse',
-    showSandbox: activeSection === 'sandbox',
-    showSettings: activeSection === 'settings',
-    showDocs: activeSection === 'docs',
-    showConsole: activeSection === 'console',
+    showDashboard: activeSection === 'DASHBOARD',
+    showRunning: activeSection === 'RUNNING',
+    showIssueBoard: activeSection === 'ISSUES',
+    showProjects: activeSection === 'PROJECTS',
+    showAgents: activeSection === 'AGENTS',
+    showWarehouse: activeSection === 'WAREHOUSE',
+    showSandbox: activeSection === 'SANDBOX',
+    showSettings: activeSection === 'SETTINGS',
+    showDocs: activeSection === 'DOCS',
+    showConsole: activeSection === 'CONSOLE',
   }
 }
 
 export function getCurrentSectionMeta(activeSection: SectionID): { label: string; title: string } {
-  return sectionMeta[activeSection] ?? sectionMeta.issues
+  return sectionMeta[activeSection] ?? sectionMeta.ISSUES
 }

@@ -18,7 +18,7 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/unsandbox"
 )
 
-const ProviderUnsandbox Provider = "unsandbox"
+const ProviderUnsandbox Provider = "UNSANDBOX"
 
 // UnsandboxRunner executes agent turns inside unsandbox.com containers.
 //
@@ -166,7 +166,7 @@ func (r *UnsandboxRunner) RunTurn(ctx context.Context, request TurnRequest, onEv
 	// Wrap in cd to workspace + PATH setup
 	agentCmd = fmt.Sprintf("export PATH=\"$HOME/.local/bin:$PATH\" && cd %s && %s", shellQuote(workDir), agentCmd)
 
-	emit("run_started", "executing agent in unsandbox", nil)
+	emit("RUN_STARTED", "executing agent in unsandbox", nil)
 
 	result, err := r.client.ShellSession(ctx, remoteSessionID, agentCmd)
 	if err != nil {

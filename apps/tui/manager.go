@@ -21,6 +21,21 @@ const (
 	StatusError
 )
 
+func (s ServiceStatus) String() string {
+	switch s {
+	case StatusStopped:
+		return "STOPPED"
+	case StatusStarting:
+		return "STARTING"
+	case StatusRunning:
+		return "RUNNING"
+	case StatusError:
+		return "ERROR"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 type Service struct {
 	Name    string
 	Cmd     string

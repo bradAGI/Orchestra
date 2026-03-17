@@ -2,17 +2,23 @@ package agents
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
 type Provider string
 
 const (
-	ProviderCodex    Provider = "codex"
-	ProviderClaude   Provider = "claude"
-	ProviderOpenCode Provider = "opencode"
-	ProviderGemini   Provider = "gemini"
+	ProviderCodex    Provider = "CODEX"
+	ProviderClaude   Provider = "CLAUDE"
+	ProviderOpenCode Provider = "OPENCODE"
+	ProviderGemini   Provider = "GEMINI"
 )
+
+// NormalizeProvider normalizes a provider string to UPPERCASE for backward compatibility.
+func NormalizeProvider(s string) Provider {
+	return Provider(strings.ToUpper(strings.TrimSpace(s)))
+}
 
 type TurnRequest struct {
 	SessionID       string

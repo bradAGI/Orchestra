@@ -412,7 +412,7 @@ func TestRecordRunSuccessRemovesRunningEntry(t *testing.T) {
 	service := NewService()
 	service.SetRunningForTest([]RunningEntry{{IssueID: "1", IssueIdentifier: "ORC-1"}, {IssueID: "2", IssueIdentifier: "ORC-2"}})
 
-	service.RecordRunSuccess("1", "codex")
+	service.RecordRunSuccess("1", "CODEX")
 
 	snapshot := service.Snapshot()
 	if len(snapshot.Running) != 1 || snapshot.Running[0].IssueID != "2" {
@@ -527,7 +527,7 @@ func TestRecordRunEventUpdatesRunningStatus(t *testing.T) {
 	service := NewService()
 	service.SetRunningForTest([]RunningEntry{{IssueID: "1", IssueIdentifier: "ORC-1", LastEvent: "dispatch_queued"}})
 
-	service.RecordRunEvent("1", "codex", agents.Event{
+	service.RecordRunEvent("1", "CODEX", agents.Event{
 		Provider:  agents.ProviderCodex,
 		Kind:      "turn/completed",
 		Message:   "Completed turn",
@@ -546,7 +546,7 @@ func TestRecordRunEventUpdatesRunningStatus(t *testing.T) {
 
 func TestShouldContinueTurnHonorsMaxTurns(t *testing.T) {
 	service := NewService()
-	continueTurn, err := service.ShouldContinueTurn(context.Background(), "issue-1", "codex", int64(3), 10)
+	continueTurn, err := service.ShouldContinueTurn(context.Background(), "issue-1", "CODEX", int64(3), 10)
 	if err != nil {
 		t.Fatalf("should continue turn: %v", err)
 	}
@@ -560,7 +560,7 @@ func TestShouldContinueTurnChecksTrackerState(t *testing.T) {
 	service.SetTrackerClient(memory.NewClient([]tracker.Issue{{ID: "1", Identifier: "ORC-1", State: "In Progress"}}))
 	service.SetStateSets([]string{"Todo", "In Progress"}, []string{"Done"})
 
-	continueTurn, err := service.ShouldContinueTurn(context.Background(), "1", "codex", int64(5), 10)
+	continueTurn, err := service.ShouldContinueTurn(context.Background(), "1", "CODEX", int64(5), 10)
 	if err != nil {
 		t.Fatalf("should continue turn: %v", err)
 	}
@@ -569,7 +569,7 @@ func TestShouldContinueTurnChecksTrackerState(t *testing.T) {
 	}
 
 	service.SetTrackerClient(memory.NewClient([]tracker.Issue{{ID: "1", Identifier: "ORC-1", State: "Done"}}))
-	continueTurn, err = service.ShouldContinueTurn(context.Background(), "1", "codex", int64(5), 10)
+	continueTurn, err = service.ShouldContinueTurn(context.Background(), "1", "CODEX", int64(5), 10)
 	if err != nil {
 		t.Fatalf("should continue turn: %v", err)
 	}
@@ -583,7 +583,7 @@ func TestShouldContinueTurnStopsWhenIssueUnassigned(t *testing.T) {
 	service.SetStateSets([]string{"Todo", "In Progress"}, []string{"Done"})
 	service.SetTrackerClient(staticTrackerClient{candidates: []tracker.Issue{{ID: "1", Identifier: "ORC-1", State: "In Progress", AssignedToWorker: false}}})
 
-	continueTurn, err := service.ShouldContinueTurn(context.Background(), "1", "codex", int64(5), 10)
+	continueTurn, err := service.ShouldContinueTurn(context.Background(), "1", "CODEX", int64(5), 10)
 	if err != nil {
 		t.Fatalf("should continue turn: %v", err)
 	}
@@ -603,7 +603,7 @@ func TestShouldContinueTurnStopsWhenTodoBlockedByNonTerminal(t *testing.T) {
 		BlockedBy:        []tracker.Blocker{{ID: "B-1", State: "In Progress"}},
 	}}})
 
-	continueTurn, err := service.ShouldContinueTurn(context.Background(), "1", "codex", int64(5), 10)
+	continueTurn, err := service.ShouldContinueTurn(context.Background(), "1", "CODEX", int64(5), 10)
 	if err != nil {
 		t.Fatalf("should continue turn: %v", err)
 	}
@@ -617,7 +617,7 @@ func TestPrepareNextTurnIncrementsTurnAndReleasesClaim(t *testing.T) {
 	service.SetRunningForTest([]RunningEntry{{IssueID: "1", IssueIdentifier: "ORC-1", TurnCount: 0}})
 	_, _ = service.ClaimNextRunnable()
 
-	service.PrepareNextTurn("1", "codex", int64(1))
+	service.PrepareNextTurn("1", "CODEX", int64(1))
 
 	snapshot := service.Snapshot()
 	if snapshot.Running[0].TurnCount != 1 {
@@ -633,7 +633,7 @@ func TestRecordRunSuccessAccumulatesSecondsRun(t *testing.T) {
 	startedAt := time.Now().UTC().Add(-2 * time.Second).Format(time.RFC3339)
 	service.SetRunningForTest([]RunningEntry{{IssueID: "1", IssueIdentifier: "ORC-1", StartedAt: startedAt}})
 
-	service.RecordRunSuccess("1", "codex")
+	service.RecordRunSuccess("1", "CODEX")
 	snapshot := service.Snapshot()
 
 	if snapshot.CodexTotals.SecondsRun < 1 {
@@ -645,7 +645,7 @@ func TestRecordRunEventUpdatesRateLimits(t *testing.T) {
 	service := NewService()
 	service.SetRunningForTest([]RunningEntry{{IssueID: "1", IssueIdentifier: "ORC-1", StartedAt: time.Now().UTC().Format(time.RFC3339)}})
 
-	service.RecordRunEvent("1", "codex", agents.Event{Kind: "rate_limit", Raw: map[string]any{"rate_limits": map[string]any{"remaining": 42}}, Timestamp: time.Now().UTC()})
+	service.RecordRunEvent("1", "CODEX", agents.Event{Kind: "rate_limit", Raw: map[string]any{"rate_limits": map[string]any{"remaining": 42}}, Timestamp: time.Now().UTC()})
 	snapshot := service.Snapshot()
 
 	rateLimits, ok := snapshot.RateLimits.(map[string]any)
@@ -661,7 +661,7 @@ func TestRecordRunEventUpdatesNestedRateLimits(t *testing.T) {
 	service := NewService()
 	service.SetRunningForTest([]RunningEntry{{IssueID: "1", IssueIdentifier: "ORC-1", StartedAt: time.Now().UTC().Format(time.RFC3339)}})
 
-	service.RecordRunEvent("1", "codex", agents.Event{
+	service.RecordRunEvent("1", "CODEX", agents.Event{
 		Kind:      "provider_event",
 		Raw:       map[string]any{"meta": map[string]any{"rateLimits": map[string]any{"remaining": 7, "reset_at": "soon"}}},
 		Timestamp: time.Now().UTC(),
@@ -687,7 +687,7 @@ func TestRecordRunEventPreservesExistingLastEventAndMessageWhenEmpty(t *testing.
 		StartedAt:       time.Now().UTC().Format(time.RFC3339),
 	}})
 
-	service.RecordRunEvent("1", "codex", agents.Event{Kind: "", Message: "", Timestamp: time.Now().UTC()})
+	service.RecordRunEvent("1", "CODEX", agents.Event{Kind: "", Message: "", Timestamp: time.Now().UTC()})
 	snapshot := service.Snapshot()
 
 	if snapshot.Running[0].LastEvent != "run_claimed" {
@@ -702,7 +702,7 @@ func TestRecordRunEventDerivesTotalTokensWhenMissing(t *testing.T) {
 	service := NewService()
 	service.SetRunningForTest([]RunningEntry{{IssueID: "1", IssueIdentifier: "ORC-1", StartedAt: time.Now().UTC().Format(time.RFC3339)}})
 
-	service.RecordRunEvent("1", "codex", agents.Event{
+	service.RecordRunEvent("1", "CODEX", agents.Event{
 		Kind:      "token_update",
 		Timestamp: time.Now().UTC(),
 		Usage:     agents.TokenUsage{InputTokens: 9, OutputTokens: 5},
@@ -718,7 +718,7 @@ func TestRecordRunEventUpdatesRateLimitsFromParamsEnvelope(t *testing.T) {
 	service := NewService()
 	service.SetRunningForTest([]RunningEntry{{IssueID: "1", IssueIdentifier: "ORC-1", StartedAt: time.Now().UTC().Format(time.RFC3339)}})
 
-	service.RecordRunEvent("1", "codex", agents.Event{
+	service.RecordRunEvent("1", "CODEX", agents.Event{
 		Kind:      "thread/rate_limits",
 		Timestamp: time.Now().UTC(),
 		Raw:       map[string]any{"params": map[string]any{"rate_limits": map[string]any{"remaining": 11}}},
@@ -738,7 +738,7 @@ func TestRecordRunEventUpdatesRateLimitsFromJSONStringEnvelope(t *testing.T) {
 	service := NewService()
 	service.SetRunningForTest([]RunningEntry{{IssueID: "1", IssueIdentifier: "ORC-1", StartedAt: time.Now().UTC().Format(time.RFC3339)}})
 
-	service.RecordRunEvent("1", "codex", agents.Event{
+	service.RecordRunEvent("1", "CODEX", agents.Event{
 		Kind:      "thread/rate_limits",
 		Timestamp: time.Now().UTC(),
 		Raw:       map[string]any{"meta": `{"rateLimits":{"remaining":5}}`},
@@ -758,7 +758,7 @@ func TestRecordRunEventUpdatesRateLimitsFromArrayEnvelope(t *testing.T) {
 	service := NewService()
 	service.SetRunningForTest([]RunningEntry{{IssueID: "1", IssueIdentifier: "ORC-1", StartedAt: time.Now().UTC().Format(time.RFC3339)}})
 
-	service.RecordRunEvent("1", "codex", agents.Event{
+	service.RecordRunEvent("1", "CODEX", agents.Event{
 		Kind:      "thread/rate_limits",
 		Timestamp: time.Now().UTC(),
 		Raw: map[string]any{

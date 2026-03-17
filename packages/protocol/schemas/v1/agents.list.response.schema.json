@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["name", "path", "category", "scope"],
+    "properties": {
+      "name": { "type": "string" },
+      "content": { "type": "string" },
+      "path": { "type": "string" },
+      "category": {
+        "type": "string",
+        "enum": ["CORE", "SKILL"]
+      },
+      "scope": {
+        "type": "string",
+        "enum": ["GLOBAL", "PROJECT"]
+      }
+    }
+  }
+}

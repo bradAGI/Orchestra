@@ -92,7 +92,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
 
     /* ---------- navigation ---------- */
     const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
-    const [scope, setScope] = useState<'global' | 'project'>('global')
+    const [scope, setScope] = useState<'GLOBAL' | 'PROJECT'>('GLOBAL')
     const [selectedProjectID, setSelectedProjectID] = useState<string>('')
 
     /* ---------- instructions state ---------- */
@@ -139,7 +139,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
         setLoading(true)
         try {
             const [configsData, projectsData, mcpToolsData, mcpServersData] = await Promise.all([
-                fetchAgentConfigs(config, scope === 'project' ? selectedProjectID : undefined),
+                fetchAgentConfigs(config, scope === 'PROJECT' ? selectedProjectID : undefined),
                 fetchProjects(config),
                 fetchMCPTools(config),
                 fetchMCPServers(config),
@@ -163,7 +163,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
     const syncActiveConfig = (provider: Provider, availableConfigs: AgentConfig[]) => {
         const match = availableConfigs.find(c =>
             c.scope === scope &&
-            c.category === 'core' &&
+            c.category === 'CORE' &&
             c.name.toLowerCase().includes(provider.toLowerCase()),
         )
         if (match) {
@@ -206,10 +206,10 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
             try {
                 await createAgentResource(config, {
                     provider,
-                    type: 'core',
+                    type: 'CORE',
                     name: provider,
                     scope,
-                    ...(scope === 'project' && selectedProjectID ? { project_id: selectedProjectID } : {}),
+                    ...(scope === 'PROJECT' && selectedProjectID ? { project_id: selectedProjectID } : {}),
                 })
                 await loadData()
                 setError('')
@@ -314,10 +314,10 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
         try {
             await createAgentResource(config, {
                 provider: selectedAgent,
-                type: 'skill',
+                type: 'SKILL',
                 name: newSkillName,
                 scope,
-                ...(scope === 'project' && selectedProjectID ? { project_id: selectedProjectID } : {}),
+                ...(scope === 'PROJECT' && selectedProjectID ? { project_id: selectedProjectID } : {}),
             })
             await loadData()
             setSkillDialogOpen(false)
@@ -339,7 +339,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
     const skills = useMemo(() => {
         if (!selectedAgent) return []
         return configs.filter(c =>
-            c.category === 'skill' &&
+            c.category === 'SKILL' &&
             !c.path.includes('/agents/') &&
             c.name.toLowerCase().includes(selectedAgent.toLowerCase()),
         )
@@ -363,7 +363,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
             return
         }
         try {
-            const projId = scope === 'project' ? selectedProjectID : undefined
+            const projId = scope === 'PROJECT' ? selectedProjectID : undefined
             const servers = await fetchProviderMCPServers(config, selectedAgent, projId)
             setProviderMcpServers(servers)
         } catch {
@@ -379,7 +379,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
     const reloadProviderConfig = React.useCallback(async () => {
         if (!config || !selectedAgent) return
         try {
-            const projId = scope === 'project' ? selectedProjectID : undefined
+            const projId = scope === 'PROJECT' ? selectedProjectID : undefined
             const [perms, model, hks] = await Promise.all([
                 fetchProviderPermissions(config, selectedAgent, projId),
                 fetchProviderModel(config, selectedAgent),
@@ -454,28 +454,28 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
     }
 
     const hasCoreConfig = (provider: Provider) =>
-        configs.some(c => c.category === 'core' && c.name.toLowerCase().includes(provider))
+        configs.some(c => c.category === 'CORE' && c.name.toLowerCase().includes(provider))
 
     /* ---------- scope dropdown options ---------- */
     const scopeOptions = useMemo(() => {
         const opts: { label: string; value: string; icon?: React.ReactNode }[] = [
-            { label: 'All Projects', value: 'global', icon: <Folder size={12} className="text-muted-foreground/50" /> },
+            { label: 'All Projects', value: 'GLOBAL', icon: <Folder size={12} className="text-muted-foreground/50" /> },
             ...projects.map(p => ({ label: p.name, value: p.id, icon: <Folder size={12} className="text-primary/60" /> })),
         ]
         return opts
     }, [projects])
 
     const handleScopeChange = (value: string) => {
-        if (value === 'global') {
-            setScope('global')
+        if (value === 'GLOBAL') {
+            setScope('GLOBAL')
             setSelectedProjectID('')
         } else {
-            setScope('project')
+            setScope('PROJECT')
             setSelectedProjectID(value)
         }
     }
 
-    const scopeValue = scope === 'global' ? 'global' : selectedProjectID
+    const scopeValue = scope === 'GLOBAL' ? 'GLOBAL' : selectedProjectID
 
     /* ================================================================ */
     /*  RENDER                                                          */
@@ -817,7 +817,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                             )}
 
                             {/* Allowed Tools (Claude only, project scope) */}
-                            {selectedAgent === 'claude' && scope === 'project' && permissions.allowed_tools && permissions.allowed_tools.length > 0 && (
+                            {selectedAgent === 'claude' && scope === 'PROJECT' && permissions.allowed_tools && permissions.allowed_tools.length > 0 && (
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Project Allowed Tools</label>
                                     <p className="text-[9px] text-muted-foreground/40">Managed by Claude Code permission dialogs</p>

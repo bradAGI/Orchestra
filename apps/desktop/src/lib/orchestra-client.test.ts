@@ -61,7 +61,7 @@ describe('normalizeSnapshotPayload', () => {
         input_tokens: 12,
         output_tokens: 8,
         total_tokens: 20,
-        seconds_run: 5,
+        seconds_running: 5,
       },
       rate_limits: { remaining: 99 },
     })
@@ -81,22 +81,22 @@ describe('normalizeEventEnvelope', () => {
   it('normalizes valid event payload', () => {
     const normalized = normalizeEventEnvelope(
       {
-        type: 'run_failed',
+        type: 'RUN_FAILED',
         timestamp: '2026-03-06T00:00:00Z',
         data: { issue_id: 'i-1' },
       },
       'fallback_type',
     )
 
-    expect(normalized.type).toBe('run_failed')
+    expect(normalized.type).toBe('RUN_FAILED')
     expect(normalized.timestamp).toBe('2026-03-06T00:00:00Z')
     expect(normalized.data).toEqual({ issue_id: 'i-1' })
   })
 
   it('applies fallback values for malformed envelopes', () => {
-    const normalized = normalizeEventEnvelope({ data: 'bad-data' }, 'run_event')
+    const normalized = normalizeEventEnvelope({ data: 'bad-data' }, 'RUN_EVENT')
 
-    expect(normalized.type).toBe('run_event')
+    expect(normalized.type).toBe('RUN_EVENT')
     expect(normalized.timestamp.length).toBeGreaterThan(0)
     expect(normalized.data).toEqual({})
   })
@@ -117,7 +117,7 @@ describe('operator flow client calls', () => {
             counts: { running: 1, retrying: 0 },
             running: [],
             retrying: [],
-            codex_totals: { input_tokens: 0, output_tokens: 0, total_tokens: 0, seconds_run: 0 },
+            codex_totals: { input_tokens: 0, output_tokens: 0, total_tokens: 0, seconds_running: 0 },
             rate_limits: null,
           }),
           { status: 200 },
@@ -208,7 +208,7 @@ describe('operator flow client calls', () => {
           counts: { running: 0, retrying: 0 },
           running: [],
           retrying: [],
-          codex_totals: { input_tokens: 0, output_tokens: 0, total_tokens: 0, seconds_run: 0 },
+          codex_totals: { input_tokens: 0, output_tokens: 0, total_tokens: 0, seconds_running: 0 },
           rate_limits: null,
         }),
         { status: 200 },

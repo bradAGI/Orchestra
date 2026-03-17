@@ -11,8 +11,8 @@ import (
 type ConfigScope string
 
 const (
-	ScopeGlobal  ConfigScope = "global"
-	ScopeProject ConfigScope = "project"
+	ScopeGlobal  ConfigScope = "GLOBAL"
+	ScopeProject ConfigScope = "PROJECT"
 )
 
 type AgentConfig struct {
@@ -93,7 +93,7 @@ func ListAgentConfigs(workspaceRoot string, projectRoot string) ([]AgentConfig, 
 			Name:     "Orchestra: " + name,
 			Content:  content,
 			Path:     path,
-			Category: "core",
+			Category: "CORE",
 			Scope:    ScopeGlobal,
 		})
 	}
@@ -111,7 +111,7 @@ func ListAgentConfigs(workspaceRoot string, projectRoot string) ([]AgentConfig, 
 							Name:     fmt.Sprintf("%s (Global)", agentName),
 							Content:  string(content),
 							Path:     fullPath,
-							Category: "core",
+							Category: "CORE",
 							Scope:    ScopeGlobal,
 						})
 						foundGlobal = true
@@ -127,7 +127,7 @@ func ListAgentConfigs(workspaceRoot string, projectRoot string) ([]AgentConfig, 
 						Name:     fmt.Sprintf("%s (Global)", agentName),
 						Content:  string(content),
 						Path:     path,
-						Category: "core",
+						Category: "CORE",
 						Scope:    ScopeGlobal,
 					})
 					break
@@ -144,7 +144,7 @@ func ListAgentConfigs(workspaceRoot string, projectRoot string) ([]AgentConfig, 
 						Name:     fmt.Sprintf("%s (Project)", agentName),
 						Content:  string(content),
 						Path:     path,
-						Category: "core",
+						Category: "CORE",
 						Scope:    ScopeProject,
 					})
 				}
@@ -155,18 +155,18 @@ func ListAgentConfigs(workspaceRoot string, projectRoot string) ([]AgentConfig, 
 		for _, relSubDir := range meta.SkillPaths {
 			// Check Global Subdir
 			globalSubDir := filepath.Join(home, relSubDir)
-			configs = append(configs, discoverFilesInDir(globalSubDir, agentName, "skill", ScopeGlobal)...)
+			configs = append(configs, discoverFilesInDir(globalSubDir, agentName, "SKILL", ScopeGlobal)...)
 
 			// Check Project Subdir
 			if projectRoot != "" {
 				projectSubDir := filepath.Join(projectRoot, relSubDir)
-				configs = append(configs, discoverFilesInDir(projectSubDir, agentName, "skill", ScopeProject)...)
+				configs = append(configs, discoverFilesInDir(projectSubDir, agentName, "SKILL", ScopeProject)...)
 			}
 		}
 	}
 
 	// 3. Skills in .codex/skills (Legacy/Internal)
-	configs = append(configs, discoverFilesInDir(filepath.Join(workspaceRoot, ".codex", "skills"), "Orchestra", "skill", ScopeGlobal)...)
+	configs = append(configs, discoverFilesInDir(filepath.Join(workspaceRoot, ".codex", "skills"), "Orchestra", "SKILL", ScopeGlobal)...)
 
 	return configs, nil
 }

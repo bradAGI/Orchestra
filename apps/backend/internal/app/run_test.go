@@ -32,7 +32,7 @@ func TestPublishRunEventIncludesIssueAndProvider(t *testing.T) {
 
 	select {
 	case got := <-ch:
-		if got.Type != "run_event" {
+		if got.Type != "RUN_EVENT" {
 			t.Fatalf("expected run_event type, got %q", got.Type)
 		}
 		data, ok := got.Data.(map[string]any)
@@ -55,11 +55,11 @@ func TestPublishLifecycleEventPublishesTypedEnvelope(t *testing.T) {
 	ch, unsub := pubsub.Subscribe(1)
 	defer unsub()
 
-	publishLifecycleEvent(pubsub, "run_succeeded", map[string]any{"issue_id": "1"})
+	publishLifecycleEvent(pubsub, "RUN_SUCCEEDED", map[string]any{"issue_id": "1"})
 
 	select {
 	case got := <-ch:
-		if got.Type != "run_succeeded" {
+		if got.Type != "RUN_SUCCEEDED" {
 			t.Fatalf("expected run_succeeded type, got %q", got.Type)
 		}
 		data, ok := got.Data.(map[string]any)
@@ -114,11 +114,11 @@ func TestProcessExecutionTickPublishesSuccessLifecycleEvents(t *testing.T) {
 		select {
 		case evt := <-ch:
 			switch evt.Type {
-			case "run_started":
+			case "RUN_STARTED":
 				seenStarted = true
-			case "run_event":
+			case "RUN_EVENT":
 				seenRunEvent = true
-			case "run_succeeded":
+			case "RUN_SUCCEEDED":
 				seenSucceeded = true
 			}
 		case <-deadline:
@@ -176,16 +176,16 @@ func TestProcessExecutionTickPublishesFailureAndRetryLifecycleEvents(t *testing.
 		select {
 		case evt := <-ch:
 			switch evt.Type {
-			case "run_started":
+			case "RUN_STARTED":
 				seenStarted = true
-			case "run_failed":
+			case "RUN_FAILED":
 				seenFailed = true
 				if data, ok := evt.Data.(map[string]any); ok {
 					if cause, ok := data["cause"].(string); ok {
 						failedCause = cause
 					}
 				}
-			case "retry_scheduled":
+			case "RETRY_SCHEDULED":
 				seenRetry = true
 				if data, ok := evt.Data.(map[string]any); ok {
 					if cause, ok := data["cause"].(string); ok {
@@ -252,16 +252,16 @@ func TestProcessExecutionTickDoesNotPublishRetryWhenAttemptExceedsMax(t *testing
 		select {
 		case evt := <-ch:
 			switch evt.Type {
-			case "run_started":
+			case "RUN_STARTED":
 				seenStarted = true
-			case "run_failed":
+			case "RUN_FAILED":
 				seenFailed = true
 				if data, ok := evt.Data.(map[string]any); ok {
 					if cause, ok := data["cause"].(string); ok {
 						failedCause = cause
 					}
 				}
-			case "retry_scheduled":
+			case "RETRY_SCHEDULED":
 				seenRetry = true
 			}
 		case <-deadline:
@@ -317,13 +317,13 @@ func TestPublishRefreshRetryLifecycleEventsPublishesOnlyNewEntries(t *testing.T)
 		select {
 		case evt := <-ch:
 			switch evt.Type {
-			case "run_failed":
+			case "RUN_FAILED":
 				seenRunFailed = true
 				data, ok := evt.Data.(map[string]any)
 				if !ok || data["issue_id"] != "2" || data["source"] != "refresh" || data["cause"] != "refresh_retry" {
 					t.Fatalf("unexpected run_failed payload: %+v", evt.Data)
 				}
-			case "retry_scheduled":
+			case "RETRY_SCHEDULED":
 				seenRetryScheduled = true
 				data, ok := evt.Data.(map[string]any)
 				if !ok || data["issue_id"] != "2" || data["source"] != "refresh" || data["cause"] != "refresh_retry" {
@@ -473,7 +473,7 @@ func TestProcessExecutionTickPublishesBeforeRunHookFailureCause(t *testing.T) {
 	for {
 		select {
 		case evt := <-ch:
-			if evt.Type != "run_failed" {
+			if evt.Type != "RUN_FAILED" {
 				continue
 			}
 			data, ok := evt.Data.(map[string]any)
@@ -551,13 +551,13 @@ func TestPublishRefreshRetryLifecycleEventsCarriesCompleteFields(t *testing.T) {
 			if payload["source"] != "refresh" || payload["cause"] != "stalled_timeout" {
 				t.Fatalf("unexpected source/cause fields for %s: %+v", evt.Type, payload)
 			}
-			if evt.Type == "run_failed" {
+			if evt.Type == "RUN_FAILED" {
 				if payload["error"] != "stalled run exceeded timeout" {
 					t.Fatalf("expected error in run_failed payload, got %+v", payload)
 				}
 				seenRunFailed = true
 			}
-			if evt.Type == "retry_scheduled" {
+			if evt.Type == "RETRY_SCHEDULED" {
 				if payload["due_at"] != "2026-01-01T00:00:30Z" {
 					t.Fatalf("expected due_at in retry_scheduled payload, got %+v", payload)
 				}

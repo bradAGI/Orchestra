@@ -62,7 +62,7 @@ export function extractHookOutputs(timeline: TimelineItem[], issueId: string, is
   const outputs: Record<string, string> = {}
   relevant.forEach((event) => {
     const data = asEventData(event)
-    if (event.type === 'hook_completed' || event.type === 'hook_failed') {
+    if (event.type === 'HOOK_COMPLETED' || event.type === 'HOOK_FAILED') {
       const type = typeof data.hook_type === 'string' ? data.hook_type : ''
       const output = typeof data.output === 'string' ? data.output : ''
       if (type && output) {
@@ -78,11 +78,11 @@ export function getHookStatus(timeline: TimelineItem[], issueId: string, issueId
     const data = asEventData(event)
     return data.issue_id === issueId || data.issue_identifier === issueIdentifier
   })
-  const failed = relevant.find((event) => event.type === 'hook_failed' && asEventData(event).hook_type === type)
+  const failed = relevant.find((event) => event.type === 'HOOK_FAILED' && asEventData(event).hook_type === type)
   if (failed) return 'failed'
-  const completed = relevant.find((event) => event.type === 'hook_completed' && asEventData(event).hook_type === type)
+  const completed = relevant.find((event) => event.type === 'HOOK_COMPLETED' && asEventData(event).hook_type === type)
   if (completed) return 'completed'
-  const started = relevant.find((event) => event.type === 'hook_started' && asEventData(event).hook_type === type)
+  const started = relevant.find((event) => event.type === 'HOOK_STARTED' && asEventData(event).hook_type === type)
   if (started) return 'active'
   return 'pending'
 }
@@ -175,7 +175,7 @@ function collectCandidateMessages(timeline: TimelineItem[], issueId: string, iss
       continue
     }
 
-    if (event.type !== 'run_event') {
+    if (event.type !== 'RUN_EVENT') {
       continue
     }
 

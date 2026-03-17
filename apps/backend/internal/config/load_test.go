@@ -29,8 +29,8 @@ func TestLoad_UsesOrchestraEnv(t *testing.T) {
 	if cfg.APIToken != "token-1" {
 		t.Fatalf("expected ORCHESTRA api token, got=%q", cfg.APIToken)
 	}
-	if cfg.AgentProvider != "codex" {
-		t.Fatalf("expected default agent provider codex, got=%q", cfg.AgentProvider)
+	if cfg.AgentProvider != "CODEX" {
+		t.Fatalf("expected default agent provider CODEX, got=%q", cfg.AgentProvider)
 	}
 	if cfg.WorkflowFile != "WORKFLOW.md" {
 		t.Fatalf("expected default workflow file WORKFLOW.md, got=%q", cfg.WorkflowFile)
@@ -52,11 +52,11 @@ func TestLoad_AgentProviderAndCommandsFromEnv(t *testing.T) {
 		t.Fatalf("expected config load success, got err=%v", err)
 	}
 
-	if cfg.AgentProvider != "claude" {
-		t.Fatalf("expected agent provider claude, got=%q", cfg.AgentProvider)
+	if cfg.AgentProvider != "CLAUDE" {
+		t.Fatalf("expected agent provider CLAUDE, got=%q", cfg.AgentProvider)
 	}
-	if cfg.AgentCommands["claude"] != "claude -p {{prompt}} --output-format json" {
-		t.Fatalf("unexpected claude command: %q", cfg.AgentCommands["claude"])
+	if cfg.AgentCommands["CLAUDE"] != "claude -p {{prompt}} --output-format json" {
+		t.Fatalf("unexpected CLAUDE command: %q", cfg.AgentCommands["CLAUDE"])
 	}
 	if cfg.AgentMaxTurns != 7 {
 		t.Fatalf("expected env max turns 7, got=%d", cfg.AgentMaxTurns)
@@ -123,11 +123,11 @@ func TestLoad_UsesWorkflowOverridesWhenEnvUnset(t *testing.T) {
 	if cfg.APIToken != "workflow-token" {
 		t.Fatalf("expected workflow API token override, got=%q", cfg.APIToken)
 	}
-	if cfg.AgentProvider != "opencode" {
+	if cfg.AgentProvider != "OPENCODE" {
 		t.Fatalf("expected workflow agent provider override, got=%q", cfg.AgentProvider)
 	}
-	if cfg.AgentCommands["opencode"] != "opencode run {{prompt}} --json" {
-		t.Fatalf("unexpected workflow opencode command override: %q", cfg.AgentCommands["opencode"])
+	if cfg.AgentCommands["OPENCODE"] != "opencode run {{prompt}} --json" {
+		t.Fatalf("unexpected workflow OPENCODE command override: %q", cfg.AgentCommands["OPENCODE"])
 	}
 	if cfg.AgentMaxTurns != 4 {
 		t.Fatalf("expected workflow max turns 4, got=%d", cfg.AgentMaxTurns)

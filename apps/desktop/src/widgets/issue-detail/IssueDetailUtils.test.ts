@@ -6,7 +6,7 @@ import { extractOperationalPlanItems } from './IssueDetailUtils'
 
 function runEvent(issueId: string, issueIdentifier: string, kind: string, message: string): TimelineItem {
   return {
-    type: 'run_event',
+    type: 'RUN_EVENT',
     at: '2026-03-13T00:00:00Z',
     data: {
       issue_id: issueId,

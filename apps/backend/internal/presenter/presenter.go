@@ -62,12 +62,12 @@ func IssuePayload(snapshot orchestrator.Snapshot, issueIdentifier string) (map[s
 		return nil, false
 	}
 
-	status := "tracked"
+	status := "TRACKED"
 	if runtime["running"] != nil {
-		status = "running"
+		status = "RUNNING"
 	}
 	if runtime["retry"] != nil {
-		status = "retrying"
+		status = "RETRYING"
 	}
 
 	payload := map[string]any{

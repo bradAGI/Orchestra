@@ -49,6 +49,7 @@ type ProviderHook struct {
 
 func (s *Server) GetProviderPermissions(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
+	provider = strings.ToLower(provider)
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "home_dir", "cannot determine home directory")
@@ -111,6 +112,7 @@ func (s *Server) GetProviderPermissions(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) PostProviderPermissions(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
+	provider = strings.ToLower(provider)
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "home_dir", "cannot determine home directory")
@@ -153,6 +155,7 @@ func (s *Server) PostProviderPermissions(w http.ResponseWriter, r *http.Request)
 
 func (s *Server) GetProviderModel(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
+	provider = strings.ToLower(provider)
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "home_dir", "cannot determine home directory")
@@ -181,6 +184,7 @@ func (s *Server) GetProviderModel(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) PostProviderModel(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
+	provider = strings.ToLower(provider)
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "home_dir", "cannot determine home directory")
@@ -223,6 +227,7 @@ func (s *Server) PostProviderModel(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) GetProviderHooks(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
+	provider = strings.ToLower(provider)
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "home_dir", "cannot determine home directory")
@@ -255,6 +260,7 @@ func (s *Server) GetProviderHooks(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) PostProviderHooks(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
+	provider = strings.ToLower(provider)
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "home_dir", "cannot determine home directory")

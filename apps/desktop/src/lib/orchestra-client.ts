@@ -192,7 +192,7 @@ export function normalizeSnapshotPayload(value: unknown): SnapshotPayload {
       input_tokens: asNumber(totals.input_tokens, 0),
       output_tokens: asNumber(totals.output_tokens, 0),
       total_tokens: asNumber(totals.total_tokens, 0),
-      seconds_run: asNumber(totals.seconds_run, 0),
+      seconds_running: asNumber(totals.seconds_running, 0),
     },
     rate_limits: rateLimits,
     mcp_servers: isRecord(root.mcp_servers) ? (root.mcp_servers as Record<string, string>) : undefined,

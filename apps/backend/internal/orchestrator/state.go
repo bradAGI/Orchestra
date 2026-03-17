@@ -919,7 +919,7 @@ func (s *Service) releaseDueRetries() {
 		}
 		state := strings.TrimSpace(retry.State)
 		if state == "" {
-			state = "retrying"
+			state = "RETRYING"
 		}
 
 		s.running = append(s.running, RunningEntry{

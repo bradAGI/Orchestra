@@ -157,7 +157,7 @@ func TestEventsEndpointStreamsSnapshotFrame(t *testing.T) {
 func TestEventsEndpointSnapshotIncludesRateLimits(t *testing.T) {
 	service := orchestrator.NewService()
 	service.SetRunningForTest([]orchestrator.RunningEntry{{IssueID: "1", IssueIdentifier: "ORC-1"}})
-	service.RecordRunEvent("1", "codex", agents.Event{
+	service.RecordRunEvent("1", "CODEX", agents.Event{
 		Kind:      "thread/rate_limits",
 		Timestamp: time.Now().UTC(),
 		Raw: map[string]any{
@@ -196,12 +196,12 @@ func TestEventsEndpointStreamingSnapshotReflectsUpdatedRateLimits(t *testing.T) 
 
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		service.RecordRunEvent("1", "codex", agents.Event{
+		service.RecordRunEvent("1", "CODEX", agents.Event{
 			Kind:      "thread/rate_limits",
 			Timestamp: time.Now().UTC(),
 			Raw:       map[string]any{"meta": map[string]any{"data": []any{map[string]any{"rate_limits": map[string]any{"remaining": 5}}}}},
 		})
-		pubsub.Publish(observability.Event{Type: "run_event", Data: map[string]any{"issue_id": "1"}})
+		pubsub.Publish(observability.Event{Type: "RUN_EVENT", Data: map[string]any{"issue_id": "1"}})
 		time.Sleep(5200 * time.Millisecond)
 		cancel()
 	}()
@@ -244,7 +244,7 @@ func TestEventsEndpointStreamsPubSubEvent(t *testing.T) {
 
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		pubsub.Publish(observability.Event{Type: "run_event", Data: map[string]any{"issue_id": "ORC-1"}})
+		pubsub.Publish(observability.Event{Type: "RUN_EVENT", Data: map[string]any{"issue_id": "ORC-1"}})
 		time.Sleep(50 * time.Millisecond)
 		cancel()
 	}()
@@ -268,12 +268,12 @@ func TestEventsEndpointPublishesImmediateSnapshotAfterPubSubEvent(t *testing.T) 
 
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		service.RecordRunEvent("1", "codex", agents.Event{
+		service.RecordRunEvent("1", "CODEX", agents.Event{
 			Kind:      "thread/rate_limits",
 			Timestamp: time.Now().UTC(),
 			Raw:       map[string]any{"rate_limits": map[string]any{"remaining": 4}},
 		})
-		pubsub.Publish(observability.Event{Type: "run_event", Data: map[string]any{"issue_id": "1"}})
+		pubsub.Publish(observability.Event{Type: "RUN_EVENT", Data: map[string]any{"issue_id": "1"}})
 		time.Sleep(80 * time.Millisecond)
 		cancel()
 	}()
@@ -303,8 +303,8 @@ func TestEventsEndpointStreamsLifecycleEvents(t *testing.T) {
 
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		pubsub.Publish(observability.Event{Type: "run_started", Data: map[string]any{"issue_id": "1", "attempt": float64(1)}})
-		pubsub.Publish(observability.Event{Type: "retry_scheduled", Data: map[string]any{"issue_id": "1", "due_at": "2026-01-01T00:00:00Z"}})
+		pubsub.Publish(observability.Event{Type: "RUN_STARTED", Data: map[string]any{"issue_id": "1", "attempt": float64(1)}})
+		pubsub.Publish(observability.Event{Type: "RETRY_SCHEDULED", Data: map[string]any{"issue_id": "1", "due_at": "2026-01-01T00:00:00Z"}})
 		time.Sleep(50 * time.Millisecond)
 		cancel()
 	}()
@@ -332,7 +332,7 @@ func TestEventsEndpointDoesNotSynthesizeRetryScheduled(t *testing.T) {
 
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		pubsub.Publish(observability.Event{Type: "run_failed", Data: map[string]any{"issue_id": "1", "attempt": float64(2)}})
+		pubsub.Publish(observability.Event{Type: "RUN_FAILED", Data: map[string]any{"issue_id": "1", "attempt": float64(2)}})
 		time.Sleep(50 * time.Millisecond)
 		cancel()
 	}()
@@ -357,8 +357,8 @@ func TestEventsEndpointStreamsRefreshLifecyclePair(t *testing.T) {
 
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		pubsub.Publish(observability.Event{Type: "run_failed", Data: map[string]any{"issue_id": "1", "attempt": float64(2), "source": "refresh", "cause": "stalled_timeout", "error": "stalled run exceeded timeout"}})
-		pubsub.Publish(observability.Event{Type: "retry_scheduled", Data: map[string]any{"issue_id": "1", "attempt": float64(2), "due_at": "2026-01-01T00:00:00Z", "source": "refresh", "cause": "stalled_timeout"}})
+		pubsub.Publish(observability.Event{Type: "RUN_FAILED", Data: map[string]any{"issue_id": "1", "attempt": float64(2), "source": "refresh", "cause": "stalled_timeout", "error": "stalled run exceeded timeout"}})
+		pubsub.Publish(observability.Event{Type: "RETRY_SCHEDULED", Data: map[string]any{"issue_id": "1", "attempt": float64(2), "due_at": "2026-01-01T00:00:00Z", "source": "refresh", "cause": "stalled_timeout"}})
 		time.Sleep(50 * time.Millisecond)
 		cancel()
 	}()
@@ -381,7 +381,7 @@ func TestEventsEndpointStreamsRefreshLifecyclePair(t *testing.T) {
 
 func TestWriteEventEnvelopeWrapsRawPayloadWithTypeDataAndTimestamp(t *testing.T) {
 	res := httptest.NewRecorder()
-	writeEventEnvelope(res, "run_event", map[string]any{"issue_id": "1"})
+	writeEventEnvelope(res, "RUN_EVENT", map[string]any{"issue_id": "1"})
 	body := res.Body.String()
 
 	if !strings.Contains(body, "event: run_event") {
@@ -400,7 +400,7 @@ func TestWriteEventEnvelopeWrapsRawPayloadWithTypeDataAndTimestamp(t *testing.T)
 
 func TestWriteEventEnvelopePreservesProvidedEventTimestamp(t *testing.T) {
 	res := httptest.NewRecorder()
-	writeEventEnvelope(res, "run_event", observability.Event{Type: "run_event", Timestamp: "2026-01-01T00:00:00Z", Data: map[string]any{"issue_id": "1"}})
+	writeEventEnvelope(res, "RUN_EVENT", observability.Event{Type: "RUN_EVENT", Timestamp: "2026-01-01T00:00:00Z", Data: map[string]any{"issue_id": "1"}})
 	body := res.Body.String()
 
 	if !strings.Contains(body, "\"timestamp\":\"2026-01-01T00:00:00Z\"") {
@@ -418,9 +418,9 @@ func TestEventsEndpointNonSnapshotFramesUseStableEnvelopeShape(t *testing.T) {
 
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		pubsub.Publish(observability.Event{Type: "run_event", Data: map[string]any{"issue_id": "1"}})
-		pubsub.Publish(observability.Event{Type: "run_failed", Data: map[string]any{"issue_id": "1", "cause": "agent_run_failed"}})
-		pubsub.Publish(observability.Event{Type: "retry_scheduled", Data: map[string]any{"issue_id": "1", "due_at": "2026-01-01T00:00:00Z"}})
+		pubsub.Publish(observability.Event{Type: "RUN_EVENT", Data: map[string]any{"issue_id": "1"}})
+		pubsub.Publish(observability.Event{Type: "RUN_FAILED", Data: map[string]any{"issue_id": "1", "cause": "agent_run_failed"}})
+		pubsub.Publish(observability.Event{Type: "RETRY_SCHEDULED", Data: map[string]any{"issue_id": "1", "due_at": "2026-01-01T00:00:00Z"}})
 		time.Sleep(100 * time.Millisecond)
 		cancel()
 	}()
@@ -474,7 +474,7 @@ func TestEventsEndpointSnapshotFrameCarriesExpectedShape(t *testing.T) {
 		DueAt:           "2026-01-01T00:00:00Z",
 		Error:           "transient",
 	}})
-	service.RecordRunEvent("1", "codex", agents.Event{
+	service.RecordRunEvent("1", "CODEX", agents.Event{
 		Kind:      "thread/rate_limits",
 		Timestamp: time.Now().UTC(),
 		Raw:       map[string]any{"rate_limits": map[string]any{"remaining": 6}},
@@ -536,8 +536,8 @@ func TestEventsEndpointLifecycleEnvelopeCarriesExpectedDataFields(t *testing.T) 
 
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		pubsub.Publish(observability.Event{Type: "run_failed", Data: map[string]any{"issue_id": "1", "attempt": float64(2), "cause": "agent_run_failed", "error": "boom"}})
-		pubsub.Publish(observability.Event{Type: "retry_scheduled", Data: map[string]any{"issue_id": "1", "attempt": float64(2), "cause": "agent_run_failed", "due_at": "2026-01-01T00:00:00Z"}})
+		pubsub.Publish(observability.Event{Type: "RUN_FAILED", Data: map[string]any{"issue_id": "1", "attempt": float64(2), "cause": "agent_run_failed", "error": "boom"}})
+		pubsub.Publish(observability.Event{Type: "RETRY_SCHEDULED", Data: map[string]any{"issue_id": "1", "attempt": float64(2), "cause": "agent_run_failed", "due_at": "2026-01-01T00:00:00Z"}})
 		time.Sleep(100 * time.Millisecond)
 		cancel()
 	}()
@@ -551,7 +551,7 @@ func TestEventsEndpointLifecycleEnvelopeCarriesExpectedDataFields(t *testing.T) 
 	seenRunFailed := false
 	seenRetryScheduled := false
 	for _, frame := range frames {
-		if frame.Event != "run_failed" && frame.Event != "retry_scheduled" {
+		if frame.Event != "RUN_FAILED" && frame.Event != "RETRY_SCHEDULED" {
 			continue
 		}
 		envelope := map[string]any{}
@@ -571,13 +571,13 @@ func TestEventsEndpointLifecycleEnvelopeCarriesExpectedDataFields(t *testing.T) 
 		if data["cause"] != "agent_run_failed" {
 			t.Fatalf("expected cause in %s data, got %+v", frame.Event, data)
 		}
-		if frame.Event == "run_failed" {
+		if frame.Event == "RUN_FAILED" {
 			if _, ok := data["error"].(string); !ok {
 				t.Fatalf("expected error field in run_failed data, got %+v", data)
 			}
 			seenRunFailed = true
 		}
-		if frame.Event == "retry_scheduled" {
+		if frame.Event == "RETRY_SCHEDULED" {
 			if data["due_at"] != "2026-01-01T00:00:00Z" {
 				t.Fatalf("expected due_at in retry_scheduled data, got %+v", data)
 			}
