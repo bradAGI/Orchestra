@@ -1,29 +1,29 @@
 # 8. Enum Reference
 
 > **Source files:**
-> - `apps/backend/internal/types/enums.go` — IssueStatus, AgentCategory, SSEEventType
-> - `apps/backend/internal/agents/types.go` — Provider
-> - `apps/backend/internal/agents/config.go` — ConfigScope
-> - `apps/desktop/src/lib/enums.ts` — All enums (TypeScript mirrors)
-> - `packages/protocol/schemas/v1/` — JSON schema enum constraints
+> - `apps/backend/internal/types/enums.go` -- IssueStatus, AgentCategory, SSEEventType (Go)
+> - `apps/backend/internal/agents/types.go` -- Provider (Go)
+> - `apps/backend/internal/tracker/types.go` -- Issue.State, Blocker.State (Go)
+> - `apps/desktop/src/lib/enums.ts` -- All enums (TypeScript mirrors)
+> - `packages/protocol/schemas/v1/` -- JSON schema enum constraints
 
 Orchestra uses a consistent set of enums across the backend (Go), frontend (TypeScript), and protocol schemas (JSON Schema). All enum values are UPPERCASE strings. The backend provides normalization functions (`NormalizeProvider`, `NormalizeSSEEventType`) that accept case-insensitive input for backward compatibility.
 
 ---
 
-### Provider
+## Provider
 
-Identifies which ML agent backend processes an issue.
+Identifies which ML agent backend processes an issue. Defined in all three layers.
 
-| Value | Description |
-|-------|-------------|
-| `CODEX` | OpenAI Codex agent (CLI-based) |
-| `CLAUDE` | Anthropic Claude Code agent |
-| `OPENCODE` | OpenCode agent |
-| `GEMINI` | Google Gemini agent |
-| `UNSANDBOX` | Remote execution via the unsandbox platform |
+| Value | Description | Layer |
+|---|---|---|
+| `CODEX` | OpenAI Codex agent (CLI-based) | Backend, Frontend, Schema |
+| `CLAUDE` | Anthropic Claude Code agent | Backend, Frontend, Schema |
+| `OPENCODE` | OpenCode agent | Backend, Frontend, Schema |
+| `GEMINI` | Google Gemini agent | Backend, Frontend, Schema |
+| `UNSANDBOX` | Remote execution via the unsandbox platform | Frontend, Schema only |
 
-**Backend definition:** `apps/backend/internal/agents/types.go`
+**Backend definition** (`apps/backend/internal/agents/types.go`):
 
 ```go
 type Provider string
@@ -36,7 +36,7 @@ const (
 )
 ```
 
-**Frontend definition:** `apps/desktop/src/lib/enums.ts`
+**Frontend definition** (`apps/desktop/src/lib/enums.ts`):
 
 ```typescript
 export const Provider = {
@@ -46,26 +46,29 @@ export const Provider = {
   GEMINI: 'GEMINI',
   UNSANDBOX: 'UNSANDBOX',
 } as const
+export type Provider = (typeof Provider)[keyof typeof Provider]
 ```
 
-**JSON Schema usage:** The `provider` field in `issue.create.request.schema.json`, `issue.response.schema.json`, and `state.response.schema.json` constrains values to `["CODEX", "CLAUDE", "OPENCODE", "GEMINI", "UNSANDBOX"]`.
+**JSON Schema usage:** The `provider` field in `issue.create.request.schema.json`, `issue.update.request.schema.json`, `issue.response.schema.json`, `issues.list.response.schema.json`, and `state.response.schema.json` constrains values to `["CODEX", "CLAUDE", "OPENCODE", "GEMINI", "UNSANDBOX"]`.
 
-Note: `UNSANDBOX` is defined in the frontend and JSON schemas but not in the backend Go constants, as unsandbox execution is handled through a separate code path rather than the standard `Runner` interface.
+**Note:** `UNSANDBOX` is defined in the frontend and JSON schemas but not in the backend Go constants, as unsandbox execution is handled through a separate code path rather than the standard `Runner` interface.
+
+**Normalization:** `NormalizeProvider(s string)` converts any input to UPPERCASE for backward compatibility.
 
 ---
 
-### IssueStatus
+## IssueStatus
 
-Computed runtime status of an issue, derived from orchestrator state rather than stored directly.
+Computed runtime status of an issue, derived from orchestrator state rather than stored directly in the tracker. This is distinct from the tracker `state` field (e.g. `open`, `backlog`, `done`) which represents the issue's workflow state.
 
-| Value | Description |
-|-------|-------------|
-| `RUNNING` | An agent is actively processing this issue |
-| `RETRYING` | The issue failed and is queued for retry with backoff |
-| `TRACKED` | The issue is tracked in the system but not currently running |
-| `IDLE` | The issue exists but has no active or pending work |
+| Value | Description | Layer |
+|---|---|---|
+| `RUNNING` | An agent is actively processing this issue | Backend, Frontend, Schema |
+| `RETRYING` | The issue failed and is queued for retry with exponential backoff | Backend, Frontend, Schema |
+| `TRACKED` | The issue is known to the tracker but not currently running | Backend, Frontend, Schema |
+| `IDLE` | The issue exists but has no active or pending work | Backend, Frontend, Schema |
 
-**Backend definition:** `apps/backend/internal/types/enums.go`
+**Backend definition** (`apps/backend/internal/types/enums.go`):
 
 ```go
 type IssueStatus string
@@ -78,7 +81,21 @@ const (
 )
 ```
 
+**Frontend definition** (`apps/desktop/src/lib/enums.ts`):
+
+```typescript
+export const IssueStatus = {
+  RUNNING: 'RUNNING',
+  RETRYING: 'RETRYING',
+  TRACKED: 'TRACKED',
+  IDLE: 'IDLE',
+} as const
+export type IssueStatus = (typeof IssueStatus)[keyof typeof IssueStatus]
+```
+
 **JSON Schema usage:** The `status` field in `issue.response.schema.json` constrains values to `["RUNNING", "RETRYING", "TRACKED", "IDLE"]`.
+
+**State transitions:**
 
 ```mermaid
 stateDiagram-v2
@@ -94,16 +111,16 @@ stateDiagram-v2
 
 ---
 
-### AgentCategory
+## AgentCategory
 
 Classifies agent configuration files into core settings versus skill/tool definitions.
 
-| Value | Description |
-|-------|-------------|
-| `CORE` | Primary agent configuration (settings, model config, permissions) |
-| `SKILL` | Skill, sub-agent, or tool definitions (markdown prompts, tool specs) |
+| Value | Description | Layer |
+|---|---|---|
+| `CORE` | Primary agent configuration (settings, model config, permissions) | Backend, Frontend, Schema |
+| `SKILL` | Skill, sub-agent, or tool definitions (markdown prompts, tool specs) | Backend, Frontend, Schema |
 
-**Backend definition:** `apps/backend/internal/types/enums.go`
+**Backend definition** (`apps/backend/internal/types/enums.go`):
 
 ```go
 type AgentCategory string
@@ -114,60 +131,71 @@ const (
 )
 ```
 
+**Frontend definition** (`apps/desktop/src/lib/enums.ts`):
+
+```typescript
+export const AgentCategory = {
+  CORE: 'CORE',
+  SKILL: 'SKILL',
+} as const
+export type AgentCategory = (typeof AgentCategory)[keyof typeof AgentCategory]
+```
+
+**JSON Schema usage:** The `category` field in `agents.list.response.schema.json` and `agent.config.response.schema.json` constrains values to `["CORE", "SKILL"]`.
+
 **Config discovery paths by category:**
 
 | Provider | CORE paths | SKILL paths |
-|----------|-----------|-------------|
+|---|---|---|
 | `claude` | `~/.claude/settings.json`, `~/.claude.json`, `{project}/.claude/settings.json` | `~/.claude/agents/`, `{project}/.claude/agents/` |
 | `codex` | `~/.codex/config.toml`, `{project}/.codex/config.toml`, `{project}/AGENTS.md` | `~/.codex/skills/`, `{project}/.codex/skills/` |
 | `gemini` | `~/.gemini/settings.json`, `{project}/.gemini/settings.json` | `~/.gemini/agents/`, `~/.gemini/skills/`, `{project}/.gemini/agents/` |
 | `opencode` | `~/.config/opencode/opencode.json`, `{project}/opencode.json` | `~/.config/opencode/agents/`, `~/.config/opencode/skills/`, `~/.config/opencode/tools/` |
 
-**Source:** `apps/backend/internal/agents/config.go` (`AgentMeta` map)
-
 ---
 
-### ConfigScope
+## ConfigScope
 
 Indicates whether a configuration file applies globally or to a specific project.
 
-| Value | Description |
-|-------|-------------|
-| `GLOBAL` | Applies to all projects (stored in `$HOME` or workspace root) |
-| `PROJECT` | Applies only to a specific project (stored in the project directory) |
+| Value | Description | Layer |
+|---|---|---|
+| `GLOBAL` | Applies to all projects (stored in `$HOME` or workspace root) | Backend, Frontend, Schema |
+| `PROJECT` | Applies only to a specific project (stored in the project directory) | Backend, Frontend, Schema |
 
-**Backend definition:** `apps/backend/internal/agents/config.go`
+**Frontend definition** (`apps/desktop/src/lib/enums.ts`):
 
-```go
-type ConfigScope string
-
-const (
-    ScopeGlobal  ConfigScope = "GLOBAL"
-    ScopeProject ConfigScope = "PROJECT"
-)
+```typescript
+export const ConfigScope = {
+  GLOBAL: 'GLOBAL',
+  PROJECT: 'PROJECT',
+} as const
+export type ConfigScope = (typeof ConfigScope)[keyof typeof ConfigScope]
 ```
 
-Global configs are resolved from `$HOME/{provider_paths}` or from the Orchestra workspace at `.orchestra/agents/`. Project configs are resolved from `{project_root}/{provider_paths}`. The `workspace.json` file can override global config paths via the `pointers` map.
+**JSON Schema usage:** The `scope` field in `agents.list.response.schema.json` and `agent.config.response.schema.json` constrains values to `["GLOBAL", "PROJECT"]`.
+
+Global configs are resolved from `$HOME/{provider_paths}` or from the Orchestra workspace at `.orchestra/agents/`. Project configs are resolved from `{project_root}/{provider_paths}`.
 
 ---
 
-### SSEEventType
+## SSEEventType
 
-Event types emitted over the Server-Sent Events stream. See [3.1 Server-Sent Events](api/sse-events.md) for protocol details.
+Event types emitted over the Server-Sent Events stream. See [Section 3.2: SSE Events](api/sse-events.md) for protocol details.
 
-| Value | Category | Description |
-|-------|----------|-------------|
-| `RUN_EVENT` | Run | Generic event during an agent run (log output, tool calls) |
-| `RUN_STARTED` | Run | Agent run has begun |
-| `RUN_FAILED` | Run | Agent run has failed |
-| `RUN_CONTINUES` | Run | Agent run continues after a turn boundary |
-| `RUN_SUCCEEDED` | Run | Agent run completed successfully |
-| `RETRY_SCHEDULED` | Retry | Failed run scheduled for retry (includes attempt count) |
-| `HOOK_STARTED` | Hook | Lifecycle hook execution began |
-| `HOOK_COMPLETED` | Hook | Lifecycle hook completed successfully |
-| `HOOK_FAILED` | Hook | Lifecycle hook failed |
+| Value | Category | Description | Layer |
+|---|---|---|---|
+| `RUN_EVENT` | Run | Generic event during an agent run (log output, tool calls) | Backend, Frontend |
+| `RUN_STARTED` | Run | Agent run has begun for an issue | Backend, Frontend |
+| `RUN_FAILED` | Run | Agent run ended with a failure | Backend, Frontend |
+| `RUN_CONTINUES` | Run | Agent run continues after a turn boundary | Backend, Frontend |
+| `RUN_SUCCEEDED` | Run | Agent run completed successfully | Backend, Frontend |
+| `RETRY_SCHEDULED` | Retry | Failed run has been queued for retry (includes attempt count) | Backend, Frontend |
+| `HOOK_STARTED` | Hook | Lifecycle hook execution began | Backend, Frontend |
+| `HOOK_COMPLETED` | Hook | Lifecycle hook completed successfully | Backend, Frontend |
+| `HOOK_FAILED` | Hook | Lifecycle hook ended with a failure | Backend, Frontend |
 
-**Backend definition:** `apps/backend/internal/types/enums.go`
+**Backend definition** (`apps/backend/internal/types/enums.go`):
 
 ```go
 type SSEEventType string
@@ -185,14 +213,33 @@ const (
 )
 ```
 
+**Frontend definition** (`apps/desktop/src/lib/enums.ts`):
+
+```typescript
+export const SSEEventType = {
+  RUN_EVENT: 'RUN_EVENT',
+  RUN_STARTED: 'RUN_STARTED',
+  RUN_FAILED: 'RUN_FAILED',
+  RUN_CONTINUES: 'RUN_CONTINUES',
+  RUN_SUCCEEDED: 'RUN_SUCCEEDED',
+  RETRY_SCHEDULED: 'RETRY_SCHEDULED',
+  HOOK_STARTED: 'HOOK_STARTED',
+  HOOK_COMPLETED: 'HOOK_COMPLETED',
+  HOOK_FAILED: 'HOOK_FAILED',
+} as const
+export type SSEEventType = (typeof SSEEventType)[keyof typeof SSEEventType]
+```
+
+**Normalization:** `NormalizeSSEEventType(s string)` converts any input to UPPERCASE for backward compatibility.
+
 In addition to these typed events, the SSE stream emits two system-level events that are not part of this enum:
 
 | System Event | Description |
-|--------------|-------------|
+|---|---|
 | `snapshot` | Full system state (sent as heartbeat every 5s and after each lifecycle event) |
 | `error` | Error during event encoding or processing |
 
-**Normalization:** `NormalizeSSEEventType(s string)` converts any input to UPPERCASE for backward compatibility with clients that may send lowercase event type strings.
+**Event lifecycle flow:**
 
 ```mermaid
 graph LR
@@ -215,24 +262,24 @@ graph LR
 
 ---
 
-### SectionID
+## SectionID
 
-Frontend navigation section identifiers. Used by the desktop app to track which section/view is active.
+Frontend navigation section identifiers. Used by the desktop app to track which section/view is active. This enum is frontend-only and does not have a backend Go counterpart or JSON schema constraint.
 
-| Value | Description |
-|-------|-------------|
-| `DASHBOARD` | Main dashboard overview |
-| `RUNNING` | Currently running agent sessions |
-| `ISSUES` | Issue list and management |
-| `PROJECTS` | Project list and management |
-| `AGENTS` | Agent configuration and status |
-| `WAREHOUSE` | Data warehouse and analytics |
-| `SANDBOX` | Unsandbox remote execution |
-| `SETTINGS` | Application settings |
-| `DOCS` | Documentation viewer |
-| `CONSOLE` | Terminal/console interface |
+| Value | Description | Layer |
+|---|---|---|
+| `DASHBOARD` | Main dashboard overview | Frontend only |
+| `RUNNING` | Currently running agent sessions | Frontend only |
+| `ISSUES` | Issue list and management | Frontend only |
+| `PROJECTS` | Project list and management | Frontend only |
+| `AGENTS` | Agent configuration and status | Frontend only |
+| `WAREHOUSE` | Data warehouse and analytics | Frontend only |
+| `SANDBOX` | Unsandbox remote execution | Frontend only |
+| `SETTINGS` | Application settings | Frontend only |
+| `DOCS` | Documentation viewer | Frontend only |
+| `CONSOLE` | Terminal/console interface | Frontend only |
 
-**Frontend definition:** `apps/desktop/src/lib/enums.ts`
+**Frontend definition** (`apps/desktop/src/lib/enums.ts`):
 
 ```typescript
 export const SectionID = {
@@ -247,21 +294,28 @@ export const SectionID = {
   DOCS: 'DOCS',
   CONSOLE: 'CONSOLE',
 } as const
+export type SectionID = (typeof SectionID)[keyof typeof SectionID]
 ```
-
-This enum is frontend-only and does not have a backend Go counterpart.
 
 ---
 
-### Enum Cross-Reference
+## Enum cross-reference
 
-Summary of where each enum is defined and used:
+Summary of where each enum is defined and used across the stack:
 
 | Enum | Backend (Go) | Frontend (TS) | JSON Schema |
-|------|-------------|---------------|-------------|
-| `Provider` | `agents/types.go` | `enums.ts` | `issue.*.schema.json`, `state.response.schema.json` |
-| `IssueStatus` | `types/enums.go` | `enums.ts` | `issue.response.schema.json` |
-| `AgentCategory` | `types/enums.go` | `enums.ts` | -- |
-| `ConfigScope` | `agents/config.go` | `enums.ts` | -- |
-| `SSEEventType` | `types/enums.go` | `enums.ts` | -- |
+|---|---|---|---|
+| `Provider` | `internal/agents/types.go` | `enums.ts` | `issue.*.schema.json`, `state.response.schema.json` |
+| `IssueStatus` | `internal/types/enums.go` | `enums.ts` | `issue.response.schema.json` |
+| `AgentCategory` | `internal/types/enums.go` | `enums.ts` | `agents.list.response.schema.json`, `agent.config.response.schema.json` |
+| `ConfigScope` | `internal/agents/config.go` | `enums.ts` | `agents.list.response.schema.json`, `agent.config.response.schema.json` |
+| `SSEEventType` | `internal/types/enums.go` | `enums.ts` | -- |
 | `SectionID` | -- | `enums.ts` | -- |
+
+---
+
+## Cross-references
+
+- **JSON schema definitions** that use these enums are documented in [Section 3.2: JSON Schemas & Types](api/schemas.md).
+- **SSE event stream protocol** is documented in [SSE Events](api/sse-events.md).
+- **API endpoint routes** are documented in [Section 3.1: API Reference](api/reference.md).
