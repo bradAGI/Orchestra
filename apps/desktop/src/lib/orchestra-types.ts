@@ -31,6 +31,13 @@ export type RunningEntry = {
   last_event_at?: string
   started_at?: string
   provider?: string
+  title?: string
+  description?: string
+  assignee_id?: string
+  project_id?: string
+  session_log_path?: string
+  disabled_tools?: string[]
+  tokens?: { input_tokens: number; output_tokens: number; total_tokens: number }
 }
 
 export type RetryEntry = {
@@ -47,7 +54,7 @@ export type CodexTotals = {
   input_tokens: number
   output_tokens: number
   total_tokens: number
-  seconds_run: number
+  seconds_running: number
 }
 
 export type SnapshotPayload = {
@@ -84,11 +91,11 @@ export type IssueDetailPayload = {
   workspace: {
     path: string
   }
-  running: Record<string, unknown> | null
-  retry: Record<string, unknown> | null
-  logs: Record<string, unknown>
+  running: RunningEntry | null
+  retry: RetryEntry | null
+  logs: { codex_session_logs: Array<{ label: string; path: string; url?: string }> }
   recent_events: Array<Record<string, unknown>>
-  last_error: Record<string, unknown> | null
+  last_error: string | null
   tracked: Record<string, unknown>
 }
 
@@ -138,8 +145,8 @@ export type AgentConfig = {
   name: string
   content: string
   path: string
-  category: 'core' | 'skill'
-  scope: 'global' | 'project'
+  category: 'CORE' | 'SKILL'
+  scope: 'GLOBAL' | 'PROJECT'
 }
 
 export type DocItem = {

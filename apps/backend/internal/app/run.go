@@ -296,21 +296,21 @@ func processExecutionTick(
 
 	if workspacePath == "" {
 		// Fallback to the generated workspace if no project path available
-		publishLifecycleEvent(pubsub, "hook_started", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create"})
+		publishLifecycleEvent(pubsub, "HOOK_STARTED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create"})
 		var ensureErr error
 		workspacePath, created, createRes, ensureErr = workspaceService.EnsureIssueWorkspace(entry.IssueIdentifier, activeProviderName, workspaceHooks)
 		if ensureErr != nil {
 			err = ensureErr
 		}
 	} else {
-		publishLifecycleEvent(pubsub, "hook_started", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create"})
-		publishLifecycleEvent(pubsub, "hook_completed", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create", "reused": true})
+		publishLifecycleEvent(pubsub, "HOOK_STARTED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create"})
+		publishLifecycleEvent(pubsub, "HOOK_COMPLETED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create", "reused": true})
 	}
 	if err != nil {
-		publishLifecycleEvent(pubsub, "hook_failed", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create", "error": err.Error(), "output": createRes.Output})
+		publishLifecycleEvent(pubsub, "HOOK_FAILED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create", "error": err.Error(), "output": createRes.Output})
 		attempt := entry.TurnCount + 1
 		dueAt := service.NextRetryDue(entry.IssueID, attempt)
-		publishLifecycleEvent(pubsub, "run_failed", map[string]any{
+		publishLifecycleEvent(pubsub, "RUN_FAILED", map[string]any{
 			"issue_id":         entry.IssueID,
 			"issue_identifier": entry.IssueIdentifier,
 			"provider":         activeProviderName,
@@ -319,7 +319,7 @@ func processExecutionTick(
 			"cause":            "workspace_prepare_failed",
 		})
 		if service.ShouldRetryAttempt(attempt) {
-			publishLifecycleEvent(pubsub, "retry_scheduled", map[string]any{
+			publishLifecycleEvent(pubsub, "RETRY_SCHEDULED", map[string]any{
 				"issue_id":         entry.IssueID,
 				"issue_identifier": entry.IssueIdentifier,
 				"provider":         activeProviderName,
@@ -334,17 +334,17 @@ func processExecutionTick(
 		return
 	}
 	if created {
-		publishLifecycleEvent(pubsub, "hook_completed", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create", "output": createRes.Output})
+		publishLifecycleEvent(pubsub, "HOOK_COMPLETED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create", "output": createRes.Output})
 	} else {
 		// Even if not created, we mark it as completed since we "ensured" it exists
-		publishLifecycleEvent(pubsub, "hook_completed", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create", "reused": true})
+		publishLifecycleEvent(pubsub, "HOOK_COMPLETED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create", "reused": true})
 	}
 	runAfterHook := func() {
-		publishLifecycleEvent(pubsub, "hook_started", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_run"})
+		publishLifecycleEvent(pubsub, "HOOK_STARTED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_run"})
 		if res, err := workspaceService.RunAfterRunHook(workspacePath, workspaceHooks); err != nil {
-			publishLifecycleEvent(pubsub, "hook_failed", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_run", "error": err.Error(), "output": res.Output})
+			publishLifecycleEvent(pubsub, "HOOK_FAILED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_run", "error": err.Error(), "output": res.Output})
 		} else {
-			publishLifecycleEvent(pubsub, "hook_completed", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_run", "output": res.Output})
+			publishLifecycleEvent(pubsub, "HOOK_COMPLETED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_run", "output": res.Output})
 		}
 	}
 
@@ -391,13 +391,13 @@ func processExecutionTick(
 			}
 		}
 
-		publishLifecycleEvent(pubsub, "hook_started", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "before_run"})
+		publishLifecycleEvent(pubsub, "HOOK_STARTED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "before_run"})
 		if res, err := workspaceService.RunBeforeRunHook(workspacePath, workspaceHooks); err != nil {
-			publishLifecycleEvent(pubsub, "hook_failed", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "before_run", "error": err.Error(), "output": res.Output})
+			publishLifecycleEvent(pubsub, "HOOK_FAILED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "before_run", "error": err.Error(), "output": res.Output})
 			runAfterHook()
 			attempt := entry.TurnCount + 1
 			dueAt := service.NextRetryDue(entry.IssueID, attempt)
-			publishLifecycleEvent(pubsub, "run_failed", map[string]any{
+			publishLifecycleEvent(pubsub, "RUN_FAILED", map[string]any{
 				"issue_id":         entry.IssueID,
 				"issue_identifier": entry.IssueIdentifier,
 				"provider":         activeProviderName,
@@ -406,7 +406,7 @@ func processExecutionTick(
 				"cause":            "before_run_hook_failed",
 			})
 			if service.ShouldRetryAttempt(attempt) {
-				publishLifecycleEvent(pubsub, "retry_scheduled", map[string]any{
+				publishLifecycleEvent(pubsub, "RETRY_SCHEDULED", map[string]any{
 					"issue_id":         entry.IssueID,
 					"issue_identifier": entry.IssueIdentifier,
 					"provider":         activeProviderName,
@@ -420,11 +420,11 @@ func processExecutionTick(
 			publishSnapshot(pubsub, service)
 			return
 		}
-		publishLifecycleEvent(pubsub, "hook_completed", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "before_run"})
+		publishLifecycleEvent(pubsub, "HOOK_COMPLETED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "before_run"})
 	}
 
 	attempt := entry.TurnCount + 1
-	publishLifecycleEvent(pubsub, "run_started", map[string]any{
+	publishLifecycleEvent(pubsub, "RUN_STARTED", map[string]any{
 		"issue_id":         entry.IssueID,
 		"issue_identifier": entry.IssueIdentifier,
 		"provider":         activeProviderName,
@@ -585,7 +585,7 @@ func processExecutionTick(
 	if runErr != nil {
 		runAfterHook()
 		dueAt := service.NextRetryDue(entry.IssueID, attempt)
-		publishLifecycleEvent(pubsub, "run_failed", map[string]any{
+		publishLifecycleEvent(pubsub, "RUN_FAILED", map[string]any{
 			"issue_id":         entry.IssueID,
 			"issue_identifier": entry.IssueIdentifier,
 			"provider":         activeProviderName,
@@ -594,7 +594,7 @@ func processExecutionTick(
 			"cause":            "agent_run_failed",
 		})
 		if service.ShouldRetryAttempt(attempt) {
-			publishLifecycleEvent(pubsub, "retry_scheduled", map[string]any{
+			publishLifecycleEvent(pubsub, "RETRY_SCHEDULED", map[string]any{
 				"issue_id":         entry.IssueID,
 				"issue_identifier": entry.IssueIdentifier,
 				"provider":         activeProviderName,
@@ -615,7 +615,7 @@ func processExecutionTick(
 	if checkErr != nil {
 		runAfterHook()
 		dueAt := service.NextRetryDue(entry.IssueID, attempt)
-		publishLifecycleEvent(pubsub, "run_failed", map[string]any{
+		publishLifecycleEvent(pubsub, "RUN_FAILED", map[string]any{
 			"issue_id":         entry.IssueID,
 			"issue_identifier": entry.IssueIdentifier,
 			"provider":         providerName,
@@ -624,7 +624,7 @@ func processExecutionTick(
 			"cause":            "continuation_check_failed",
 		})
 		if service.ShouldRetryAttempt(attempt) {
-			publishLifecycleEvent(pubsub, "retry_scheduled", map[string]any{
+			publishLifecycleEvent(pubsub, "RETRY_SCHEDULED", map[string]any{
 				"issue_id":         entry.IssueID,
 				"issue_identifier": entry.IssueIdentifier,
 				"provider":         providerName,
@@ -641,7 +641,7 @@ func processExecutionTick(
 
 	if continueTurn {
 		service.PrepareNextTurn(entry.IssueID, activeProviderName, attempt)
-		publishLifecycleEvent(pubsub, "run_continues", map[string]any{
+		publishLifecycleEvent(pubsub, "RUN_CONTINUES", map[string]any{
 			"issue_id":         entry.IssueID,
 			"issue_identifier": entry.IssueIdentifier,
 			"provider":         providerName,
@@ -695,7 +695,7 @@ func processExecutionTick(
 		logger.Warn().Err(err).Str("issue_id", entry.IssueID).Msg("failed to set issue to Review after success")
 	}
 
-	publishLifecycleEvent(pubsub, "run_succeeded", map[string]any{
+	publishLifecycleEvent(pubsub, "RUN_SUCCEEDED", map[string]any{
 		"issue_id":         entry.IssueID,
 		"issue_identifier": entry.IssueIdentifier,
 		"provider":         providerName,
@@ -985,7 +985,7 @@ func publishRunEvent(pubsub *observability.PubSub, entry orchestrator.RunningEnt
 		return
 	}
 
-	pubsub.Publish(observability.Event{Type: "run_event", Data: map[string]any{
+	pubsub.Publish(observability.Event{Type: "RUN_EVENT", Data: map[string]any{
 		"issue_id":         entry.IssueID,
 		"issue_identifier": entry.IssueIdentifier,
 		"provider":         providerName,
@@ -1008,7 +1008,7 @@ func publishRefreshRetryLifecycleEvents(pubsub *observability.PubSub, before orc
 		if _, ok := existing[key]; ok {
 			continue
 		}
-		publishLifecycleEvent(pubsub, "run_failed", map[string]any{
+		publishLifecycleEvent(pubsub, "RUN_FAILED", map[string]any{
 			"issue_id":         retry.IssueID,
 			"issue_identifier": retry.IssueIdentifier,
 			"attempt":          retry.Attempt,
@@ -1016,7 +1016,7 @@ func publishRefreshRetryLifecycleEvents(pubsub *observability.PubSub, before orc
 			"source":           "refresh",
 			"cause":            classifyRefreshRetryCause(retry.Error),
 		})
-		publishLifecycleEvent(pubsub, "retry_scheduled", map[string]any{
+		publishLifecycleEvent(pubsub, "RETRY_SCHEDULED", map[string]any{
 			"issue_id":         retry.IssueID,
 			"issue_identifier": retry.IssueIdentifier,
 			"attempt":          retry.Attempt,
@@ -1133,7 +1133,7 @@ func logEventToUnfirehose(ufLogger *unfirehose.Logger, sessionID, provider strin
 	}
 
 	// System/progress events
-	if kind == "system" || strings.HasPrefix(kind, "run_") || kind == "hook_started" || kind == "hook_completed" {
+	if kind == "system" || strings.HasPrefix(kind, "RUN_") || kind == "HOOK_STARTED" || kind == "HOOK_COMPLETED" {
 		if event.Message != "" {
 			_ = ufLogger.LogSystem(sessionID, kind, map[string]any{"durationMs": event.Usage.TotalTokens})
 		}

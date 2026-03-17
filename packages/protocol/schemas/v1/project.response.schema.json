@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["id", "name", "root_path"],
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "root_path": { "type": "string" },
+    "remote_url": { "type": "string" },
+    "github_owner": { "type": "string" },
+    "github_repo": { "type": "string" },
+    "github_token": { "type": "string" },
+    "path_exists": { "type": "boolean" },
+    "total_sessions": { "type": "number" },
+    "total_input": { "type": "number" },
+    "total_output": { "type": "number" },
+    "last_active": { "type": "string" }
+  }
+}

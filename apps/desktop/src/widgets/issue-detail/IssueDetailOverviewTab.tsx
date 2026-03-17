@@ -247,7 +247,7 @@ export function OverviewTab({
                 variant="outline"
                 size="sm"
                 className="h-7 px-2 gap-1.5 border-amber-500/30 text-amber-500 hover:bg-amber-500/10 text-[10px] font-black uppercase tracking-widest"
-                onClick={() => onNavigate('settings')}
+                onClick={() => onNavigate('SETTINGS')}
               >
                 <Settings2 size={10} />
                 Update Credentials

@@ -26,15 +26,15 @@ type RuntimeSyncDeps = {
 }
 
 const lifecycleEventTypes = [
-  'run_event',
-  'run_started',
-  'run_failed',
-  'run_continues',
-  'run_succeeded',
-  'retry_scheduled',
-  'hook_started',
-  'hook_completed',
-  'hook_failed',
+  'RUN_EVENT',
+  'RUN_STARTED',
+  'RUN_FAILED',
+  'RUN_CONTINUES',
+  'RUN_SUCCEEDED',
+  'RETRY_SCHEDULED',
+  'HOOK_STARTED',
+  'HOOK_COMPLETED',
+  'HOOK_FAILED',
 ]
 
 function reconnectDelayMs(attempt: number): number {
@@ -126,7 +126,7 @@ export function startRuntimeSync(config: BackendConfig, handlers: RuntimeSyncHan
         const parsed = deps.normalizeEnvelope(JSON.parse(dataText), eventType)
 
         // Spec 5.3: Deduplicate retry events by (issue_id, attempt, error) identity.
-        if (eventType === 'retry_scheduled') {
+        if (eventType === 'RETRY_SCHEDULED') {
           const issueId = (parsed.data.issue_id as string) || ''
           const attempt = (parsed.data.attempt as number) || 0
           const error = (parsed.data.error as string) || ''

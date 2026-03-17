@@ -26,15 +26,23 @@
         "properties": {
           "issue_id": { "type": "string" },
           "issue_identifier": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
           "state": { "type": "string" },
+          "assignee_id": { "type": "string" },
+          "project_id": { "type": "string" },
           "session_id": { "type": "string" },
           "session_log_path": { "type": "string" },
+          "disabled_tools": { "type": "array", "items": { "type": "string" } },
           "turn_count": { "type": "number" },
           "last_event": { "type": "string" },
           "last_message": { "type": "string" },
           "last_event_at": { "type": "string" },
           "started_at": { "type": "string" },
-          "provider": { "type": "string" },
+          "provider": {
+            "type": "string",
+            "enum": ["CODEX", "CLAUDE", "OPENCODE", "GEMINI", "UNSANDBOX"]
+          },
           "tokens": {
             "type": "object",
             "properties": {
@@ -55,6 +63,12 @@
           "issue_id": { "type": "string" },
           "issue_identifier": { "type": "string" },
           "state": { "type": "string" },
+          "assignee_id": { "type": "string" },
+          "provider": {
+            "type": "string",
+            "enum": ["CODEX", "CLAUDE", "OPENCODE", "GEMINI", "UNSANDBOX"]
+          },
+          "disabled_tools": { "type": "array", "items": { "type": "string" } },
           "attempt": { "type": "number" },
           "due_at": { "type": "string" },
           "error": { "type": "string" }
@@ -71,6 +85,10 @@
         "seconds_running": { "type": "number" }
       }
     },
-    "rate_limits": {}
+    "rate_limits": {},
+    "mcp_servers": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
   }
 }

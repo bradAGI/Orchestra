@@ -153,15 +153,15 @@ class MockEventSource {
 }
 
 const lifecycleEventTypes = [
-  'run_event',
-  'run_started',
-  'run_failed',
-  'run_continues',
-  'run_succeeded',
-  'retry_scheduled',
-  'hook_started',
-  'hook_completed',
-  'hook_failed',
+  'RUN_EVENT',
+  'RUN_STARTED',
+  'RUN_FAILED',
+  'RUN_CONTINUES',
+  'RUN_SUCCEEDED',
+  'RETRY_SCHEDULED',
+  'HOOK_STARTED',
+  'HOOK_COMPLETED',
+  'HOOK_FAILED',
 ]
 
 function setupFetch(snapshotPayload: SnapshotPayload, options?: { onFetch?: (url: string, init?: RequestInit) => Response | null }) {
@@ -227,7 +227,7 @@ function defaultSnapshot(runningCount = 0): SnapshotPayload {
           ]
         : [],
     retrying: [],
-    codex_totals: { input_tokens: 0, output_tokens: 0, total_tokens: 0, seconds_run: 0 },
+    codex_totals: { input_tokens: 0, output_tokens: 0, total_tokens: 0, seconds_running: 0 },
     rate_limits: null,
   }
 }
@@ -272,7 +272,7 @@ describe('App smoke render', () => {
 
     render(<App />)
 
-    fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+    fireEvent.click(await screen.findByTestId('sidebar-nav-ISSUES'))
 
     await waitFor(() => {
       expect(screen.getAllByText(/Tasks/i).length).toBeGreaterThan(0)
@@ -319,7 +319,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+      fireEvent.click(await screen.findByTestId('sidebar-nav-ISSUES'))
 
       await waitFor(() => {
         expect(screen.getAllByText(/To Do/i).length).toBeGreaterThan(0)
@@ -386,7 +386,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+      fireEvent.click(await screen.findByTestId('sidebar-nav-ISSUES'))
 
       await waitFor(() => {
         expect(screen.getByText('Delete me')).toBeTruthy()
@@ -432,7 +432,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+      fireEvent.click(await screen.findByTestId('sidebar-nav-ISSUES'))
       fireEvent.click(await screen.findByRole('button', { name: 'Delete task OPS-1' }))
 
       const dialog = await screen.findByRole('dialog')
@@ -476,7 +476,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+      fireEvent.click(await screen.findByTestId('sidebar-nav-ISSUES'))
 
       await waitFor(() => {
         expect(screen.getByText('Inspect this task')).toBeTruthy()
@@ -527,7 +527,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+      fireEvent.click(await screen.findByTestId('sidebar-nav-ISSUES'))
 
       await waitFor(() => {
         expect(screen.getByText('State change task')).toBeTruthy()
@@ -578,7 +578,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+      fireEvent.click(await screen.findByTestId('sidebar-nav-ISSUES'))
 
       await waitFor(() => {
         expect(screen.getAllByText(/To Do/i).length).toBeGreaterThan(0)
@@ -624,7 +624,7 @@ describe('App smoke render', () => {
       ]
       const historyEntries = [
         { id: 'h1', kind: 'state_change', message: 'State changed to In Progress', timestamp: '2026-03-06T00:01:00Z' },
-        { id: 'h2', kind: 'run_started', message: 'Agent session initiated', timestamp: '2026-03-06T00:02:00Z' },
+        { id: 'h2', kind: 'RUN_STARTED', message: 'Agent session initiated', timestamp: '2026-03-06T00:02:00Z' },
       ]
       setupFetch(defaultSnapshot(), {
         onFetch: (url) => {
@@ -643,7 +643,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(await screen.findByTestId('sidebar-nav-issues'))
+      fireEvent.click(await screen.findByTestId('sidebar-nav-ISSUES'))
 
       await waitFor(() => {
         expect(screen.getByText('History task')).toBeTruthy()
@@ -672,7 +672,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(await screen.findByTestId('sidebar-nav-projects'))
+      fireEvent.click(await screen.findByTestId('sidebar-nav-PROJECTS'))
 
       // Wait for the empty state or projects to load
       await screen.findByText(/No Projects/i)
@@ -713,7 +713,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(await screen.findByTestId('sidebar-nav-projects'))
+      fireEvent.click(await screen.findByTestId('sidebar-nav-PROJECTS'))
 
       await waitFor(() => {
         expect(screen.getByText('Alpha Project')).toBeTruthy()
@@ -750,7 +750,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(await screen.findByTestId('sidebar-nav-projects'))
+      fireEvent.click(await screen.findByTestId('sidebar-nav-PROJECTS'))
 
       await waitFor(() => {
         expect(screen.getByText('Doomed Project')).toBeTruthy()
@@ -791,7 +791,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(await screen.findByTestId('sidebar-nav-projects'))
+      fireEvent.click(await screen.findByTestId('sidebar-nav-PROJECTS'))
 
       await waitFor(() => {
         expect(screen.getByText('Ghost Project')).toBeTruthy()
@@ -813,7 +813,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
+      fireEvent.click(screen.getByTestId('sidebar-nav-SETTINGS'))
 
       // Wait for form to be ready
       await screen.findByText(/Connection Profiles/i)
@@ -836,7 +836,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
+      fireEvent.click(screen.getByTestId('sidebar-nav-SETTINGS'))
       await screen.findByText(/Connection Profiles/i)
 
       fireEvent.change(screen.getByPlaceholderText('http://127.0.0.1:4010'), { target: { value: 'not-a-url' } })
@@ -853,7 +853,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
+      fireEvent.click(screen.getByTestId('sidebar-nav-SETTINGS'))
 
       await screen.findByText(/Connection Profiles/i)
 
@@ -881,7 +881,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(await screen.findByTestId('sidebar-nav-settings'))
+      fireEvent.click(await screen.findByTestId('sidebar-nav-SETTINGS'))
 
       // Trigger dropdown
       const dropdownTrigger = await screen.findByRole('button', { name: /Profile/i })
@@ -920,7 +920,7 @@ describe('App smoke render', () => {
       // Simulate first instance connecting
       eventSourceInstances[0]?.emit('open')
 
-      fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
+      fireEvent.click(screen.getByTestId('sidebar-nav-SETTINGS'))
 
       const dropdownTrigger = await screen.findByRole('button', { name: /Profile/i })
       fireEvent.click(dropdownTrigger)
@@ -951,7 +951,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
+      fireEvent.click(screen.getByTestId('sidebar-nav-SETTINGS'))
 
       await screen.findByText(/Connection Profiles/i)
 
@@ -982,7 +982,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
+      fireEvent.click(screen.getByTestId('sidebar-nav-SETTINGS'))
 
       await screen.findByText(/Connection Profiles/i)
 
@@ -1006,7 +1006,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
+      fireEvent.click(screen.getByTestId('sidebar-nav-SETTINGS'))
       fireEvent.click(await screen.findByRole('button', { name: 'Migration' }))
 
       fireEvent.click(await screen.findByRole('button', { name: 'Workspace Migration' }))
@@ -1043,7 +1043,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(screen.getByTestId('sidebar-nav-settings'))
+      fireEvent.click(screen.getByTestId('sidebar-nav-SETTINGS'))
       fireEvent.click(await screen.findByRole('button', { name: 'Migration' }))
 
       fireEvent.click(await screen.findByRole('button', { name: 'Workspace Migration' }))
@@ -1132,8 +1132,8 @@ describe('App smoke render', () => {
       })
 
       const sections = [
-        { testId: 'sidebar-nav-projects', label: /Projects/i },
-        { testId: 'sidebar-nav-settings', label: /Settings/i },
+        { testId: 'sidebar-nav-PROJECTS', label: /Projects/i },
+        { testId: 'sidebar-nav-SETTINGS', label: /Settings/i },
       ]
 
       for (const section of sections) {
@@ -1151,12 +1151,12 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      const issuesButton = await screen.findByTestId('sidebar-nav-issues')
+      const issuesButton = await screen.findByTestId('sidebar-nav-ISSUES')
 
       fireEvent.keyDown(issuesButton, { key: 'ArrowDown' })
 
       await waitFor(() => {
-        const projectsButton = screen.getByTestId('sidebar-nav-projects')
+        const projectsButton = screen.getByTestId('sidebar-nav-PROJECTS')
         expect(projectsButton.getAttribute('aria-current')).toBe('page')
       })
     })
@@ -1167,18 +1167,18 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      const dashboardButton = await screen.findByTestId('sidebar-nav-issues')
+      const dashboardButton = await screen.findByTestId('sidebar-nav-ISSUES')
 
       fireEvent.keyDown(dashboardButton, { key: 'End' })
       await waitFor(() => {
-        const docsButton = screen.getByTestId('sidebar-nav-docs')
+        const docsButton = screen.getByTestId('sidebar-nav-DOCS')
         expect(docsButton.getAttribute('aria-current')).toBe('page')
       })
 
-      const docsButton = screen.getByTestId('sidebar-nav-docs')
+      const docsButton = screen.getByTestId('sidebar-nav-DOCS')
       fireEvent.keyDown(docsButton, { key: 'Home' })
       await waitFor(() => {
-        const firstButton = screen.getByTestId('sidebar-nav-issues')
+        const firstButton = screen.getByTestId('sidebar-nav-ISSUES')
         expect(firstButton.getAttribute('aria-current')).toBe('page')
       })
     })

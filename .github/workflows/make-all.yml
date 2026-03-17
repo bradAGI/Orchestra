@@ -48,8 +48,5 @@ jobs:
           name: tui-coverage
           path: apps/tui/coverage.out
 
-      - name: Run TUI tests
-        run: cd apps/tui && go test ./...
-
       - name: Verify make build
         run: make build

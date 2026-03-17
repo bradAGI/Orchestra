@@ -43,7 +43,7 @@ func TestPubSubPublishSetsTimestampWhenMissing(t *testing.T) {
 	ch, unsub := ps.Subscribe(1)
 	defer unsub()
 
-	ps.Publish(Event{Type: "run_event", Data: map[string]any{"issue_id": "1"}})
+	ps.Publish(Event{Type: "RUN_EVENT", Data: map[string]any{"issue_id": "1"}})
 
 	select {
 	case event := <-ch:
@@ -60,7 +60,7 @@ func TestPubSubPublishPreservesProvidedTimestamp(t *testing.T) {
 	ch, unsub := ps.Subscribe(1)
 	defer unsub()
 
-	ps.Publish(Event{Type: "run_event", Timestamp: "2026-01-01T00:00:00Z", Data: map[string]any{"issue_id": "1"}})
+	ps.Publish(Event{Type: "RUN_EVENT", Timestamp: "2026-01-01T00:00:00Z", Data: map[string]any{"issue_id": "1"}})
 
 	select {
 	case event := <-ch:

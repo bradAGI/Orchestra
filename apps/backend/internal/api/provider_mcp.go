@@ -25,6 +25,7 @@ type ProviderMCPServer struct {
 // GetProviderMCPServers reads MCP servers from a provider's native config file.
 func (s *Server) GetProviderMCPServers(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
+	provider = strings.ToLower(provider)
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "home_dir", "cannot determine home directory")
@@ -106,6 +107,7 @@ func (s *Server) GetProviderMCPServers(w http.ResponseWriter, r *http.Request) {
 // AddProviderMCPServer adds an MCP server to a provider's native config file.
 func (s *Server) AddProviderMCPServer(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
+	provider = strings.ToLower(provider)
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "home_dir", "cannot determine home directory")
@@ -157,6 +159,7 @@ func (s *Server) AddProviderMCPServer(w http.ResponseWriter, r *http.Request) {
 // DeleteProviderMCPServer removes an MCP server from a provider's native config file.
 func (s *Server) DeleteProviderMCPServer(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
+	provider = strings.ToLower(provider)
 	name := chi.URLParam(r, "name")
 	homeDir, err := os.UserHomeDir()
 	if err != nil {

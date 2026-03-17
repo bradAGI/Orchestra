@@ -9,7 +9,7 @@ describe('applySnapshotUpdate', () => {
       counts: { running: 1, retrying: 0 },
       running: [],
       retrying: [],
-      codex_totals: { input_tokens: 0, output_tokens: 0, total_tokens: 0, seconds_run: 0 },
+      codex_totals: { input_tokens: 0, output_tokens: 0, total_tokens: 0, seconds_running: 0 },
       rate_limits: null,
     })
 
@@ -22,7 +22,7 @@ describe('applySnapshotUpdate', () => {
       counts: { running: 1, retrying: 0 },
       running: [],
       retrying: [],
-      codex_totals: { input_tokens: 0, output_tokens: 0, total_tokens: 0, seconds_run: 0 },
+      codex_totals: { input_tokens: 0, output_tokens: 0, total_tokens: 0, seconds_running: 0 },
       rate_limits: null,
     })
     const next = normalizeSnapshotPayload({
@@ -30,7 +30,7 @@ describe('applySnapshotUpdate', () => {
       counts: { running: 1, retrying: 0 },
       running: [],
       retrying: [],
-      codex_totals: { input_tokens: 0, output_tokens: 0, total_tokens: 0, seconds_run: 0 },
+      codex_totals: { input_tokens: 0, output_tokens: 0, total_tokens: 0, seconds_running: 0 },
       rate_limits: null,
     })
 
@@ -59,7 +59,7 @@ describe('appendTimelineEvent', () => {
 
   it('skips duplicate head item', () => {
     const head = {
-      type: 'run_event',
+      type: 'RUN_EVENT',
       at: '2026-03-06T00:00:00Z',
       data: { issue: 'OPS-1' },
     }

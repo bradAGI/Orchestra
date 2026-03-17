@@ -146,7 +146,7 @@ export default function App() {
   const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false)
   const [createTaskInitialState, setCreateTaskInitialState] = useState('Backlog')
   const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false)
-  const [activeSection, setActiveSection] = useState<SectionID>('issues')
+  const [activeSection, setActiveSection] = useState<SectionID>('ISSUES')
   const [activePeriod, setActivePeriod] = useState<'Today' | 'Week' | 'Month'>('Week')
   const [paletteOpen, setPaletteOpen] = useState(false)
 
@@ -166,11 +166,11 @@ export default function App() {
       }
       if (e.key === '1' && e.altKey) {
         e.preventDefault()
-        setActiveSection('dashboard')
+        setActiveSection('DASHBOARD')
       }
       if (e.key === '2' && e.altKey) {
         e.preventDefault()
-        setActiveSection('projects')
+        setActiveSection('PROJECTS')
       }
     }
     document.addEventListener('keydown', down)
@@ -224,7 +224,7 @@ export default function App() {
       if (prev.some(p => p.id === termId)) return prev
       return [...prev, { id: termId, title: `Agent: ${identifier}` }]
     })
-    setActiveSection('console')
+    setActiveSection('CONSOLE')
   }
 
   const handleSectionChange = (section: string) => {
@@ -243,7 +243,7 @@ export default function App() {
     setSelectedProjectID(session.project_id || null)
     setCreateTaskInitialState('Todo')
     setCreateTaskDialogOpen(true)
-    setActiveSection('issues')
+    setActiveSection('ISSUES')
   }
 
   const sidebarWidth = sidebarCollapsed ? 64 : 320
@@ -297,7 +297,7 @@ export default function App() {
       // Always fetch projects if we have none yet
       // Always load projects - needed for task inspector project name resolution
       const needsProjects = true
-      const needsWarehouse = activeSection === 'warehouse'
+      const needsWarehouse = activeSection === 'WAREHOUSE'
 
       if (!needsProjects && !needsWarehouse) return
 
@@ -410,7 +410,7 @@ export default function App() {
         },
         onTimelineEvent: (eventType, envelope) => {
           setTimeline((previous) => appendTimelineEvent(previous, { type: envelope.type, at: envelope.timestamp, data: envelope.data }))
-          if (eventType === 'run_succeeded') {
+          if (eventType === 'RUN_SUCCEEDED') {
             const issueId = (envelope.data.issue_id as string) || ''
             const issueIdentifier = (envelope.data.issue_identifier as string) || ''
             if (issueId && issueIdentifier) {
@@ -986,7 +986,7 @@ export default function App() {
           setActivePeriod,
           refreshPending,
           configReady: Boolean(config),
-          onOpenSettings: () => setActiveSection('settings'),
+          onOpenSettings: () => setActiveSection('SETTINGS'),
           onRefresh: handleRefresh,
           onSearch: (query) => (config ? searchIssues(config, query) : Promise.resolve([])),
           onResultClick: handleInspectIssueFromList,
@@ -1242,19 +1242,19 @@ export default function App() {
 
           <Command.Group heading="Navigation" className="px-2 py-1 text-xs font-semibold text-muted-foreground">
             <Command.Item
-              onSelect={() => { setActiveSection('issues'); setPaletteOpen(false) }}
+              onSelect={() => { setActiveSection('ISSUES'); setPaletteOpen(false) }}
               className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
             >
               <ListTodo className="h-4 w-4" /> Go to Tasks
             </Command.Item>
             <Command.Item
-              onSelect={() => { setActiveSection('projects'); setPaletteOpen(false) }}
+              onSelect={() => { setActiveSection('PROJECTS'); setPaletteOpen(false) }}
               className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
             >
               <FolderTree className="h-4 w-4" /> Go to Projects
             </Command.Item>
             <Command.Item
-              onSelect={() => { setActiveSection('warehouse'); setPaletteOpen(false) }}
+              onSelect={() => { setActiveSection('WAREHOUSE'); setPaletteOpen(false) }}
               className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
             >
               <Database className="h-4 w-4" /> Go to Analytics Warehouse
@@ -1288,7 +1288,7 @@ export default function App() {
                 <Command.Item
                   key={p.id}
                   onSelect={() => {
-                    setActiveSection('projects')
+                    setActiveSection('PROJECTS')
                     setSelectedProjectID(p.id)
                     setPaletteOpen(false)
                   }}

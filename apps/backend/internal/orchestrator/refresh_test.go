@@ -99,7 +99,7 @@ func TestPerformRefreshClearsClaimsForReconciledOutIssues(t *testing.T) {
 		t.Fatalf("perform refresh: %v", err)
 	}
 
-	service.RecordRunSuccess("1", "codex")
+	service.RecordRunSuccess("1", "CODEX")
 	if _, ok := service.ClaimNextRunnable(); ok {
 		t.Fatalf("expected no stale claimed issue after reconcile")
 	}

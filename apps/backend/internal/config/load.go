@@ -16,13 +16,13 @@ func Load() (Config, error) {
 	if os.Getenv("HOME") == "" {
 		workspaceDefault = filepath.Join(os.TempDir(), "orchestra_workspaces")
 	}
-	agentProviderDefault := "codex"
+	agentProviderDefault := "CODEX"
 	agentMaxTurnsDefault := 10
 	agentCommandsDefault := map[string]string{
-		"codex":    "codex exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox --json {{prompt}}",
-		"claude":   "claude -p {{prompt}} --output-format stream-json --verbose --dangerously-skip-permissions",
-		"opencode": "opencode run {{prompt}} --format json",
-		"gemini":   "gemini -p {{prompt}} --output-format stream-json --approval-mode yolo",
+		"CODEX":    "codex exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox --json {{prompt}}",
+		"CLAUDE":   "claude -p {{prompt}} --output-format stream-json --verbose --dangerously-skip-permissions",
+		"OPENCODE": "opencode run {{prompt}} --format json",
+		"GEMINI":   "gemini -p {{prompt}} --output-format stream-json --approval-mode yolo",
 	}
 
 	host := getenvOrEmpty("ORCHESTRA_SERVER_HOST")
@@ -151,32 +151,32 @@ func Load() (Config, error) {
 	}
 
 	if value := strings.TrimSpace(workflowOverrides.AgentCommandCodex); value != "" {
-		agentCommands["codex"] = value
+		agentCommands["CODEX"] = value
 	}
 	if value := strings.TrimSpace(workflowOverrides.AgentCommandClaude); value != "" {
-		agentCommands["claude"] = value
+		agentCommands["CLAUDE"] = value
 	}
 	if value := strings.TrimSpace(workflowOverrides.AgentCommandOpenCode); value != "" {
-		agentCommands["opencode"] = value
+		agentCommands["OPENCODE"] = value
 	}
 	if value := strings.TrimSpace(workflowOverrides.AgentCommandGemini); value != "" {
-		agentCommands["gemini"] = value
+		agentCommands["GEMINI"] = value
 	}
 
 	if value := strings.TrimSpace(agentCommandCodex); value != "" {
-		agentCommands["codex"] = value
+		agentCommands["CODEX"] = value
 	}
 	if value := strings.TrimSpace(agentCommandClaude); value != "" {
-		agentCommands["claude"] = value
+		agentCommands["CLAUDE"] = value
 	}
 	if value := strings.TrimSpace(agentCommandOpenCode); value != "" {
-		agentCommands["opencode"] = value
+		agentCommands["OPENCODE"] = value
 	}
 	if value := strings.TrimSpace(agentCommandGemini); value != "" {
-		agentCommands["gemini"] = value
+		agentCommands["GEMINI"] = value
 	}
 	if value := strings.TrimSpace(agentCommandUnsandbox); value != "" {
-		agentCommands["unsandbox"] = value
+		agentCommands["UNSANDBOX"] = value
 	}
 
 	port, err := strconv.Atoi(strings.TrimSpace(portRaw))
@@ -217,7 +217,7 @@ func Load() (Config, error) {
 	mcpServers := parseMCPServers(mcpServersRaw)
 	telemetryProviders := parseStateList(telemetryProvidersRaw)
 	if len(telemetryProviders) == 0 {
-		telemetryProviders = []string{"claude", "codex", "gemini", "opencode"}
+		telemetryProviders = []string{"CLAUDE", "CODEX", "GEMINI", "OPENCODE"}
 	}
 	telemetryRetentionDays := 7
 	if strings.TrimSpace(telemetryRetentionDaysRaw) != "" {
@@ -239,7 +239,7 @@ func Load() (Config, error) {
 		WorkspaceRoot:            strings.TrimSpace(workspaceRoot),
 		APIToken:                 strings.TrimSpace(apiToken),
 		WorkflowFile:             strings.TrimSpace(workflowPath),
-		AgentProvider:            strings.TrimSpace(strings.ToLower(agentProvider)),
+		AgentProvider:            strings.TrimSpace(strings.ToUpper(agentProvider)),
 		AgentCommands:            agentCommands,
 		AgentMaxTurns:            agentMaxTurns,
 		TrackerType:              strings.TrimSpace(strings.ToLower(trackerType)),

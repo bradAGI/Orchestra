@@ -37,7 +37,7 @@ const snapshot = normalizeSnapshotPayload({
   counts: { running: 0, retrying: 0 },
   running: [],
   retrying: [],
-  codex_totals: { input_tokens: 0, output_tokens: 0, total_tokens: 0, seconds_run: 0 },
+  codex_totals: { input_tokens: 0, output_tokens: 0, total_tokens: 0, seconds_running: 0 },
   rate_limits: null,
 })
 

@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["id", "identifier", "title", "state"],
+    "properties": {
+      "id": { "type": "string" },
+      "identifier": { "type": "string" },
+      "title": { "type": "string" },
+      "description": { "type": "string" },
+      "priority": { "type": "number" },
+      "state": { "type": "string" },
+      "branch_name": { "type": "string" },
+      "url": { "type": "string" },
+      "project_id": { "type": "string" },
+      "assignee_id": { "type": "string" },
+      "assigned_to_worker": { "type": "boolean" },
+      "labels": { "type": "array", "items": { "type": "string" } },
+      "blocked_by": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "identifier": { "type": "string" },
+            "state": { "type": "string" }
+          }
+        }
+      },
+      "created_at": { "type": "string" },
+      "updated_at": { "type": "string" },
+      "provider": {
+        "type": "string",
+        "enum": ["CODEX", "CLAUDE", "OPENCODE", "GEMINI", "UNSANDBOX"]
+      },
+      "disabled_tools": { "type": "array", "items": { "type": "string" } },
+      "base_sha": { "type": "string" }
+    }
+  }
+}

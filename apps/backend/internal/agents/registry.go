@@ -54,7 +54,7 @@ func (r *Registry) SetCommand(provider Provider, command string) {
 	if strings.TrimSpace(command) == "" {
 		return
 	}
-	p := Provider(strings.ToLower(strings.TrimSpace(string(provider))))
+	p := NormalizeProvider(string(provider))
 	if p == ProviderCodex && strings.Contains(strings.ToLower(command), "app-server") {
 		r.runners[p] = NewCodexAppServerRunner(command)
 		return

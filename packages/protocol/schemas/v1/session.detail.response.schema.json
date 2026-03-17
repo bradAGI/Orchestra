@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["id", "provider", "created_at", "events"],
+  "properties": {
+    "id": { "type": "string" },
+    "project_id": { "type": "string" },
+    "project_name": { "type": "string" },
+    "session_uuid": { "type": "string" },
+    "provider": { "type": "string" },
+    "model": { "type": "string" },
+    "branch": { "type": "string" },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" },
+    "total_input": { "type": "number" },
+    "total_output": { "type": "number" },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "session_id", "kind", "timestamp"],
+        "properties": {
+          "id": { "type": "string" },
+          "session_id": { "type": "string" },
+          "kind": { "type": "string" },
+          "message": { "type": "string" },
+          "raw_payload": { "type": "string" },
+          "input_tokens": { "type": "number" },
+          "output_tokens": { "type": "number" },
+          "timestamp": { "type": "string" }
+        }
+      }
+    }
+  }
+}
