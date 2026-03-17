@@ -22,26 +22,40 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/workspace"
 )
 
+// CommandRunner executes agent turns by spawning a shell command and parsing
+// its stdout/stderr streams for structured events (SSE, JSON, or plain text).
+// It supports both one-shot subprocess execution and persistent PTY sessions
+// when a terminal.Manager is attached.
 type CommandRunner struct {
 	provider    Provider
 	command     string
 	termManager *terminal.Manager
 }
 
+// NewCommandRunner creates a CommandRunner for the given provider and shell command.
 func NewCommandRunner(provider Provider, command string) *CommandRunner {
 	return &CommandRunner{provider: provider, command: strings.TrimSpace(command)}
 }
 
+// WithTerminalManager attaches a terminal.Manager to enable PTY-based session
+// execution. Returns the receiver for method chaining.
 func (r *CommandRunner) WithTerminalManager(tm *terminal.Manager) *CommandRunner {
 	r.termManager = tm
 	return r
 }
 
 const (
+	// MaxOutputSize is the maximum number of bytes of raw output collected per turn (5 MB).
 	MaxOutputSize = 5 * 1024 * 1024 // 5MB cap on raw output
-	MaxEventCount = 2000            // 2000 events max per turn
+	// MaxEventCount is the maximum number of events processed per turn before
+	// further events are silently dropped.
+	MaxEventCount = 2000 // 2000 events max per turn
 )
 
+// RunTurn executes a single agent turn by spawning the configured command as a
+// subprocess (or sending to a PTY if a terminal manager is set). It streams
+// stdout and stderr, parses events, enforces output size and event count limits,
+// and returns the aggregated result.
 func (r *CommandRunner) RunTurn(ctx context.Context, request TurnRequest, onEvent EventHandler) (TurnResult, error) {
 	if err := workspace.ValidateWorkspacePath(request.WorkspaceRoot, request.Workspace); err != nil {
 		log.Printf("WARN: workspace path validation: %v (proceeding anyway)", err)

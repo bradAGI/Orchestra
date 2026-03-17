@@ -254,6 +254,8 @@ func UpdateGlobalAgentConfig(workspaceRoot string, name string, content string) 
 	return UpdateConfigByPath(filepath.Join(workspaceRoot, ".orchestra", "agents", name), content)
 }
 
+// GetGlobalConfigMap reads the named JSON configuration file from the workspace's
+// .orchestra/agents directory and returns its contents as a generic map.
 func GetGlobalConfigMap(workspaceRoot string, name string) (map[string]any, error) {
 	path := filepath.Join(workspaceRoot, ".orchestra", "agents", name)
 	if _, err := os.Stat(path); err != nil {
@@ -270,6 +272,8 @@ func GetGlobalConfigMap(workspaceRoot string, name string) (map[string]any, erro
 	return data, nil
 }
 
+// LoadGlobalWorkspaceDefaults loads and returns the workspace.json defaults from
+// the workspace's .orchestra/agents directory.
 func LoadGlobalWorkspaceDefaults(workspaceRoot string) (map[string]any, error) {
 	return GetGlobalConfigMap(workspaceRoot, "workspace.json")
 }

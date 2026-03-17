@@ -1,3 +1,6 @@
+// Package api implements the Orchestra HTTP API, including RESTful endpoints
+// for issue management, agent configuration, project operations, SSE event
+// streaming, terminal WebSocket proxying, and GitHub integration.
 package api
 
 import (
@@ -19,6 +22,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Server holds shared dependencies for all HTTP handlers, including the
+// logger, orchestrator service, database, pub/sub bus, and configuration.
 type Server struct {
 	logger        zerolog.Logger
 	orchestrator  *orchestrator.Service
@@ -30,6 +35,8 @@ type Server struct {
 	termManager   *terminal.Manager
 }
 
+// NewRouter creates an http.Handler with the full API route table, using only
+// the required dependencies (no pub/sub, warehouse DB, or terminal manager).
 func NewRouter(
 	logger zerolog.Logger,
 	orchestratorService *orchestrator.Service,
@@ -38,6 +45,9 @@ func NewRouter(
 	return NewRouterWithPubSub(logger, orchestratorService, cfg, nil, nil, nil)
 }
 
+// NewRouterWithPubSub creates an http.Handler with the full API route table and
+// optional pub/sub, warehouse database, and terminal manager dependencies for
+// SSE streaming, data persistence, and PTY support.
 func NewRouterWithPubSub(
 	logger zerolog.Logger,
 	orchestratorService *orchestrator.Service,
@@ -192,6 +202,8 @@ func NewRouterWithPubSub(
 	return r
 }
 
+// RequestLogger returns chi-compatible middleware that logs each HTTP request
+// with its method, path, status code, and duration.
 func RequestLogger(logger zerolog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -255,6 +267,8 @@ func contentTypeGuard(next http.Handler) http.Handler {
 	})
 }
 
+// writeJSONError writes a structured JSON error response with the given HTTP
+// status code, machine-readable error code, and human-readable message.
 func writeJSONError(w http.ResponseWriter, status int, code string, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

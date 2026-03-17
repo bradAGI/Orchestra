@@ -19,6 +19,8 @@ type Client struct {
 	workerAssigneeIDs map[string]struct{}
 }
 
+// NewClient creates a new SQLite-backed Client using the given database connection
+// and a list of worker assignee IDs used to determine issue ownership.
 func NewClient(localDB *db.DB, workerAssigneeIDs []string) *Client {
 	assigneeSet := map[string]struct{}{}
 	for _, value := range workerAssigneeIDs {
@@ -33,6 +35,7 @@ func NewClient(localDB *db.DB, workerAssigneeIDs []string) *Client {
 	}
 }
 
+// FetchCandidateIssues returns issues whose state matches one of the given active states, ordered by identifier.
 func (c *Client) FetchCandidateIssues(ctx context.Context, activeStates []string) ([]tracker.Issue, error) {
 	if len(activeStates) == 0 {
 		return []tracker.Issue{}, nil
@@ -52,6 +55,7 @@ func (c *Client) FetchCandidateIssues(ctx context.Context, activeStates []string
 	return c.queryIssues(ctx, query, args...)
 }
 
+// FetchIssuesByIDs returns issues matching the given IDs.
 func (c *Client) FetchIssuesByIDs(ctx context.Context, issueIDs []string) ([]tracker.Issue, error) {
 	if len(issueIDs) == 0 {
 		return []tracker.Issue{}, nil
@@ -71,6 +75,7 @@ func (c *Client) FetchIssuesByIDs(ctx context.Context, issueIDs []string) ([]tra
 	return c.queryIssues(ctx, query, args...)
 }
 
+// FetchIssueStatesByIDs returns a map of issue ID to current state for the given IDs.
 func (c *Client) FetchIssueStatesByIDs(ctx context.Context, issueIDs []string) (map[string]string, error) {
 	issues, err := c.FetchIssuesByIDs(ctx, issueIDs)
 	if err != nil {
@@ -84,10 +89,12 @@ func (c *Client) FetchIssueStatesByIDs(ctx context.Context, issueIDs []string) (
 	return states, nil
 }
 
+// FetchIssuesByStates returns issues filtered by the given states.
 func (c *Client) FetchIssuesByStates(ctx context.Context, states []string) ([]tracker.Issue, error) {
 	return c.FetchCandidateIssues(ctx, states)
 }
 
+// FetchIssues returns issues matching the given filter criteria including state, project, and assignee.
 func (c *Client) FetchIssues(ctx context.Context, filter tracker.IssueFilter) ([]tracker.Issue, error) {
 	query := "SELECT id, identifier, title, description, state, assignee_id, project_id, priority, branch_name, url, labels, blocked_by, provider, disabled_tools, created_at, updated_at, base_sha FROM issues"
 	var where []string
@@ -120,6 +127,7 @@ func (c *Client) FetchIssues(ctx context.Context, filter tracker.IssueFilter) ([
 	return c.queryIssues(ctx, query, args...)
 }
 
+// SearchIssues performs a LIKE-based text search across issue titles, identifiers, and IDs.
 func (c *Client) SearchIssues(ctx context.Context, query string) ([]tracker.Issue, error) {
 	if query == "" {
 		return []tracker.Issue{}, nil
@@ -130,6 +138,8 @@ func (c *Client) SearchIssues(ctx context.Context, query string) ([]tracker.Issu
 	return c.queryIssues(ctx, sqlQuery, pattern, pattern, pattern)
 }
 
+// CreateIssue inserts a new issue into the database with an auto-generated identifier
+// based on the project prefix and returns the created issue.
 func (c *Client) CreateIssue(ctx context.Context, title, description, state string, priority int, assigneeID, projectID string, provider string, disabledTools []string) (*tracker.Issue, error) {
 	id := uuid.New().String()
 
@@ -165,6 +175,8 @@ func (c *Client) CreateIssue(ctx context.Context, title, description, state stri
 	return c.FetchIssueByIdentifier(ctx, id)
 }
 
+// UpdateIssue applies field updates to the issue matching the given identifier or ID.
+// Only whitelisted columns are accepted to prevent injection.
 func (c *Client) UpdateIssue(ctx context.Context, identifier string, updates map[string]any) (*tracker.Issue, error) {
 	if len(updates) == 0 {
 		return c.FetchIssueByIdentifier(ctx, identifier)
@@ -224,6 +236,8 @@ func (c *Client) UpdateIssue(ctx context.Context, identifier string, updates map
 	return c.FetchIssueByIdentifier(ctx, identifier)
 }
 
+// DeleteIssue removes the issue and its associated runs, history, and session references
+// within a single transaction.
 func (c *Client) DeleteIssue(ctx context.Context, identifier string) error {
 	tx, err := c.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -282,6 +296,8 @@ func (c *Client) DeleteIssue(ctx context.Context, identifier string) error {
 	return nil
 }
 
+// FetchIssueByIdentifier returns a single issue matching the given identifier or ID,
+// or nil if not found.
 func (c *Client) FetchIssueByIdentifier(ctx context.Context, identifier string) (*tracker.Issue, error) {
 	query := "SELECT id, identifier, title, description, state, assignee_id, project_id, priority, branch_name, url, labels, blocked_by, provider, disabled_tools, created_at, updated_at, base_sha FROM issues WHERE id = ? OR identifier = ?;"
 	issues, err := c.queryIssues(ctx, query, identifier, identifier)

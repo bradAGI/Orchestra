@@ -10,6 +10,11 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/observability"
 )
 
+// GetEvents opens a Server-Sent Events (SSE) stream to the client. It
+// immediately sends a snapshot of the current orchestrator state and then
+// continues streaming incremental events from the pub/sub bus and periodic
+// snapshot refreshes. If the query parameter "once=1" is set, only a single
+// snapshot is sent and the connection is closed.
 func (s *Server) GetEvents(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -60,6 +65,8 @@ func (s *Server) GetEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// writeSnapshotEvent serializes the orchestrator snapshot as JSON and writes it
+// as an SSE event with type "snapshot".
 func writeSnapshotEvent(w http.ResponseWriter, snapshot any) {
 	encoded, err := json.Marshal(snapshot)
 	if err != nil {
@@ -70,6 +77,8 @@ func writeSnapshotEvent(w http.ResponseWriter, snapshot any) {
 	_, _ = fmt.Fprintf(w, "event: snapshot\ndata: %s\n\n", string(encoded))
 }
 
+// writeEventEnvelope normalizes the given data into an observability.Event
+// envelope and writes it as an SSE event with the specified type.
 func writeEventEnvelope(w http.ResponseWriter, eventType string, data any) {
 	envelope := normalizeEventEnvelope(eventType, data)
 	encoded, err := json.Marshal(envelope)

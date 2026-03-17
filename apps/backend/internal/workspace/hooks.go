@@ -8,10 +8,13 @@ import (
 	"time"
 )
 
+// HookResult holds the combined stdout/stderr output from a workspace hook execution.
 type HookResult struct {
 	Output string
 }
 
+// RunHook executes the given shell script in the specified working directory
+// with the given timeout, returning the combined output.
 func RunHook(name string, script string, cwd string, timeout time.Duration) (HookResult, error) {
 	if script == "" {
 		return HookResult{}, nil

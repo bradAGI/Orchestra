@@ -1,3 +1,5 @@
+// Package mcp provides a JSON-RPC client and registry for communicating with
+// Model Context Protocol (MCP) servers over stdio.
 package mcp
 
 import (
@@ -14,6 +16,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Client represents a connection to a single MCP server process, communicating
+// via JSON-RPC over stdin/stdout.
 type Client struct {
 	name    string
 	command string
@@ -27,6 +31,7 @@ type Client struct {
 	isStarted bool
 }
 
+// NewClient creates a new MCP Client with the given server name and shell command.
 func NewClient(name, command string, logger zerolog.Logger) *Client {
 	return &Client{
 		name:    name,
@@ -36,6 +41,8 @@ func NewClient(name, command string, logger zerolog.Logger) *Client {
 	}
 }
 
+// Start launches the MCP server process, performs the initialize handshake,
+// and begins listening for responses.
 func (c *Client) Start(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -85,6 +92,8 @@ func (c *Client) Start(ctx context.Context) error {
 	return nil
 }
 
+// Call sends a JSON-RPC request to the MCP server and waits for the response.
+// The result is unmarshalled into the provided target. Times out after 30 seconds.
 func (c *Client) Call(ctx context.Context, method string, params any, result any) error {
 	id := uuid.New().String()
 	ch := make(chan json.RawMessage, 1)
@@ -124,6 +133,7 @@ func (c *Client) Call(ctx context.Context, method string, params any, result any
 	}
 }
 
+// Notify sends a one-way JSON-RPC notification to the MCP server without expecting a response.
 func (c *Client) Notify(method string, params any) error {
 	req := map[string]any{
 		"jsonrpc": "2.0",
@@ -167,6 +177,7 @@ func (c *Client) listen() {
 	}
 }
 
+// Close shuts down the MCP server process by closing stdin/stdout and waiting for exit.
 func (c *Client) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -178,11 +189,14 @@ func (c *Client) Close() error {
 	return c.cmd.Wait()
 }
 
+// Registry manages a collection of named MCP server clients and provides
+// aggregate operations across all servers.
 type Registry struct {
 	clients map[string]*Client
 	logger  zerolog.Logger
 }
 
+// NewRegistry creates a new Registry from a map of server names to shell commands.
 func NewRegistry(servers map[string]string, logger zerolog.Logger) *Registry {
 	clients := make(map[string]*Client)
 	for name, cmd := range servers {
@@ -191,6 +205,7 @@ func NewRegistry(servers map[string]string, logger zerolog.Logger) *Registry {
 	return &Registry{clients: clients, logger: logger}
 }
 
+// StartAll launches all registered MCP server processes.
 func (r *Registry) StartAll(ctx context.Context) {
 	for name, client := range r.clients {
 		if err := client.Start(ctx); err != nil {
@@ -199,6 +214,8 @@ func (r *Registry) StartAll(ctx context.Context) {
 	}
 }
 
+// ListTools aggregates tool listings from all registered MCP servers,
+// prefixing each tool name with the server name to avoid collisions.
 func (r *Registry) ListTools(ctx context.Context) ([]map[string]any, error) {
 	var allTools []map[string]any
 	for _, client := range r.clients {
@@ -216,6 +233,7 @@ func (r *Registry) ListTools(ctx context.Context) ([]map[string]any, error) {
 	return allTools, nil
 }
 
+// ListResources aggregates resource listings from all registered MCP servers.
 func (r *Registry) ListResources(ctx context.Context) ([]map[string]any, error) {
 	var allResources []map[string]any
 	for _, client := range r.clients {
@@ -233,6 +251,7 @@ func (r *Registry) ListResources(ctx context.Context) ([]map[string]any, error) 
 	return allResources, nil
 }
 
+// ReadResource reads a resource by URI from the specified MCP server.
 func (r *Registry) ReadResource(ctx context.Context, serverName, uri string) (map[string]any, error) {
 	client, ok := r.clients[serverName]
 	if !ok {
@@ -245,6 +264,7 @@ func (r *Registry) ReadResource(ctx context.Context, serverName, uri string) (ma
 	return result, err
 }
 
+// ExecuteTool invokes a tool by name on the specified MCP server with the given arguments.
 func (r *Registry) ExecuteTool(ctx context.Context, serverName, toolName string, args map[string]any) (map[string]any, error) {
 	client, ok := r.clients[serverName]
 	if !ok {

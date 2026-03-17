@@ -174,6 +174,8 @@ func (s *Service) DeregisterCancel(issueID string, provider string) {
 	delete(s.cancels, issueID)
 }
 
+// StopSession cancels the active run for the given issue, returning true if a
+// cancellation was triggered.
 func (s *Service) StopSession(issueID string, provider string) bool {
 	s.mu.Lock()
 	cancel, ok := s.cancels[issueID]
@@ -186,6 +188,8 @@ func (s *Service) StopSession(issueID string, provider string) bool {
 	return false
 }
 
+// StopAllSessionsForIssue cancels every active session for the given issue and
+// removes its cancel registration.
 func (s *Service) StopAllSessionsForIssue(issueID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -196,6 +200,8 @@ func (s *Service) StopAllSessionsForIssue(issueID string) {
 	delete(s.cancels, issueID)
 }
 
+// Snapshot returns a consistent point-in-time copy of the orchestrator state,
+// safe to serialize and broadcast to clients.
 func (s *Service) Snapshot() Snapshot {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -231,6 +237,8 @@ func (s *Service) Snapshot() Snapshot {
 	}
 }
 
+// QueueRefresh marks a refresh as pending. If one is already pending, the
+// request is coalesced to avoid redundant tracker polls.
 func (s *Service) QueueRefresh() RefreshResult {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -246,18 +254,22 @@ func (s *Service) QueueRefresh() RefreshResult {
 	}
 }
 
+// CompleteRefreshCycle clears the refresh-pending flag after a refresh cycle completes.
 func (s *Service) CompleteRefreshCycle() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.refreshPending = false
 }
 
+// RefreshPending reports whether a refresh cycle has been requested but not yet completed.
 func (s *Service) RefreshPending() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.refreshPending
 }
 
+// LookupIssue searches both the running and retrying lists for the given issue
+// identifier, returning a combined IssueRuntime and whether it was found.
 func (s *Service) LookupIssue(issueIdentifier string) (IssueRuntime, bool) {
 	identifier := strings.TrimSpace(issueIdentifier)
 	if identifier == "" {
@@ -301,24 +313,28 @@ func (s *Service) LookupIssue(issueIdentifier string) (IssueRuntime, bool) {
 	return runtime, true
 }
 
+// SetRunningForTest replaces the running entries list. Intended for use in tests only.
 func (s *Service) SetRunningForTest(entries []RunningEntry) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.running = append([]RunningEntry(nil), entries...)
 }
 
+// SetRetryingForTest replaces the retrying entries list. Intended for use in tests only.
 func (s *Service) SetRetryingForTest(entries []RetryEntry) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.retrying = append([]RetryEntry(nil), entries...)
 }
 
+// SetTrackerClient configures the issue tracker client used for fetching and updating issues.
 func (s *Service) SetTrackerClient(client tracker.Client) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.trackerClient = client
 }
 
+// FetchIssueByID retrieves a single issue from the configured tracker by its ID.
 func (s *Service) FetchIssueByID(ctx context.Context, issueID string) (*tracker.Issue, error) {
 	s.mu.RLock()
 	client := s.trackerClient
@@ -336,12 +352,15 @@ func (s *Service) FetchIssueByID(ctx context.Context, issueID string) (*tracker.
 	return &issues[0], nil
 }
 
+// SetDB assigns the warehouse database used for state persistence and history queries.
 func (s *Service) SetDB(database *db.DB) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.db = database
 }
 
+// SetAgentRegistry configures the agent registry, per-provider commands, and
+// the default provider used for dispatching new runs.
 func (s *Service) SetAgentRegistry(registry *agents.Registry, commands map[string]string, provider string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -353,6 +372,7 @@ func (s *Service) SetAgentRegistry(registry *agents.Registry, commands map[strin
 	s.agentProvider = provider
 }
 
+// GetAgentConfig returns a copy of the current agent commands map and the default provider name.
 func (s *Service) GetAgentConfig() (map[string]string, string) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -363,6 +383,7 @@ func (s *Service) GetAgentConfig() (map[string]string, string) {
 	return commands, s.agentProvider
 }
 
+// GetProviders returns the list of available agent provider names.
 func (s *Service) GetProviders() []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -381,30 +402,36 @@ func (s *Service) GetProviders() []string {
 	return out
 }
 
+// SetWorkspaceService configures the workspace service used for managing issue workspaces.
 func (s *Service) SetWorkspaceService(svc workspace.Service) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.workspaceService = svc
 }
 
+// SetWorkspaceRoot sets the filesystem root directory for agent workspaces.
 func (s *Service) SetWorkspaceRoot(root string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.workspaceRoot = root
 }
 
+// ListArtifacts returns the list of artifact file paths in the workspace for the given issue.
 func (s *Service) ListArtifacts(issueIdentifier string, provider string) ([]string, error) {
 	return s.workspaceService.ListArtifacts(issueIdentifier, provider)
 }
 
+// GetArtifactContent reads and returns the content of a specific artifact file.
 func (s *Service) GetArtifactContent(issueIdentifier string, provider string, relPath string) ([]byte, error) {
 	return s.workspaceService.GetArtifactContent(issueIdentifier, provider, relPath)
 }
 
+// GetDiff returns the git diff output for changes made in the issue workspace.
 func (s *Service) GetDiff(issueIdentifier string, provider string) (string, error) {
 	return s.workspaceService.GetDiff(issueIdentifier, provider)
 }
 
+// UpdateAgentConfig merges new agent commands and optionally updates the default provider.
 func (s *Service) UpdateAgentConfig(commands map[string]string, provider string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -422,6 +449,7 @@ func (s *Service) UpdateAgentConfig(commands map[string]string, provider string)
 	}
 }
 
+// ListAgentConfigs discovers agent configuration files in the workspace and project directories.
 func (s *Service) ListAgentConfigs(projectID string) ([]agents.AgentConfig, error) {
 	projectRoot := ""
 	if projectID != "" && s.db != nil {
@@ -435,10 +463,13 @@ func (s *Service) ListAgentConfigs(projectID string) ([]agents.AgentConfig, erro
 	return agents.ListAgentConfigs(workspaceRoot, projectRoot)
 }
 
+// UpdateConfigByPath writes new content to an agent configuration file at the given path.
 func (s *Service) UpdateConfigByPath(path string, content string) error {
 	return agents.UpdateConfigByPath(path, content)
 }
 
+// CreateAgentResource creates a new agent resource file (skill or config) for the
+// specified provider and scope, returning the full path to the created file.
 func (s *Service) CreateAgentResource(provider, resourceType, name, scope, projectID string) (string, error) {
 	home, _ := os.UserHomeDir()
 	var baseDir string
@@ -512,6 +543,8 @@ func (s *Service) CreateAgentResource(provider, resourceType, name, scope, proje
 	return fullPath, nil
 }
 
+// SetStateSets configures which issue states are considered active (dispatchable)
+// and which are terminal (completed/cancelled).
 func (s *Service) SetStateSets(activeStates []string, terminalStates []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -523,6 +556,7 @@ func (s *Service) SetStateSets(activeStates []string, terminalStates []string) {
 	}
 }
 
+// SetMaxConcurrent sets the global upper limit on simultaneously running agent sessions.
 func (s *Service) SetMaxConcurrent(maxConcurrent int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -531,18 +565,22 @@ func (s *Service) SetMaxConcurrent(maxConcurrent int) {
 	}
 }
 
+// GetMaxTurns returns the maximum number of consecutive turns an agent may execute per issue.
 func (s *Service) GetMaxTurns() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.maxTurns
 }
 
+// SetMaxTurns sets the maximum number of consecutive turns an agent may execute per issue.
 func (s *Service) SetMaxTurns(turns int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.maxTurns = turns
 }
 
+// SetMaxConcurrentByState sets per-state concurrency limits, restricting how many
+// issues in a given state can run simultaneously.
 func (s *Service) SetMaxConcurrentByState(limits map[string]int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -560,6 +598,8 @@ func (s *Service) SetMaxConcurrentByState(limits map[string]int) {
 	s.maxByState = normalized
 }
 
+// SetRetryPolicy configures the retry backoff parameters: maximum attempts,
+// base delay, and maximum delay cap.
 func (s *Service) SetRetryPolicy(maxAttempts int64, baseDelay time.Duration, maxDelay time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -574,6 +614,8 @@ func (s *Service) SetRetryPolicy(maxAttempts int64, baseDelay time.Duration, max
 	}
 }
 
+// SetStallTimeout sets the duration after which a claimed run with no events
+// is considered stalled and moved to the retry queue.
 func (s *Service) SetStallTimeout(timeout time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -582,12 +624,17 @@ func (s *Service) SetStallTimeout(timeout time.Duration) {
 	}
 }
 
+// ShouldRetryAttempt reports whether the given attempt number is within the
+// configured maximum retry limit.
 func (s *Service) ShouldRetryAttempt(attempt int64) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return attempt > 0 && attempt <= s.maxRetryAttempts
 }
 
+// PerformRefresh executes a full refresh cycle: reconciles stalled runs, fetches
+// candidate issues from the tracker, filters retries, promotes due retries, and
+// reconciles running states against the tracker's current view.
 func (s *Service) PerformRefresh(ctx context.Context) error {
 	s.mu.RLock()
 	client := s.trackerClient
@@ -635,6 +682,7 @@ func (s *Service) PerformRefresh(ctx context.Context) error {
 	return nil
 }
 
+// ListIssues delegates to the tracker client to fetch issues matching the given filter.
 func (s *Service) ListIssues(ctx context.Context, filter tracker.IssueFilter) ([]tracker.Issue, error) {
 	s.mu.RLock()
 	client := s.trackerClient
@@ -647,6 +695,7 @@ func (s *Service) ListIssues(ctx context.Context, filter tracker.IssueFilter) ([
 	return client.FetchIssues(ctx, filter)
 }
 
+// FetchIssueByIdentifier retrieves a single issue from the tracker by its human-readable identifier.
 func (s *Service) FetchIssueByIdentifier(ctx context.Context, identifier string) (*tracker.Issue, error) {
 	s.mu.RLock()
 	client := s.trackerClient

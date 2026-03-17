@@ -72,46 +72,75 @@ export type RunningEntry = {
   tokens?: { input_tokens: number; output_tokens: number; total_tokens: number }
 }
 
+/** An issue that failed and is scheduled for an automatic retry. */
 export type RetryEntry = {
+  /** Internal UUID of the issue. */
   issue_id: string
+  /** Human-readable issue identifier. */
   issue_identifier: string
+  /** Current lifecycle state (typically "RETRYING"). */
   state: string
+  /** Zero-based retry attempt number. */
   attempt: number
+  /** ISO-8601 timestamp when the next retry is due. */
   due_at: string
+  /** Error message from the failed attempt. */
   error: string
+  /** Provider that will handle the retry. */
   provider?: string
 }
 
+/** Cumulative token usage and runtime totals across all codex sessions. */
 export type CodexTotals = {
+  /** Total input (prompt) tokens consumed. */
   input_tokens: number
+  /** Total output (completion) tokens produced. */
   output_tokens: number
+  /** Sum of input and output tokens. */
   total_tokens: number
+  /** Total wall-clock seconds spent running agent sessions. */
   seconds_running: number
 }
 
+/** Full point-in-time snapshot of the orchestrator runtime state. */
 export type SnapshotPayload = {
+  /** ISO-8601 timestamp when this snapshot was generated. */
   generated_at: string
+  /** Aggregate running/retrying counts. */
   counts: SnapshotCounts
+  /** All currently running issue entries. */
   running: RunningEntry[]
+  /** All issues currently awaiting retry. */
   retrying: RetryEntry[]
+  /** Cumulative token and runtime totals. */
   codex_totals: CodexTotals
+  /** Provider-level rate limit information, if any. */
   rate_limits: Record<string, unknown> | null
+  /** Map of MCP server name to status, when available. */
   mcp_servers?: Record<string, string>
 }
 
+/** Generic wrapper for a single SSE event received from the orchestrator. */
 export type EventEnvelope = {
+  /** Event type identifier (e.g. "RUN_STARTED", "HOOK_COMPLETED"). */
   type: string
+  /** ISO-8601 timestamp of the event. */
   timestamp: string
+  /** Arbitrary event payload data. */
   data: Record<string, unknown>
 }
 
+/** Standard error response shape returned by the orchestrator API. */
 export type APIErrorEnvelope = {
   error: {
+    /** Machine-readable error code (e.g. "unauthorized", "not_found"). */
     code: string
+    /** Human-readable error description. */
     message: string
   }
 }
 
+/** Detailed server-side payload for a single issue, including runtime and log data. */
 export type IssueDetailPayload = {
   issue_identifier: string
   issue_id: string
@@ -131,6 +160,7 @@ export type IssueDetailPayload = {
   tracked: Record<string, unknown>
 }
 
+/** A registered project (local workspace) managed by the orchestrator. */
 export type Project = {
   id: string
   name: string
@@ -142,6 +172,7 @@ export type Project = {
   path_exists?: boolean
 }
 
+/** Aggregate statistics for a single project. */
 export type ProjectStats = {
   total_sessions: number
   total_input: number
@@ -151,6 +182,7 @@ export type ProjectStats = {
   last_active: string
 }
 
+/** Platform-wide token usage and session statistics (warehouse). */
 export type GlobalStats = {
   total_tokens: number
   total_input: number
@@ -160,6 +192,7 @@ export type GlobalStats = {
   recent_sessions: SessionSummary[]
 }
 
+/** Abbreviated session record used in list views and statistics. */
 export type SessionSummary = {
   id: string
   source?: string
@@ -173,6 +206,7 @@ export type SessionSummary = {
   [key: string]: unknown
 }
 
+/** Configuration file (CLAUDE.md, skill file, etc.) for an agent. */
 export type AgentConfig = {
   name: string
   content: string
@@ -181,6 +215,7 @@ export type AgentConfig = {
   scope: 'GLOBAL' | 'PROJECT'
 }
 
+/** A documentation file or folder in the docs tree. */
 export type DocItem = {
   name: string
   path: string
@@ -189,6 +224,7 @@ export type DocItem = {
   children?: DocItem[]
 }
 
+/** A single event within an agent session timeline. */
 export type SessionEvent = {
   kind: string
   timestamp: string
@@ -199,6 +235,7 @@ export type SessionEvent = {
   [key: string]: unknown
 }
 
+/** Full detail record for an individual agent session. */
 export type SessionDetail = {
   id: string
   provider: string
@@ -210,12 +247,14 @@ export type SessionDetail = {
   [key: string]: unknown
 }
 
+/** A reference to an issue that blocks another issue. */
 export type Blocker = {
   id: string
   identifier?: string
   state?: string
 }
 
+/** Full issue record as stored by the orchestrator. */
 export type Issue = {
   id: string
   identifier: string

@@ -11,6 +11,8 @@ import (
 
 var sanitizeIssueIDPattern = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
 
+// WorkspacePath computes the absolute workspace directory path for a given issue identifier
+// and provider, sanitizing the identifier and validating path safety.
 func WorkspacePath(root string, issueIdentifier string, provider string) (string, error) {
 	if strings.TrimSpace(issueIdentifier) == "" {
 		return "", errors.New("issue identifier is required")
@@ -35,6 +37,8 @@ func WorkspacePath(root string, issueIdentifier string, provider string) (string
 	return path, nil
 }
 
+// ValidateWorkspacePath ensures the candidate path is a proper subdirectory of the root,
+// checking for directory traversal and symlink escapes.
 func ValidateWorkspacePath(root string, candidate string) error {
 	absRoot, err := filepath.Abs(root)
 	if err != nil {
@@ -66,6 +70,8 @@ func ValidateWorkspacePath(root string, candidate string) error {
 	return nil
 }
 
+// ValidateProjectPath ensures the candidate project path falls within one of the allowed
+// root directories, or within the user's home directory if no roots are configured.
 func ValidateProjectPath(candidate string, allowedRoots []string) error {
 	absCandidate, err := filepath.Abs(candidate)
 	if err != nil {

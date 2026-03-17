@@ -1,3 +1,5 @@
+// Package workspace provides workspace lifecycle management including creation,
+// removal, hook execution, artifact listing, and git diff retrieval for issue workspaces.
 package workspace
 
 import (
@@ -10,11 +12,13 @@ import (
 	"time"
 )
 
+// Service manages issue workspaces under a configurable root directory.
 type Service struct {
 	Root        string
 	HookTimeout time.Duration
 }
 
+// Hooks defines shell scripts to run at various points in the workspace lifecycle.
 type Hooks struct {
 	AfterCreate  string
 	BeforeRemove string
@@ -22,6 +26,8 @@ type Hooks struct {
 	AfterRun     string
 }
 
+// EnsureIssueWorkspace creates or verifies the workspace directory for the given issue,
+// returning the path, whether the workspace was newly created, and any hook result.
 func (s Service) EnsureIssueWorkspace(issueIdentifier string, provider string, hooks Hooks) (string, bool, HookResult, error) {
 	path, err := WorkspacePath(s.Root, issueIdentifier, provider)
 	if err != nil {
@@ -65,6 +71,8 @@ func (s Service) EnsureIssueWorkspace(issueIdentifier string, provider string, h
 	return path, created, HookResult{}, nil
 }
 
+// RemoveIssueWorkspaces deletes the workspace directory for the given issue,
+// running the before_remove hook first if configured.
 func (s Service) RemoveIssueWorkspaces(issueIdentifier string, provider string, hooks Hooks) error {
 	if issueIdentifier == "" {
 		return nil
@@ -97,6 +105,7 @@ func (s Service) RemoveIssueWorkspaces(issueIdentifier string, provider string, 
 	return nil
 }
 
+// RunBeforeRunHook executes the before_run hook script in the given workspace directory.
 func (s Service) RunBeforeRunHook(workspacePath string, hooks Hooks) (HookResult, error) {
 	if hooks.BeforeRun == "" {
 		return HookResult{}, nil
@@ -104,6 +113,7 @@ func (s Service) RunBeforeRunHook(workspacePath string, hooks Hooks) (HookResult
 	return RunHook("before_run", hooks.BeforeRun, workspacePath, s.timeoutOrDefault())
 }
 
+// RunAfterRunHook executes the after_run hook script in the given workspace directory.
 func (s Service) RunAfterRunHook(workspacePath string, hooks Hooks) (HookResult, error) {
 	if hooks.AfterRun == "" {
 		return HookResult{}, nil
@@ -111,6 +121,8 @@ func (s Service) RunAfterRunHook(workspacePath string, hooks Hooks) (HookResult,
 	return RunHook("after_run", hooks.AfterRun, workspacePath, s.timeoutOrDefault())
 }
 
+// ListArtifacts returns relative paths of all files in the workspace for the given issue,
+// excluding .git directories and the .orchestra marker file.
 func (s Service) ListArtifacts(issueIdentifier string, provider string) ([]string, error) {
 	path, err := WorkspacePath(s.Root, issueIdentifier, provider)
 	if err != nil {
@@ -149,6 +161,8 @@ func (s Service) ListArtifacts(issueIdentifier string, provider string) ([]strin
 	return artifacts, err
 }
 
+// GetArtifactContent reads and returns the content of a file at the given relative path
+// within the issue workspace, validating that the path does not escape the workspace root.
 func (s Service) GetArtifactContent(issueIdentifier string, provider string, relPath string) ([]byte, error) {
 	root, err := WorkspacePath(s.Root, issueIdentifier, provider)
 	if err != nil {
@@ -163,6 +177,8 @@ func (s Service) GetArtifactContent(issueIdentifier string, provider string, rel
 	return os.ReadFile(fullPath)
 }
 
+// GetDiff returns the git diff of changes in the workspace for the given issue.
+// Returns an empty string if the workspace is not a git repository.
 func (s Service) GetDiff(issueIdentifier string, provider string) (string, error) {
 	path, err := WorkspacePath(s.Root, issueIdentifier, provider)
 	if err != nil {
@@ -214,6 +230,7 @@ func isPathErrorNotExist(err error) bool {
 	return false
 }
 
+// MarkerPath returns the path to the .orchestra marker file within the given directory.
 func MarkerPath(path string) string {
 	return filepath.Join(path, ".orchestra")
 }

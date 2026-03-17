@@ -1,3 +1,6 @@
+// Package telemetry provides a file watcher that ingests session logs from
+// external agent providers (Claude, Codex, Gemini, OpenCode) and records
+// events and sessions into the local database.
 package telemetry
 
 import (
@@ -31,11 +34,15 @@ var (
 	healthState   = newHealthState()
 )
 
+// Options configures the telemetry watcher behavior including which providers
+// to scan and whether to store raw event payloads.
 type Options struct {
 	Providers       []string
 	StoreRawPayload bool
 }
 
+// ProviderHealth tracks operational metrics for a single telemetry provider
+// including scan counts, event throughput, and error rates.
 type ProviderHealth struct {
 	Provider           string `json:"provider"`
 	LastSuccessAt      string `json:"last_success_at"`
@@ -46,6 +53,8 @@ type ProviderHealth struct {
 	LastScanDurationMs int64  `json:"last_scan_duration_ms"`
 }
 
+// HealthSnapshot captures the current health state of the telemetry watcher
+// across all providers at a point in time.
 type HealthSnapshot struct {
 	LastTickAt string           `json:"last_tick_at"`
 	Providers  []ProviderHealth `json:"providers"`
@@ -126,6 +135,7 @@ func (s *telemetryHealthState) snapshot() HealthSnapshot {
 	}
 }
 
+// Health returns a snapshot of the current telemetry watcher health across all providers.
 func Health() HealthSnapshot {
 	return healthState.snapshot()
 }
@@ -160,6 +170,7 @@ func stripPreamble(title string) string {
 	return strings.TrimSpace(preambleRegex.ReplaceAllString(title, ""))
 }
 
+// ClaudeLogEntry represents a single parsed entry from a Claude Code JSONL log file.
 type ClaudeLogEntry struct {
 	Timestamp string `json:"timestamp"`
 	Type      string `json:"type"`

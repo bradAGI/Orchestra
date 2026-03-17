@@ -1,23 +1,34 @@
 import type { APIErrorEnvelope, EventEnvelope, GlobalStats, IssueDetailPayload, Project, ProjectStats, SnapshotPayload, AgentConfig, DocItem, Issue, SessionDetail, SessionSummary } from '@/lib/orchestra-types'
 
+/** Runtime connection configuration for the orchestrator backend. */
 export type BackendConfig = {
+  /** Base URL of the orchestrator HTTP server. */
   baseUrl: string
+  /** Bearer token used for API authentication. */
   apiToken: string
+  /** Optional map of MCP server names to their connection URIs. */
   mcpServers?: Record<string, string>
 }
 
+/** A tool exposed by an MCP (Model Context Protocol) server. */
 export type MCPTool = {
+  /** Tool name as registered with the MCP server. */
   name: string
   [key: string]: unknown
 }
 
+/** An MCP server registration managed by the orchestrator. */
 export type MCPServer = {
+  /** Server UUID, assigned by the backend. */
   id?: string
+  /** Human-readable server name. */
   name: string
+  /** Shell command used to launch the server process. */
   command: string
   [key: string]: unknown
 }
 
+/** Flattened issue record used in list views, merging Issue fields with runtime state. */
 export type IssueListItem = Partial<Issue> & {
   id?: string
   issue_id?: string
@@ -33,6 +44,7 @@ export type IssueListItem = Partial<Issue> & {
   [key: string]: unknown
 }
 
+/** A single historical event for an issue (e.g. state change, agent message). */
 export type IssueHistoryEntry = {
   id?: string
   kind: string
@@ -44,6 +56,7 @@ export type IssueHistoryEntry = {
   [key: string]: unknown
 }
 
+/** A node in the project file tree returned by the backend. */
 export type ProjectTreeNode = {
   name: string
   path: string
@@ -52,6 +65,7 @@ export type ProjectTreeNode = {
   [key: string]: unknown
 }
 
+/** A git commit record from a project repository. */
 export type GitCommit = {
   hash?: string
   message: string
@@ -60,16 +74,20 @@ export type GitCommit = {
   [key: string]: unknown
 }
 
+/** A single file entry from `git status` output. */
 export type GitStatusEntry = {
   path: string
   status: string
   [key: string]: unknown
 }
 
+/** Result payload from a workspace migration plan or execution. */
 export type WorkspaceMigrationResult = Record<string, unknown>
 
+/** Result payload from a backend refresh operation. */
 export type RefreshResult = Record<string, unknown>
 
+/** Partial update fields for PATCH-ing an existing issue. */
 export type IssueUpdatePayload = {
   state?: string
   assignee_id?: string
@@ -81,6 +99,7 @@ export type IssueUpdatePayload = {
   [key: string]: unknown
 }
 
+/** Required fields for creating a new issue via the API. */
 export type IssueCreatePayload = {
   title: string
   description: string
@@ -91,12 +110,14 @@ export type IssueCreatePayload = {
   disabled_tools?: string[]
 }
 
+/** Response from creating a GitHub pull request through the orchestrator. */
 export type GitHubPRResult = {
   url: string
   number: number
   [key: string]: unknown
 }
 
+/** Health check response from the speech-to-text subsystem. */
 export type STTHealth = {
   ready: boolean
   binary?: string
@@ -105,6 +126,7 @@ export type STTHealth = {
   reason?: string
 }
 
+/** Result of a speech-to-text transcription request. */
 export type STTTranscriptionResult = {
   text: string
   elapsed_ms?: number
@@ -120,6 +142,11 @@ class APIError extends Error {
   }
 }
 
+/**
+ * Checks whether an error represents an unauthorized (401) response.
+ * @param error - The caught error value to inspect.
+ * @returns `true` if the error indicates an authentication failure.
+ */
 export function isUnauthorizedError(error: unknown): boolean {
   if (error instanceof APIError) {
     return error.code === 'unauthorized'
@@ -145,6 +172,12 @@ function asNumber(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }
 
+/**
+ * Safely coerces an unknown value into a well-typed {@link SnapshotPayload}.
+ * Missing or malformed fields are replaced with sensible defaults.
+ * @param value - Raw parsed JSON (or any value) from the backend.
+ * @returns A fully populated SnapshotPayload.
+ */
 export function normalizeSnapshotPayload(value: unknown): SnapshotPayload {
   const root = isRecord(value) ? value : {}
   const counts = isRecord(root.counts) ? root.counts : {}
@@ -199,6 +232,12 @@ export function normalizeSnapshotPayload(value: unknown): SnapshotPayload {
   }
 }
 
+/**
+ * Safely coerces an unknown value into a well-typed {@link EventEnvelope}.
+ * @param value - Raw parsed JSON from the SSE stream.
+ * @param fallbackType - Event type to use when the value lacks a `type` field.
+ * @returns A fully populated EventEnvelope.
+ */
 export function normalizeEventEnvelope(value: unknown, fallbackType = 'event'): EventEnvelope {
   const root = isRecord(value) ? value : {}
   return {
@@ -261,6 +300,13 @@ async function requestJSON<T>(config: BackendConfig, path: string, init?: Reques
   }
 }
 
+/**
+ * Applies a partial update (PATCH) to an existing issue.
+ * @param config - Backend connection configuration.
+ * @param issueIdentifier - Human-readable issue identifier (e.g. "ORK-42").
+ * @param updates - Fields to update on the issue.
+ * @returns The updated issue record.
+ */
 export async function updateIssue(
   config: BackendConfig,
   issueIdentifier: string,
@@ -279,6 +325,11 @@ export async function updateIssue(
   })
 }
 
+/**
+ * Permanently deletes an issue from the orchestrator.
+ * @param config - Backend connection configuration.
+ * @param issueIdentifier - Human-readable issue identifier.
+ */
 export async function deleteIssue(config: BackendConfig, issueIdentifier: string): Promise<void> {
   const normalized = issueIdentifier.trim()
   if (normalized === '') {
@@ -289,6 +340,12 @@ export async function deleteIssue(config: BackendConfig, issueIdentifier: string
   })
 }
 
+/**
+ * Stops the active agent session for an issue.
+ * @param config - Backend connection configuration.
+ * @param issueIdentifier - Human-readable issue identifier.
+ * @param provider - Optional provider filter when multiple providers are active.
+ */
 export async function stopIssueSession(config: BackendConfig, issueIdentifier: string, provider?: string): Promise<void> {
   const normalized = issueIdentifier.trim()
   if (normalized === '') {
@@ -303,11 +360,24 @@ export async function stopIssueSession(config: BackendConfig, issueIdentifier: s
   })
 }
 
+/**
+ * Fetches the current runtime snapshot from the orchestrator.
+ * @param config - Backend connection configuration.
+ * @returns The normalized runtime snapshot.
+ */
 export async function fetchState(config: BackendConfig): Promise<SnapshotPayload> {
   const payload = await requestJSON<unknown>(config, '/api/v1/state')
   return normalizeSnapshotPayload(payload)
 }
 
+/**
+ * Fetches a filtered list of issues from the orchestrator.
+ * @param config - Backend connection configuration.
+ * @param states - Optional array of state filters (e.g. ["RUNNING", "TRACKED"]).
+ * @param projectID - Optional project ID filter.
+ * @param assigneeID - Optional assignee ID filter.
+ * @returns Array of matching issue list items.
+ */
 export async function fetchIssues(config: BackendConfig, states?: string[], projectID?: string, assigneeID?: string): Promise<IssueListItem[]> {
   const params = new URLSearchParams()
   if (states && states.length > 0) params.set('states', states.join(','))
@@ -317,6 +387,12 @@ export async function fetchIssues(config: BackendConfig, states?: string[], proj
   return payload.issues || []
 }
 
+/**
+ * Creates a new issue in the orchestrator.
+ * @param config - Backend connection configuration.
+ * @param payload - Issue creation fields (title, description, state, assignee, project).
+ * @returns The newly created issue record.
+ */
 export async function createIssue(
   config: BackendConfig,
   payload: IssueCreatePayload,
@@ -328,21 +404,43 @@ export async function createIssue(
   })
 }
 
+/**
+ * Searches issues by a free-text query string.
+ * @param config - Backend connection configuration.
+ * @param query - Search query text.
+ * @returns Array of matching issue list items.
+ */
 export async function searchIssues(config: BackendConfig, query: string): Promise<IssueListItem[]> {
   const params = new URLSearchParams({ q: query })
   const payload = await requestJSON<{ issues: IssueListItem[] }>(config, `/api/v1/search?${params.toString()}`)
   return payload.issues || []
 }
 
+/**
+ * Fetches the list of registered agent names.
+ * @param config - Backend connection configuration.
+ * @returns Array of agent name strings.
+ */
 export async function fetchAgents(config: BackendConfig): Promise<string[]> {
   const payload = await requestJSON<{ agents: string[] }>(config, '/api/v1/agents')
   return payload.agents || []
 }
 
+/**
+ * Fetches the global agent configuration (commands, provider, max turns).
+ * @param config - Backend connection configuration.
+ * @returns The current agent configuration object.
+ */
 export async function fetchAgentConfig(config: BackendConfig): Promise<{ commands: Record<string, string>; agent_provider: string; max_turns: number }> {
   return requestJSON<{ commands: Record<string, string>; agent_provider: string; max_turns: number }>(config, '/api/v1/config/agents')
 }
 
+/**
+ * Partially updates the global agent configuration.
+ * @param config - Backend connection configuration.
+ * @param updates - Fields to patch (e.g. max_turns).
+ * @returns The updated agent configuration.
+ */
 export async function patchAgentConfig(config: BackendConfig, updates: { max_turns?: number }): Promise<{ commands: Record<string, string>; agent_provider: string; max_turns: number }> {
   return requestJSON<{ commands: Record<string, string>; agent_provider: string; max_turns: number }>(config, '/api/v1/config/agents', {
     method: 'PATCH',
@@ -351,12 +449,24 @@ export async function patchAgentConfig(config: BackendConfig, updates: { max_tur
   })
 }
 
+/**
+ * Triggers a full state refresh on the orchestrator backend.
+ * @param config - Backend connection configuration.
+ * @returns The refresh result payload.
+ */
 export async function postRefresh(config: BackendConfig): Promise<RefreshResult> {
   return requestJSON<RefreshResult>(config, '/api/v1/refresh', {
     method: 'POST',
   })
 }
 
+/**
+ * Fetches a dry-run workspace migration plan between two paths.
+ * @param config - Backend connection configuration.
+ * @param from - Source workspace path.
+ * @param to - Destination workspace path.
+ * @returns The migration plan result.
+ */
 export async function fetchWorkspaceMigrationPlan(
   config: BackendConfig,
   from: string,
@@ -369,6 +479,13 @@ export async function fetchWorkspaceMigrationPlan(
   return requestJSON<WorkspaceMigrationResult>(config, `/api/v1/workspace/migration/plan${suffix}`)
 }
 
+/**
+ * Executes a workspace migration between two paths.
+ * @param config - Backend connection configuration.
+ * @param from - Source workspace path.
+ * @param to - Destination workspace path.
+ * @returns The migration execution result.
+ */
 export async function applyWorkspaceMigration(
   config: BackendConfig,
   from: string,
@@ -387,19 +504,41 @@ export async function applyWorkspaceMigration(
   })
 }
 
+/**
+ * Fetches all registered projects from the orchestrator.
+ * @param config - Backend connection configuration.
+ * @returns Array of project records.
+ */
 export async function fetchProjects(config: BackendConfig): Promise<Project[]> {
   const data = await requestJSON<Project[]>(config, '/api/v1/projects')
   return data || []
 }
 
+/**
+ * Fetches aggregate statistics for a specific project.
+ * @param config - Backend connection configuration.
+ * @param projectID - The project UUID.
+ * @returns Project-level statistics (sessions, tokens, etc.).
+ */
 export async function fetchProjectStats(config: BackendConfig, projectID: string): Promise<ProjectStats> {
   return requestJSON<ProjectStats>(config, `/api/v1/projects/${encodeURIComponent(projectID)}`)
 }
 
+/**
+ * Fetches platform-wide warehouse analytics (token totals, provider usage, recent sessions).
+ * @param config - Backend connection configuration.
+ * @returns Global statistics payload.
+ */
 export async function fetchWarehouseStats(config: BackendConfig): Promise<GlobalStats> {
   return requestJSON<GlobalStats>(config, '/api/v1/warehouse/stats')
 }
 
+/**
+ * Registers a new project by its filesystem root path.
+ * @param config - Backend connection configuration.
+ * @param rootPath - Absolute filesystem path of the project root.
+ * @returns The newly created project record.
+ */
 export async function createProject(config: BackendConfig, rootPath: string): Promise<Project> {
   return requestJSON<Project>(config, '/api/v1/projects', {
     method: 'POST',
@@ -408,6 +547,12 @@ export async function createProject(config: BackendConfig, rootPath: string): Pr
   })
 }
 
+/**
+ * Fetches full details for a single issue.
+ * @param config - Backend connection configuration.
+ * @param issueIdentifier - Human-readable issue identifier.
+ * @returns The detailed issue record.
+ */
 export async function fetchIssueDetail(config: BackendConfig, issueIdentifier: string): Promise<IssueListItem> {
   const normalized = issueIdentifier.trim()
   if (normalized === '') {
@@ -416,6 +561,13 @@ export async function fetchIssueDetail(config: BackendConfig, issueIdentifier: s
   return requestJSON<IssueListItem>(config, `/api/v1/issues/${encodeURIComponent(normalized)}`)
 }
 
+/**
+ * Fetches raw session log text for an issue.
+ * @param config - Backend connection configuration.
+ * @param issueIdentifier - Human-readable issue identifier.
+ * @param provider - Optional provider filter.
+ * @returns Raw log content as a string.
+ */
 export async function fetchIssueLogs(config: BackendConfig, issueIdentifier: string, provider?: string): Promise<string> {
   const normalized = issueIdentifier.trim()
   if (normalized === '') {
@@ -435,6 +587,12 @@ export async function fetchIssueLogs(config: BackendConfig, issueIdentifier: str
   return response.text()
 }
 
+/**
+ * Fetches the event history for an issue.
+ * @param config - Backend connection configuration.
+ * @param issueIdentifier - Human-readable issue identifier.
+ * @returns Array of historical event entries.
+ */
 export async function fetchIssueHistory(config: BackendConfig, issueIdentifier: string): Promise<IssueHistoryEntry[]> {
   const normalized = issueIdentifier.trim()
   if (normalized === '') {
@@ -444,6 +602,13 @@ export async function fetchIssueHistory(config: BackendConfig, issueIdentifier: 
   return data.history || []
 }
 
+/**
+ * Fetches the workspace git diff for an issue.
+ * @param config - Backend connection configuration.
+ * @param issueIdentifier - Human-readable issue identifier.
+ * @param provider - Optional provider filter.
+ * @returns Unified diff output as a string.
+ */
 export async function fetchIssueDiff(config: BackendConfig, issueIdentifier: string, provider?: string): Promise<string> {
   const normalized = issueIdentifier.trim()
   if (normalized === '') {
@@ -463,6 +628,13 @@ export async function fetchIssueDiff(config: BackendConfig, issueIdentifier: str
   return response.text()
 }
 
+/**
+ * Fetches the list of artifact paths produced by an issue's agent session.
+ * @param config - Backend connection configuration.
+ * @param issueIdentifier - Human-readable issue identifier.
+ * @param provider - Optional provider filter.
+ * @returns Array of relative artifact file paths.
+ */
 export async function fetchArtifacts(config: BackendConfig, issueIdentifier: string, provider?: string): Promise<string[]> {
   const normalized = issueIdentifier.trim()
   if (normalized === '') {
@@ -475,6 +647,14 @@ export async function fetchArtifacts(config: BackendConfig, issueIdentifier: str
   return payload.artifacts || []
 }
 
+/**
+ * Fetches the text content of a single artifact file.
+ * @param config - Backend connection configuration.
+ * @param issueIdentifier - Human-readable issue identifier.
+ * @param relPath - Relative path of the artifact within the workspace.
+ * @param provider - Optional provider filter.
+ * @returns The artifact file content as a string.
+ */
 export async function fetchArtifactContent(config: BackendConfig, issueIdentifier: string, relPath: string, provider?: string): Promise<string> {
   const normalized = issueIdentifier.trim()
   if (normalized === '') {
@@ -494,6 +674,11 @@ export async function fetchArtifactContent(config: BackendConfig, issueIdentifie
   return response.text()
 }
 
+/**
+ * Converts an unknown error into a user-friendly display string.
+ * @param error - The caught error value.
+ * @returns A human-readable error message.
+ */
 export function toDisplayError(error: unknown): string {
   if (error instanceof APIError) {
     return `${error.code}: ${error.message}`
@@ -504,30 +689,60 @@ export function toDisplayError(error: unknown): string {
   return 'unexpected error'
 }
 
+/**
+ * Fetches session summaries, optionally filtered by project.
+ * @param config - Backend connection configuration.
+ * @param projectId - Optional project ID to filter sessions.
+ * @returns Array of session summary records.
+ */
 export async function fetchSessions(config: BackendConfig, projectId?: string): Promise<SessionSummary[]> {
   const url = projectId ? `/api/v1/sessions?project_id=${projectId}` : '/api/v1/sessions'
   const data = await requestJSON<SessionSummary[]>(config, url)
   return data || []
 }
 
+/**
+ * Deletes a project registration from the orchestrator.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID to delete.
+ */
 export async function deleteProject(config: BackendConfig, projectId: string): Promise<void> {
   return requestJSON<void>(config, `/api/v1/projects/${projectId}`, {
     method: 'DELETE',
   })
 }
 
+/**
+ * Triggers a refresh/rescan of a project's workspace.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID to refresh.
+ */
 export async function refreshProject(config: BackendConfig, projectId: string): Promise<void> {
   return requestJSON<void>(config, `/api/v1/projects/${projectId}/refresh`, {
     method: 'POST',
   })
 }
 
+/**
+ * Fetches the file tree for a project, optionally rooted at a sub-path.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param path - Optional sub-directory path to scope the tree.
+ * @returns Array of tree nodes (files and directories).
+ */
 export async function fetchProjectTree(config: BackendConfig, projectId: string, path?: string): Promise<ProjectTreeNode[]> {
   const query = path ? `?path=${encodeURIComponent(path)}` : ''
   const data = await requestJSON<ProjectTreeNode[]>(config, `/api/v1/projects/${projectId}/tree${query}`)
   return data || []
 }
 
+/**
+ * Fetches the text content of a single file within a project workspace.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param path - Relative file path within the project.
+ * @returns The file content as a string.
+ */
 export async function fetchProjectFileContent(config: BackendConfig, projectId: string, path: string): Promise<string> {
   const response = await fetch(`${config.baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/file?path=${encodeURIComponent(path)}`, {
     headers: buildHeaders(config),
@@ -538,16 +753,35 @@ export async function fetchProjectFileContent(config: BackendConfig, projectId: 
   return response.text()
 }
 
+/**
+ * Fetches the git commit history for a project.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @returns Array of git commit records.
+ */
 export async function fetchProjectGitHistory(config: BackendConfig, projectId: string): Promise<GitCommit[]> {
   const data = await requestJSON<GitCommit[]>(config, `/api/v1/projects/${projectId}/git`)
   return data || []
 }
 
+/**
+ * Fetches the current git status (modified/untracked files) for a project.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @returns Array of git status entries.
+ */
 export async function fetchProjectGitStatus(config: BackendConfig, projectId: string): Promise<GitStatusEntry[]> {
   const data = await requestJSON<GitStatusEntry[]>(config, `/api/v1/projects/${projectId}/git/status`)
   return data || []
 }
 
+/**
+ * Fetches the git diff for a project, optionally at a specific commit hash.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param hash - Optional commit hash to diff against.
+ * @returns Unified diff output as a string.
+ */
 export async function fetchProjectGitDiff(config: BackendConfig, projectId: string, hash?: string): Promise<string> {
   const query = hash ? `?hash=${encodeURIComponent(hash)}` : ''
   const response = await fetch(`${config.baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/git/diff${query}`, {
@@ -561,10 +795,22 @@ export async function fetchProjectGitDiff(config: BackendConfig, projectId: stri
   return response.text()
 }
 
+/**
+ * Fetches full detail for a specific agent session.
+ * @param config - Backend connection configuration.
+ * @param sessionId - The session UUID.
+ * @returns The full session detail record including events.
+ */
 export async function fetchSessionDetail(config: BackendConfig, sessionId: string): Promise<SessionDetail> {
   return requestJSON<SessionDetail>(config, `/api/v1/sessions/${sessionId}`)
 }
 
+/**
+ * Creates a git commit in a project workspace with the given message.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param message - Commit message text.
+ */
 export async function gitCommit(config: BackendConfig, projectId: string, message: string): Promise<void> {
   await requestJSON<void>(config, `/api/v1/projects/${projectId}/git/commit`, {
     method: 'POST',
@@ -573,6 +819,13 @@ export async function gitCommit(config: BackendConfig, projectId: string, messag
   })
 }
 
+/**
+ * Pushes commits to a remote git repository.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param remote - Remote name (defaults to "origin").
+ * @param branch - Branch name (defaults to "main").
+ */
 export async function gitPush(config: BackendConfig, projectId: string, remote = 'origin', branch = 'main'): Promise<void> {
   await requestJSON<void>(config, `/api/v1/projects/${projectId}/git/push`, {
     method: 'POST',
@@ -581,6 +834,13 @@ export async function gitPush(config: BackendConfig, projectId: string, remote =
   })
 }
 
+/**
+ * Pulls commits from a remote git repository.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param remote - Remote name (defaults to "origin").
+ * @param branch - Branch name (defaults to "main").
+ */
 export async function gitPull(config: BackendConfig, projectId: string, remote = 'origin', branch = 'main'): Promise<void> {
   await requestJSON<void>(config, `/api/v1/projects/${projectId}/git/pull`, {
     method: 'POST',
@@ -589,6 +849,13 @@ export async function gitPull(config: BackendConfig, projectId: string, remote =
   })
 }
 
+/**
+ * Creates a GitHub pull request for an issue through the orchestrator.
+ * @param config - Backend connection configuration.
+ * @param issueIdentifier - Human-readable issue identifier.
+ * @param payload - PR creation fields (title, body, head/base branches, optional owner/repo/token).
+ * @returns The created PR result with URL and number.
+ */
 export async function createGitHubPR(
   config: BackendConfig,
   issueIdentifier: string,
@@ -601,6 +868,11 @@ export async function createGitHubPR(
   })
 }
 
+/**
+ * Replaces the global agent configuration (commands map and default provider).
+ * @param config - Backend connection configuration.
+ * @param payload - The full agent configuration to set.
+ */
 export async function updateAgentConfig(config: BackendConfig, payload: { commands: Record<string, string>, agent_provider: string }): Promise<void> {
   await requestJSON<void>(config, '/api/v1/config/agents', {
     method: 'POST',
@@ -608,6 +880,12 @@ export async function updateAgentConfig(config: BackendConfig, payload: { comman
     body: JSON.stringify(payload),
   })
 }
+/**
+ * Fetches agent configuration files (CLAUDE.md, skills, etc.), optionally filtered by project.
+ * @param config - Backend connection configuration.
+ * @param projectID - Optional project ID to scope the query.
+ * @returns Array of agent configuration records.
+ */
 export async function fetchAgentConfigs(config: BackendConfig, projectID?: string): Promise<AgentConfig[]> {
   const url = projectID ? `/api/v1/config/agents/items?project_id=${encodeURIComponent(projectID)}` : '/api/v1/config/agents/items'
   const data = await requestJSON<{ configs: AgentConfig[] }>(config, url)

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 )
 
+// MigrationAction describes a single filesystem operation in a workspace migration plan.
 type MigrationAction struct {
 	Type   string `json:"type"`
 	Source string `json:"source"`
@@ -13,6 +14,8 @@ type MigrationAction struct {
 	Note   string `json:"note,omitempty"`
 }
 
+// MigrationResult holds the outcome of a workspace migration, including whether
+// actions were applied and the list of planned or executed actions.
 type MigrationResult struct {
 	Applied bool              `json:"applied"`
 	Actions []MigrationAction `json:"actions"`
