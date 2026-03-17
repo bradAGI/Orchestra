@@ -250,7 +250,7 @@ func processExecutionTick(
 	activeProviderName := providerName
 
 	if entry.Provider != "" {
-		candidate := agents.Provider(strings.ToLower(entry.Provider))
+		candidate := agents.NormalizeProvider(entry.Provider)
 		if registry.HasProvider(candidate) {
 			activeProvider = candidate
 			activeProviderName = string(candidate)
@@ -258,7 +258,7 @@ func processExecutionTick(
 	} else if entry.AssigneeID != "" {
 		// Fallback: Resolve provider from assignee if possible
 		p := strings.TrimPrefix(entry.AssigneeID, "agent-")
-		candidate := agents.Provider(strings.ToLower(p))
+		candidate := agents.NormalizeProvider(p)
 		if registry.HasProvider(candidate) {
 			activeProvider = candidate
 			activeProviderName = string(candidate)
