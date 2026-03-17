@@ -411,11 +411,14 @@ type Event struct {
 	Timestamp    string `json:"timestamp"`
 }
 
+// SessionDetail combines a Session with its ordered list of Events.
 type SessionDetail struct {
 	Session
 	Events []Event `json:"events"`
 }
 
+// GetSessions returns sessions optionally filtered by project ID, with aggregated
+// token usage and last-activity timestamps. An empty projectID returns all sessions.
 func (db *DB) GetSessions(ctx context.Context, projectID string) ([]Session, error) {
 	var rows *sql.Rows
 	var err error
@@ -465,6 +468,7 @@ func (db *DB) GetSessions(ctx context.Context, projectID string) ([]Session, err
 	return sessions, rows.Err()
 }
 
+// GetSessionDetail retrieves a session and all its events by session ID.
 func (db *DB) GetSessionDetail(ctx context.Context, sessionID string) (*SessionDetail, error) {
 	var detail SessionDetail
 

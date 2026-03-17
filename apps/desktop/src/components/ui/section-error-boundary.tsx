@@ -1,12 +1,18 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 
+/** Props for the {@link SectionErrorBoundary} component. */
 type Props = {
+  /** Display name of the section (shown in the error fallback). */
   name: string
+  /** Child components to render within the error boundary. */
   children: ReactNode
 }
 
+/** Internal state for the error boundary. */
 type State = {
+  /** Whether an error has been caught. */
   hasError: boolean
+  /** The error message to display. */
   message: string
 }
 
