@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
-    Database,
     TrendingUp,
     Zap,
     Cpu,
@@ -10,7 +9,7 @@ import {
     RefreshCcw,
     DollarSign,
 } from 'lucide-react'
-import type { GlobalStats, SessionSummary } from '@/lib/orchestra-types'
+import type { GlobalStats, ProviderTokens, SessionSummary } from '@/lib/orchestra-types'
 import { fetchProviderModel, type BackendConfig } from '@/lib/orchestra-client'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -110,8 +109,16 @@ function calculateCost(tokens: number, type: 'input' | 'output', provider: strin
     return (tokens / 1_000_000) * rate
 }
 
-function calculateWeightedCost(inputTokens: number, outputTokens: number, providerUsage: Record<string, number>, totalTokens: number, liveModels: Record<string, string>): number {
+function calculateWeightedCost(inputTokens: number, outputTokens: number, providerUsage: Record<string, number>, totalTokens: number, liveModels: Record<string, string>, providerTokens?: Record<string, ProviderTokens>): number {
     let cost = 0
+    // Use per-provider input/output breakdown when available (accurate)
+    if (providerTokens && Object.keys(providerTokens).length > 0) {
+        for (const [provider, pt] of Object.entries(providerTokens)) {
+            cost += calculateCost(pt.input, 'input', provider, liveModels) + calculateCost(pt.output, 'output', provider, liveModels)
+        }
+        return cost
+    }
+    // Fallback: fraction-based split (less accurate for mixed-provider fleets)
     for (const [provider, tokens] of Object.entries(providerUsage)) {
         const fraction = totalTokens > 0 ? tokens / totalTokens : 0
         const providerInput = inputTokens * fraction
@@ -196,16 +203,22 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
     const totalSpend = useMemo(() => {
         if (!stats) return 0
-        return calculateWeightedCost(stats.total_input, stats.total_output, stats.provider_usage || {}, stats.total_tokens, liveModels)
+        return calculateWeightedCost(stats.total_input, stats.total_output, stats.provider_usage || {}, stats.total_tokens, liveModels, stats.provider_tokens)
     }, [stats, liveModels])
 
     const inputCost = useMemo(() => {
         if (!stats) return 0
         let cost = 0
-        const total = stats.total_tokens || 1
-        for (const [provider, tokens] of Object.entries(stats.provider_usage || {})) {
-            const fraction = tokens / total
-            cost += calculateCost(stats.total_input * fraction, 'input', provider, liveModels)
+        const pt = stats.provider_tokens
+        if (pt && Object.keys(pt).length > 0) {
+            for (const [provider, tokens] of Object.entries(pt)) {
+                cost += calculateCost(tokens.input, 'input', provider, liveModels)
+            }
+        } else {
+            const total = stats.total_tokens || 1
+            for (const [provider, tokens] of Object.entries(stats.provider_usage || {})) {
+                cost += calculateCost(stats.total_input * (tokens / total), 'input', provider, liveModels)
+            }
         }
         return cost
     }, [stats, liveModels])
@@ -213,10 +226,16 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     const outputCost = useMemo(() => {
         if (!stats) return 0
         let cost = 0
-        const total = stats.total_tokens || 1
-        for (const [provider, tokens] of Object.entries(stats.provider_usage || {})) {
-            const fraction = tokens / total
-            cost += calculateCost(stats.total_output * fraction, 'output', provider, liveModels)
+        const pt = stats.provider_tokens
+        if (pt && Object.keys(pt).length > 0) {
+            for (const [provider, tokens] of Object.entries(pt)) {
+                cost += calculateCost(tokens.output, 'output', provider, liveModels)
+            }
+        } else {
+            const total = stats.total_tokens || 1
+            for (const [provider, tokens] of Object.entries(stats.provider_usage || {})) {
+                cost += calculateCost(stats.total_output * (tokens / total), 'output', provider, liveModels)
+            }
         }
         return cost
     }, [stats, liveModels])
@@ -345,23 +364,6 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     // -----------------------------------------------------------------------
     return (
         <div className="p-6 space-y-6 overflow-y-auto h-full custom-scrollbar bg-background/20">
-            {/* ============================================================= */}
-            {/* 1. Header                                                      */}
-            {/* ============================================================= */}
-            <div className="flex items-center gap-4 mb-8">
-                <div className="h-12 w-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shadow-lg shadow-primary/5 group transition-all hover:scale-105 active:scale-95 cursor-default">
-                    <Database className="text-primary h-6 w-6 group-hover:animate-pulse" strokeWidth={2.5} />
-                </div>
-                <div>
-                    <h1 className="text-2xl font-black tracking-tight leading-none bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">
-                        Analytics
-                    </h1>
-                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-[0.2em] opacity-60 mt-1.5">
-                        Fleet spend est. <span className="text-primary font-black">${totalSpend.toFixed(2)}</span> across all providers
-                    </p>
-                </div>
-            </div>
-
             {/* ============================================================= */}
             {/* 2. Stat Cards Row                                              */}
             {/* ============================================================= */}

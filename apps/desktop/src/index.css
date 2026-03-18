@@ -123,12 +123,14 @@ body {
 
 /* Smooth continuous spin for circular spinners (Loader2) */
 @keyframes spin-smooth {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .animate-spin-smooth {
-  animation: spin-smooth 1.2s linear infinite;
+  animation: spin-smooth 0.75s linear infinite;
+  transform-origin: center;
+  will-change: transform;
 }
 
 /* Refresh spin for arrow-style icons (RefreshCcw) */

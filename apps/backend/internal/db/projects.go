@@ -524,15 +524,23 @@ func (db *DB) GetSessionDetail(ctx context.Context, sessionID string) (*SessionD
 	return &detail, nil
 }
 
+// ProviderTokens holds per-provider input/output token breakdowns.
+type ProviderTokens struct {
+	Total  int64 `json:"total"`
+	Input  int64 `json:"input"`
+	Output int64 `json:"output"`
+}
+
 // GlobalStats holds platform-wide aggregate metrics including total tokens,
 // per-provider and per-model breakdowns, and recent sessions.
 type GlobalStats struct {
-	TotalTokens    int64            `json:"total_tokens"`
-	TotalInput     int64            `json:"total_input"`
-	TotalOutput    int64            `json:"total_output"`
-	ProviderUsage  map[string]int64 `json:"provider_usage"`
-	ModelUsage     map[string]int64 `json:"model_usage"`
-	RecentSessions []Session        `json:"recent_sessions"`
+	TotalTokens    int64                       `json:"total_tokens"`
+	TotalInput     int64                       `json:"total_input"`
+	TotalOutput    int64                       `json:"total_output"`
+	ProviderUsage  map[string]int64            `json:"provider_usage"`
+	ProviderTokens map[string]ProviderTokens   `json:"provider_tokens"`
+	ModelUsage     map[string]int64            `json:"model_usage"`
+	RecentSessions []Session                   `json:"recent_sessions"`
 }
 
 // GetGlobalStats computes platform-wide token usage, per-provider and per-model
@@ -540,14 +548,16 @@ type GlobalStats struct {
 func (db *DB) GetGlobalStats(ctx context.Context) (GlobalStats, error) {
 	var stats GlobalStats
 	stats.ProviderUsage = make(map[string]int64)
+	stats.ProviderTokens = make(map[string]ProviderTokens)
 	stats.ModelUsage = make(map[string]int64)
 
 	query := `SELECT SUM(input_tokens), SUM(output_tokens) FROM events`
 	_ = db.QueryRowContext(ctx, query).Scan(&stats.TotalInput, &stats.TotalOutput)
 	stats.TotalTokens = stats.TotalInput + stats.TotalOutput
 
+	// Per-provider input/output breakdown
 	rows, err := db.QueryContext(ctx, `
-		SELECT s.provider, SUM(e.input_tokens + e.output_tokens)
+		SELECT s.provider, SUM(e.input_tokens), SUM(e.output_tokens)
 		FROM sessions s
 		JOIN events e ON s.id = e.session_id
 		GROUP BY s.provider
@@ -556,9 +566,14 @@ func (db *DB) GetGlobalStats(ctx context.Context) (GlobalStats, error) {
 		defer rows.Close()
 		for rows.Next() {
 			var provider string
-			var tokens int64
-			if err := rows.Scan(&provider, &tokens); err == nil {
-				stats.ProviderUsage[provider] = tokens
+			var input, output int64
+			if err := rows.Scan(&provider, &input, &output); err == nil {
+				stats.ProviderUsage[provider] = input + output
+				stats.ProviderTokens[provider] = ProviderTokens{
+					Total:  input + output,
+					Input:  input,
+					Output: output,
+				}
 			}
 		}
 	}
@@ -581,12 +596,39 @@ func (db *DB) GetGlobalStats(ctx context.Context) (GlobalStats, error) {
 		}
 	}
 
-	// Fetch recent sessions
-	sessions, _ := db.GetSessions(ctx, "")
-	if len(sessions) > 50 {
-		stats.RecentSessions = sessions[:50]
-	} else {
-		stats.RecentSessions = sessions
+	// Fetch recent sessions (limited to 50 in SQL for performance)
+	sessionRows, err := db.QueryContext(ctx, `
+		SELECT
+			s.id, s.project_id, p.name, s.session_uuid, s.provider, COALESCE(s.model, ''), s.branch, s.created_at,
+			COALESCE(MAX(e.timestamp), s.created_at) as updated_at,
+			COALESCE(SUM(e.input_tokens), 0),
+			COALESCE(SUM(e.output_tokens), 0)
+		FROM sessions s
+		LEFT JOIN projects p ON s.project_id = p.id
+		LEFT JOIN events e ON s.id = e.session_id
+		GROUP BY s.id
+		ORDER BY updated_at DESC
+		LIMIT 50
+	`)
+	if err == nil {
+		defer sessionRows.Close()
+		for sessionRows.Next() {
+			var s Session
+			var prjID, prjName, branch sql.NullString
+			if err := sessionRows.Scan(&s.ID, &prjID, &prjName, &s.SessionUUID, &s.Provider, &s.Model, &branch, &s.CreatedAt, &s.UpdatedAt, &s.TotalInput, &s.TotalOutput); err != nil {
+				continue
+			}
+			if prjID.Valid {
+				s.ProjectID = prjID.String
+			}
+			if prjName.Valid {
+				s.ProjectName = prjName.String
+			}
+			if branch.Valid {
+				s.Branch = branch.String
+			}
+			stats.RecentSessions = append(stats.RecentSessions, s)
+		}
 	}
 
 	return stats, nil

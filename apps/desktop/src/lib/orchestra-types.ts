@@ -183,11 +183,18 @@ export type ProjectStats = {
 }
 
 /** Platform-wide token usage and session statistics (warehouse). */
+export type ProviderTokens = {
+  total: number
+  input: number
+  output: number
+}
+
 export type GlobalStats = {
   total_tokens: number
   total_input: number
   total_output: number
   provider_usage: Record<string, number>
+  provider_tokens?: Record<string, ProviderTokens>
   model_usage: Record<string, number>
   recent_sessions: SessionSummary[]
 }
