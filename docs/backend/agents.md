@@ -1,4 +1,4 @@
-# 4.1 Agent System & Runners
+# 3.2 Agent System & Runners
 
 > **Source files:** `apps/backend/internal/agents/types.go`, `apps/backend/internal/agents/registry.go`, `apps/backend/internal/agents/command_runner.go`, `apps/backend/internal/agents/claude_runner.go`, `apps/backend/internal/agents/codex_appserver.go`, `apps/backend/internal/agents/opencode_runner.go`, `apps/backend/internal/agents/gemini_runner.go`, `apps/backend/internal/agents/unsandbox_runner.go`, `apps/backend/internal/agents/config.go`
 

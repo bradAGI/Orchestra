@@ -1,4 +1,4 @@
-# 5.3 Views & Dashboards
+# 4.2 Views & Dashboards
 
 > **Source files:**
 > - `apps/desktop/src/components/dashboard/DashboardOverview.tsx` -- Operations hub
@@ -32,7 +32,7 @@ graph TD
 
     MC1 --> |snapshot.running.length| DATA[SnapshotPayload]
     MC2 --> |warehouseStats.total_tokens| WH[GlobalStats]
-    MC3 --> |projects.length| PR[Project[]]
+    MC3 --> |projects.length| PR["Project[]"]
     PG --> |sorted by activity| PR
 ```
 

@@ -449,7 +449,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                 onClick={handleRefresh}
                                 disabled={refreshing}
                             >
-                                <RefreshCcw size={14} className={refreshing ? 'animate-spin' : ''} />
+                                <RefreshCcw size={14} className={refreshing ? 'animate-refresh-spin' : ''} />
                             </Button>
                         </AppTooltip>
 
@@ -723,7 +723,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                                 <File size={12} className="text-primary/60 shrink-0" />
                                                  <span className="text-[10px] font-mono text-muted-foreground truncate">{selectedFile || 'No file selected'}</span>
                                             </div>
-                                            {contentLoading && <RefreshCcw size={12} className="text-primary animate-spin" />}
+                                            {contentLoading && <RefreshCcw size={12} className="text-primary animate-refresh-spin" />}
                                         </div>
                                         <div className="flex-1 overflow-auto custom-scrollbar text-left">
                                             {selectedFile ? (
@@ -924,7 +924,7 @@ function FileTreeNode({
                 {item.is_dir ? (
                     <>
                         {loading ? (
-                            <RefreshCcw size={13} className="text-primary/50 animate-spin" />
+                            <RefreshCcw size={13} className="text-primary/50 animate-refresh-spin" />
                         ) : (
                             <ChevronRight
                                 size={13}

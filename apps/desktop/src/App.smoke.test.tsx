@@ -607,7 +607,7 @@ describe('App smoke render', () => {
       expect((submitButton as HTMLButtonElement).disabled).toBe(true)
     })
 
-    it('shows activity events', async () => {
+    it('opens issue inspector with detail tabs', async () => {
       setupDesktopBridge()
       const issues = [
         {
@@ -622,14 +622,10 @@ describe('App smoke render', () => {
           project_id: '',
         },
       ]
-      const historyEntries = [
-        { id: 'h1', kind: 'state_change', message: 'State changed to In Progress', timestamp: '2026-03-06T00:01:00Z' },
-        { id: 'h2', kind: 'RUN_STARTED', message: 'Agent session initiated', timestamp: '2026-03-06T00:02:00Z' },
-      ]
       setupFetch(defaultSnapshot(), {
         onFetch: (url) => {
           if (url.includes('/api/v1/issues/OPS-50/history')) {
-            return new Response(JSON.stringify({ history: historyEntries }), { status: 200 })
+            return new Response(JSON.stringify({ history: [] }), { status: 200 })
           }
           if (url.includes('/api/v1/issues/OPS-50')) {
             return new Response(JSON.stringify(issues[0]), { status: 200 })
@@ -655,12 +651,11 @@ describe('App smoke render', () => {
         expect(screen.getByText(/Issue Inspector/i)).toBeTruthy()
       })
 
-      // Switch to activity tab and verify events render
-      const activityTabs = screen.getAllByText(/Activity/i)
-      fireEvent.click(activityTabs[activityTabs.length - 1])
+      // Verify the detail tabs are present (Details, Plan, Session, Changes)
       await waitFor(() => {
-        expect(screen.getAllByText(/state change/i).length).toBeGreaterThan(0)
-        expect(screen.getAllByText(/run started/i).length).toBeGreaterThan(0)
+        expect(screen.getByText('Details')).toBeTruthy()
+        expect(screen.getByText('Session')).toBeTruthy()
+        expect(screen.getByText('Changes')).toBeTruthy()
       })
     })
   })

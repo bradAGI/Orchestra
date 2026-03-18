@@ -1,4 +1,4 @@
-# 4.7 Workspace Management
+# 3.4 Workspace Management
 
 > **Source files:**
 > - `apps/backend/internal/workspace/service.go`
@@ -185,6 +185,6 @@ func MarkerPath(path string) string {
 
 ## Cross-References
 
-- [4.3 Configuration & Environment](config.md) -- `ORCHESTRA_WORKSPACE_ROOT` and hook environment variables (`ORCHESTRA_WORKSPACE_AFTER_CREATE`, etc.)
-- [4.5 Tool System](tools.md) -- Agents execute within provisioned workspaces
-- [4.8 Database Layer](database.md) -- Issues reference workspaces via `branch_name` and workspace state
+- [3.6 Configuration & Environment](config.md) -- `ORCHESTRA_WORKSPACE_ROOT` and hook environment variables (`ORCHESTRA_WORKSPACE_AFTER_CREATE`, etc.)
+- [3.8 Tool System](tools.md) -- Agents execute within provisioned workspaces
+- [3.5 Database Layer](database.md) -- Issues reference workspaces via `branch_name` and workspace state

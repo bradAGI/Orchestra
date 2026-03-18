@@ -1,4 +1,4 @@
-# 3.1 Server-Sent Events
+# 2.3 Server-Sent Events
 
 > **Source files:**
 > - `apps/backend/internal/api/events.go` — SSE endpoint handler and event serialization
@@ -79,7 +79,7 @@ event: snapshot
 data: {"generated_at":"2026-03-17T10:30:00Z","counts":{"running":2,"retrying":1},"running":[...],"retrying":[...],"codex_totals":{...},"rate_limits":null,"mcp_servers":{}}
 ```
 
-The snapshot payload conforms to the `SnapshotPayload` type. See [3.2 JSON Schemas & Types](schemas.md) for the full field reference.
+The snapshot payload conforms to the `SnapshotPayload` type. See [2.2 JSON Schemas & Types](schemas.md) for the full field reference.
 
 #### Lifecycle Event Envelope
 

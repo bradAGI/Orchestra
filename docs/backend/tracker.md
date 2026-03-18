@@ -1,4 +1,4 @@
-# 4.2 Issue Trackers
+# 3.3 Issue Trackers
 
 > **Source files:** `apps/backend/internal/tracker/types.go`, `apps/backend/internal/tracker/memory/client.go`, `apps/backend/internal/tracker/sqlite/client.go`, `apps/backend/internal/tracker/github/client.go`
 

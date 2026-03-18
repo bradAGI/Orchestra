@@ -1,4 +1,4 @@
-# 5.2 Orchestra Client & API Layer
+# 4.3 Orchestra Client & API Layer
 
 > **Source files:**
 > - `apps/desktop/src/lib/orchestra-client.ts` -- All HTTP client functions, types, and normalization
@@ -174,7 +174,7 @@ Converts any error to a user-friendly display string.
 | `createMCPServer` | POST | `/api/v1/mcp/servers` | `MCPServer` |
 | `deleteMCPServer` | DELETE | `/api/v1/mcp/servers/:id` | `void` |
 
-#### Warehouse / Analytics
+#### Analytics / Analytics
 
 | Function | Method | Endpoint | Returns |
 |----------|--------|----------|---------|

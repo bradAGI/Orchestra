@@ -937,7 +937,8 @@ export async function fetchDocs(config: BackendConfig): Promise<DocItem[]> {
  * @returns The document content as a string.
  */
 export async function fetchDocContent(config: BackendConfig, path: string): Promise<string> {
-  const response = await fetch(new URL(`/api/v1/docs/${encodeURIComponent(path)}`, config.baseUrl).toString(), {
+  const encodedPath = path.split('/').map(encodeURIComponent).join('/')
+  const response = await fetch(new URL(`/api/v1/docs/${encodedPath}`, config.baseUrl).toString(), {
     headers: buildHeaders(config),
   })
   if (!response.ok) {

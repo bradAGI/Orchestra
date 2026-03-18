@@ -1,4 +1,4 @@
-# 3. API Reference
+# 2.1 API Reference
 
 > **Source files:**
 > - `apps/backend/internal/api/router.go` — Route definitions and middleware
@@ -47,7 +47,7 @@ Real-time system state and server-sent event stream.
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/v1/state` | Current system snapshot (running/retrying issues, token totals) |
-| `GET` | `/api/v1/events` | SSE event stream. Query param `once=1` returns a single snapshot and closes. See [3.1 Server-Sent Events](sse-events.md) |
+| `GET` | `/api/v1/events` | SSE event stream. Query param `once=1` returns a single snapshot and closes. See [2.3 Server-Sent Events](sse-events.md) |
 | `POST` | `/api/v1/refresh` | Force a full state refresh |
 
 ---
@@ -59,7 +59,7 @@ CRUD operations on Orchestra issues and their associated resources.
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/v1/issues` | List all issues |
-| `POST` | `/api/v1/issues` | Create a new issue. Body: `IssueCreateRequest` (see [3.2 Schemas](schemas.md)) |
+| `POST` | `/api/v1/issues` | Create a new issue. Body: `IssueCreateRequest` (see [2.2 Schemas](schemas.md)) |
 | `GET` | `/api/v1/issues/{issue_identifier}` | Get issue detail (status, attempts, logs, events) |
 | `PATCH` | `/api/v1/issues/{issue_identifier}` | Update issue fields. Body: `IssueUpdateRequest` |
 | `DELETE` | `/api/v1/issues/{issue_identifier}` | Delete an issue |
@@ -190,7 +190,7 @@ Agent session tracking and inspection.
 
 ---
 
-### Warehouse
+### Analytics
 
 Data warehouse and aggregated telemetry statistics.
 
@@ -246,7 +246,7 @@ Manage remote execution environments via the unsandbox/unturf/permacomputer plat
 
 ### Error Responses
 
-All API errors follow a consistent envelope format. See [3.2 JSON Schemas & Types](schemas.md) for the full schema.
+All API errors follow a consistent envelope format. See [2.2 JSON Schemas & Types](schemas.md) for the full schema.
 
 ```json
 {
@@ -311,7 +311,7 @@ sequenceDiagram
 | Agents & Config | 16 |
 | MCP | 4 |
 | Sessions | 2 |
-| Warehouse | 1 |
+| Analytics | 1 |
 | Telemetry & STT | 3 |
 | Documentation | 2 |
 | Workspace Migration | 2 |

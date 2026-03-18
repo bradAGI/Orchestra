@@ -159,7 +159,7 @@ export function CreateTaskDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl w-[90vw] bg-card border-border/30 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] p-0 overflow-hidden min-h-[55vh] max-h-[85vh] flex flex-col rounded-2xl">
         <form onSubmit={handleSubmit} className="flex flex-col h-full flex-1">
-          <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pt-6 pb-4 space-y-4">
+          <div className="flex-1 flex flex-col overflow-hidden px-6 pt-6 pb-4 space-y-4">
             <input
               autoFocus
               className="w-full bg-transparent border-none outline-none text-xl font-bold placeholder:text-muted-foreground/20 focus:ring-0 focus:outline-none p-0 selection:bg-primary/30"
@@ -170,13 +170,21 @@ export function CreateTaskDialog({
               required
             />
             {titleError && <p className="text-xs text-red-400 -mt-2">{titleError}</p>}
-            <textarea
-              className="w-full bg-transparent border-none outline-none text-sm text-foreground/70 placeholder:text-muted-foreground/15 focus:ring-0 focus:outline-none p-0 resize-none min-h-[80px] selection:bg-primary/20 leading-relaxed"
-              placeholder="Describe the task for the agent..."
-              value={description}
-              onChange={(e) => { setDescription(e.target.value); setDescError('') }}
-              onFocus={() => { activeFieldRef.current = 'description' }}
-            />
+            <div
+              className="flex-1 min-h-0 cursor-text"
+              onClick={(e) => {
+                const ta = (e.currentTarget as HTMLElement).querySelector('textarea')
+                if (ta && e.target === e.currentTarget) ta.focus()
+              }}
+            >
+              <textarea
+                className="w-full h-full bg-transparent border-none outline-none text-sm text-foreground/70 placeholder:text-muted-foreground/15 focus:ring-0 focus:outline-none p-0 resize-none min-h-0 selection:bg-primary/20 leading-relaxed"
+                placeholder="Describe the task for the agent..."
+                value={description}
+                onChange={(e) => { setDescription(e.target.value); setDescError('') }}
+                onFocus={() => { activeFieldRef.current = 'description' }}
+              />
+            </div>
             {descError && <p className="text-xs text-red-400 -mt-2">{descError}</p>}
           </div>
 
@@ -251,9 +259,9 @@ export function CreateTaskDialog({
                 {recording ? (
                   <><Square className="h-3 w-3 mr-1" /> Release to Stop</>
                 ) : whisperStatus.state === 'loading' ? (
-                  <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Loading {whisperStatus.progress}%</>
+                  <><Loader2 className="h-3 w-3 mr-1 animate-spin-smooth" /> Loading {whisperStatus.progress}%</>
                 ) : whisperStatus.state === 'transcribing' ? (
-                  <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Transcribing...</>
+                  <><Loader2 className="h-3 w-3 mr-1 animate-spin-smooth" /> Transcribing...</>
                 ) : (
                   <><Mic className="h-3 w-3 mr-1" /> Hold to Talk</>
                 )}
@@ -273,7 +281,7 @@ export function CreateTaskDialog({
                 disabled={pending || !title.trim() || !projectID}
                 className="h-7 px-4 bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 font-bold uppercase tracking-widest text-[10px] disabled:opacity-30"
               >
-                {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create'}
+                {pending ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : 'Create'}
               </Button>
             </div>
           </div>

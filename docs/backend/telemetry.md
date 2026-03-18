@@ -1,4 +1,4 @@
-# 4.6 Telemetry & Log Watching
+# 3.9 Telemetry & Log Watching
 
 > **Source files:**
 > - `apps/backend/internal/telemetry/watcher.go`
@@ -210,6 +210,6 @@ Access the health snapshot via `telemetry.Health()`.
 
 ## Cross-References
 
-- [4.3 Configuration & Environment](config.md) -- `ORCHESTRA_TELEMETRY_PROVIDERS`, `ORCHESTRA_TELEMETRY_RETENTION_DAYS`, `ORCHESTRA_TELEMETRY_STORE_RAW_PAYLOAD`
-- [4.8 Database Layer](database.md) -- `sessions`, `events`, and `ingest_offsets` table schemas
-- [4.5 Tool System](tools.md) -- Sessions can be linked to issues tracked by the tool system
+- [3.6 Configuration & Environment](config.md) -- `ORCHESTRA_TELEMETRY_PROVIDERS`, `ORCHESTRA_TELEMETRY_RETENTION_DAYS`, `ORCHESTRA_TELEMETRY_STORE_RAW_PAYLOAD`
+- [3.5 Database Layer](database.md) -- `sessions`, `events`, and `ingest_offsets` table schemas
+- [3.8 Tool System](tools.md) -- Sessions can be linked to issues tracked by the tool system

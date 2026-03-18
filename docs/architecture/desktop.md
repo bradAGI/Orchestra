@@ -1,4 +1,4 @@
-# 2.2 Desktop Frontend Architecture
+# 1.3 Desktop Frontend Architecture
 
 > **Source files:** `apps/desktop/src/`, `apps/desktop/electron/`, `apps/desktop/vite.config.ts`, `apps/desktop/package.json`
 
@@ -196,6 +196,6 @@ The `src/lib/enums.ts` file defines the canonical enum values used throughout th
 
 ### Cross-References
 
-- [2. Architecture Overview](overview.md) -- System-level context
-- [2.1 Backend Architecture](backend.md) -- API endpoints consumed by the frontend
-- [2.4 Data Flow & Events](data-flow.md) -- SSE event pipeline and snapshot strategy
+- [1.1 Architecture Overview](overview.md) -- System-level context
+- [1.2 Backend Architecture](backend.md) -- API endpoints consumed by the frontend
+- [1.5 Data Flow & Events](data-flow.md) -- SSE event pipeline and snapshot strategy

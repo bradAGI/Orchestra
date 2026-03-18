@@ -17,8 +17,8 @@ flowchart LR
     end
 
     subgraph Stage2["Stage 2: runtime (distroless)"]
-        BIN_D[/usr/local/bin/orchestrad]
-        BIN_C[/usr/local/bin/orchestra]
+        BIN_D["/usr/local/bin/orchestrad"]
+        BIN_C["/usr/local/bin/orchestra"]
         ENV[Environment defaults]
         HC[Healthcheck]
         EP[ENTRYPOINT orchestrad]
@@ -124,7 +124,7 @@ docker compose down
 
 ## 6.2.4 Registry Publishing
 
-Container images are published to GHCR via the `orchestra-container-publish` workflow (see [Section 6.1](ci-cd.md)):
+Container images are published to GHCR via the `orchestra-container-publish` workflow (see [Section 6.3](ci-cd.md)):
 
 ```mermaid
 flowchart LR
@@ -153,4 +153,4 @@ docker run -d -p 4010:4010 ghcr.io/<owner>/orchestra-backend:latest
 
 ---
 
-*Cross-references: [CI/CD Pipelines](ci-cd.md) (Section 6.1), [Configuration Guide](../guides/configuration.md) (Section 7.1), [Deployment](deployment.md) (Section 6)*
+*Cross-references: [CI/CD Pipelines](ci-cd.md) (Section 6.3), [Configuration Guide](../guides/configuration.md) (Section 5.2), [Deployment](deployment.md) (Section 6.1)*

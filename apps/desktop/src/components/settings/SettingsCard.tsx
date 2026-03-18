@@ -88,15 +88,14 @@ export function SettingsCard({
   onNotifVolumeChange?: (volume: number) => void
 }) {
   const { isMac } = usePlatform()
-  const [activeTab, setActiveTab] = useState<'backend' | 'agents' | 'integrations' | 'migration' | 'shortcuts' | 'notifications'>('backend')
+  const [activeTab, setActiveTab] = useState<'backend' | 'agents' | 'integrations' | 'shortcuts' | 'notifications'>('backend')
 
   const tabs = [
     { id: 'backend', label: 'Backend', tooltip: 'Configure backend profiles and API connection', icon: <Database className="h-3.5 w-3.5" /> },
     { id: 'agents', label: 'Agents', tooltip: 'Set provider commands and default runner', icon: <Zap className="h-3.5 w-3.5" /> },
     { id: 'integrations', label: 'Integrations', tooltip: 'Configure external service connections', icon: <Globe className="h-3.5 w-3.5" /> },
     { id: 'notifications', label: 'Notifications', tooltip: 'Sound and notification preferences', icon: <Bell className="h-3.5 w-3.5" /> },
-    { id: 'migration', label: 'Migration', tooltip: 'Plan and apply workspace migrations', icon: <RefreshCcw className="h-3.5 w-3.5" /> },
-    { id: 'shortcuts', label: 'Shortcuts', tooltip: 'View global keyboard shortcuts', icon: <Keyboard className="h-3.5 w-3.5" /> },
+{ id: 'shortcuts', label: 'Shortcuts', tooltip: 'View global keyboard shortcuts', icon: <Keyboard className="h-3.5 w-3.5" /> },
   ] as const
 
   return (
@@ -207,36 +206,6 @@ export function SettingsCard({
             </div>
           )}
 
-          {activeTab === 'migration' && (
-            <div className="space-y-6 flex-1 flex flex-col">
-              <div className="group relative rounded-2xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 p-6 shadow-sm transition-all hover:shadow-md overflow-hidden">
-                <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-primary/80">
-                    <RefreshCcw className="h-4 w-4" />
-                    <h3 className="text-xs font-black uppercase tracking-wider">Workspace Transfer</h3>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed bg-muted/20 p-3 rounded-xl border border-border/20 italic">
-                    Relocate issue workspaces across filesystem targets. This tool recursively copies git state, artifacts, and logs.
-                  </p>
-                  <div className="flex flex-wrap items-center gap-4">
-                    <WorkspaceMigrationDialog
-                      migrationPending={migrationPending}
-                      config={config}
-                      migrationFrom={migrationFrom}
-                      migrationTo={migrationTo}
-                      migrationPlan={migrationPlan}
-                      onMigrationFromChange={onMigrationFromChange}
-                      onMigrationToChange={onMigrationToChange}
-                      onMigrationPlan={onMigrationPlan}
-                      onMigrationApply={onMigrationApply}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {activeTab === 'shortcuts' && (
             <div className="space-y-6 pb-6 flex-1 flex flex-col">
               <div className="grid gap-3 sm:grid-cols-2">
@@ -244,7 +213,7 @@ export function SettingsCard({
                   { label: 'Command Palette', desc: 'Search and navigate instantly', keys: [isMac ? '\u2318' : 'Ctrl', 'K'] },
                   { label: 'Refresh Tracker', desc: 'Full state synchronization', keys: [isMac ? '\u2318' : 'Ctrl', 'R'] },
                   { label: 'Toggle Sidebar', desc: 'Collapse/expand navigation', keys: [isMac ? '\u2318' : 'Ctrl', '/'] },
-                  { label: 'Quick Switch', desc: 'Back to operations overview', keys: [isMac ? '\u2325' : 'Alt', '1'] },
+                  { label: 'Switch Tab', desc: 'Ctrl+1 Tasks, Ctrl+2 Projects, etc.', keys: [isMac ? '\u2318' : 'Ctrl', '1-8'] },
                 ].map((s, idx) => (
                   <div key={idx} className="group/item relative flex items-center justify-between p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 shadow-sm transition-all hover:border-primary/20 overflow-hidden">
                     <div className="space-y-0.5">
@@ -478,7 +447,7 @@ function AgentConfigForm({
           disabled={disabled || !provider}
           className="px-6 font-black uppercase tracking-widest text-[9px] h-9 rounded-lg"
         >
-          {disabled ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Update Agent Configuration'}
+          {disabled ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : 'Update Agent Configuration'}
         </Button>
       </div>
     </div>
@@ -555,7 +524,7 @@ function BackendConfigForm({
                   />
                   {profilesPending && (
                     <div className="absolute right-8 top-1/2 -translate-y-1/2">
-                      <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                      <Loader2 className="h-3 w-3 animate-spin-smooth text-primary" />
                     </div>
                   )}
                 </div>
@@ -678,7 +647,7 @@ function BackendConfigForm({
           disabled={disabled || baseUrl.trim() === ''}
           className="px-6 shadow-lg shadow-primary/20 font-black uppercase tracking-widest text-[9px] h-9 rounded-lg"
         >
-          {savingConfig ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save Backend Config'}
+          {savingConfig ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : 'Save Backend Config'}
         </Button>
       </div>
     </div>
@@ -921,7 +890,7 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
             disabled={disabled || saving || !publicKey.trim() || (!secretKey.trim() && !isConfigured)}
             className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+            {saving ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <Check className="h-3 w-3" />}
             Save Keys
           </button>
           <button
@@ -929,7 +898,7 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
             disabled={disabled || checking || !isConfigured}
             className="flex items-center gap-1.5 rounded-lg border border-border/40 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:border-border disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {checking ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
+            {checking ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <ShieldCheck className="h-3 w-3" />}
             Test Connection
           </button>
           {isConfigured && (
@@ -954,9 +923,9 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
           <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-1">
             <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-500">API Key Status</p>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
-              {status.key_info.tier && <><span className="text-muted-foreground">Tier</span><span className="font-mono">{String(status.key_info.tier)}</span></>}
-              {status.key_info.rate_per_minute && <><span className="text-muted-foreground">Rate</span><span className="font-mono">{String(status.key_info.rate_per_minute)}/min</span></>}
-              {status.key_info.concurrency && <><span className="text-muted-foreground">Concurrency</span><span className="font-mono">{String(status.key_info.concurrency)}</span></>}
+              {status.key_info.tier ? <><span className="text-muted-foreground">Tier</span><span className="font-mono">{String(status.key_info.tier)}</span></> : null}
+              {status.key_info.rate_per_minute ? <><span className="text-muted-foreground">Rate</span><span className="font-mono">{String(status.key_info.rate_per_minute)}/min</span></> : null}
+              {status.key_info.concurrency ? <><span className="text-muted-foreground">Concurrency</span><span className="font-mono">{String(status.key_info.concurrency)}</span></> : null}
             </div>
           </div>
         )}

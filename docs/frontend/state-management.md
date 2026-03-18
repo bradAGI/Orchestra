@@ -1,4 +1,4 @@
-# 5.1 State Management & Runtime Sync
+# 4.4 State Management & Runtime Sync
 
 > **Source files:**
 > - `apps/desktop/src/lib/runtime-sync.ts` -- SSE connection lifecycle and polling fallback

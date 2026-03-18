@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Loader2, Moon, Search, Settings2, Sun, Activity, Download, AlertTriangle, RefreshCcw } from 'lucide-react'
 import * as Tooltip from '@radix-ui/react-tooltip'
 import { Button } from '@/components/ui/button'
@@ -27,6 +28,7 @@ export function TopBar({
   usePolling,
   onDownloadDiagnostics,
   onTogglePolling,
+  flush,
 }: {
   sectionLabel: string
   sectionTitle: string
@@ -46,6 +48,7 @@ export function TopBar({
   usePolling?: boolean
   onDownloadDiagnostics?: () => void
   onTogglePolling?: () => void
+  flush?: boolean
 }) {
   const { isMac } = usePlatform()
   const [searchQuery, setSearchQuery] = useState('')
@@ -53,16 +56,23 @@ export function TopBar({
   const [searchPending, setSearchPending] = useState(false)
   const [showResults, setShowResults] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      if (
+        searchRef.current && !searchRef.current.contains(target) &&
+        dropdownRef.current && !dropdownRef.current.contains(target)
+      ) {
         setShowResults(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
 
   useEffect(() => {
     const timer = setTimeout(async () => {
@@ -148,8 +158,9 @@ export function TopBar({
               className="flex h-8 min-w-[220px] items-center gap-2 rounded-xl bg-muted/30 px-3 text-muted-foreground border border-border/50 shadow-inner transition-all duration-300 focus-within:bg-background focus-within:border-primary/40 focus-within:ring-4 focus-within:ring-primary/10"
               role="search"
             >
-              {searchPending ? <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" /> : <Search className="h-3.5 w-3.5 group-focus-within:text-primary transition-colors" />}
+              {searchPending ? <Loader2 className="h-3.5 w-3.5 animate-spin-smooth text-primary" /> : <Search className="h-3.5 w-3.5 group-focus-within:text-primary transition-colors" />}
               <input
+                ref={searchInputRef}
                 type="text"
                 className="w-full bg-transparent text-[11px] font-medium text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
                 placeholder="Universal Search..."
@@ -162,13 +173,26 @@ export function TopBar({
               </kbd>
             </div>
 
-            {showResults && searchResults.length > 0 && (
-              <div className="absolute top-full right-0 z-50 mt-2 w-[300px] overflow-hidden rounded-xl border border-border bg-card shadow-2xl animate-in fade-in zoom-in-95 duration-100">
+            {showResults && searchResults.length > 0 && createPortal(
+              <div
+                ref={dropdownRef}
+                className="fixed overflow-hidden rounded-xl border border-border text-foreground shadow-2xl animate-in fade-in zoom-in-95 duration-100"
+                style={{
+                  backgroundColor: 'hsl(160, 10%, 9%)',
+                  top: (searchRef.current?.getBoundingClientRect().bottom ?? 50) + 4,
+                  left: searchRef.current?.getBoundingClientRect().left ?? 0,
+                  width: searchRef.current?.getBoundingClientRect().width ?? 340,
+                  zIndex: 99999,
+                }}
+              >
+                <div className="px-3 py-2 border-b border-border/50">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">{searchResults.length} result{searchResults.length !== 1 ? 's' : ''}</span>
+                </div>
                 <div className="max-h-[300px] overflow-auto py-1">
                   {searchResults.map((result, idx) => (
                     <button
                       key={result.id ?? result.issue_id ?? result.identifier ?? result.issue_identifier ?? `result-${idx}`}
-                      className="flex w-full flex-col gap-0.5 px-3 py-2 text-left hover:bg-muted/50 transition-colors"
+                      className="flex w-full flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-white/5 transition-colors border-b border-border/30 last:border-0"
                       onClick={() => {
                         const issueIdentifier = result.identifier ?? result.issue_identifier
                         if (issueIdentifier) {
@@ -186,7 +210,8 @@ export function TopBar({
                     </button>
                   ))}
                 </div>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
 
@@ -210,7 +235,7 @@ export function TopBar({
               }`}
             >
               {refreshPending ? (
-                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin-smooth" />
               ) : (
                 <RefreshCcw className="mr-2 h-3.5 w-3.5" />
               )}

@@ -1,4 +1,4 @@
-# 7.1 Configuration Guide
+# 5.2 Configuration Guide
 
 > **Source files:** `apps/backend/internal/config/load.go`, `apps/backend/internal/config/types.go`
 
@@ -230,4 +230,4 @@ docker run -d \
 
 ---
 
-*Cross-references: [Getting Started](getting-started.md) (Section 7), [Container Build](../operations/docker.md) (Section 6.2), [Backend Internals](../backend/orchestrator.md) (Section 4)*
+*Cross-references: [Getting Started](getting-started.md) (Section 5.1), [Container Build](../operations/docker.md) (Section 6.2), [Backend Internals](../backend/orchestrator.md) (Section 3.1)*

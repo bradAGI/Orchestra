@@ -1,4 +1,4 @@
-# 7 Getting Started
+# 5.1 Getting Started
 
 > **Source files:** `README.md`, `apps/backend/cmd/orchestrad/main.go`, `apps/desktop/package.json`, `apps/backend/internal/app/run.go`
 
@@ -149,7 +149,7 @@ flowchart TD
 
 5. **Create an issue** through the UI and dispatch it to an agent. Monitor progress in real time via the event stream.
 
-See [Configuration Guide](configuration.md) (Section 7.1) for the full environment variable reference.
+See [Configuration Guide](configuration.md) (Section 5.2) for the full environment variable reference.
 
 ## 7.7 Troubleshooting
 
@@ -166,4 +166,4 @@ See [Configuration Guide](configuration.md) (Section 7.1) for the full environme
 
 ---
 
-*Cross-references: [Configuration Guide](configuration.md) (Section 7.1), [Development Guide](development.md) (Section 7.2), [Architecture Overview](../architecture/overview.md) (Section 2)*
+*Cross-references: [Configuration Guide](configuration.md) (Section 5.2), [Development Guide](development.md) (Section 5.3), [Architecture Overview](../architecture/overview.md) (Section 1.1)*

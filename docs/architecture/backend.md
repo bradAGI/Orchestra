@@ -1,4 +1,4 @@
-# 2.1 Backend Architecture
+# 1.2 Backend Architecture
 
 > **Source files:** `apps/backend/cmd/orchestrad/`, `apps/backend/internal/`
 
@@ -217,6 +217,6 @@ Key operations:
 
 ### Cross-References
 
-- [2. Architecture Overview](overview.md) -- High-level system diagram
-- [2.4 Data Flow & Events](data-flow.md) -- SSE event pipeline and PubSub internals
-- [2.2 Desktop Frontend](desktop.md) -- How the frontend consumes the API
+- [1.1 Architecture Overview](overview.md) -- High-level system diagram
+- [1.5 Data Flow & Events](data-flow.md) -- SSE event pipeline and PubSub internals
+- [1.3 Desktop Frontend](desktop.md) -- How the frontend consumes the API

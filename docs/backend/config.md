@@ -1,4 +1,4 @@
-# 4.3 Configuration & Environment
+# 3.6 Configuration & Environment
 
 > **Source files:**
 > - `apps/backend/internal/config/types.go`
@@ -216,7 +216,7 @@ Four functions support runtime config operations:
 
 ## Cross-References
 
-- [4.4 MCP Server Integration](mcp.md) -- MCP server definitions from `MCPServers` config field
-- [4.5 Tool System](tools.md) -- Agent command templates and tool execution
-- [4.7 Workspace Management](workspace.md) -- Workspace hooks and root directory configuration
-- [4.6 Telemetry & Log Watching](telemetry.md) -- Telemetry provider and retention configuration
+- [3.7 MCP Server Integration](mcp.md) -- MCP server definitions from `MCPServers` config field
+- [3.8 Tool System](tools.md) -- Agent command templates and tool execution
+- [3.4 Workspace Management](workspace.md) -- Workspace hooks and root directory configuration
+- [3.9 Telemetry & Log Watching](telemetry.md) -- Telemetry provider and retention configuration

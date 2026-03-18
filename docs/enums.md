@@ -1,4 +1,4 @@
-# 8. Enum Reference
+# 7. Enum Reference
 
 > **Source files:**
 > - `apps/backend/internal/types/enums.go` -- IssueStatus, AgentCategory, SSEEventType (Go)
@@ -181,7 +181,7 @@ Global configs are resolved from `$HOME/{provider_paths}` or from the Orchestra 
 
 ## SSEEventType
 
-Event types emitted over the Server-Sent Events stream. See [Section 3.2: SSE Events](api/sse-events.md) for protocol details.
+Event types emitted over the Server-Sent Events stream. See [Section 2.3: SSE Events](api/sse-events.md) for protocol details.
 
 | Value | Category | Description | Layer |
 |---|---|---|---|
@@ -316,6 +316,6 @@ Summary of where each enum is defined and used across the stack:
 
 ## Cross-references
 
-- **JSON schema definitions** that use these enums are documented in [Section 3.2: JSON Schemas & Types](api/schemas.md).
+- **JSON schema definitions** that use these enums are documented in [Section 2.2: JSON Schemas & Types](api/schemas.md).
 - **SSE event stream protocol** is documented in [SSE Events](api/sse-events.md).
-- **API endpoint routes** are documented in [Section 3.1: API Reference](api/reference.md).
+- **API endpoint routes** are documented in [Section 2.1: API Reference](api/reference.md).

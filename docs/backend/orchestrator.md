@@ -1,4 +1,4 @@
-# 4. Orchestrator Service
+# 3.1 Orchestrator Service
 
 > **Source files:** `apps/backend/internal/orchestrator/state.go`, `apps/backend/internal/orchestrator/reconcile.go`
 

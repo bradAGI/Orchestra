@@ -1,4 +1,4 @@
-# 4.4 MCP Server Integration
+# 3.7 MCP Server Integration
 
 > **Source files:**
 > - `apps/backend/internal/mcp/client.go`
@@ -158,7 +158,7 @@ MCP server configurations are also persisted in the SQLite database for manageme
 | Update | `UpdateMCPServer(ctx, id, name, command)` | Updates name and command by ID |
 | Delete | `DeleteMCPServer(ctx, id)` | Removes a server by ID |
 
-See [4.8 Database Layer](database.md) for the `mcp_servers` table schema.
+See [3.5 Database Layer](database.md) for the `mcp_servers` table schema.
 
 ---
 
@@ -177,6 +177,6 @@ See [4.8 Database Layer](database.md) for the `mcp_servers` table schema.
 
 ## Cross-References
 
-- [4.3 Configuration & Environment](config.md) -- `ORCHESTRA_MCP_SERVERS` environment variable and `MCPServers` config field
-- [4.5 Tool System](tools.md) -- Tool execution patterns that complement MCP tools
-- [4.8 Database Layer](database.md) -- `mcp_servers` table for persistent server registration
+- [3.6 Configuration & Environment](config.md) -- `ORCHESTRA_MCP_SERVERS` environment variable and `MCPServers` config field
+- [3.8 Tool System](tools.md) -- Tool execution patterns that complement MCP tools
+- [3.5 Database Layer](database.md) -- `mcp_servers` table for persistent server registration

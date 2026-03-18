@@ -354,7 +354,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                 </div>
                 <div>
                     <h1 className="text-2xl font-black tracking-tight leading-none bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">
-                        Warehouse Analytics
+                        Analytics
                     </h1>
                     <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-[0.2em] opacity-60 mt-1.5">
                         Fleet spend est. <span className="text-primary font-black">${totalSpend.toFixed(2)}</span> across all providers

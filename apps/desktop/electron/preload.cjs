@@ -13,4 +13,5 @@ contextBridge.exposeInMainWorld('orchestraDesktop', {
   openPath: (targetPath) => ipcRenderer.invoke('orchestra:open-path', targetPath),
   selectFolder: () => ipcRenderer.invoke('orchestra:select-folder'),
   getScaleFactor: () => 1,
+  onSwitchTab: (callback) => ipcRenderer.on('orchestra:switch-tab', (_event, tabNum) => callback(tabNum)),
 })

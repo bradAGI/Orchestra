@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { 
     BookOpen, FileText, ChevronRight, Search, 
     Terminal, Info, ShieldCheck, ListTree, 
-    Sparkles, RefreshCcw, Folder, FolderOpen,
+    RefreshCcw, Folder, FolderOpen,
     CheckCircle2, Activity, Clock, Hash,
     ArrowUp, Menu, LayoutList, ScrollText, Code as CodeIcon
 } from 'lucide-react'
@@ -18,13 +18,15 @@ import rehypeSlug from 'rehype-slug'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { D3ArchitectureGraph } from '../diagrams/D3ArchitectureGraph'
+import { MermaidDiagram, DiagramFullscreenOverlay, DiagramErrorBoundary } from '../diagrams/MermaidDiagram'
 import { AppTooltip } from '../ui/tooltip-wrapper'
 
 interface DocsDashboardProps {
     config: BackendConfig | null
+    theme?: 'light' | 'dark'
 }
 
-export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config }) => {
+export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) => {
     const [docs, setDocs] = useState<DocItem[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedPath, setSelectedPath] = useState<string | null>(null)
@@ -62,6 +64,9 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config }) => {
     }
 
     const findFirstDoc = (items: DocItem[]): DocItem | null => {
+        // Prefer index.md as the landing page
+        const indexDoc = items.find(i => i.name === 'index.md')
+        if (indexDoc) return indexDoc
         for (const item of items) {
             if (!item.is_folder) return item
             if (item.children) {
@@ -98,6 +103,95 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config }) => {
             setContentLoading(false)
         }
     }
+
+    // Stable refs for the memoized markdown components
+    const handleSelectDocRef = useRef(handleSelectDoc)
+    handleSelectDocRef.current = handleSelectDoc
+    const selectedPathRef = useRef(selectedPath)
+    selectedPathRef.current = selectedPath
+
+    const markdownComponents = useMemo(() => ({
+        a({href, children, ...props}: any) {
+            if (href && (href.endsWith('.md') || href.includes('.md#'))) {
+                const currentDir = selectedPathRef.current?.split('/').slice(0, -1).join('/') || ''
+                let resolvedPath = href.split('#')[0]
+                if (!resolvedPath.startsWith('/') && currentDir) {
+                    resolvedPath = `${currentDir}/${resolvedPath}`
+                }
+                const parts = resolvedPath.split('/').filter(Boolean)
+                const normalized: string[] = []
+                for (const p of parts) {
+                    if (p === '..') normalized.pop()
+                    else if (p !== '.') normalized.push(p)
+                }
+                resolvedPath = normalized.join('/')
+                return (
+                    <a
+                        href="#"
+                        onClick={(e) => { e.preventDefault(); handleSelectDocRef.current(resolvedPath) }}
+                        className="text-primary border-b border-primary/30 hover:border-primary transition-colors cursor-pointer"
+                        {...props}
+                    >
+                        {children}
+                    </a>
+                )
+            }
+            return <a href={href} target="_blank" rel="noopener noreferrer" {...props}>{children}</a>
+        },
+        pre({node, children, ...preProps}: any) {
+            const codeChild = node?.children?.[0]
+            if (codeChild?.type === 'element' && codeChild.tagName === 'code') {
+                const cls = codeChild.properties?.className
+                const langStr = Array.isArray(cls) ? cls.join(' ') : String(cls || '')
+                if (langStr.includes('language-mermaid')) {
+                    const text = codeChild.children
+                        ?.map((c: any) => c.type === 'text' ? c.value : '')
+                        .join('') || ''
+                    return <DiagramErrorBoundary chart={text}><MermaidDiagram chart={text} theme={theme} /></DiagramErrorBoundary>
+                }
+            }
+            return <pre {...preProps}>{children}</pre>
+        },
+        code({node, className, children, ...props}: any) {
+            const match = /language-([a-zA-Z0-9-]+)/.exec(className || '')
+            const isInline = node?.tagName === 'code' && !match
+            if (!isInline && match) {
+                if (match[1] === 'diagram-architecture') {
+                    return <D3ArchitectureGraph data={String(children)} />
+                }
+                return (
+                    <div className="my-10 rounded-3xl overflow-hidden border border-border shadow-2xl bg-card">
+                        <div className="bg-muted/30 px-6 py-3 flex items-center justify-between border-b border-border">
+                            <div className="flex items-center gap-3">
+                                <div className="flex gap-1.5">
+                                    <div className="h-2.5 w-2.5 rounded-full bg-destructive/20 border border-destructive/10" />
+                                    <div className="h-2.5 w-2.5 rounded-full bg-amber-500/20 border border-amber-500/10" />
+                                    <div className="h-2.5 w-2.5 rounded-full bg-emerald-500/20 border border-emerald-500/10" />
+                                </div>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">{match[1]}</span>
+                            </div>
+                            <div className="h-5 w-5 rounded-md bg-muted/20 flex items-center justify-center border border-border">
+                                <CodeIcon size={12} className="text-muted-foreground/40" />
+                            </div>
+                        </div>
+                        <SyntaxHighlighter
+                            style={oneDark}
+                            language={match[1]}
+                            PreTag="div"
+                            customStyle={{ margin: 0, padding: '2rem', fontSize: '14px', background: 'transparent', lineHeight: '1.6' }}
+                        >
+                            {String(children).replace(/\n$/, '')}
+                        </SyntaxHighlighter>
+                    </div>
+                )
+            }
+            return (
+                <code className="bg-primary/10 text-primary px-1.5 py-0.5 rounded-md font-mono text-[0.9em]" {...props}>
+                    {children}
+                </code>
+            )
+        }
+    }), [theme])
 
     const generateToc = (markdown: string) => {
         const lines = markdown.split('\n')
@@ -149,28 +243,87 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config }) => {
 
     const filteredDocs = useMemo(() => filterTree(docs, searchQuery), [docs, searchQuery])
 
-    const renderTree = (items: DocItem[], level = 0) => {
-        return items.sort((a, b) => {
+    // Section ordering and numbering
+    const sectionOrder: Record<string, number> = {
+        'index.md': 0,
+        'architecture': 1,
+        'api': 2,
+        'backend': 3,
+        'frontend': 4,
+        'guides': 5,
+        'operations': 6,
+        'enums.md': 7,
+    }
+    const subSectionOrder: Record<string, Record<string, number>> = {
+        'architecture': { 'overview.md': 0, 'backend.md': 1, 'desktop.md': 2, 'tui.md': 3, 'data-flow.md': 4 },
+        'api': { 'reference.md': 0, 'schemas.md': 1, 'sse-events.md': 2 },
+        'backend': { 'orchestrator.md': 0, 'agents.md': 1, 'tracker.md': 2, 'workspace.md': 3, 'database.md': 4, 'config.md': 5, 'mcp.md': 6, 'tools.md': 7, 'telemetry.md': 8 },
+        'frontend': { 'components.md': 0, 'views.md': 1, 'client.md': 2, 'state-management.md': 3, 'electron.md': 4 },
+        'guides': { 'getting-started.md': 0, 'configuration.md': 1, 'development.md': 2 },
+        'operations': { 'deployment.md': 0, 'docker.md': 1, 'ci-cd.md': 2 },
+    }
+
+    const getDisplayName = (item: DocItem): string => {
+        if (item.name === 'index.md') return 'Orchestra Documentation'
+        return item.name.replace('.md', '').replace(/[-_]/g, ' ')
+    }
+
+    const getSectionNumber = (item: DocItem): string => {
+        const parentDir = item.path.includes('/') ? item.path.split('/')[0] : ''
+        if (item.is_folder) {
+            const num = sectionOrder[item.name]
+            return num !== undefined && num > 0 ? `${num}` : ''
+        }
+        if (!parentDir) {
+            // Root-level file
+            const num = sectionOrder[item.name]
+            return num !== undefined ? (num === 0 ? '' : `${num}`) : ''
+        }
+        // File inside a folder
+        const parentNum = sectionOrder[parentDir]
+        const subOrder = subSectionOrder[parentDir]
+        const subNum = subOrder?.[item.name]
+        if (parentNum !== undefined && subNum !== undefined) {
+            return `${parentNum}.${subNum + 1}`
+        }
+        return ''
+    }
+
+    const sortItems = (items: DocItem[], parentDir?: string): DocItem[] => {
+        return [...items].sort((a, b) => {
+            // Folders before files, except index.md always first
+            if (a.name === 'index.md') return -1
+            if (b.name === 'index.md') return 1
             if (a.is_folder && !b.is_folder) return -1
             if (!a.is_folder && b.is_folder) return 1
+
+            const orderMap = parentDir ? subSectionOrder[parentDir] : sectionOrder
+            const aOrder = orderMap?.[a.name] ?? 999
+            const bOrder = orderMap?.[b.name] ?? 999
+            if (aOrder !== bOrder) return aOrder - bOrder
             return a.name.localeCompare(b.name)
-        }).map(item => {
+        })
+    }
+
+    const renderTree = (items: DocItem[], level = 0, parentDir?: string) => {
+        return sortItems(items, parentDir).map(item => {
             if (item.is_folder) {
                 const isExpanded = expandedFolders.has(item.path)
                 return (
                     <div key={item.path} className="space-y-0.5">
                         <button
                             onClick={() => toggleFolder(item.path)}
-                            className="w-full flex items-center gap-2 px-2 py-1 rounded-md text-muted-foreground/50 hover:bg-muted transition-all text-left group"
+                            className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-muted-foreground/50 hover:bg-muted transition-all text-left group"
                             style={{ paddingLeft: `${level * 12 + 8}px` }}
                         >
                             <div className="flex items-center gap-2 flex-1 text-left">
-                                {isExpanded ? <FolderOpen size={12} className="text-primary/60" /> : <Folder size={12} className="text-muted-foreground/30" />}
-                                <span className="text-[10px] font-black uppercase tracking-widest group-hover:text-muted-foreground transition-colors">{item.name}</span>
+                                {isExpanded ? <FolderOpen size={14} className="text-primary/60" /> : <Folder size={14} className="text-muted-foreground/30" />}
+                                {getSectionNumber(item) && <span className="text-[10px] font-mono text-primary/50">{getSectionNumber(item)}</span>}
+                                <span className="text-xs font-black uppercase tracking-widest group-hover:text-muted-foreground transition-colors">{item.name}</span>
                             </div>
-                            <ChevronRight size={10} className={`transition-transform duration-200 opacity-20 ${isExpanded ? 'rotate-90' : ''}`} />
+                            <ChevronRight size={12} className={`transition-transform duration-200 opacity-20 ${isExpanded ? 'rotate-90' : ''}`} />
                         </button>
-                        {isExpanded && item.children && renderTree(item.children, level + 1)}
+                        {isExpanded && item.children && renderTree(item.children, level + 1, item.name)}
                     </div>
                 )
             }
@@ -180,17 +333,18 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config }) => {
                 <button
                     key={item.path}
                     onClick={() => handleSelectDoc(item.path)}
-                    className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md transition-all text-left relative group ${
-                        isActive 
-                            ? 'bg-primary/10 text-primary border border-primary/20 shadow-sm font-bold' 
+                    className={`w-full flex items-center gap-2.5 px-2 py-2.5 rounded-md transition-all text-left relative group ${
+                        isActive
+                            ? 'bg-primary/10 text-primary border border-primary/20 shadow-sm font-bold'
                             : 'text-muted-foreground/60 hover:bg-muted border border-transparent hover:text-foreground'
                     }`}
                     style={{ paddingLeft: `${level * 12 + 8}px` }}
                 >
-                    {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 h-3 w-0.5 bg-primary rounded-r-full" />}
-                    <FileText size={12} className={isActive ? 'text-primary' : 'text-muted-foreground/30 group-hover:text-muted-foreground/60'} />
-                    <span className={`flex-1 text-[13px] tracking-tight truncate`}>
-                        {item.name.replace('.md', '').replace(/_/g, ' ')}
+                    {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-0.5 bg-primary rounded-r-full" />}
+                    <FileText size={14} className={isActive ? 'text-primary' : 'text-muted-foreground/30 group-hover:text-muted-foreground/60'} />
+                    {getSectionNumber(item) && <span className="text-[10px] font-mono text-primary/40 shrink-0">{getSectionNumber(item)}</span>}
+                    <span className={`flex-1 text-sm tracking-tight truncate`}>
+                        {getDisplayName(item)}
                     </span>
                 </button>
             )
@@ -199,54 +353,33 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config }) => {
 
     return (
         <div className="flex flex-col h-full bg-background/20 overflow-hidden">
-            {/* Wiki Header */}
-            <div className="flex items-center justify-between px-8 py-5 border-b border-border bg-background/40 shadow-sm transition-colors duration-300">
-                <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shadow-lg shadow-primary/5">
-                        <BookOpen className="text-primary h-5 w-5" />
-                    </div>
-                    <div className="text-left">
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-xl font-black tracking-tight text-foreground/90 uppercase">Knowledge Base</h1>
-                            <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 text-[8px] font-black uppercase tracking-widest h-4 px-1.5">v1.0.8</Badge>
-                        </div>
-                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium uppercase tracking-widest opacity-60">
-                            <span>{selectedPath?.split('/').join(' / ') || 'Home'}</span>
-                        </div>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3">
-                    <div className="relative group">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
-                        <input 
-                            type="text"
-                            placeholder="Search wiki..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="h-9 pl-9 pr-4 bg-muted/30 border-border rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 w-64 transition-all"
-                        />
-                    </div>
-                    <AppTooltip content="Force documentation scan">
-                        <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={loadDocs} 
-                            disabled={loading}
-                            className="h-9 w-9 p-0 border border-border hover:bg-muted"
-                        >
-                            <RefreshCcw size={14} className={loading ? 'animate-spin' : ''} />
-                        </Button>
-                    </AppTooltip>
-                </div>
-            </div>
-
+            <DiagramFullscreenOverlay />
             <div className="flex-1 flex overflow-hidden min-h-0 relative bg-transparent">
                 {/* Left Sidebar (Navigation) */}
-                <div className="w-72 border-r border-border bg-muted/10 flex flex-col min-h-0 z-20">
-                    <div className="p-4 border-b border-border shrink-0 bg-muted/5">
-                        <div className="flex items-center gap-2 px-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">
-                            <LayoutList size={12} />
-                            Navigation
+                <div className="w-72 border-r border-border bg-muted/10 flex flex-col min-h-0 z-20 ml-3">
+                    <div className="p-3 border-b border-border shrink-0 bg-muted/5">
+                        <div className="flex items-center gap-2">
+                            <div className="relative group flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
+                                <input
+                                    type="text"
+                                    placeholder="Search docs..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full h-8 pl-9 pr-4 bg-muted/30 border-border rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                                />
+                            </div>
+                            <AppTooltip content="Force documentation scan">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={loadDocs}
+                                    disabled={loading}
+                                    className="h-8 w-8 p-0 shrink-0 border border-border hover:bg-muted"
+                                >
+                                    <RefreshCcw size={14} className={loading ? 'animate-refresh-spin' : ''} />
+                                </Button>
+                            </AppTooltip>
                         </div>
                     </div>
                     <OverlayScrollbarsComponent
@@ -297,53 +430,10 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config }) => {
                                     </div>
 
                                     <article className="prose prose-invert max-w-none prose-wiki">
-                                        <ReactMarkdown 
+                                        <ReactMarkdown
                                             remarkPlugins={[remarkGfm]}
                                             rehypePlugins={[rehypeSlug]}
-                                            components={{
-                                                code({node, className, children, ...props}) {
-                                                    const match = /language-([a-zA-Z0-9-]+)/.exec(className || '')
-                                                    const isInline = node?.tagName === 'code' && !match
-                                                    
-                                                    if (!isInline && match) {
-                                                        if (match[1] === 'diagram-architecture') {
-                                                            return <D3ArchitectureGraph data={String(children)} />
-                                                        }
-
-                                                        return (
-                                                            <div className="my-10 rounded-3xl overflow-hidden border border-border shadow-2xl bg-card">
-                                                                <div className="bg-muted/30 px-6 py-3 flex items-center justify-between border-b border-border">
-                                                                    <div className="flex items-center gap-3">
-                                                                        <div className="flex gap-1.5">
-                                                                            <div className="h-2.5 w-2.5 rounded-full bg-destructive/20 border border-destructive/10" />
-                                                                            <div className="h-2.5 w-2.5 rounded-full bg-amber-500/20 border border-amber-500/10" />
-                                                                            <div className="h-2.5 w-2.5 rounded-full bg-emerald-500/20 border border-emerald-500/10" />
-                                                                        </div>
-                                                                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">{match[1]}</span>
-                                                                    </div>
-                                                                    <div className="h-5 w-5 rounded-md bg-muted/20 flex items-center justify-center border border-border">
-                                                                        <CodeIcon size={12} className="text-muted-foreground/40" />
-                                                                    </div>
-                                                                </div>
-                                                                <SyntaxHighlighter
-                                                                    style={oneDark}
-                                                                    language={match[1]}
-                                                                    PreTag="div"
-                                                                    customStyle={{ margin: 0, padding: '2rem', fontSize: '14px', background: 'transparent', lineHeight: '1.6' }}
-                                                                >
-                                                                    {String(children).replace(/\n$/, '')}
-                                                                </SyntaxHighlighter>
-                                                            </div>
-                                                        )
-                                                    }
-
-                                                    return (
-                                                        <code className="bg-primary/10 text-primary px-1.5 py-0.5 rounded-md font-mono text-[0.9em]" {...props}>
-                                                            {children}
-                                                        </code>
-                                                    )
-                                                }
-                                            }}
+                                            components={markdownComponents}
                                         >
                                             {content}
                                         </ReactMarkdown>
@@ -426,32 +516,6 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config }) => {
                                 </nav>
                             )}
 
-                            <div className="mt-12 space-y-4 pt-8 border-t border-border">
-                                <h3 className="text-[10px] font-black uppercase tracking-widest text-primary/60 px-3 italic">System Wiki</h3>
-                                <div className="grid gap-2">
-                                    <div className="relative p-4 rounded-2xl bg-gradient-to-b from-card via-card to-muted/20 border border-border space-y-2 group hover:border-primary/30 transition-all overflow-hidden">
-                                        <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                                        <div className="flex items-center gap-2 font-black text-[10px] uppercase tracking-widest text-foreground/60">
-                                            <Sparkles size={12} className="text-amber-500" />
-                                            Contribution
-                                        </div>
-                                        <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                            Documentation is extracted from the <code className="text-primary/80">/docs</code> root. Submit a PR to add new guides.
-                                        </p>
-                                    </div>
-                                    
-                                    <div className="relative p-4 rounded-2xl bg-gradient-to-b from-card via-card to-muted/20 border border-border space-y-2 group hover:border-primary/30 transition-all overflow-hidden">
-                                        <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                                        <div className="flex items-center gap-2 font-black text-[10px] uppercase tracking-widest text-foreground/60">
-                                            <ShieldCheck size={12} className="text-primary" />
-                                            Standards
-                                        </div>
-                                        <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                            Follow the <code className="text-amber-500/80">ARCHITECTURE.md</code> patterns for all new system integrations.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     </OverlayScrollbarsComponent>
                 </div>

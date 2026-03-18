@@ -121,6 +121,21 @@ body {
   width: 100%;
 }
 
+/* Smooth continuous spin for circular spinners (Loader2) */
+@keyframes spin-smooth {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-spin-smooth {
+  animation: spin-smooth 1.2s linear infinite;
+}
+
+/* Refresh spin for arrow-style icons (RefreshCcw) */
+.animate-refresh-spin {
+  animation: spin-smooth 1s linear infinite;
+}
+
 
 body {
   @apply bg-background text-foreground antialiased;

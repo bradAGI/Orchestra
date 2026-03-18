@@ -1,4 +1,4 @@
-# 3.2 JSON Schemas & Types
+# 2.2 JSON Schemas & Types
 
 > **Source files:**
 > - `packages/protocol/schemas/v1/*.schema.json` -- all 21 JSON schema definitions
@@ -262,7 +262,7 @@ Same shape as a single list item. Required fields: `name`, `path`, `category`, `
 
 ---
 
-## Warehouse stats response
+## Analytics stats response
 
 **Required fields:** `total_tokens`, `total_input`, `total_output`, `provider_usage`, `model_usage`, `recent_sessions`
 
@@ -682,6 +682,6 @@ classDiagram
 
 ## Cross-references
 
-- **Enum values** used in schemas (Provider, IssueStatus, AgentCategory, ConfigScope, SSEEventType) are documented in [Section 8: Enum Reference](../enums.md).
+- **Enum values** used in schemas (Provider, IssueStatus, AgentCategory, ConfigScope, SSEEventType) are documented in [Section 7: Enum Reference](../enums.md).
 - **SSE event stream format** is documented in [SSE Events](sse-events.md).
-- **API endpoint routes** are documented in [Section 3.1: API Reference](reference.md).
+- **API endpoint routes** are documented in [Section 2.1: API Reference](reference.md).

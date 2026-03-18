@@ -64,7 +64,7 @@ export function ChangesTab({
                 <GitBranch size={14} className="text-primary/60" />
                 <span className="truncate font-mono text-[11px] text-foreground/90 font-bold">{activeDiffFile}</span>
               </div>
-              {diffLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />}
+              {diffLoading && <Loader2 className="h-3.5 w-3.5 animate-spin-smooth text-primary" />}
             </div>
             <div className="flex-1 overflow-auto custom-scrollbar">
               <SyntaxHighlighter
@@ -164,7 +164,7 @@ export function LogsTab({
               </Button>
             </AppTooltip>
           )}
-          {logsLoading && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
+          {logsLoading && <Loader2 className="h-3 w-3 animate-spin-smooth text-primary" />}
         </div>
       </div>
 
@@ -270,7 +270,7 @@ export function ArtifactsTab({
                 <FileText size={14} className="text-primary/60" />
                 <span className="truncate font-mono text-[11px] text-foreground/90 font-bold">{selectedArtifact}</span>
               </div>
-              {contentLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />}
+              {contentLoading && <Loader2 className="h-3.5 w-3.5 animate-spin-smooth text-primary" />}
             </div>
             <div className="flex-1 overflow-auto custom-scrollbar">
               {contentLoading && !artifactContent ? (
@@ -328,7 +328,7 @@ export function ActivityTab({
             </h3>
             <p className="text-xs text-muted-foreground text-left">Chronological narrative of all system interactions for this issue.</p>
           </div>
-          {historyLoading && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+          {historyLoading && <Loader2 className="h-4 w-4 animate-spin-smooth text-primary" />}
         </div>
 
         {issueHistory.length === 0 && !historyLoading ? (

@@ -97,7 +97,7 @@ export function PRReviewDialog({
               <Button onClick={() => void onFinalize()} disabled={prPending || !prTitle.trim()} className="h-9 px-6 bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 font-black uppercase tracking-widest text-[11px]">
                 {prPending ? (
                   <div className="flex items-center gap-2">
-                    <Loader2 size={14} className="animate-spin" />
+                    <Loader2 size={14} className="animate-spin-smooth" />
                     <span>Creating...</span>
                   </div>
                 ) : (

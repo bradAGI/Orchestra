@@ -164,7 +164,7 @@ export function SandboxDashboard({ config }: { config: BackendConfig | null }) {
             disabled={executing || !code.trim() || !isConfigured}
             className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {executing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+            {executing ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <Play className="h-3 w-3" />}
             Execute
           </button>
           <span className="text-[10px] text-muted-foreground">
@@ -216,7 +216,7 @@ export function SandboxDashboard({ config }: { config: BackendConfig | null }) {
             disabled={loadingSessions}
             className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
           >
-            <RefreshCcw className={`h-3 w-3 ${loadingSessions ? 'animate-spin' : ''}`} />
+            <RefreshCcw className={`h-3 w-3 ${loadingSessions ? 'animate-refresh-spin' : ''}`} />
             Refresh
           </button>
         </div>

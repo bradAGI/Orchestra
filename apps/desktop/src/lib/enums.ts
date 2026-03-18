@@ -52,12 +52,10 @@ export type SSEEventType = (typeof SSEEventType)[keyof typeof SSEEventType]
 
 /** Identifiers for top-level navigation sections in the desktop app. */
 export const SectionID = {
-  DASHBOARD: 'DASHBOARD',
-  RUNNING: 'RUNNING',
   ISSUES: 'ISSUES',
   PROJECTS: 'PROJECTS',
   AGENTS: 'AGENTS',
-  WAREHOUSE: 'WAREHOUSE',
+  ANALYTICS: 'WAREHOUSE',
   SANDBOX: 'SANDBOX',
   SETTINGS: 'SETTINGS',
   DOCS: 'DOCS',

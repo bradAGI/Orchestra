@@ -9,10 +9,11 @@ interface TerminalViewProps {
     baseUrl: string
     apiToken?: string
     onClose?: () => void
+    initialCommand?: string
     theme?: 'light' | 'dark'
 }
 
-export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId, baseUrl, apiToken, onClose, theme }) => {
+export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId, baseUrl, apiToken, onClose, initialCommand, theme }) => {
     const terminalRef = useRef<HTMLDivElement>(null)
     const xtermRef = useRef<Terminal | null>(null)
     const wsRef = useRef<WebSocket | null>(null)
@@ -23,10 +24,10 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
         const isDark = theme === 'dark' || document.documentElement.classList.contains('dark')
         const term = new Terminal({
             cursorBlink: true,
-            fontSize: 12,
-            lineHeight: 1.4,
-            letterSpacing: 0.5,
-            fontFamily: 'JetBrains Mono, Menlo, Monaco, Consolas, "Courier New", monospace',
+            fontSize: 13,
+            lineHeight: 1.3,
+            letterSpacing: 0,
+            fontFamily: '"CaskaydiaMono Nerd Font", "CaskaydiaMono NFM", "JetBrainsMono Nerd Font Mono", Menlo, Monaco, Consolas, monospace',
             theme: {
                 background: isDark ? '#0a0a0b' : '#f8fafc',
                 foreground: isDark ? '#ffffff' : '#0f172a',
@@ -73,6 +74,14 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
             // Send initial size
             const { rows, cols } = term
             ws.send(JSON.stringify({ type: 'resize', rows, cols }))
+            // Run initial command if provided (e.g. launching an agent)
+            if (initialCommand) {
+                setTimeout(() => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.send(initialCommand + '\n')
+                    }
+                }, 500)
+            }
         }
 
         ws.onmessage = async (event) => {
@@ -95,24 +104,35 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
         })
 
         const handleResize = () => {
-            fitAddon.fit()
-            const { rows, cols } = term
-            if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'resize', rows, cols }))
-            }
+            try {
+                fitAddon.fit()
+                const { rows, cols } = term
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'resize', rows, cols }))
+                }
+            } catch {}
+        }
+
+        // ResizeObserver for mosaic pane resizing
+        const resizeObserver = new ResizeObserver(() => {
+            requestAnimationFrame(handleResize)
+        })
+        if (terminalRef.current) {
+            resizeObserver.observe(terminalRef.current)
         }
 
         window.addEventListener('resize', handleResize)
 
         return () => {
             window.removeEventListener('resize', handleResize)
+            resizeObserver.disconnect()
             ws.close()
             term.dispose()
         }
     }, [sessionId, projectId, baseUrl, apiToken, theme])
 
     return (
-        <div className="w-full h-full bg-background p-2 rounded-xl border border-border overflow-hidden">
+        <div className="w-full h-full overflow-hidden">
             <div ref={terminalRef} className="w-full h-full" />
         </div>
     )

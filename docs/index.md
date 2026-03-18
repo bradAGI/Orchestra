@@ -12,12 +12,42 @@ This documentation covers the system architecture, API surface, backend internal
 
 | # | Section | Path | Description |
 |---|---------|------|-------------|
-| 1 | Overview | [index.md](index.md) | This page -- project introduction and documentation map |
-| 2 | Architecture Overview | [architecture/overview.md](architecture/overview.md) | High-level system diagram, component roles, communication patterns |
-| 2.1 | Backend Architecture | [architecture/backend.md](architecture/backend.md) | Go backend packages, request lifecycle, dependency graph |
-| 2.2 | Desktop Frontend | [architecture/desktop.md](architecture/desktop.md) | Electron + React app, component hierarchy, state management |
-| 2.3 | TUI Architecture | [architecture/tui.md](architecture/tui.md) | Bubble Tea terminal dashboard, service manager |
-| 2.4 | Data Flow & Events | [architecture/data-flow.md](architecture/data-flow.md) | SSE pipeline, PubSub bus, snapshot polling, retry scheduling |
+| | Orchestra Documentation | [index.md](index.md) | This page — project introduction and documentation map |
+| **1** | **Architecture** | | |
+| 1.1 | Overview | [architecture/overview.md](architecture/overview.md) | High-level system diagram, component roles, communication patterns |
+| 1.2 | Backend Architecture | [architecture/backend.md](architecture/backend.md) | Go backend packages, request lifecycle, dependency graph |
+| 1.3 | Desktop Frontend | [architecture/desktop.md](architecture/desktop.md) | Electron + React app, component hierarchy, state management |
+| 1.4 | TUI Architecture | [architecture/tui.md](architecture/tui.md) | Bubble Tea terminal dashboard, service manager |
+| 1.5 | Data Flow & Events | [architecture/data-flow.md](architecture/data-flow.md) | SSE pipeline, PubSub bus, snapshot polling, retry scheduling |
+| **2** | **API** | | |
+| 2.1 | API Reference | [api/reference.md](api/reference.md) | REST endpoint catalog, request/response formats |
+| 2.2 | JSON Schemas & Types | [api/schemas.md](api/schemas.md) | Shared data structures and payload types |
+| 2.3 | SSE Events | [api/sse-events.md](api/sse-events.md) | Server-sent event stream protocol and event types |
+| **3** | **Backend** | | |
+| 3.1 | Orchestrator | [backend/orchestrator.md](backend/orchestrator.md) | Core dispatch loop, state machine, retry logic |
+| 3.2 | Agents | [backend/agents.md](backend/agents.md) | Agent providers, runner pool, command execution |
+| 3.3 | Tracker | [backend/tracker.md](backend/tracker.md) | Issue storage backends (in-memory, SQLite, GitHub) |
+| 3.4 | Workspace | [backend/workspace.md](backend/workspace.md) | Isolated git workspaces for agent execution |
+| 3.5 | Database | [backend/database.md](backend/database.md) | SQLite schema, migrations, query patterns |
+| 3.6 | Configuration | [backend/config.md](backend/config.md) | Runtime configuration and environment variables |
+| 3.7 | MCP | [backend/mcp.md](backend/mcp.md) | Model Context Protocol server integration |
+| 3.8 | Tools | [backend/tools.md](backend/tools.md) | Tool system and registration |
+| 3.9 | Telemetry | [backend/telemetry.md](backend/telemetry.md) | Logging, metrics, and observability |
+| **4** | **Frontend** | | |
+| 4.1 | Components | [frontend/components.md](frontend/components.md) | React component library and hierarchy |
+| 4.2 | Views | [frontend/views.md](frontend/views.md) | Page-level view components and routing |
+| 4.3 | API Client | [frontend/client.md](frontend/client.md) | TypeScript HTTP client and request helpers |
+| 4.4 | State Management | [frontend/state-management.md](frontend/state-management.md) | Runtime sync, snapshot store, event timeline |
+| 4.5 | Electron | [frontend/electron.md](frontend/electron.md) | Main process, preload, IPC bridge |
+| **5** | **Guides** | | |
+| 5.1 | Getting Started | [guides/getting-started.md](guides/getting-started.md) | Setup, prerequisites, first run |
+| 5.2 | Configuration | [guides/configuration.md](guides/configuration.md) | Environment variables and config files |
+| 5.3 | Development | [guides/development.md](guides/development.md) | Local dev workflow, testing, contributing |
+| **6** | **Operations** | | |
+| 6.1 | Deployment | [operations/deployment.md](operations/deployment.md) | Production deployment patterns |
+| 6.2 | Docker | [operations/docker.md](operations/docker.md) | Container builds and compose setup |
+| 6.3 | CI/CD | [operations/ci-cd.md](operations/ci-cd.md) | GitHub Actions workflows and automation |
+| **7** | Enums & Constants | [enums.md](enums.md) | Shared enum values and constant definitions |
 
 ---
 
@@ -25,23 +55,33 @@ This documentation covers the system architecture, API surface, backend internal
 
 ```mermaid
 graph TD
-    INDEX["1. Index<br/><i>this page</i>"]
+    INDEX["Orchestra Documentation"]
 
-    INDEX --> ARCH["2. Architecture Overview"]
-    ARCH --> BACKEND["2.1 Backend Architecture"]
-    ARCH --> DESKTOP["2.2 Desktop Frontend"]
-    ARCH --> TUI["2.3 TUI Architecture"]
-    ARCH --> DATAFLOW["2.4 Data Flow & Events"]
+    INDEX --> ARCH["1. Architecture"]
+    INDEX --> API["2. API"]
+    INDEX --> BACK["3. Backend"]
+    INDEX --> FRONT["4. Frontend"]
+    INDEX --> GUIDES["5. Guides"]
+    INDEX --> OPS["6. Operations"]
+    INDEX --> ENUMS["7. Enums"]
 
-    BACKEND --> DATAFLOW
-    DESKTOP --> DATAFLOW
+    ARCH --> A1["1.1 Overview"]
+    ARCH --> A2["1.2 Backend"]
+    ARCH --> A3["1.3 Desktop"]
+    ARCH --> A4["1.4 TUI"]
+    ARCH --> A5["1.5 Data Flow"]
 
-    style INDEX fill:#1a1a2e,stroke:#e94560,color:#fff
-    style ARCH fill:#16213e,stroke:#0f3460,color:#fff
-    style BACKEND fill:#0f3460,stroke:#533483,color:#fff
-    style DESKTOP fill:#0f3460,stroke:#533483,color:#fff
-    style TUI fill:#0f3460,stroke:#533483,color:#fff
-    style DATAFLOW fill:#0f3460,stroke:#533483,color:#fff
+    API --> B1["2.1 Reference"]
+    API --> B2["2.2 Schemas"]
+    API --> B3["2.3 SSE Events"]
+
+    BACK --> C1["3.1 Orchestrator"]
+    BACK --> C2["3.2 Agents"]
+    BACK --> C3["3.3 Tracker"]
+
+    FRONT --> D1["4.1 Components"]
+    FRONT --> D2["4.2 Views"]
+    FRONT --> D3["4.3 Client"]
 ```
 
 ---

@@ -1,4 +1,4 @@
-# 2. Architecture Overview
+# 1.1 Architecture Overview
 
 > **Source files:** `apps/backend/cmd/orchestrad/`, `apps/backend/internal/`, `apps/desktop/`, `apps/tui/`
 
@@ -21,7 +21,7 @@ graph TB
         PUBSUB["PubSub<br/><small>Event Bus</small>"]
         AGENTS["Agent Registry<br/><small>Runner Pool</small>"]
         TRACKER["Tracker<br/><small>Issue Store</small>"]
-        DB["Warehouse DB<br/><small>SQLite</small>"]
+        DB["Analytics DB<br/><small>SQLite</small>"]
         WORKSPACE["Workspace<br/><small>File + Git</small>"]
         MCP_PKG["MCP Client<br/><small>Tool Server</small>"]
     end
@@ -67,7 +67,7 @@ graph TB
 | **Agent Registry** | `internal/agents` | Provider abstraction -- registers runners for Claude, Gemini, Codex, OpenCode, Unsandbox |
 | **Tracker** | `internal/tracker` | Pluggable issue storage (memory, SQLite, GitHub Issues) |
 | **PubSub** | `internal/observability` | In-process event bus -- fan-out lifecycle events to SSE subscribers |
-| **Warehouse DB** | `internal/db` | SQLite database for sessions, projects, token usage, MCP server configs |
+| **Analytics DB** | `internal/db` | SQLite database for sessions, projects, token usage, MCP server configs |
 | **Workspace** | `internal/workspace` | Manages working directories, git operations, workspace migration, path guards |
 | **MCP Client** | `internal/mcp` | Model Context Protocol client for connecting to external tool servers |
 | **Config** | `internal/config` | Loads configuration from environment variables and config files |
@@ -162,7 +162,7 @@ sequenceDiagram
 
 ### Cross-References
 
-- [2.1 Backend Architecture](backend.md) -- Package-level internals of `orchestrad`
-- [2.2 Desktop Frontend](desktop.md) -- Electron + React component structure
-- [2.3 TUI Architecture](tui.md) -- Terminal dashboard details
-- [2.4 Data Flow & Events](data-flow.md) -- SSE event types, PubSub, retry logic
+- [1.2 Backend Architecture](backend.md) -- Package-level internals of `orchestrad`
+- [1.3 Desktop Frontend](desktop.md) -- Electron + React component structure
+- [1.4 TUI Architecture](tui.md) -- Terminal dashboard details
+- [1.5 Data Flow & Events](data-flow.md) -- SSE event types, PubSub, retry logic

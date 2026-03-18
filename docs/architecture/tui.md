@@ -1,4 +1,4 @@
-# 2.3 TUI Architecture
+# 1.4 TUI Architecture
 
 > **Source files:** `apps/tui/main.go`, `apps/tui/manager.go`, `apps/tui/styles.go`
 
@@ -145,6 +145,6 @@ When a service is stopped, the cancel function is called, which terminates the p
 
 ### Cross-References
 
-- [2. Architecture Overview](overview.md) -- Where the TUI fits in the system
-- [2.1 Backend Architecture](backend.md) -- The backend process that the TUI manages
-- [2.2 Desktop Frontend](desktop.md) -- The frontend process that the TUI manages
+- [1.1 Architecture Overview](overview.md) -- Where the TUI fits in the system
+- [1.2 Backend Architecture](backend.md) -- The backend process that the TUI manages
+- [1.3 Desktop Frontend](desktop.md) -- The frontend process that the TUI manages

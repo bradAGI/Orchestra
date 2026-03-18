@@ -1,4 +1,4 @@
-# 6.1 CI/CD Pipelines
+# 6.3 CI/CD Pipelines
 
 > **Source files:** `.github/workflows/*.yml`, `.github/actions/`
 
@@ -134,4 +134,4 @@ All workflows share these settings:
 
 ---
 
-*Cross-references: [Container Build](docker.md) (Section 6.2), [Deployment](deployment.md) (Section 6)*
+*Cross-references: [Container Build](docker.md) (Section 6.2), [Deployment](deployment.md) (Section 6.1)*

@@ -1,4 +1,4 @@
-# 6. Deployment & Operations
+# 6.1 Deployment & Operations
 
 > **Source files:**
 > - `apps/backend/cmd/orchestrad/` -- Backend server entry point
@@ -135,7 +135,7 @@ make install  # installs to /usr/local/bin/orchestra-dash
 
 ### Docker Container
 
-See [6.2 Container Build](docker.md) for full details.
+See [6.2 Docker Container Build](docker.md) for full details.
 
 ```bash
 docker build -f ops/docker/Dockerfile.backend -t orchestra-backend .
@@ -191,7 +191,7 @@ graph LR
 graph LR
     LB[Load Balancer] -->|HTTPS| PROXY[Reverse Proxy]
     PROXY -->|HTTP| CONTAINER[orchestrad container]
-    CONTAINER -->|Volume mount| WORKSPACES[/data/workspaces]
+    CONTAINER -->|Volume mount| WORKSPACES["/data/workspaces"]
 ```
 
 Mount a persistent volume at the workspace root to preserve agent workspaces across container restarts.

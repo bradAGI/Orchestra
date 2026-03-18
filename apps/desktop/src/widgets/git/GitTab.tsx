@@ -107,7 +107,7 @@ export function GitTab({
           className="shrink-0 px-3 py-2.5 text-muted-foreground/40 hover:text-foreground transition-colors"
           title="Refresh"
         >
-          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+          <RefreshCw size={14} className={refreshing ? 'animate-refresh-spin' : ''} />
         </button>
       </div>
 

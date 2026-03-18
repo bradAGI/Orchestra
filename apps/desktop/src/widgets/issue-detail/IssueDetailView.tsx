@@ -495,7 +495,7 @@ export function IssueDetailView({
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em]">
                   {isRunning ? 'Waiting for agent to create plan...' : localState === 'Todo' ? 'Plan will appear when agent starts' : 'No plan recorded'}
                 </p>
-                {isRunning && <Loader2 size={14} className="animate-spin text-primary/30" />}
+                {isRunning && <Loader2 size={14} className="animate-spin-smooth text-primary/30" />}
               </div>
             )}
           </div>
@@ -506,7 +506,7 @@ export function IssueDetailView({
         {bottomTab === 'output' && (
           <div className="h-full bg-gradient-to-b from-card via-card to-muted/10">
             {logsLoading ? (
-              <div className="h-full flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary/30" /></div>
+              <div className="h-full flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin-smooth text-primary/30" /></div>
             ) : logs && !logs.includes('# No logs available') ? (
               <div className="flex flex-col h-full overflow-auto custom-scrollbar">
                 {(() => {
@@ -747,7 +747,7 @@ export function IssueDetailView({
         {bottomTab === 'changes' && (
           <div className="h-full">
             {diffLoading ? (
-              <div className="h-full flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary/30" /></div>
+              <div className="h-full flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin-smooth text-primary/30" /></div>
             ) : diffFiles.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground/20 gap-3">
                 <FileText size={36} />

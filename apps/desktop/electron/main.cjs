@@ -177,7 +177,10 @@ async function stopManagedBackend() {
 }
 
 // GPU enabled for WebGPU (Transformers.js Whisper inference)
-app.commandLine.appendSwitch('enable-features', 'Vulkan,WebGPU')
+// Use WebGPU without forcing Vulkan — Vulkan can crash the renderer on Wayland
+app.commandLine.appendSwitch('enable-features', 'WebGPU')
+app.commandLine.appendSwitch('enable-unsafe-webgpu')
+app.commandLine.appendSwitch('ozone-platform-hint', 'auto')
 
 function createDefaultProfile() {
   const managed = managedBackendState?.config
@@ -360,10 +363,19 @@ function createWindow() {
     console.error('render-process-gone', details)
   })
 
-  // Set zoom level for Electron — negative values zoom out
-  // -3 ≈ 0.6x which matches the original design scale
   win.webContents.on('did-finish-load', () => {
-    win.webContents.setZoomLevel(-3)
+    win.webContents.setZoomLevel(0)
+  })
+
+  // Intercept Ctrl+1-8 before Chromium consumes them
+  win.webContents.on('before-input-event', (event, input) => {
+    if ((input.control || input.meta) && !input.alt && !input.shift) {
+      const num = parseInt(input.key, 10)
+      if (!isNaN(num) && num >= 1 && num <= 8) {
+        event.preventDefault()
+        win.webContents.send('orchestra:switch-tab', num)
+      }
+    }
   })
 
   const devServerUrl = process.env.VITE_DEV_SERVER_URL

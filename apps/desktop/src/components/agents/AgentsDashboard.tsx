@@ -461,6 +461,55 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
         opencode: [],
     }
 
+    const modelsForProvider: Record<string, { value: string; label: string }[]> = {
+        claude: [
+            { value: 'sonnet', label: 'Sonnet (latest)' },
+            { value: 'opus', label: 'Opus (latest)' },
+            { value: 'haiku', label: 'Haiku (latest)' },
+            { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+            { value: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
+            { value: 'claude-opus-4-6[1m]', label: 'Claude Opus 4.6 (1M context)' },
+            { value: 'claude-sonnet-4-5-20250514', label: 'Claude Sonnet 4.5' },
+            { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
+        ],
+        codex: [
+            { value: 'gpt-5.3-codex', label: 'GPT 5.3 Codex' },
+            { value: 'gpt-5.3-codex-spark', label: 'GPT 5.3 Codex Spark' },
+            { value: 'gpt-5.2-codex', label: 'GPT 5.2 Codex' },
+            { value: 'gpt-5.1-codex', label: 'GPT 5.1 Codex' },
+            { value: 'gpt-5.1-codex-max', label: 'GPT 5.1 Codex Max' },
+            { value: 'gpt-5.1-codex-mini', label: 'GPT 5.1 Codex Mini' },
+            { value: 'gpt-5-codex', label: 'GPT 5 Codex' },
+            { value: 'gpt-5.4', label: 'GPT 5.4' },
+            { value: 'gpt-5.2', label: 'GPT 5.2' },
+            { value: 'codex-mini-latest', label: 'Codex Mini (latest)' },
+            { value: 'o3', label: 'o3' },
+        ],
+        gemini: [
+            { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+            { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+            { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+        ],
+        opencode: [
+            { value: 'openai/gpt-5.3-codex', label: 'OpenAI GPT 5.3 Codex' },
+            { value: 'openai/gpt-5.3-codex-spark', label: 'OpenAI GPT 5.3 Codex Spark' },
+            { value: 'openai/gpt-5.2-codex', label: 'OpenAI GPT 5.2 Codex' },
+            { value: 'openai/gpt-5.1-codex', label: 'OpenAI GPT 5.1 Codex' },
+            { value: 'openai/gpt-5.1-codex-max', label: 'OpenAI GPT 5.1 Codex Max' },
+            { value: 'openai/gpt-5.4', label: 'OpenAI GPT 5.4' },
+            { value: 'openai/gpt-5.2', label: 'OpenAI GPT 5.2' },
+            { value: 'openai/codex-mini-latest', label: 'OpenAI Codex Mini' },
+            { value: 'opencode/big-pickle', label: 'Big Pickle' },
+            { value: 'opencode/gpt-5-nano', label: 'GPT 5 Nano' },
+            { value: 'opencode/mimo-v2-flash-free', label: 'Mimo V2 Flash (free)' },
+            { value: 'opencode/minimax-m2.5-free', label: 'Minimax M2.5 (free)' },
+            { value: 'opencode/nemotron-3-super-free', label: 'Nemotron 3 Super (free)' },
+        ],
+        unsandbox: [
+            { value: 'default', label: 'Default' },
+        ],
+    }
+
     const hasCoreConfig = (provider: Provider) =>
         configs.some(c => c.category === 'CORE' && c.name.toLowerCase().includes(provider))
 
@@ -597,7 +646,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                             disabled={!!saving}
                                             className="h-7 bg-primary text-primary-foreground font-bold uppercase text-[10px] px-4 rounded-lg"
                                         >
-                                            {saving ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <Save size={12} className="mr-1.5" />}
+                                            {saving ? <Loader2 size={12} className="animate-spin-smooth mr-1.5" /> : <Save size={12} className="mr-1.5" />}
                                             Save
                                         </Button>
                                     </div>
@@ -627,7 +676,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                     disabled={savingPermissions}
                                     className="h-7 bg-primary text-primary-foreground font-bold uppercase text-[10px] px-4 rounded-lg"
                                 >
-                                    {savingPermissions ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <Save size={12} className="mr-1.5" />}
+                                    {savingPermissions ? <Loader2 size={12} className="animate-spin-smooth mr-1.5" /> : <Save size={12} className="mr-1.5" />}
                                     Save
                                 </Button>
                             </div>
@@ -635,27 +684,22 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                             {/* Approval Mode */}
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Approval Mode</label>
-                                <select
+                                <CustomDropdown
+                                    className="w-full"
                                     value={permissions.approval_mode}
-                                    onChange={e => setPermissions(p => ({ ...p, approval_mode: e.target.value }))}
-                                    className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs font-medium focus:ring-2 focus:ring-primary/20 outline-none"
-                                >
-                                    {selectedAgent === 'claude' ? (
-                                        <>
-                                            <option value="default">Default (interactive)</option>
-                                            <option value="acceptEdits">Accept Edits</option>
-                                            <option value="bypassPermissions">Bypass Permissions</option>
-                                            <option value="plan">Plan</option>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <option value="interactive">Interactive</option>
-                                            <option value="auto-edit">Auto-edit</option>
-                                            <option value="full-auto">Full-auto</option>
-                                            <option value="on-request">On-request</option>
-                                        </>
-                                    )}
-                                </select>
+                                    options={selectedAgent === 'claude' ? [
+                                        { label: 'Default (interactive)', value: 'default' },
+                                        { label: 'Accept Edits', value: 'acceptEdits' },
+                                        { label: 'Bypass Permissions', value: 'bypassPermissions' },
+                                        { label: 'Plan', value: 'plan' },
+                                    ] : [
+                                        { label: 'Interactive', value: 'interactive' },
+                                        { label: 'Auto-edit', value: 'auto-edit' },
+                                        { label: 'Full-auto', value: 'full-auto' },
+                                        { label: 'On-request', value: 'on-request' },
+                                    ]}
+                                    onChange={(val) => setPermissions(p => ({ ...p, approval_mode: val }))}
+                                />
                             </div>
 
                             {/* Allowed */}
@@ -811,16 +855,17 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                             {selectedAgent === 'codex' && (
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Sandbox</label>
-                                    <select
+                                    <CustomDropdown
+                                        className="w-full"
                                         value={permissions.sandbox || ''}
-                                        onChange={e => setPermissions(p => ({ ...p, sandbox: e.target.value }))}
-                                        className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs font-medium focus:ring-2 focus:ring-primary/20 outline-none"
-                                    >
-                                        <option value="">None</option>
-                                        <option value="workspace-write">Workspace Write</option>
-                                        <option value="workspace-read">Workspace Read</option>
-                                        <option value="none">Disabled</option>
-                                    </select>
+                                        options={[
+                                            { label: 'None', value: '' },
+                                            { label: 'Workspace Write', value: 'workspace-write' },
+                                            { label: 'Workspace Read', value: 'workspace-read' },
+                                            { label: 'Disabled', value: 'none' },
+                                        ]}
+                                        onChange={(val) => setPermissions(p => ({ ...p, sandbox: val }))}
+                                    />
                                 </div>
                             )}
 
@@ -872,18 +917,21 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                     disabled={savingModel}
                                     className="h-7 bg-primary text-primary-foreground font-bold uppercase text-[10px] px-4 rounded-lg"
                                 >
-                                    {savingModel ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <Save size={12} className="mr-1.5" />}
+                                    {savingModel ? <Loader2 size={12} className="animate-spin-smooth mr-1.5" /> : <Save size={12} className="mr-1.5" />}
                                     Save
                                 </Button>
                             </div>
 
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Model</label>
-                                <input
-                                    className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs font-mono focus:ring-2 focus:ring-primary/20 outline-none"
+                                <CustomDropdown
+                                    className="w-full"
                                     value={modelConfig.model}
-                                    onChange={e => setModelConfig(m => ({ ...m, model: e.target.value }))}
-                                    placeholder="e.g. claude-sonnet-4-6"
+                                    options={[
+                                        { label: 'Default', value: '' },
+                                        ...(modelsForProvider[selectedAgent] || []).map(m => ({ label: m.label, value: m.value })),
+                                    ]}
+                                    onChange={(val) => setModelConfig(m => ({ ...m, model: val }))}
                                 />
                             </div>
 
@@ -940,7 +988,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                     disabled={savingHooks}
                                     className="h-7 bg-primary text-primary-foreground font-bold uppercase text-[10px] px-4 rounded-lg"
                                 >
-                                    {savingHooks ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <Save size={12} className="mr-1.5" />}
+                                    {savingHooks ? <Loader2 size={12} className="animate-spin-smooth mr-1.5" /> : <Save size={12} className="mr-1.5" />}
                                     Save
                                 </Button>
                             </div>
@@ -985,16 +1033,15 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                         <div className="flex items-end gap-2 pt-2 border-t border-border/10">
                                             <div className="flex-1 space-y-1.5">
                                                 <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Event</label>
-                                                <select
+                                                <CustomDropdown
+                                                    className="w-full"
                                                     value={newHookEvent}
-                                                    onChange={e => setNewHookEvent(e.target.value)}
-                                                    className="h-8 w-full rounded-lg border border-border bg-background px-2 text-xs font-medium focus:ring-2 focus:ring-primary/20 outline-none"
-                                                >
-                                                    <option value="">Select event...</option>
-                                                    {(hookEventsForProvider[selectedAgent] || []).map(ev => (
-                                                        <option key={ev} value={ev}>{ev}</option>
-                                                    ))}
-                                                </select>
+                                                    options={[
+                                                        { label: 'Select event...', value: '' },
+                                                        ...(hookEventsForProvider[selectedAgent] || []).map(ev => ({ label: ev, value: ev })),
+                                                    ]}
+                                                    onChange={setNewHookEvent}
+                                                />
                                             </div>
                                             <div className="flex-1 space-y-1.5">
                                                 <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Command</label>
@@ -1161,7 +1208,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                                             <Button variant="ghost" size="sm" className="h-6 text-[9px]" onClick={() => setExpandedItem(null)}>Cancel</Button>
                                                             <Button size="sm" className="h-6 text-[9px]" disabled={savingItem === skill.path}
                                                                 onClick={() => handleSaveItem(skill.path)}>
-                                                                {savingItem === skill.path ? <Loader2 size={10} className="animate-spin mr-1" /> : <Save size={10} className="mr-1" />}
+                                                                {savingItem === skill.path ? <Loader2 size={10} className="animate-spin-smooth mr-1" /> : <Save size={10} className="mr-1" />}
                                                                 Save
                                                             </Button>
                                                         </div>
@@ -1226,7 +1273,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                                                             <Button variant="ghost" size="sm" className="h-6 text-[9px]" onClick={() => setExpandedItem(null)}>Cancel</Button>
                                                             <Button size="sm" className="h-6 text-[9px]" disabled={savingItem === agent.path}
                                                                 onClick={() => handleSaveItem(agent.path)}>
-                                                                {savingItem === agent.path ? <Loader2 size={10} className="animate-spin mr-1" /> : <Save size={10} className="mr-1" />}
+                                                                {savingItem === agent.path ? <Loader2 size={10} className="animate-spin-smooth mr-1" /> : <Save size={10} className="mr-1" />}
                                                                 Save
                                                             </Button>
                                                         </div>
@@ -1269,7 +1316,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                             />
                         </div>
                         <Button onClick={handleCreateMCPServer} disabled={!newMcpName || !newMcpCommand || creating} className="w-full h-9 bg-blue-600 text-white font-bold uppercase text-[10px] tracking-widest rounded-lg shadow-lg shadow-blue-600/20">
-                            {creating ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <Plus size={12} className="mr-1.5" />}
+                            {creating ? <Loader2 size={12} className="animate-spin-smooth mr-1.5" /> : <Plus size={12} className="mr-1.5" />}
                             Add Server
                         </Button>
                     </div>
@@ -1315,7 +1362,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
                             disabled={!newSkillName || creating}
                             className="w-full h-9 bg-primary text-primary-foreground font-bold uppercase text-[10px] tracking-widest rounded-lg shadow-lg shadow-primary/20"
                         >
-                            {creating ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <Plus size={12} className="mr-1.5" />}
+                            {creating ? <Loader2 size={12} className="animate-spin-smooth mr-1.5" /> : <Plus size={12} className="mr-1.5" />}
                             {createType === 'skill' ? 'Create Skill' : 'Create Sub-agent'}
                         </Button>
                     </div>

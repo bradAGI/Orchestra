@@ -1,4 +1,4 @@
-# 5. Component Architecture
+# 4.1 Component Architecture
 
 > **Source files:**
 > - `apps/desktop/src/App.tsx` -- Root application shell and state orchestration
@@ -100,7 +100,7 @@ The `App.tsx` component is the root orchestrator. It:
 
 Supported providers: `claude`, `codex`, `gemini`, `opencode`.
 
-#### Warehouse / Analytics (`components/warehouse/`)
+#### Analytics / Analytics (`components/warehouse/`)
 
 | Component | File | Purpose |
 |-----------|------|---------|

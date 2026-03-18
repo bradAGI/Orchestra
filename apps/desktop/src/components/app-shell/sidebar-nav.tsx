@@ -54,9 +54,9 @@ export function SidebarNav({
         <button
           type="button"
           onClick={onToggleCollapsed}
-          className="absolute left-full top-6 z-20 grid h-8 w-8 -translate-x-1/2 place-items-center rounded-full border border-border bg-card text-foreground shadow-lg transition hover:bg-muted dark:border-border dark:bg-background dark:text-foreground dark:hover:bg-muted"
+          className="absolute left-full top-6 z-20 grid h-7 w-7 -translate-x-1/2 place-items-center rounded-full border border-border bg-card text-foreground shadow-lg transition hover:bg-muted dark:border-border dark:bg-background dark:text-foreground dark:hover:bg-muted"
         >
-          {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          {sidebarCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
         </button>
       </AppTooltip>
 
@@ -103,7 +103,7 @@ export function SidebarNav({
                     onKeyDown={handleNavKeyDown(index)}
                     aria-current={active ? 'page' : undefined}
                     data-testid={`sidebar-nav-${item.id}`}
-                    className={`group relative flex w-full items-center gap-3.5 rounded-xl border px-4 py-3 text-left transition-all duration-300 ${sidebarCollapsed ? 'justify-center' : ''
+                    className={`group relative flex w-full items-center gap-3.5 rounded-xl border text-left transition-all duration-300 ${sidebarCollapsed ? 'justify-center px-2 py-4' : 'px-4 py-4'
                       } ${active
                         ? 'border-primary/30 bg-primary/10 text-primary shadow-[0_0_15px_rgba(var(--primary),0.1)]'
                         : 'border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground'
@@ -117,8 +117,8 @@ export function SidebarNav({
                     </span>
                     {!sidebarCollapsed ? (
                       <span className="min-w-0 flex-1">
-                        <span className={`block truncate text-sm font-bold tracking-tight ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}`}>{item.label}</span>
-                        <span className="block truncate text-[11px] text-muted-foreground/60 leading-tight font-medium">{item.description}</span>
+                        <span className={`block truncate text-base font-bold tracking-tight ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}`}>{item.label}</span>
+                        <span className="block truncate text-xs text-muted-foreground/60 leading-tight font-medium">{item.description}</span>
                       </span>
                     ) : null}
                   </button>

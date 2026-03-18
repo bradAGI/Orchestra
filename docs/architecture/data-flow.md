@@ -1,4 +1,4 @@
-# 2.4 Data Flow & Event Pipeline
+# 1.5 Data Flow & Event Pipeline
 
 > **Source files:** `apps/backend/internal/api/events.go`, `apps/backend/internal/observability/pubsub.go`, `apps/backend/internal/orchestrator/state.go`, `apps/desktop/src/lib/runtime-sync.ts`, `apps/desktop/src/lib/runtime-store.ts`
 
@@ -199,7 +199,7 @@ flowchart TD
     SSE --> NORMALIZE
     NORMALIZE --> FINGERPRINT
     FINGERPRINT -- "changed" --> APPLY --> REACT
-    FINGERPRINT -- "unchanged" --> |"return previous ref"| REACT
+    FINGERPRINT -- "unchanged, return previous ref" --> REACT
     NORMALIZE --> TIMELINE --> REACT
 ```
 
@@ -236,6 +236,6 @@ The `RetryEntry` in the orchestrator state includes the issue metadata and sched
 
 ### Cross-References
 
-- [2. Architecture Overview](overview.md) -- System-level communication patterns
-- [2.1 Backend Architecture](backend.md) -- Orchestrator state machine and API handler details
-- [2.2 Desktop Frontend](desktop.md) -- Runtime sync and store implementation
+- [1.1 Architecture Overview](overview.md) -- System-level communication patterns
+- [1.2 Backend Architecture](backend.md) -- Orchestrator state machine and API handler details
+- [1.3 Desktop Frontend](desktop.md) -- Runtime sync and store implementation

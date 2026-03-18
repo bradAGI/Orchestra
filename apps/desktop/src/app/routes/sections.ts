@@ -64,8 +64,6 @@ export const sidebarItems: SidebarItem[] = [
 
 /** Union type of all navigable section identifiers in the desktop app. */
 export type SectionID =
-  | 'DASHBOARD'
-  | 'RUNNING'
   | 'ISSUES'
   | 'PROJECTS'
   | 'AGENTS'
@@ -77,8 +75,6 @@ export type SectionID =
 
 /** Ordered list of all valid section IDs, used for validation. */
 const SECTION_IDS: readonly SectionID[] = [
-  'DASHBOARD',
-  'RUNNING',
   'ISSUES',
   'PROJECTS',
   'AGENTS',
@@ -100,8 +96,6 @@ export function isSectionID(value: string): value is SectionID {
 
 /** Boolean flags indicating which section panels are currently visible. */
 export type SectionVisibility = {
-  showDashboard: boolean
-  showRunning: boolean
   showIssueBoard: boolean
   showProjects: boolean
   showAgents: boolean
@@ -114,8 +108,6 @@ export type SectionVisibility = {
 
 /** Display metadata (breadcrumb label and page title) for each section. */
 const sectionMeta: Record<SectionID, { label: string; title: string }> = {
-  DASHBOARD: { label: 'Operations', title: 'Dashboard' },
-  RUNNING: { label: 'Operations', title: 'Running' },
   ISSUES: { label: 'Tracker', title: 'Tasks' },
   PROJECTS: { label: 'Workspace', title: 'Projects' },
   AGENTS: { label: 'Compute', title: 'Agents' },
@@ -133,8 +125,6 @@ const sectionMeta: Record<SectionID, { label: string; title: string }> = {
  */
 export function getSectionVisibility(activeSection: SectionID): SectionVisibility {
   return {
-    showDashboard: activeSection === 'DASHBOARD',
-    showRunning: activeSection === 'RUNNING',
     showIssueBoard: activeSection === 'ISSUES',
     showProjects: activeSection === 'PROJECTS',
     showAgents: activeSection === 'AGENTS',

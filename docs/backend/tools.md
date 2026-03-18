@@ -1,4 +1,4 @@
-# 4.5 Tool System
+# 3.8 Tool System
 
 > **Source files:**
 > - `apps/backend/internal/tools/linear_executor.go`
@@ -202,7 +202,7 @@ The `tracker.Issue` struct represents a work item across all backends:
 
 ## Cross-References
 
-- [4.3 Configuration & Environment](config.md) -- Tracker type and agent provider configuration
-- [4.4 MCP Server Integration](mcp.md) -- MCP tool specs complement the tracker tools
-- [4.7 Workspace Management](workspace.md) -- Workspaces are provisioned per-issue
-- [4.8 Database Layer](database.md) -- SQLite schema for `issues`, `runs`, and `issue_history` tables
+- [3.6 Configuration & Environment](config.md) -- Tracker type and agent provider configuration
+- [3.7 MCP Server Integration](mcp.md) -- MCP tool specs complement the tracker tools
+- [3.4 Workspace Management](workspace.md) -- Workspaces are provisioned per-issue
+- [3.5 Database Layer](database.md) -- SQLite schema for `issues`, `runs`, and `issue_history` tables

@@ -13,6 +13,7 @@ type AppShellProps = {
   onToggleCollapsed: () => void
   osOptions: ComponentProps<typeof OverlayScrollbarsComponent>['options']
   topBarProps: ComponentProps<typeof TopBar>
+  flushContent?: boolean
   children: ReactNode
 }
 
@@ -25,6 +26,7 @@ export function AppShell({
   onToggleCollapsed,
   osOptions,
   topBarProps,
+  flushContent,
   children,
 }: AppShellProps) {
   return (
@@ -44,9 +46,11 @@ export function AppShell({
           options={osOptions}
           className="min-w-0 flex-1 bg-gradient-to-b from-background via-background to-muted/30 h-full flex flex-col"
         >
-          <div className="px-4 pb-4 pt-3 w-full flex flex-col h-full min-h-0">
-            <TopBar {...topBarProps} />
-            {children}
+          <div className="w-full flex flex-col h-full min-h-0 px-4 pt-3 pb-4">
+            <TopBar {...topBarProps} flush={flushContent} />
+            <div className={`flex-1 flex flex-col min-h-0 ${flushContent ? '-mx-4' : ''}`}>
+              {children}
+            </div>
           </div>
         </OverlayScrollbarsComponent>
       </div>

@@ -1,4 +1,4 @@
-# 5.4 Electron Shell & IPC
+# 4.5 Electron Shell & IPC
 
 > **Source files:**
 > - `apps/desktop/electron/main.cjs` -- Main process: window management, backend sidecar, IPC handlers
@@ -241,9 +241,9 @@ Packaging is handled by `electron-builder` (configured in `package.json` under t
 
 ### Cross-references
 
-- [2.2 Desktop Frontend Architecture](../architecture/desktop.md) -- High-level component hierarchy and how Electron fits into the stack
-- [5.2 Orchestra Client & API Layer](client.md) -- The HTTP client that the renderer initializes with config obtained through the IPC bridge
-- [5.3 State Management](state-management.md) -- React state layer that consumes backend config from the Electron bridge
-- [5.1 UI Components](components.md) -- React components rendered inside the Electron window
-- [3.1 API Reference](../api/reference.md) -- REST endpoints that `orchestrad` exposes (polled during sidecar health check)
-- [4.2 Backend Configuration](../backend/config.md) -- Backend environment variables passed to the managed sidecar process
+- [1.3 Desktop Frontend Architecture](../architecture/desktop.md) -- High-level component hierarchy and how Electron fits into the stack
+- [4.3 Orchestra Client & API Layer](client.md) -- The HTTP client that the renderer initializes with config obtained through the IPC bridge
+- [4.4 State Management](state-management.md) -- React state layer that consumes backend config from the Electron bridge
+- [4.1 UI Components](components.md) -- React components rendered inside the Electron window
+- [2.1 API Reference](../api/reference.md) -- REST endpoints that `orchestrad` exposes (polled during sidecar health check)
+- [3.6 Backend Configuration](../backend/config.md) -- Backend environment variables passed to the managed sidecar process

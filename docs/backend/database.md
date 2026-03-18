@@ -1,4 +1,4 @@
-# 4.8 Database Layer
+# 3.5 Database Layer
 
 > **Source files:**
 > - `apps/backend/internal/db/db.go`
@@ -322,7 +322,7 @@ System-wide metrics:
 
 ## Cross-References
 
-- [4.3 Configuration & Environment](config.md) -- Database path derived from workspace root
-- [4.4 MCP Server Integration](mcp.md) -- `mcp_servers` table for persistent server registration
-- [4.5 Tool System](tools.md) -- SQLite tracker client implements `tracker.Client` interface
-- [4.6 Telemetry & Log Watching](telemetry.md) -- `sessions`, `events`, and `ingest_offsets` tables
+- [3.6 Configuration & Environment](config.md) -- Database path derived from workspace root
+- [3.7 MCP Server Integration](mcp.md) -- `mcp_servers` table for persistent server registration
+- [3.8 Tool System](tools.md) -- SQLite tracker client implements `tracker.Client` interface
+- [3.9 Telemetry & Log Watching](telemetry.md) -- `sessions`, `events`, and `ingest_offsets` tables

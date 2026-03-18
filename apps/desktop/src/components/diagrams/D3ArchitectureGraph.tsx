@@ -25,7 +25,7 @@ const DEFAULT_DATA: GraphData = {
         { id: 'orchestrator', group: 'core', label: 'Orchestrator' },
         { id: 'api', group: 'core', label: 'REST API' },
         { id: 'sse', group: 'core', label: 'SSE Stream' },
-        { id: 'db', group: 'core', label: 'SQLite Warehouse' },
+        { id: 'db', group: 'core', label: 'SQLite Analytics' },
         
         { id: 'desktop', group: 'ui', label: 'Electron Desktop' },
         { id: 'react', group: 'ui', label: 'React Renderer' },

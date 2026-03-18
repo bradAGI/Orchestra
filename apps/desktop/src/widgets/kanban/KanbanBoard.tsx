@@ -263,43 +263,40 @@ export function KanbanBoard({
     <div className="flex-1 flex flex-col min-h-0 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2 shrink-0">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1.5 rounded-md border bg-muted/20 px-1.5 py-0.5">
-            <span className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/60">State</span>
-            <CustomDropdown
-              className="w-40"
-              value={stateFilter}
-              options={[
-                { label: 'All States', value: 'all', icon: <CircleDashed className="h-3 w-3" /> },
-                ...uniqueStates.map((state) => ({ label: state, value: state, icon: <div className="h-1.5 w-1.5 rounded-full bg-primary" /> })),
-              ]}
-              onChange={setStateFilter}
-            />
-          </div>
+          {viewMode === 'list' && (
+            <div className="flex items-center gap-1.5 rounded-md border bg-muted/20 px-1.5 py-0.5">
+              <span className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/60">State</span>
+              <CustomDropdown
+                className="w-40"
+                value={stateFilter}
+                options={[
+                  { label: 'All States', value: 'all', icon: <CircleDashed className="h-3 w-3" /> },
+                  { label: 'Backlog', value: 'Backlog', icon: <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" /> },
+                  { label: 'Todo', value: 'Todo', icon: <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground" /> },
+                  { label: 'In Progress', value: 'In Progress', icon: <div className="h-1.5 w-1.5 rounded-full bg-amber-500" /> },
+                  { label: 'Review', value: 'Review', icon: <div className="h-1.5 w-1.5 rounded-full bg-blue-500" /> },
+                  { label: 'Done', value: 'Done', icon: <div className="h-1.5 w-1.5 rounded-full bg-primary" /> },
+                ]}
+                onChange={setStateFilter}
+              />
+            </div>
+          )}
 
-          <div className="flex items-center gap-1.5 rounded-md border bg-muted/20 px-1.5 py-0.5">
-            <span className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/60">Project</span>
-            <CustomDropdown
-              className="w-56"
-              value={projectFilter}
-              options={[
-                { label: 'All Projects', value: 'all', icon: <FolderTree className="h-3 w-3" /> },
-                ...projects.map((project) => ({ label: project.name, value: project.id, icon: <Folder className="h-3 w-3" /> })),
-              ]}
-              onChange={setProjectFilter}
-            />
-          </div>
+          {projects.length > 1 && (
+            <div className="flex items-center gap-1.5 rounded-md border bg-muted/20 px-1.5 py-0.5">
+              <span className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/60">Project</span>
+              <CustomDropdown
+                className="w-56"
+                value={projectFilter}
+                options={[
+                  { label: 'All Projects', value: 'all', icon: <FolderTree className="h-3 w-3" /> },
+                  ...projects.map((project) => ({ label: project.name, value: project.id, icon: <Folder className="h-3 w-3" /> })),
+                ]}
+                onChange={setProjectFilter}
+              />
+            </div>
+          )}
 
-          {(stateFilter !== 'all' || projectFilter !== 'all') ? (
-            <button
-              className="grid h-5 w-5 place-items-center rounded-full text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors"
-              onClick={() => {
-                setStateFilter('all')
-                setProjectFilter('all')
-              }}
-            >
-              <X className="h-3 w-3" />
-            </button>
-          ) : null}
         </div>
 
         <div className="flex items-center gap-1 rounded-lg border bg-muted/20 p-1">

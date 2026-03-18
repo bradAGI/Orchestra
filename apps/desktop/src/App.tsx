@@ -51,8 +51,8 @@ import { appendTimelineEvent, applySnapshotUpdate } from '@/lib/runtime-store'
 import type { GlobalStats, Project, ProjectStats, SessionDetail, SessionSummary, SnapshotPayload } from '@/lib/orchestra-types'
 import { ProjectGrid } from '@/components/projects/ProjectGrid'
 import { ProjectDetailView } from '@/components/projects/ProjectDetailView'
-import { AnalyticsDashboard } from '@/components/warehouse/AnalyticsDashboard'
-import { SessionDetailView } from '@/components/warehouse/SessionDetailView'
+import { AnalyticsDashboard } from '@/components/analytics/AnalyticsDashboard'
+import { SessionDetailView } from '@/components/analytics/SessionDetailView'
 import { AgentsDashboard } from '@/components/agents/AgentsDashboard'
 import { DocsDashboard } from '@/components/docs/DocsDashboard'
 import { SandboxDashboard } from '@/components/sandbox/SandboxDashboard'
@@ -151,6 +151,8 @@ export default function App() {
   const [activePeriod, setActivePeriod] = useState<'Today' | 'Week' | 'Month'>('Week')
   const [paletteOpen, setPaletteOpen] = useState(false)
 
+  const handleRefreshRef = useRef<(() => Promise<void>) | null>(null)
+
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
@@ -159,23 +161,35 @@ export default function App() {
       }
       if (e.key === 'r' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
-        void handleRefresh()
+        void handleRefreshRef.current?.()
       }
       if (e.key === '/' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
         setSidebarCollapsed((v) => !v)
       }
-      if (e.key === '1' && e.altKey) {
-        e.preventDefault()
-        setActiveSection('DASHBOARD')
-      }
-      if (e.key === '2' && e.altKey) {
-        e.preventDefault()
-        setActiveSection('PROJECTS')
+      // Ctrl+1-8 tab switching (fallback for non-Electron)
+      if (e.ctrlKey && !e.altKey && !e.shiftKey) {
+        const num = parseInt(e.key, 10)
+        if (!isNaN(num) && num >= 1 && num <= sidebarItems.length) {
+          e.preventDefault()
+          setActiveSection(sidebarItems[num - 1].id as SectionID)
+        }
       }
     }
-    document.addEventListener('keydown', down)
-    return () => document.removeEventListener('keydown', down)
+    document.addEventListener('keydown', down, true)
+    return () => document.removeEventListener('keydown', down, true)
+  }, [])
+
+  // Ctrl+1-8 tab switching via Electron IPC (bypasses Chromium)
+  useEffect(() => {
+    const bridge = (window as any).orchestraDesktop
+    if (bridge?.onSwitchTab) {
+      bridge.onSwitchTab((tabNum: number) => {
+        if (tabNum >= 1 && tabNum <= sidebarItems.length) {
+          setActiveSection(sidebarItems[tabNum - 1].id as SectionID)
+        }
+      })
+    }
   }, [])
 
   // Projects & Warehouse State
@@ -186,7 +200,7 @@ export default function App() {
   const [dataLoading, setDataLoading] = useState(false)
 
   const [openTerminals, setOpenTerminals] = useState<TerminalNode[]>([
-    { id: 'master-shell', title: 'Master Control' }
+    { id: 'master-shell', title: 'System Shell' }
   ])
 
   // Sync open terminals with running sessions
@@ -195,7 +209,7 @@ export default function App() {
 
     setOpenTerminals(prev => {
       // Always keep master-shell
-      const base = prev.some(p => p.id === 'master-shell') ? [] : [{ id: 'master-shell', title: 'Master Control' }]
+      const base = prev.some(p => p.id === 'master-shell') ? [] : [{ id: 'master-shell', title: 'System Shell' }]
       
       // Find sessions that are running but don't have a terminal window yet
       const activeRunningIds = snapshot.running.map(r => `issue-${r.issue_identifier}`)
@@ -247,7 +261,7 @@ export default function App() {
     setActiveSection('ISSUES')
   }
 
-  const sidebarWidth = sidebarCollapsed ? 64 : 320
+  const sidebarWidth = sidebarCollapsed ? 76 : 320
   const sectionVisibility = getSectionVisibility(activeSection)
   const currentSectionMeta = getCurrentSectionMeta(activeSection)
 
@@ -500,6 +514,8 @@ export default function App() {
       setRefreshPending(false)
     }
   }
+
+  handleRefreshRef.current = handleRefresh
 
   const handleIssueUpdate = async (identifier: string, updates: IssueUpdatePayload) => {
     if (!config) return
@@ -978,6 +994,7 @@ export default function App() {
         onToggleCollapsed={() => setSidebarCollapsed((prev) => !prev)}
         sidebarWidth={sidebarWidth}
         osOptions={osOptions}
+        flushContent={sectionVisibility.showDocs}
         topBarProps={{
           sectionLabel: currentSectionMeta.label,
           sectionTitle: currentSectionMeta.title,
@@ -1080,8 +1097,8 @@ export default function App() {
 
               {sectionVisibility.showDocs ? (
                 <SectionErrorBoundary name="Documentation">
-                <section className="flex-1 flex flex-col min-h-0">
-                  <DocsDashboard config={config} />
+                <section className="flex-1 flex flex-col min-h-0 -mt-8 -mx-4 -mb-4">
+                  <DocsDashboard config={config} theme={theme} />
                 </section>
                 </SectionErrorBoundary>
               ) : null}
@@ -1094,6 +1111,13 @@ export default function App() {
                     baseUrl={config.baseUrl}
                     apiToken={config.apiToken}
                     onCloseTerminal={handleCloseTerminal}
+                    onAddTerminal={() => {
+                      const num = openTerminals.filter(t => t.id.startsWith('shell-')).length + 1
+                      setOpenTerminals(prev => [...prev, { id: `shell-${Date.now()}`, title: `Shell ${num}` }])
+                    }}
+                    onAddAgentTerminal={(id, title, command) => {
+                      setOpenTerminals(prev => [...prev, { id, title, initialCommand: command }])
+                    }}
                     theme={theme}
                   />
                 </section>
@@ -1258,7 +1282,7 @@ export default function App() {
               onSelect={() => { setActiveSection('WAREHOUSE'); setPaletteOpen(false) }}
               className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
             >
-              <Database className="h-4 w-4" /> Go to Analytics Warehouse
+              <Database className="h-4 w-4" /> Go to Analytics
             </Command.Item>
           </Command.Group>
 

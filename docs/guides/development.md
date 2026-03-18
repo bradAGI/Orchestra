@@ -1,4 +1,4 @@
-# 7.2 Development Guide
+# 5.3 Development Guide
 
 > **Source files:** `apps/backend/go.mod`, `apps/desktop/package.json`, `apps/tui/`, `Makefile`
 
@@ -269,4 +269,4 @@ The desktop dev server connects to the backend at `http://127.0.0.1:4010` by def
 
 ---
 
-*Cross-references: [Getting Started](getting-started.md) (Section 7), [Configuration Guide](configuration.md) (Section 7.1), [CI/CD Pipelines](../operations/ci-cd.md) (Section 6.1), [Architecture Overview](../architecture/overview.md) (Section 2)*
+*Cross-references: [Getting Started](getting-started.md) (Section 5.1), [Configuration Guide](configuration.md) (Section 5.2), [CI/CD Pipelines](../operations/ci-cd.md) (Section 6.3), [Architecture Overview](../architecture/overview.md) (Section 1.1)*

@@ -105,7 +105,7 @@ export function CreateProjectDialog({
             >
               {pending ? (
                 <div className="flex items-center gap-2">
-                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <Loader2 className="h-3 w-3 animate-spin-smooth" />
                   <span>Adding...</span>
                 </div>
               ) : 'Add Project'}
