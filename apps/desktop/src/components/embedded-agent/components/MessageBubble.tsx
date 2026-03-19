@@ -5,9 +5,10 @@ import { JsonRenderBlock } from './JsonRenderBlock'
 interface MessageBubbleProps {
   message: ChatMessage
   onAction: (action: string, params: Record<string, unknown>) => void
+  isStreaming?: boolean
 }
 
-export function MessageBubble({ message, onAction }: MessageBubbleProps) {
+export function MessageBubble({ message, onAction, isStreaming }: MessageBubbleProps) {
   const isUser = message.role === 'user'
 
   return (
@@ -25,6 +26,7 @@ export function MessageBubble({ message, onAction }: MessageBubbleProps) {
             <ToolFeedback
               toolCalls={message.toolCalls}
               toolResults={message.toolResults ?? []}
+              isStreaming={isStreaming}
             />
           </div>
         )}

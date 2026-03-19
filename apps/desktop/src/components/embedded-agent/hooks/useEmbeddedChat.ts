@@ -7,7 +7,18 @@ const STORAGE_KEY = 'orchestra-embedded-agent-chat'
 
 const SYSTEM_PROMPT = `You are Orchestra Agent, an intelligent assistant embedded in the Orchestra desktop application.
 You help users manage projects, sessions, and workflows within the Orchestra platform.
+
+Capabilities:
+- Issue & project management: create, update, search, and delete issues and projects
+- Git operations: view diffs, branches, commit history, stage/commit/push/pull, merge, stash
+- Session analysis: fetch event logs, raw logs, summarize what agents did on issues
+- Code execution: run code snippets in the Unsandbox environment (Python, JS, bash, etc.)
+- Cross-entity search: search issues, sessions, docs, and get analytics
+- Navigation: switch between app sections and settings tabs
+- Rich UI: render interactive components via json-render specs
+
 When tools are available, use them to fulfill user requests. Chain multiple tool calls when needed to complete complex tasks.
+For destructive operations (delete, force push), confirm with the user first.
 Be concise and helpful. Format responses with markdown when appropriate.`
 
 function generateId(): string {
@@ -72,6 +83,7 @@ export function useEmbeddedChat(
       // Collect tool info across steps
       const collectedToolCalls: ToolCallInfo[] = []
       const collectedToolResults: ToolResultInfo[] = []
+      let currentStep = 0
 
       try {
         const provider = createProvider(providerConfig.providerId, providerConfig.apiKey)
@@ -90,10 +102,12 @@ export function useEmbeddedChat(
           stopWhen: stepCountIs(10),
           abortSignal: abortController.signal,
           onStepFinish(event) {
+            const stepIndex = currentStep++
             for (const tc of event.toolCalls) {
               collectedToolCalls.push({
                 toolName: tc.toolName,
                 args: tc.input as Record<string, unknown>,
+                stepIndex,
               })
             }
             for (const tr of event.toolResults) {
@@ -101,8 +115,22 @@ export function useEmbeddedChat(
                 toolName: tr.toolName,
                 result: tr.output,
                 isError: false,
+                stepIndex,
               })
             }
+            // Update message with per-step progress so UI shows live updates
+            setMessages((prev) => {
+              const updated = [...prev]
+              const last = updated[updated.length - 1]
+              if (last && last.role === 'assistant') {
+                updated[updated.length - 1] = {
+                  ...last,
+                  toolCalls: [...collectedToolCalls],
+                  toolResults: [...collectedToolResults],
+                }
+              }
+              return updated
+            })
           },
         })
 

@@ -69,9 +69,13 @@ export function MessageList({ messages, isStreaming, onAction, hasApiKey, onOpen
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
       <div className="flex-1 space-y-2 px-3 py-3">
-        {messages.map((msg) => (
+        {messages.map((msg, i) => (
           <div key={msg.id} className="agent-message-enter">
-            <MessageBubble message={msg} onAction={onAction} />
+            <MessageBubble
+              message={msg}
+              onAction={onAction}
+              isStreaming={isStreaming && i === messages.length - 1}
+            />
           </div>
         ))}
 

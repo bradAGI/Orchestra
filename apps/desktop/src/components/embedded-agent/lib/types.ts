@@ -11,12 +11,14 @@ export type ChatMessage = {
 export type ToolCallInfo = {
   toolName: string
   args: Record<string, unknown>
+  stepIndex?: number
 }
 
 export type ToolResultInfo = {
   toolName: string
   result: unknown
   isError?: boolean
+  stepIndex?: number
 }
 
 export type JsonRenderSpec = {
