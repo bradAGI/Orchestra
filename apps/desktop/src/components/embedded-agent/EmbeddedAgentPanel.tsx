@@ -32,11 +32,24 @@ export function EmbeddedAgentPanel({ onOpenSettings }: { onOpenSettings?: () => 
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
 
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border/20 px-4 py-2.5">
+      <div className="flex items-center justify-between px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            {providerConfig.apiKey ? providerConfig.modelId : 'Not configured'}
-          </span>
+          {providerConfig.apiKey ? (
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              {providerConfig.modelId}
+            </span>
+          ) : onOpenSettings ? (
+            <button
+              onClick={() => { togglePanel(); onOpenSettings() }}
+              className="text-[10px] font-bold uppercase tracking-widest text-primary hover:text-primary/80 transition-colors"
+            >
+              Configure API key
+            </button>
+          ) : (
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
+              No API key
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-0.5">
           {onOpenSettings && (

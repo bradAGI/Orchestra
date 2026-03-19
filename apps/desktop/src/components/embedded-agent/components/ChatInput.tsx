@@ -48,7 +48,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
           onKeyDown={handleKeyDown}
           placeholder="Message Orchestra Agent..."
           disabled={disabled || isStreaming}
-          className="flex-1 resize-none rounded-xl border border-border/30 bg-muted/10 px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/40 focus:border-primary/40 focus:bg-background disabled:opacity-40"
+          className="flex-1 resize-none rounded-xl bg-muted/10 px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/40 focus:bg-muted/20 disabled:opacity-40"
           style={{ maxHeight: 120 }}
         />
 
