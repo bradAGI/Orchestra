@@ -1,13 +1,12 @@
 import { useCallback } from 'react'
-import { X, RefreshCcw } from 'lucide-react'
+import { X, RefreshCcw, Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AppTooltip } from '@/components/ui/tooltip-wrapper'
 import { useEmbeddedAgent } from './EmbeddedAgentProvider'
 import { MessageList } from './components/MessageList'
 import { ChatInput } from './components/ChatInput'
-import { ProviderSelector } from './components/ProviderSelector'
 
-export function EmbeddedAgentPanel() {
+export function EmbeddedAgentPanel({ onOpenSettings }: { onOpenSettings?: () => void }) {
   const {
     messages,
     isStreaming,
@@ -15,8 +14,6 @@ export function EmbeddedAgentPanel() {
     stop,
     clearChat,
     providerConfig,
-    availableKeys,
-    updateProvider,
     togglePanel,
   } = useEmbeddedAgent()
 
@@ -33,14 +30,24 @@ export function EmbeddedAgentPanel() {
     <div className="fixed bottom-20 right-6 z-50 flex h-[620px] w-[420px] flex-col overflow-hidden rounded-2xl border border-border/30 bg-card shadow-[0_32px_64px_-12px_rgba(0,0,0,0.4)]">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border/30 px-4 py-3">
-        <div className="flex items-center gap-3">
-          <ProviderSelector
-            config={providerConfig}
-            availableKeys={availableKeys}
-            onUpdate={updateProvider}
-          />
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            {providerConfig.apiKey ? providerConfig.modelId : 'Not configured'}
+          </span>
         </div>
         <div className="flex items-center gap-1">
+          {onOpenSettings && (
+            <AppTooltip content="Agent settings">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { togglePanel(); onOpenSettings() }}
+                className="h-7 w-7 p-0"
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+              </Button>
+            </AppTooltip>
+          )}
           <AppTooltip content="New chat">
             <Button
               variant="ghost"

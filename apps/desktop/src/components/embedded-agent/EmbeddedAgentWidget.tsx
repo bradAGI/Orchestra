@@ -6,6 +6,7 @@ import { EmbeddedAgentPanel } from './EmbeddedAgentPanel'
 interface EmbeddedAgentWidgetProps {
   config: BackendConfig | null
   onNavigate: (section: string, id?: string) => void
+  onOpenSettings?: () => void
 }
 
 function AgentIcon({ className }: { className?: string }) {
@@ -42,7 +43,7 @@ function AgentIcon({ className }: { className?: string }) {
   )
 }
 
-function WidgetInner() {
+function WidgetInner({ onOpenSettings }: { onOpenSettings?: () => void }) {
   const { isPanelOpen, togglePanel, isStreaming } = useEmbeddedAgent()
 
   useEffect(() => {
@@ -58,7 +59,7 @@ function WidgetInner() {
 
   return (
     <>
-      {isPanelOpen && <EmbeddedAgentPanel />}
+      {isPanelOpen && <EmbeddedAgentPanel onOpenSettings={onOpenSettings} />}
 
       <button
         type="button"
@@ -74,10 +75,10 @@ function WidgetInner() {
   )
 }
 
-export function EmbeddedAgentWidget({ config, onNavigate }: EmbeddedAgentWidgetProps) {
+export function EmbeddedAgentWidget({ config, onNavigate, onOpenSettings }: EmbeddedAgentWidgetProps) {
   return (
     <EmbeddedAgentProvider config={config} onNavigate={onNavigate}>
-      <WidgetInner />
+      <WidgetInner onOpenSettings={onOpenSettings} />
     </EmbeddedAgentProvider>
   )
 }

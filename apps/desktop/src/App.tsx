@@ -1175,6 +1175,7 @@ export default function App() {
               setSettingsInitialTab(id as 'backend' | 'agents' | 'integrations' | 'shortcuts' | 'notifications')
             }
           }}
+          onOpenSettings={() => { setSettingsInitialTab('integrations'); setActiveSection('SETTINGS') }}
         />
       </AppShell>
 
