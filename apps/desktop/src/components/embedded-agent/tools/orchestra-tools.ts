@@ -20,7 +20,11 @@ import type { JsonRenderSpec } from '../lib/types'
 export function createOrchestraTools(config: BackendConfig) {
   return {
     list_issues: tool({
-      description: 'List issues from the orchestrator, optionally filtered by state, project, or assignee.',
+      description:
+        'List issues, optionally filtered by state, project, or assignee. ' +
+        'Use when the user asks to show, list, or view issues. ' +
+        'Filters are optional — omit them to return all issues. ' +
+        'Returns an array of issue objects with identifier, title, state, and assignee.',
       inputSchema: z.object({
         state: z.string().optional().describe('Filter by issue state (e.g. "open", "in progress", "done")'),
         project_id: z.string().optional().describe('Filter by project ID'),
@@ -38,7 +42,10 @@ export function createOrchestraTools(config: BackendConfig) {
     }),
 
     create_issue: tool({
-      description: 'Create a new issue in the orchestrator.',
+      description:
+        'Create a new issue with title, description, state, and optional provider assignment. ' +
+        'Use when the user asks to create, add, or file a new issue, task, or ticket. ' +
+        'Defaults to state="open". Returns the created issue object with its identifier.',
       inputSchema: z.object({
         title: z.string().describe('Title of the issue'),
         description: z.string().optional().default('').describe('Description of the issue'),
@@ -58,7 +65,11 @@ export function createOrchestraTools(config: BackendConfig) {
     }),
 
     update_issue: tool({
-      description: 'Update an existing issue by its identifier.',
+      description:
+        'Update fields on an existing issue by its identifier (e.g. "ISS-1"). ' +
+        'Use when the user asks to change, update, edit, or move an issue. ' +
+        'Only send the fields being changed — omitted fields are left unchanged. ' +
+        'Returns the updated issue object.',
       inputSchema: z.object({
         identifier: z.string().describe('The issue identifier (e.g. "ISS-1")'),
         title: z.string().optional().describe('New title'),
@@ -76,7 +87,11 @@ export function createOrchestraTools(config: BackendConfig) {
     }),
 
     delete_issue: tool({
-      description: 'Delete an issue by its identifier.',
+      description:
+        'Permanently delete an issue by its identifier. Cannot be undone. ' +
+        'Use when the user explicitly asks to delete or remove an issue. ' +
+        'CONFIRM BEFORE CALLING — state what will be deleted and wait for "yes". ' +
+        'Returns {success: true}.',
       inputSchema: z.object({
         identifier: z.string().describe('The issue identifier to delete'),
       }),
@@ -87,7 +102,10 @@ export function createOrchestraTools(config: BackendConfig) {
     }),
 
     get_orchestrator_state: tool({
-      description: 'Get the current orchestrator runtime state snapshot including all issues, agents, and sessions.',
+      description:
+        'Get the full orchestrator runtime snapshot: all issues, running/queued/retrying sessions, and agent status. ' +
+        'Use when the user asks for system status, what is running, or a runtime overview. ' +
+        'Returns a large object — summarize key points for the user.',
       inputSchema: z.object({}),
       execute: async () => {
         const state = await fetchState(config)
@@ -96,15 +114,19 @@ export function createOrchestraTools(config: BackendConfig) {
     }),
 
     dispatch_agent: tool({
-      description: 'Dispatch an agent to work on an issue by setting its state to "in progress".',
+      description:
+        'Dispatch an agent to work on an issue by setting its state to "in progress" and assigning a provider. ' +
+        'Use when the user asks to dispatch, assign, or start an agent on an issue. ' +
+        'Returns the updated issue object.',
       inputSchema: z.object({
         identifier: z.string().describe('The issue identifier to dispatch'),
         provider: z.string().optional().describe('Agent provider to assign'),
       }),
       execute: async (params) => {
-        const updates: Record<string, string> = { state: 'in progress' }
+        const updates: Record<string, unknown> = { state: 'in progress' }
         if (params.provider) {
           updates.provider = params.provider
+          updates.assignee_id = `agent-${params.provider}`
         }
         const issue = await updateIssue(config, params.identifier, updates)
         return { issue }
@@ -112,7 +134,11 @@ export function createOrchestraTools(config: BackendConfig) {
     }),
 
     stop_session: tool({
-      description: 'Stop the active session for an issue.',
+      description:
+        'Stop the active agent session for an issue. ' +
+        'Use when the user asks to stop, kill, or cancel a running session. ' +
+        'CONFIRM BEFORE CALLING — state which session will be stopped and wait for "yes". ' +
+        'Returns {success: true}.',
       inputSchema: z.object({
         identifier: z.string().describe('The issue identifier whose session to stop'),
         provider: z.string().optional().describe('Provider of the session to stop'),
@@ -124,7 +150,10 @@ export function createOrchestraTools(config: BackendConfig) {
     }),
 
     list_projects: tool({
-      description: 'List all projects in the orchestrator.',
+      description:
+        'List all projects in the orchestrator. ' +
+        'Use when the user asks to list, show, or view projects. ' +
+        'Returns an array of project objects with id, name, and metadata.',
       inputSchema: z.object({}),
       execute: async () => {
         const projects = await fetchProjects(config)
@@ -133,7 +162,12 @@ export function createOrchestraTools(config: BackendConfig) {
     }),
 
     render_ui: tool({
-      description: 'Render a custom UI component using a JSON render specification. The spec defines a tree of elements with types, props, and children.',
+      description:
+        'Render structured data visually using a JSON render spec. ' +
+        'Use instead of plain text when the response benefits from layout: tables, metrics, cards, code blocks, key-value pairs, or action buttons. ' +
+        'Components: Card, Stack, Divider, Metric, Table, Badge, CodeBlock, KeyValue, Button, ButtonGroup, Alert, Progress. ' +
+        'Actions: navigate, send_chat, copy_to_clipboard. ' +
+        'See system prompt for full spec structure and component props.',
       inputSchema: z.object({
         spec: z.object({
           root: z.string().describe('The key of the root element'),

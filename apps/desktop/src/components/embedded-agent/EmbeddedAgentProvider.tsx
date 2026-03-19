@@ -1,34 +1,97 @@
-import { createContext, useContext, useMemo, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, useState, useCallback, useRef, type ReactNode } from 'react'
 import type { BackendConfig } from '@/lib/orchestra-client'
 import type { EmbeddedAgentContextValue } from './lib/types'
 import { useProviderConfig } from './hooks/useProviderConfig'
 import { useEmbeddedChat } from './hooks/useEmbeddedChat'
+import { useWatchMode } from './hooks/useWatchMode'
+import { useScheduler } from './hooks/useScheduler'
+import { useContextSuggestions } from './hooks/useContextSuggestions'
 import { createOrchestraTools } from './tools/orchestra-tools'
 import { createNavigationTools } from './tools/navigation-tools'
+import { createGitTools } from './tools/git-tools'
+import { createSessionTools } from './tools/session-tools'
+import { createSearchTools } from './tools/search-tools'
+import { createCodeExecutionTools } from './tools/code-execution-tools'
+import { createSchedulerTools } from './tools/scheduler-tools'
+import { createMCPBridgeTools } from './tools/mcp-bridge-tools'
+import { createMetaTools } from './tools/meta-tools'
 
 const EmbeddedAgentContext = createContext<EmbeddedAgentContextValue | null>(null)
 
 interface EmbeddedAgentProviderProps {
   config: BackendConfig | null
   onNavigate: (section: string, id?: string) => void
+  activeSection?: string
+  selectedProjectId?: string
   children: ReactNode
 }
 
-export function EmbeddedAgentProvider({ config, onNavigate, children }: EmbeddedAgentProviderProps) {
+// eslint-disable-next-line react-refresh/only-export-components
+export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selectedProjectId, children }: EmbeddedAgentProviderProps) {
   const { providerConfig, setProviderConfig, updateProvider, availableKeys } = useProviderConfig(config)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
+  const sendMessageRef = useRef<((text: string) => Promise<void>) | null>(null)
+
+  // Tier 3: Watch mode
+  const watchMode = useWatchMode(config)
+
+  // Tier 3: Scheduler
+  const scheduler = useScheduler(
+    // onReminder: inject as a system message into chat
+    useCallback((message: string) => {
+      void sendMessageRef.current?.(`[Reminder] ${message}`)
+    }, []),
+    // onAction: trigger tool execution via chat
+    useCallback((toolName: string, args: Record<string, unknown>) => {
+      void sendMessageRef.current?.(`Run the ${toolName} tool with these parameters: ${JSON.stringify(args)}`)
+    }, []),
+  )
+
+  // Tier 3: Context-aware suggestions
+  const contextSuggestions = useContextSuggestions(config, activeSection || '', undefined, selectedProjectId)
 
   const tools = useMemo(() => {
     const orchestraTools = config ? createOrchestraTools(config) : {}
     const navigationTools = createNavigationTools(onNavigate)
-    return { ...orchestraTools, ...navigationTools }
-  }, [config, onNavigate])
+    const gitTools = config ? createGitTools(config) : {}
+    const sessionTools = config ? createSessionTools(config) : {}
+    const searchTools = config ? createSearchTools(config) : {}
+    const codeExecutionTools = config ? createCodeExecutionTools(config) : {}
+    const schedulerTools = createSchedulerTools(scheduler)
+    const mcpBridgeTools = config ? createMCPBridgeTools(config) : {}
+    const domainTools = {
+      ...orchestraTools,
+      ...navigationTools,
+      ...gitTools,
+      ...sessionTools,
+      ...searchTools,
+      ...codeExecutionTools,
+      ...schedulerTools,
+      ...mcpBridgeTools,
+    }
+    const metaTools = createMetaTools(domainTools)
+    return { ...domainTools, ...metaTools }
+  }, [config, onNavigate, scheduler])
 
   const { messages, sendMessage, isStreaming, stop, clearChat } = useEmbeddedChat(providerConfig, tools)
+
+  // Keep ref updated so scheduler callbacks can access latest sendMessage
+  sendMessageRef.current = sendMessage
 
   const togglePanel = useCallback(() => {
     setIsPanelOpen((prev) => !prev)
   }, [])
+
+  // Destructure stable references to avoid busting useMemo on every render
+  const {
+    enabled: watchEnabled, toggle: watchToggle, notifications: watchNotifications,
+    unreadCount: watchUnread, dismiss: watchDismiss, dismissAll: watchDismissAll,
+  } = watchMode
+  const { activeItems: schedActiveItems, cancel: schedCancel } = scheduler
+  const {
+    suggestions: ctxSuggestions, enabled: ctxEnabled,
+    toggle: ctxToggle, dismiss: ctxDismiss,
+  } = contextSuggestions
 
   const value = useMemo<EmbeddedAgentContextValue>(
     () => ({
@@ -43,8 +106,33 @@ export function EmbeddedAgentProvider({ config, onNavigate, children }: Embedded
       updateProvider,
       isPanelOpen,
       togglePanel,
+      watchMode: {
+        enabled: watchEnabled,
+        toggle: watchToggle,
+        notifications: watchNotifications,
+        unreadCount: watchUnread,
+        dismiss: watchDismiss,
+        dismissAll: watchDismissAll,
+      },
+      scheduler: {
+        activeItems: schedActiveItems,
+        cancel: schedCancel,
+      },
+      contextSuggestions: {
+        suggestions: ctxSuggestions,
+        enabled: ctxEnabled,
+        toggle: ctxToggle,
+        dismiss: ctxDismiss,
+      },
     }),
-    [messages, isStreaming, sendMessage, stop, clearChat, providerConfig, setProviderConfig, availableKeys, updateProvider, isPanelOpen, togglePanel],
+    [
+      messages, isStreaming, sendMessage, stop, clearChat,
+      providerConfig, setProviderConfig, availableKeys, updateProvider,
+      isPanelOpen, togglePanel,
+      watchEnabled, watchToggle, watchNotifications, watchUnread, watchDismiss, watchDismissAll,
+      schedActiveItems, schedCancel,
+      ctxSuggestions, ctxEnabled, ctxToggle, ctxDismiss,
+    ],
   )
 
   return (
@@ -54,6 +142,7 @@ export function EmbeddedAgentProvider({ config, onNavigate, children }: Embedded
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useEmbeddedAgent(): EmbeddedAgentContextValue {
   const ctx = useContext(EmbeddedAgentContext)
   if (!ctx) {

@@ -5,6 +5,9 @@ import { AppTooltip } from '@/components/ui/tooltip-wrapper'
 import { useEmbeddedAgent } from './EmbeddedAgentProvider'
 import { MessageList } from './components/MessageList'
 import { ChatInput } from './components/ChatInput'
+import { WatchNotifications, WatchToggle } from './components/WatchNotifications'
+import { ContextSuggestions } from './components/ContextSuggestions'
+import { SchedulePanel } from './components/SchedulePanel'
 
 export function EmbeddedAgentPanel({ onOpenSettings }: { onOpenSettings?: () => void }) {
   const {
@@ -15,6 +18,9 @@ export function EmbeddedAgentPanel({ onOpenSettings }: { onOpenSettings?: () => 
     clearChat,
     providerConfig,
     togglePanel,
+    watchMode,
+    scheduler,
+    contextSuggestions,
   } = useEmbeddedAgent()
 
   const handleAction = useCallback(
@@ -52,6 +58,12 @@ export function EmbeddedAgentPanel({ onOpenSettings }: { onOpenSettings?: () => 
           )}
         </div>
         <div className="flex items-center gap-0.5">
+          {/* Watch mode toggle */}
+          <WatchToggle
+            enabled={watchMode.enabled}
+            onToggle={watchMode.toggle}
+            unreadCount={watchMode.unreadCount}
+          />
           {onOpenSettings && (
             <AppTooltip content="Agent settings">
               <Button
@@ -86,6 +98,33 @@ export function EmbeddedAgentPanel({ onOpenSettings }: { onOpenSettings?: () => 
           </AppTooltip>
         </div>
       </div>
+
+      {/* Watch mode notifications */}
+      {watchMode.enabled && watchMode.notifications.filter((n) => !n.dismissed).length > 0 && (
+        <WatchNotifications
+          enabled={watchMode.enabled}
+          onToggle={watchMode.toggle}
+          notifications={watchMode.notifications}
+          onDismiss={watchMode.dismiss}
+          onDismissAll={watchMode.dismissAll}
+          onAction={handleAction}
+        />
+      )}
+
+      {/* Context-aware suggestions */}
+      {contextSuggestions.enabled && contextSuggestions.suggestions.length > 0 && (
+        <ContextSuggestions
+          suggestions={contextSuggestions.suggestions}
+          onDismiss={contextSuggestions.dismiss}
+          onAction={handleAction}
+        />
+      )}
+
+      {/* Scheduled items */}
+      <SchedulePanel
+        items={scheduler.activeItems}
+        onCancel={scheduler.cancel}
+      />
 
       {/* Body */}
       <MessageList

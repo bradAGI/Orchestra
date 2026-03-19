@@ -29,7 +29,9 @@ export function createNavigationTools(
 ) {
   return {
     navigate_to: tool({
-      description: 'Navigate the desktop app to a specific section.',
+      description:
+        'Navigate the app to a specific section (Issues, Projects, Console, Agents, Warehouse, Sandbox, Settings, Docs). ' +
+        'Use when the user asks to go to, open, or show a section.',
       inputSchema: z.object({
         section: z.enum(SECTIONS).describe('The section to navigate to'),
       }),
@@ -40,7 +42,9 @@ export function createNavigationTools(
     }),
 
     open_settings_tab: tool({
-      description: 'Open a specific tab within the Settings section.',
+      description:
+        'Open a specific tab within Settings (backend, agents, integrations, shortcuts, notifications). ' +
+        'Use when the user asks to open a specific settings tab.',
       inputSchema: z.object({
         tab: z.enum(SETTINGS_TABS).describe('The settings tab to open'),
       }),
