@@ -82,44 +82,8 @@ export type EmbeddedAgentContextValue = {
 }
 
 export const CHAT_PROVIDERS = [
-  {
-    id: 'openrouter' as const,
-    label: 'OpenRouter',
-    models: [
-      'anthropic/claude-sonnet-4',
-      'anthropic/claude-haiku-4',
-      'openai/gpt-4o',
-      'openai/gpt-4o-mini',
-      'google/gemini-2.5-pro',
-      'google/gemini-2.5-flash',
-    ],
-  },
-  {
-    id: 'claude' as const,
-    label: 'Anthropic',
-    models: [
-      'claude-sonnet-4-6',
-      'claude-haiku-4-5',
-      'claude-opus-4-5',
-    ],
-  },
-  {
-    id: 'openai' as const,
-    label: 'OpenAI',
-    models: [
-      'gpt-4o',
-      'gpt-4o-mini',
-      'gpt-4.1',
-      'gpt-4.1-mini',
-    ],
-  },
-  {
-    id: 'gemini' as const,
-    label: 'Google',
-    models: [
-      'gemini-2.5-pro',
-      'gemini-2.5-flash',
-      'gemini-2.5-flash-lite',
-    ],
-  },
+  { id: 'openrouter' as const, label: 'OpenRouter' },
+  { id: 'claude' as const, label: 'Anthropic' },
+  { id: 'openai' as const, label: 'OpenAI' },
+  { id: 'gemini' as const, label: 'Google' },
 ] as const
