@@ -79,6 +79,17 @@ export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selec
     setIsPanelOpen((prev) => !prev)
   }, [])
 
+  // Destructure stable references to avoid busting useMemo on every render
+  const {
+    enabled: watchEnabled, toggle: watchToggle, notifications: watchNotifications,
+    unreadCount: watchUnread, dismiss: watchDismiss, dismissAll: watchDismissAll,
+  } = watchMode
+  const { activeItems: schedActiveItems, cancel: schedCancel } = scheduler
+  const {
+    suggestions: ctxSuggestions, enabled: ctxEnabled,
+    toggle: ctxToggle, dismiss: ctxDismiss,
+  } = contextSuggestions
+
   const value = useMemo<EmbeddedAgentContextValue>(
     () => ({
       messages,
@@ -93,25 +104,32 @@ export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selec
       isPanelOpen,
       togglePanel,
       watchMode: {
-        enabled: watchMode.enabled,
-        toggle: watchMode.toggle,
-        notifications: watchMode.notifications,
-        unreadCount: watchMode.unreadCount,
-        dismiss: watchMode.dismiss,
-        dismissAll: watchMode.dismissAll,
+        enabled: watchEnabled,
+        toggle: watchToggle,
+        notifications: watchNotifications,
+        unreadCount: watchUnread,
+        dismiss: watchDismiss,
+        dismissAll: watchDismissAll,
       },
       scheduler: {
-        activeItems: scheduler.activeItems,
-        cancel: scheduler.cancel,
+        activeItems: schedActiveItems,
+        cancel: schedCancel,
       },
       contextSuggestions: {
-        suggestions: contextSuggestions.suggestions,
-        enabled: contextSuggestions.enabled,
-        toggle: contextSuggestions.toggle,
-        dismiss: contextSuggestions.dismiss,
+        suggestions: ctxSuggestions,
+        enabled: ctxEnabled,
+        toggle: ctxToggle,
+        dismiss: ctxDismiss,
       },
     }),
-    [messages, isStreaming, sendMessage, stop, clearChat, providerConfig, setProviderConfig, availableKeys, updateProvider, isPanelOpen, togglePanel, watchMode, scheduler, contextSuggestions],
+    [
+      messages, isStreaming, sendMessage, stop, clearChat,
+      providerConfig, setProviderConfig, availableKeys, updateProvider,
+      isPanelOpen, togglePanel,
+      watchEnabled, watchToggle, watchNotifications, watchUnread, watchDismiss, watchDismissAll,
+      schedActiveItems, schedCancel,
+      ctxSuggestions, ctxEnabled, ctxToggle, ctxDismiss,
+    ],
   )
 
   return (

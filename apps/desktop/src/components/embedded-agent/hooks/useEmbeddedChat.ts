@@ -151,8 +151,8 @@ export function useEmbeddedChat(
         let jsonRenderSpec: ChatMessage['jsonRenderSpec'] = null
         for (const tr of collectedToolResults) {
           const res = tr.result as Record<string, unknown> | undefined
-          if (res && res.type === 'json_render') {
-            jsonRenderSpec = res as unknown as ChatMessage['jsonRenderSpec']
+          if (res && res.type === 'json_render' && res.spec) {
+            jsonRenderSpec = res.spec as ChatMessage['jsonRenderSpec']
             break
           }
         }

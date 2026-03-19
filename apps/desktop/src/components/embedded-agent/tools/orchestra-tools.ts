@@ -102,9 +102,10 @@ export function createOrchestraTools(config: BackendConfig) {
         provider: z.string().optional().describe('Agent provider to assign'),
       }),
       execute: async (params) => {
-        const updates: Record<string, string> = { state: 'in progress' }
+        const updates: Record<string, unknown> = { state: 'in progress' }
         if (params.provider) {
           updates.provider = params.provider
+          updates.assignee_id = `agent-${params.provider}`
         }
         const issue = await updateIssue(config, params.identifier, updates)
         return { issue }
