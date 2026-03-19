@@ -43,6 +43,27 @@ export type AgentProviderKeys = {
   }>
 }
 
+export type WatchModeState = {
+  enabled: boolean
+  toggle: () => void
+  notifications: { id: string; type: string; title: string; message: string; dismissed: boolean; actions?: { label: string; action: string; params?: Record<string, unknown> }[] }[]
+  unreadCount: number
+  dismiss: (id: string) => void
+  dismissAll: () => void
+}
+
+export type SchedulerState = {
+  activeItems: { id: string; type: string; message?: string; toolName?: string; firesAt: Date }[]
+  cancel: (id: string) => void
+}
+
+export type SuggestionsState = {
+  suggestions: { id: string; text: string; action: string; params?: Record<string, unknown>; dismissed: boolean }[]
+  enabled: boolean
+  toggle: () => void
+  dismiss: (id: string) => void
+}
+
 export type EmbeddedAgentContextValue = {
   messages: ChatMessage[]
   isStreaming: boolean
@@ -55,6 +76,9 @@ export type EmbeddedAgentContextValue = {
   updateProvider: (providerId: ChatProviderConfig['providerId'], modelId?: string) => void
   isPanelOpen: boolean
   togglePanel: () => void
+  watchMode: WatchModeState
+  scheduler: SchedulerState
+  contextSuggestions: SuggestionsState
 }
 
 export const CHAT_PROVIDERS = [

@@ -1176,6 +1176,7 @@ export default function App() {
             }
           }}
           onOpenSettings={() => { setSettingsInitialTab('integrations'); setActiveSection('SETTINGS') }}
+          activeSection={activeSection}
         />
       </AppShell>
 

@@ -7,6 +7,8 @@ interface EmbeddedAgentWidgetProps {
   config: BackendConfig | null
   onNavigate: (section: string, id?: string) => void
   onOpenSettings?: () => void
+  activeSection?: string
+  selectedProjectId?: string
 }
 
 function AgentIcon({ className }: { className?: string }) {
@@ -38,7 +40,7 @@ function AgentIcon({ className }: { className?: string }) {
 }
 
 function WidgetInner({ onOpenSettings }: { onOpenSettings?: () => void }) {
-  const { isPanelOpen, togglePanel, isStreaming } = useEmbeddedAgent()
+  const { isPanelOpen, togglePanel, isStreaming, watchMode } = useEmbeddedAgent()
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -66,15 +68,20 @@ function WidgetInner({ onOpenSettings }: { onOpenSettings?: () => void }) {
           title="Orchestra Agent (Ctrl+.)"
         >
           <AgentIcon className="h-7 w-7" />
+          {watchMode.unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white">
+              {watchMode.unreadCount > 9 ? '9+' : watchMode.unreadCount}
+            </span>
+          )}
         </button>
       )}
     </>
   )
 }
 
-export function EmbeddedAgentWidget({ config, onNavigate, onOpenSettings }: EmbeddedAgentWidgetProps) {
+export function EmbeddedAgentWidget({ config, onNavigate, onOpenSettings, activeSection, selectedProjectId }: EmbeddedAgentWidgetProps) {
   return (
-    <EmbeddedAgentProvider config={config} onNavigate={onNavigate}>
+    <EmbeddedAgentProvider config={config} onNavigate={onNavigate} activeSection={activeSection} selectedProjectId={selectedProjectId}>
       <WidgetInner onOpenSettings={onOpenSettings} />
     </EmbeddedAgentProvider>
   )
