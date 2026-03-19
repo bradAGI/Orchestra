@@ -1555,3 +1555,32 @@ export type UnsandboxService = {
 export async function fetchUnsandboxServices(config: BackendConfig): Promise<{ services: UnsandboxService[] }> {
   return requestJSON<{ services: UnsandboxService[] }>(config, '/api/v1/unsandbox/services')
 }
+
+/**
+ * Fetches configured agent provider API keys from the orchestrator.
+ * @param config - Backend connection configuration.
+ * @returns Object containing provider configuration status and keys.
+ */
+export async function fetchAgentProviderKeys(config: BackendConfig): Promise<{
+  providers: Record<string, { configured: boolean; api_key?: string }>
+}> {
+  return requestJSON(config, '/api/v1/config/agent-providers')
+}
+
+/**
+ * Saves an API key for a specific agent provider.
+ * @param config - Backend connection configuration.
+ * @param providerId - The provider identifier (e.g. 'openai', 'claude').
+ * @param apiKey - The API key to save.
+ */
+export async function saveAgentProviderKey(
+  config: BackendConfig,
+  providerId: string,
+  apiKey: string,
+): Promise<void> {
+  await requestJSON(config, '/api/v1/config/agent-providers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider: providerId, api_key: apiKey }),
+  })
+}
