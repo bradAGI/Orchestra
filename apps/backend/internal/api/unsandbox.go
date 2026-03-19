@@ -3,13 +3,15 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/orchestra/orchestra/apps/backend/internal/unsandbox"
 )
 
-// PostUnsandboxExecute executes code in an unsandbox container.
+// PostUnsandboxExecute submits code for async execution.
 // POST /api/v1/unsandbox/execute
 // Body: { "language": "python", "code": "print('hello')", "network": "semitrusted" }
+// Returns: { "job_id": "...", "status": "pending" }
 func (s *Server) PostUnsandboxExecute(w http.ResponseWriter, r *http.Request) {
 	client, err := unsandbox.NewClientFromEnv()
 	if err != nil {
@@ -34,22 +36,57 @@ func (s *Server) PostUnsandboxExecute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := client.ExecuteWithOpts(r.Context(), body.Language, body.Code, body.Network)
+	// Bootstrap Claude credentials when bash code references claude
+	code := body.Code
+	if body.Language == "bash" && strings.Contains(code, "claude") {
+		if creds := unsandbox.SyncClaudeCredentials(); creds != "" {
+			code = creds + "\n" + code
+		}
+	}
+
+	// Submit async — returns immediately with job_id
+	result, err := client.ExecuteAsync(r.Context(), body.Language, code, body.Network)
 	if err != nil {
-		writeJSONError(w, http.StatusBadGateway, "execution_failed", "execution failed")
+		writeJSONError(w, http.StatusBadGateway, "execution_failed", err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK,map[string]any{
-		"status": result.Status,
-		"output": result.Output,
-		"error":  result.Error,
+	writeJSON(w, http.StatusOK, map[string]any{
 		"job_id": result.JobID,
+		"status": result.Status,
+	})
+}
+
+// GetUnsandboxJob polls a job for status and output.
+// GET /api/v1/unsandbox/jobs/{jobID}
+func (s *Server) GetUnsandboxJob(w http.ResponseWriter, r *http.Request) {
+	jobID := strings.TrimPrefix(r.URL.Path, "/api/v1/unsandbox/jobs/")
+	if jobID == "" {
+		writeJSONError(w, http.StatusBadRequest, "missing_job_id", "job ID is required")
+		return
+	}
+
+	client, err := unsandbox.NewClientFromEnv()
+	if err != nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "unsandbox_not_configured", "unsandbox is not configured")
+		return
+	}
+
+	job, err := client.GetJob(r.Context(), jobID)
+	if err != nil {
+		writeJSONError(w, http.StatusBadGateway, "job_poll_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"job_id": jobID,
+		"status": job.Status,
+		"output": job.Output,
+		"error":  job.Error,
 	})
 }
 
 // GetUnsandboxSessions lists active unsandbox sessions.
-// GET /api/v1/unsandbox/sessions
 func (s *Server) GetUnsandboxSessions(w http.ResponseWriter, r *http.Request) {
 	client, err := unsandbox.NewClientFromEnv()
 	if err != nil {
@@ -63,13 +100,12 @@ func (s *Server) GetUnsandboxSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK,map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"sessions": sessions,
 	})
 }
 
 // GetUnsandboxServices lists unsandbox services.
-// GET /api/v1/unsandbox/services
 func (s *Server) GetUnsandboxServices(w http.ResponseWriter, r *http.Request) {
 	client, err := unsandbox.NewClientFromEnv()
 	if err != nil {
@@ -83,17 +119,16 @@ func (s *Server) GetUnsandboxServices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK,map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"services": services,
 	})
 }
 
 // GetUnsandboxStatus checks if unsandbox credentials are configured and valid.
-// GET /api/v1/unsandbox/status
 func (s *Server) GetUnsandboxStatus(w http.ResponseWriter, r *http.Request) {
 	client, err := unsandbox.NewClientFromEnv()
 	if err != nil {
-		writeJSON(w, http.StatusOK,map[string]any{
+		writeJSON(w, http.StatusOK, map[string]any{
 			"configured": false,
 			"error":      err.Error(),
 		})
@@ -102,7 +137,7 @@ func (s *Server) GetUnsandboxStatus(w http.ResponseWriter, r *http.Request) {
 
 	keyInfo, err := client.ValidateKeys(r.Context())
 	if err != nil {
-		writeJSON(w, http.StatusOK,map[string]any{
+		writeJSON(w, http.StatusOK, map[string]any{
 			"configured": true,
 			"valid":      false,
 			"error":      err.Error(),
@@ -110,7 +145,7 @@ func (s *Server) GetUnsandboxStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK,map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"configured": true,
 		"valid":      true,
 		"key_info":   keyInfo,

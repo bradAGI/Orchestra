@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, Play, Terminal, Globe, RefreshCcw, KeyRound, Settings2 } from 'lucide-react'
+import { Loader2, Play, Terminal, Globe, RefreshCcw, KeyRound, Settings2, Zap } from 'lucide-react'
 import { CustomDropdown } from '@/components/app-shell/shared/controls'
 import { Button } from '@/components/ui/button'
 import type { BackendConfig } from '@/lib/orchestra-client'
 import {
-  executeUnsandbox,
   fetchUnsandboxSessions,
   fetchUnsandboxServices,
   fetchUnsandboxStatus,
@@ -37,12 +36,18 @@ const LANGUAGES = [
 const NETWORKS = ['semitrusted', 'zerotrust']
 
 export function SandboxDashboard({ config, onOpenSettings }: { config: BackendConfig | null; onOpenSettings?: () => void }) {
-  const [language, setLanguage] = useState('bash')
-  const [network, setNetwork] = useState('semitrusted')
-  const [code, setCode] = useState('')
+  const [language, setLanguage] = useState(() => localStorage.getItem('sandbox:language') || 'bash')
+  const [network, setNetwork] = useState(() => localStorage.getItem('sandbox:network') || 'semitrusted')
+  const [code, setCode] = useState(() => localStorage.getItem('sandbox:code') || '')
   const [executing, setExecuting] = useState(false)
   const [result, setResult] = useState<UnsandboxExecuteResult | null>(null)
   const [execError, setExecError] = useState('')
+  const [progressStatus, setProgressStatus] = useState('')
+  const [currentJobId, setCurrentJobId] = useState('')
+  const [currentJobStatus, setCurrentJobStatus] = useState('')
+  const [sessionLog, setSessionLog] = useState<Array<{ type: string; message: string; ts: string }>>([])
+  const abortRef = useRef<AbortController | null>(null)
+  const logEndRef = useRef<HTMLDivElement>(null)
 
   const [status, setStatus] = useState<UnsandboxStatus | null>(null)
   const [sessions, setSessions] = useState<UnsandboxSession[]>([])
@@ -67,6 +72,14 @@ export function SandboxDashboard({ config, onOpenSettings }: { config: BackendCo
       setSpinning(false)
     }
   }, [])
+
+  useEffect(() => { localStorage.setItem('sandbox:language', language) }, [language])
+  useEffect(() => { localStorage.setItem('sandbox:network', network) }, [network])
+  useEffect(() => { localStorage.setItem('sandbox:code', code) }, [code])
+
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [sessionLog])
 
   useEffect(() => {
     if (!config) return
@@ -95,12 +108,83 @@ export function SandboxDashboard({ config, onOpenSettings }: { config: BackendCo
     setExecuting(true)
     setResult(null)
     setExecError('')
+    setProgressStatus('')
+    setCurrentJobId('')
+    setCurrentJobStatus('')
+    setSessionLog([])
+
+    const controller = new AbortController()
+    abortRef.current = controller
+
     try {
-      const res = await executeUnsandbox(config, language, code, network)
-      setResult(res)
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (config.apiToken.trim()) headers.Authorization = `Bearer ${config.apiToken.trim()}`
+
+      // Step 1: Submit — returns immediately with job_id
+      const submitUrl = new URL('/api/v1/unsandbox/execute', config.baseUrl)
+      const submitResp = await fetch(submitUrl.toString(), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ language, code, network: network || 'semitrusted' }),
+        signal: controller.signal,
+      })
+
+      if (!submitResp.ok) {
+        const text = await submitResp.text()
+        setExecError(`HTTP ${submitResp.status}: ${text}`)
+        return
+      }
+
+      const submitData = await submitResp.json()
+      const jobId = submitData.job_id
+      if (!jobId) {
+        // Completed synchronously
+        setResult({ status: submitData.status || 'completed', output: submitData.output || '', error: submitData.error || '', job_id: '' })
+        return
+      }
+
+      setCurrentJobId(jobId)
+      setCurrentJobStatus('pending')
+      setProgressStatus(`${jobId.slice(0, 12)} pending...`)
+
+      // Step 2: Poll until done
+      const pollUrl = new URL(`/api/v1/unsandbox/jobs/${jobId}`, config.baseUrl)
+      while (!controller.signal.aborted) {
+        await new Promise((r) => setTimeout(r, 2000))
+        if (controller.signal.aborted) break
+
+        const pollResp = await fetch(pollUrl.toString(), { headers, signal: controller.signal })
+        if (!pollResp.ok) {
+          setExecError(`Poll failed: HTTP ${pollResp.status}`)
+          setCurrentJobStatus('failed')
+          return
+        }
+
+        const job = await pollResp.json()
+        const status = job.status || 'unknown'
+
+        if (status === 'completed' || status === 'failed') {
+          setCurrentJobStatus(status)
+          setResult({
+            status,
+            output: job.output || '',
+            error: job.error || '',
+            job_id: jobId,
+          })
+          setProgressStatus('')
+          refreshResources()
+          return
+        }
+
+        setCurrentJobStatus(status)
+        setProgressStatus(`${status}... (${jobId.slice(0, 12)})`)
+      }
     } catch (err) {
-      setExecError(err instanceof Error ? err.message : String(err))
+      if ((err as Error).name !== 'AbortError') {
+        setExecError(err instanceof Error ? err.message : String(err))
+      }
     } finally {
+      abortRef.current = null
       setExecuting(false)
     }
   }
@@ -127,9 +211,9 @@ export function SandboxDashboard({ config, onOpenSettings }: { config: BackendCo
       {/* Status bar */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img src="/unsandbox.ico" alt="Unsandbox" className="h-7 w-7 dark:invert" />
+          <Terminal className="h-5 w-5 text-muted-foreground" />
           <div>
-            <h2 className="text-sm font-bold">Unsandbox</h2>
+            <h2 className="text-sm font-bold">Sandbox</h2>
             <p className="text-[10px] text-muted-foreground">Remote code execution</p>
           </div>
         </div>
@@ -223,6 +307,39 @@ export function SandboxDashboard({ config, onOpenSettings }: { config: BackendCo
             </div>
           </div>
 
+          {/* Progress */}
+          {executing && progressStatus && (
+            <div className="flex items-center gap-2 rounded-xl border border-border/20 bg-muted/10 px-4 py-3">
+              <Loader2 className="h-3.5 w-3.5 animate-spin-smooth text-primary" />
+              <span className="text-xs font-mono text-muted-foreground">{progressStatus}</span>
+            </div>
+          )}
+
+          {/* Session Log (JSONL snoop) */}
+          {sessionLog.length > 0 && (
+            <div className="rounded-xl border border-border/20 bg-muted/10 p-4 space-y-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Session Activity ({sessionLog.length})
+              </p>
+              <div className="max-h-[300px] overflow-auto space-y-1 scroll-smooth">
+                {sessionLog.map((entry, i) => (
+                  <div key={i} className="flex gap-2 text-[11px] font-mono">
+                    <span className="text-muted-foreground shrink-0">{entry.ts}</span>
+                    <span className={`shrink-0 font-bold uppercase tracking-wider ${
+                      entry.type === 'assistant' ? 'text-primary' :
+                      entry.type === 'result' ? 'text-emerald-500' :
+                      'text-muted-foreground'
+                    }`}>
+                      {entry.type.slice(0, 8).padEnd(8)}
+                    </span>
+                    <span className="text-foreground/80 break-all">{entry.message}</span>
+                  </div>
+                ))}
+                <div ref={logEndRef} />
+              </div>
+            </div>
+          )}
+
           {/* Result */}
           {(result || execError) && (
             <div className="rounded-xl border border-border/20 bg-muted/10 p-4 space-y-2">
@@ -277,6 +394,27 @@ export function SandboxDashboard({ config, onOpenSettings }: { config: BackendCo
             />
           </Button>
         </div>
+
+        {currentJobId && (
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold text-muted-foreground">Current Job</p>
+            <div className="flex items-center justify-between rounded-lg bg-background/50 border border-border/10 px-3 py-1.5 text-[11px]">
+              <div className="flex items-center gap-2">
+                <Zap className={`h-3 w-3 ${currentJobStatus === 'running' || currentJobStatus === 'pending' ? 'text-primary animate-pulse' : 'text-muted-foreground'}`} />
+                <span className="font-mono">{currentJobId.slice(0, 12)}</span>
+                <span className="text-muted-foreground">{language}</span>
+              </div>
+              <span className={`font-bold uppercase tracking-wider ${
+                currentJobStatus === 'completed' ? 'text-emerald-500' :
+                currentJobStatus === 'failed' ? 'text-red-500' :
+                currentJobStatus === 'running' ? 'text-primary' :
+                'text-amber-500'
+              }`}>
+                {currentJobStatus}
+              </span>
+            </div>
+          </div>
+        )}
 
         {sessions.length > 0 && (
           <div className="space-y-1">
