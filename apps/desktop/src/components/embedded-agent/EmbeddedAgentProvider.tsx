@@ -14,6 +14,7 @@ import { createSearchTools } from './tools/search-tools'
 import { createCodeExecutionTools } from './tools/code-execution-tools'
 import { createSchedulerTools } from './tools/scheduler-tools'
 import { createMCPBridgeTools } from './tools/mcp-bridge-tools'
+import { createMetaTools } from './tools/meta-tools'
 
 const EmbeddedAgentContext = createContext<EmbeddedAgentContextValue | null>(null)
 
@@ -58,7 +59,7 @@ export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selec
     const codeExecutionTools = config ? createCodeExecutionTools(config) : {}
     const schedulerTools = createSchedulerTools(scheduler)
     const mcpBridgeTools = config ? createMCPBridgeTools(config) : {}
-    return {
+    const domainTools = {
       ...orchestraTools,
       ...navigationTools,
       ...gitTools,
@@ -68,6 +69,8 @@ export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selec
       ...schedulerTools,
       ...mcpBridgeTools,
     }
+    const metaTools = createMetaTools(domainTools)
+    return { ...domainTools, ...metaTools }
   }, [config, onNavigate, scheduler])
 
   const { messages, sendMessage, isStreaming, stop, clearChat } = useEmbeddedChat(providerConfig, tools)

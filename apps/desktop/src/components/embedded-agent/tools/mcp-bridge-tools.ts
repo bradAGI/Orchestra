@@ -11,7 +11,10 @@ import { fetchMCPServers, fetchMCPTools } from '@/lib/orchestra-client'
 export function createMCPBridgeTools(config: BackendConfig) {
   return {
     list_mcp_servers: tool({
-      description: 'List all connected MCP servers and their status.',
+      description:
+        'List all connected MCP servers. ' +
+        'Use when the user asks what MCP servers are connected or available. ' +
+        'Returns server names, IDs, and connection commands.',
       inputSchema: z.object({}),
       execute: async () => {
         const servers = await fetchMCPServers(config)
@@ -27,7 +30,10 @@ export function createMCPBridgeTools(config: BackendConfig) {
     }),
 
     discover_mcp_tools: tool({
-      description: 'Discover all tools exposed by connected MCP servers. Tools are namespaced as serverName.toolName to avoid conflicts.',
+      description:
+        'Discover tools exposed by connected MCP servers, namespaced as serverName.toolName. ' +
+        'Use when the user asks what MCP tools are available. ' +
+        'Optionally filter by server_name.',
       inputSchema: z.object({
         server_name: z.string().optional().describe('Optional filter by server name'),
       }),
@@ -58,7 +64,9 @@ export function createMCPBridgeTools(config: BackendConfig) {
     }),
 
     mcp_server_status: tool({
-      description: 'Check the connection status of all MCP servers. Shows which servers are available and which tools they expose.',
+      description:
+        'Check connection status of all MCP servers with per-server tool counts. ' +
+        'Use when the user asks for MCP status or health.',
       inputSchema: z.object({}),
       execute: async () => {
         try {

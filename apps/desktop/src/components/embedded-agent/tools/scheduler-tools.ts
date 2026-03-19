@@ -15,7 +15,10 @@ type SchedulerCallbacks = {
 export function createSchedulerTools(scheduler: SchedulerCallbacks) {
   return {
     schedule_reminder: tool({
-      description: 'Schedule a reminder message to appear in the chat after a delay. Use for requests like "remind me to check analytics in 30 minutes".',
+      description:
+        'Schedule a reminder message to appear in chat after a delay. ' +
+        'Use when the user asks to be reminded of something (e.g. "remind me to check analytics in 30 minutes"). ' +
+        'Delay range: 0.5 to 1440 minutes. Returns the schedule ID and fire time.',
       inputSchema: z.object({
         message: z.string().describe('The reminder message to display'),
         delay_minutes: z.number().min(0.5).max(1440).describe('Delay in minutes before the reminder fires'),
@@ -32,7 +35,10 @@ export function createSchedulerTools(scheduler: SchedulerCallbacks) {
     }),
 
     schedule_action: tool({
-      description: 'Schedule a tool execution to run after a delay. Use for requests like "create a status report in 1 hour".',
+      description:
+        'Schedule a tool execution to run after a delay. ' +
+        'Use when the user asks to run something later (e.g. "create a status report in 1 hour"). ' +
+        'Provide the tool_name and its arguments. Returns the schedule ID and fire time.',
       inputSchema: z.object({
         tool_name: z.string().describe('Name of the tool to execute'),
         args: z.record(z.string(), z.unknown()).describe('Arguments to pass to the tool'),
@@ -50,7 +56,10 @@ export function createSchedulerTools(scheduler: SchedulerCallbacks) {
     }),
 
     cancel_schedule: tool({
-      description: 'Cancel a pending scheduled reminder or action.',
+      description:
+        'Cancel a pending scheduled reminder or action by its ID. ' +
+        'Use when the user asks to cancel a reminder or scheduled action. ' +
+        'Get the ID from list_schedules or from the original schedule response.',
       inputSchema: z.object({
         id: z.string().describe('The schedule ID to cancel'),
       }),
@@ -61,7 +70,9 @@ export function createSchedulerTools(scheduler: SchedulerCallbacks) {
     }),
 
     list_schedules: tool({
-      description: 'List all active (pending) scheduled reminders and actions.',
+      description:
+        'List all active (pending) scheduled reminders and actions. ' +
+        'Use when the user asks what is scheduled or pending.',
       inputSchema: z.object({}),
       execute: async () => {
         const items = scheduler.activeItems.map((i) => ({

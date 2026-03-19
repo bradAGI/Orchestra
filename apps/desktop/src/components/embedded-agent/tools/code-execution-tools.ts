@@ -14,7 +14,13 @@ import {
 export function createCodeExecutionTools(config: BackendConfig) {
   return {
     execute_code: tool({
-      description: 'Execute a code snippet in the Unsandbox sandboxed environment. Supports Python, JavaScript, bash, and other languages. Returns stdout, stderr, and execution status.',
+      description:
+        'Run a code snippet in the Unsandbox sandbox (Python, JavaScript, bash, Go, Rust). ' +
+        'Use when the user asks to run, execute, or test code. ' +
+        'Default network is "semitrusted". ' +
+        'CONFIRM BEFORE CALLING if network="trusted". ' +
+        'Automatically checks sandbox availability before executing. ' +
+        'Returns stdout, stderr, exit status, and job_id.',
       inputSchema: z.object({
         language: z.string().describe('Programming language (e.g. "python", "javascript", "bash", "go", "rust")'),
         code: z.string().describe('Source code to execute'),
@@ -48,7 +54,10 @@ export function createCodeExecutionTools(config: BackendConfig) {
     }),
 
     check_sandbox_status: tool({
-      description: 'Check whether the Unsandbox code execution environment is configured and available.',
+      description:
+        'Check if the Unsandbox code execution environment is configured and available. ' +
+        'Use before first code execution in a session, or when the user asks if sandbox is ready. ' +
+        'Returns configuration status and any validation errors.',
       inputSchema: z.object({}),
       execute: async () => {
         const status = await fetchUnsandboxStatus(config)
@@ -57,7 +66,9 @@ export function createCodeExecutionTools(config: BackendConfig) {
     }),
 
     list_sandbox_sessions: tool({
-      description: 'List recent Unsandbox execution sessions.',
+      description:
+        'List recent code execution sessions from Unsandbox. ' +
+        'Use when the user asks about previous code runs or sandbox history.',
       inputSchema: z.object({}),
       execute: async () => {
         const result = await fetchUnsandboxSessions(config)
