@@ -1,5 +1,7 @@
 import { useCallback } from 'react'
-import { X, Trash2 } from 'lucide-react'
+import { X, RefreshCcw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { AppTooltip } from '@/components/ui/tooltip-wrapper'
 import { useEmbeddedAgent } from './EmbeddedAgentProvider'
 import { MessageList } from './components/MessageList'
 import { ChatInput } from './components/ChatInput'
@@ -20,42 +22,46 @@ export function EmbeddedAgentPanel() {
 
   const handleAction = useCallback(
     (action: string, params: Record<string, unknown>) => {
-      if (action === 'send_chat' && typeof params.text === 'string') {
-        void sendMessage(params.text)
+      if (action === 'send_chat' && typeof params.message === 'string') {
+        void sendMessage(params.message)
       }
-      // navigate actions are handled by navigation tools
     },
     [sendMessage],
   )
 
   return (
-    <div className="fixed bottom-20 right-6 z-50 flex h-[620px] w-[420px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
+    <div className="fixed bottom-20 right-6 z-50 flex h-[620px] w-[420px] flex-col overflow-hidden rounded-2xl border border-border/30 bg-card shadow-[0_32px_64px_-12px_rgba(0,0,0,0.4)]">
       {/* Header */}
-      <div className="flex items-center gap-2 border-b border-border/50 px-3 py-2">
-        <span className="text-sm font-semibold">Agent</span>
-        <div className="flex-1">
+      <div className="flex items-center justify-between border-b border-border/30 px-4 py-3">
+        <div className="flex items-center gap-3">
           <ProviderSelector
             config={providerConfig}
             availableKeys={availableKeys}
             onUpdate={updateProvider}
           />
         </div>
-        <button
-          type="button"
-          onClick={clearChat}
-          className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-          aria-label="Clear chat"
-        >
-          <Trash2 className="size-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={togglePanel}
-          className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-          aria-label="Close panel"
-        >
-          <X className="size-3.5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <AppTooltip content="New chat">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearChat}
+              className="h-7 w-7 p-0"
+            >
+              <RefreshCcw className="h-3.5 w-3.5" />
+            </Button>
+          </AppTooltip>
+          <AppTooltip content="Close (Ctrl+.)">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={togglePanel}
+              className="h-7 w-7 p-0"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </AppTooltip>
+        </div>
       </div>
 
       {/* Body */}

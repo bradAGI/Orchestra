@@ -1,3 +1,4 @@
+import { CustomDropdown } from '@/components/app-shell/shared/controls'
 import { CHAT_PROVIDERS, type ChatProviderConfig } from '../lib/types'
 
 interface ProviderSelectorProps {
@@ -10,36 +11,30 @@ export function ProviderSelector({ config, availableKeys, onUpdate }: ProviderSe
   const currentProvider = CHAT_PROVIDERS.find((p) => p.id === config.providerId)
   const models = currentProvider?.models ?? []
 
+  const providerOptions = CHAT_PROVIDERS.map((p) => ({
+    label: availableKeys[p.id] ? p.label : `${p.label} (no key)`,
+    value: p.id,
+  }))
+
+  const modelOptions = models.map((m) => ({
+    label: m,
+    value: m,
+  }))
+
   return (
     <div className="flex items-center gap-1.5">
-      <select
+      <CustomDropdown
         value={config.providerId}
-        onChange={(e) =>
-          onUpdate(e.target.value as ChatProviderConfig['providerId'])
-        }
-        className="h-7 rounded border border-border/50 bg-background px-1.5 text-[10px] outline-none focus:border-primary/50"
-      >
-        {CHAT_PROVIDERS.map((p) => {
-          const hasKey = !!availableKeys[p.id]
-          return (
-            <option key={p.id} value={p.id} disabled={!hasKey}>
-              {p.label}{!hasKey ? ' (no key)' : ''}
-            </option>
-          )
-        })}
-      </select>
-
-      <select
+        options={providerOptions}
+        onChange={(v) => onUpdate(v as ChatProviderConfig['providerId'])}
+        className="min-w-[90px]"
+      />
+      <CustomDropdown
         value={config.modelId}
-        onChange={(e) => onUpdate(config.providerId, e.target.value)}
-        className="h-7 min-w-0 flex-1 truncate rounded border border-border/50 bg-background px-1.5 text-[10px] outline-none focus:border-primary/50"
-      >
-        {models.map((m) => (
-          <option key={m} value={m}>
-            {m}
-          </option>
-        ))}
-      </select>
+        options={modelOptions}
+        onChange={(v) => onUpdate(config.providerId, v as string)}
+        className="min-w-[100px]"
+      />
     </div>
   )
 }
