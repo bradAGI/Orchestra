@@ -1,3 +1,5 @@
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import type { ChatMessage } from '../lib/types'
 import { ToolFeedback } from './ToolFeedback'
 import { JsonRenderBlock } from './JsonRenderBlock'
@@ -43,7 +45,15 @@ export function MessageBubble({ message, onAction, isStreaming }: MessageBubbleP
 
         {/* Text content */}
         {message.content && (
-          <div className="whitespace-pre-wrap break-words">{message.content}</div>
+          isUser ? (
+            <div className="whitespace-pre-wrap break-words">{message.content}</div>
+          ) : (
+            <div className="agent-markdown break-words">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {message.content}
+              </ReactMarkdown>
+            </div>
+          )
         )}
       </div>
     </div>
