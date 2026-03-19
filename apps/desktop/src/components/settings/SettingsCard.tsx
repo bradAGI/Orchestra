@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Activity, Bell, Check, CheckCircle2, CircleDashed, Database, ExternalLink, Eye, EyeOff, Github, Globe, Info, Keyboard, Loader2, Play, Plus, RefreshCcw, Settings2, ShieldCheck, SignalHigh, Terminal, Trash2, Users, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AppTooltip } from '@/components/ui/tooltip-wrapper'
@@ -654,6 +654,134 @@ function BackendConfigForm({
   )
 }
 
+function ModelSearchDropdown({
+  models,
+  modelId,
+  loading,
+  error,
+  hasKey,
+  onSelect,
+}: {
+  models: { id: string; name: string }[]
+  modelId: string
+  loading: boolean
+  error: string
+  hasKey: boolean
+  onSelect: (id: string) => void
+}) {
+  const [search, setSearch] = useState('')
+  const [open, setOpen] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const filtered = search
+    ? models.filter(m =>
+        m.id.toLowerCase().includes(search.toLowerCase()) ||
+        m.name.toLowerCase().includes(search.toLowerCase())
+      )
+    : models
+
+  const selectedModel = models.find(m => m.id === modelId)
+
+  if (error) {
+    return (
+      <div className="space-y-1">
+        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Model</label>
+        <p className="text-[11px] text-red-500">{error}</p>
+      </div>
+    )
+  }
+
+  if (!hasKey) {
+    return (
+      <div className="space-y-1">
+        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Model</label>
+        <p className="text-[11px] text-muted-foreground/60">Enter an API key to load models</p>
+      </div>
+    )
+  }
+
+  if (models.length === 0) {
+    return (
+      <div className="space-y-1">
+        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          Model
+          {loading && <Loader2 className="ml-1.5 inline h-2.5 w-2.5 animate-spin-smooth" />}
+        </label>
+        <p className="text-[11px] text-muted-foreground/60">Loading models...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-1 relative">
+      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        Model
+        {loading && <Loader2 className="ml-1.5 inline h-2.5 w-2.5 animate-spin-smooth" />}
+        <span className="ml-2 text-muted-foreground/40 normal-case tracking-normal font-normal">{models.length} available</span>
+      </label>
+
+      {/* Selected / search input */}
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          value={open ? search : (selectedModel?.name || modelId || '')}
+          onChange={(e) => { setSearch(e.target.value); if (!open) setOpen(true) }}
+          onFocus={() => { setOpen(true); setSearch('') }}
+          placeholder="Search models..."
+          className="w-full rounded-lg border border-border/40 bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground/40 focus:border-primary focus:outline-none"
+        />
+        {modelId && !open && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground/40">
+            {models.length} models
+          </span>
+        )}
+      </div>
+
+      {/* Dropdown list */}
+      {open && (
+        <div className="absolute z-50 mt-1 w-full max-h-[240px] overflow-y-auto rounded-lg border border-border/40 bg-card shadow-lg">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-2 text-[11px] text-muted-foreground/60">
+              No models match &ldquo;{search}&rdquo;
+            </div>
+          ) : (
+            filtered.slice(0, 100).map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => {
+                  onSelect(m.id)
+                  setSearch('')
+                  setOpen(false)
+                }}
+                className={`w-full px-3 py-1.5 text-left text-[11px] transition-colors hover:bg-muted/50 ${
+                  m.id === modelId ? 'bg-primary/10 text-primary font-bold' : 'text-foreground'
+                }`}
+              >
+                <span className="block font-mono truncate">{m.id}</span>
+                {m.name !== m.id && (
+                  <span className="block text-[10px] text-muted-foreground/60 truncate">{m.name}</span>
+                )}
+              </button>
+            ))
+          )}
+          {filtered.length > 100 && (
+            <div className="px-3 py-1.5 text-[10px] text-muted-foreground/40 border-t border-border/20">
+              Showing first 100 of {filtered.length} — type to filter
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Click-away to close */}
+      {open && (
+        <div className="fixed inset-0 z-40" onClick={() => { setOpen(false); setSearch('') }} />
+      )}
+    </div>
+  )
+}
+
 function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig | null; disabled: boolean }) {
   const [providerId, setProviderId] = useState<string>(CHAT_PROVIDERS[0].id)
   const [modelId, setModelId] = useState<string>('')
@@ -817,27 +945,15 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
           </div>
         </div>
 
-        {/* Model — populated from provider API */}
-        <div className="space-y-1">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            Model
-            {modelsLoading && <Loader2 className="ml-1.5 inline h-2.5 w-2.5 animate-spin-smooth" />}
-          </label>
-          {modelsError ? (
-            <p className="text-[11px] text-red-500">{modelsError}</p>
-          ) : models.length > 0 ? (
-            <CustomDropdown
-              className="w-full"
-              value={modelId}
-              options={models.map(m => ({ label: m.name, value: m.id }))}
-              onChange={(v) => setModelId(v as string)}
-            />
-          ) : (
-            <p className="text-[11px] text-muted-foreground/60">
-              {hasKey || apiKey.trim() ? 'Loading models...' : 'Enter an API key to load models'}
-            </p>
-          )}
-        </div>
+        {/* Model — populated from provider API with search */}
+        <ModelSearchDropdown
+          models={models}
+          modelId={modelId}
+          loading={modelsLoading}
+          error={modelsError}
+          hasKey={hasKey || !!apiKey.trim()}
+          onSelect={setModelId}
+        />
 
         {/* Test */}
         <div className="flex items-center gap-2">
