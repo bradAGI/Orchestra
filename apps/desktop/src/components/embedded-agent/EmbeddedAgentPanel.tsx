@@ -27,7 +27,7 @@ export function EmbeddedAgentPanel({ onOpenSettings }: { onOpenSettings?: () => 
   )
 
   return (
-    <div className="agent-panel-enter fixed bottom-20 right-6 z-50 flex h-[620px] w-[420px] flex-col overflow-hidden rounded-2xl border border-border/20 bg-card/95 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+    <div className="agent-panel-enter fixed bottom-6 right-6 z-50 flex w-[420px] flex-col overflow-hidden rounded-2xl border border-border/20 bg-card shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] backdrop-blur-xl" style={{ top: '80px' }}>
       {/* Subtle top gradient accent */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
 

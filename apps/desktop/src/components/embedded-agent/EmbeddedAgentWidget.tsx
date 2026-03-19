@@ -55,17 +55,19 @@ function WidgetInner({ onOpenSettings }: { onOpenSettings?: () => void }) {
     <>
       {isPanelOpen && <EmbeddedAgentPanel onOpenSettings={onOpenSettings} />}
 
-      {/* Floating action button */}
-      <button
-        type="button"
-        onClick={togglePanel}
-        className={`fixed bottom-6 right-6 z-50 grid h-14 w-14 place-items-center rounded-full border border-primary/20 bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/30 active:scale-95 ${
-          isStreaming ? 'agent-fab-streaming' : ''
-        } ${isPanelOpen ? 'rotate-45 opacity-80' : 'rotate-0 opacity-100'}`}
-        title="Orchestra Agent (Ctrl+.)"
-      >
-        <AgentIcon className="h-7 w-7 transition-transform duration-300" />
-      </button>
+      {/* Floating action button — hidden when panel is open */}
+      {!isPanelOpen && (
+        <button
+          type="button"
+          onClick={togglePanel}
+          className={`agent-fab-enter fixed bottom-6 right-6 z-50 grid h-14 w-14 place-items-center rounded-full border border-primary/20 bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition-all duration-300 hover:scale-110 hover:shadow-xl hover:shadow-primary/30 active:scale-95 ${
+            isStreaming ? 'agent-fab-streaming' : ''
+          }`}
+          title="Orchestra Agent (Ctrl+.)"
+        >
+          <AgentIcon className="h-7 w-7" />
+        </button>
+      )}
     </>
   )
 }

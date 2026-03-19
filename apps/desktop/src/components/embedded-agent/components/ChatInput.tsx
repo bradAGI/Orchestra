@@ -33,7 +33,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
   )
 
   return (
-    <div className="bg-background/50 px-3 py-3">
+    <div className="px-3 py-3">
       <div className="flex items-end gap-2">
         <textarea
           ref={textareaRef}

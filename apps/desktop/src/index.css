@@ -187,22 +187,13 @@ body {
 @keyframes agent-panel-in {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.96);
+    transform: scale(0.4);
+    transform-origin: bottom right;
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes agent-panel-out {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(12px) scale(0.96);
+    transform: scale(1);
+    transform-origin: bottom right;
   }
 }
 
@@ -238,7 +229,23 @@ body {
 }
 
 .agent-panel-enter {
-  animation: agent-panel-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: agent-panel-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: bottom right;
+}
+
+@keyframes agent-fab-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.agent-fab-enter {
+  animation: agent-fab-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .agent-message-enter {
