@@ -655,210 +655,156 @@ function BackendConfigForm({
 }
 
 function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig | null; disabled: boolean }) {
-  const [keys, setKeys] = useState<Record<string, string>>({})
-  const [editing, setEditing] = useState<Record<string, string>>({})
-  const [saving, setSaving] = useState<string | null>(null)
-  const [testing, setTesting] = useState<string | null>(null)
+  const [providerId, setProviderId] = useState<string>(CHAT_PROVIDERS[0].id)
+  const [modelId, setModelId] = useState<string>(CHAT_PROVIDERS[0].models[0])
+  const [apiKey, setApiKey] = useState('')
+  const [showKey, setShowKey] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
   const [message, setMessage] = useState('')
-  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
-  const [selectedModel, setSelectedModel] = useState<Record<string, string>>({})
+  const [hasKey, setHasKey] = useState(false)
+
+  const currentProvider = CHAT_PROVIDERS.find(p => p.id === providerId)
 
   useEffect(() => {
     if (!config) return
     fetchAgentProviderKeys(config)
       .then((result) => {
-        const loaded: Record<string, string> = {}
-        const models: Record<string, string> = {}
-        for (const [id, info] of Object.entries(result.providers)) {
-          if (info.configured && info.api_key) {
-            loaded[id] = info.api_key
+        for (const p of CHAT_PROVIDERS) {
+          const info = result.providers[p.id]
+          if (info?.configured && info.api_key) {
+            setProviderId(p.id)
+            setModelId(p.models[0])
+            setHasKey(true)
+            return
           }
         }
-        for (const p of CHAT_PROVIDERS) {
-          models[p.id] = p.models[0]
-        }
-        setKeys(loaded)
-        setSelectedModel(models)
       })
       .catch(() => {})
   }, [config])
 
-  const handleSave = async (providerId: string) => {
-    if (!config) return
-    const key = editing[providerId]?.trim()
-    if (!key) return
-    setSaving(providerId)
+  useEffect(() => {
+    const provider = CHAT_PROVIDERS.find(p => p.id === providerId)
+    if (provider) setModelId(provider.models[0])
+  }, [providerId])
+
+  const handleSave = async () => {
+    if (!config || !apiKey.trim()) return
+    setSaving(true)
     setMessage('')
     try {
-      await saveAgentProviderKey(config, providerId, key)
-      setKeys(prev => ({ ...prev, [providerId]: key }))
-      setEditing(prev => { const n = { ...prev }; delete n[providerId]; return n })
-      setMessage(`${providerId} key saved.`)
+      await saveAgentProviderKey(config, providerId, apiKey.trim())
+      setHasKey(true)
+      setApiKey('')
+      setMessage('API key saved.')
     } catch (err) {
       setMessage(`Save failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
-      setSaving(null)
+      setSaving(false)
     }
   }
 
-  const handleTest = async (providerId: string) => {
-    const key = keys[providerId]
-    if (!key) return
-    setTesting(providerId)
+  const handleTest = async () => {
+    setTesting(true)
     setMessage('')
     try {
+      if (!config) throw new Error('No backend config')
+      const result = await fetchAgentProviderKeys(config)
+      const info = result.providers[providerId]
+      if (!info?.api_key) throw new Error('No API key configured for this provider')
       const { createProvider } = await import('@/components/embedded-agent/lib/providers')
       const { generateText } = await import('ai')
-      const model = selectedModel[providerId] ?? CHAT_PROVIDERS.find(p => p.id === providerId)?.models[0] ?? ''
-      const provider = createProvider(providerId, key)
+      const provider = createProvider(providerId, info.api_key)
       await generateText({
-        model: provider(model),
+        model: provider(modelId),
         prompt: 'Say "ok" and nothing else.',
       })
-      setMessage(`${providerId} connection verified.`)
+      setMessage('Connection verified.')
     } catch (err) {
       setMessage(`Test failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
-      setTesting(null)
+      setTesting(false)
     }
   }
-
-  const handleRemove = async (providerId: string) => {
-    if (!config) return
-    setSaving(providerId)
-    setMessage('')
-    try {
-      await saveAgentProviderKey(config, providerId, '')
-      setKeys(prev => { const n = { ...prev }; delete n[providerId]; return n })
-      setMessage(`${providerId} key removed.`)
-    } catch (err) {
-      setMessage(`Remove failed: ${err instanceof Error ? err.message : String(err)}`)
-    } finally {
-      setSaving(null)
-    }
-  }
-
-  const configuredCount = Object.keys(keys).length
 
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-border/20 bg-muted/10 p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="text-sm font-bold">Embedded Agent</p>
-            <p className="text-[10px] text-muted-foreground">LLM providers for the chat widget ({configuredCount} configured)</p>
+        <div className="space-y-1">
+          <p className="text-sm font-bold">Embedded Agent</p>
+          <p className="text-[10px] text-muted-foreground">Configure the LLM provider for the chat widget</p>
+        </div>
+
+        {/* Provider */}
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Provider</label>
+          <CustomDropdown
+            className="w-full"
+            value={providerId}
+            options={CHAT_PROVIDERS.map(p => ({ label: p.label, value: p.id }))}
+            onChange={(v) => setProviderId(v as string)}
+          />
+        </div>
+
+        {/* Model */}
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Model</label>
+          <CustomDropdown
+            className="w-full"
+            value={modelId}
+            options={(currentProvider?.models ?? []).map(m => ({ label: m, value: m }))}
+            onChange={(v) => setModelId(v as string)}
+          />
+        </div>
+
+        {/* API Key */}
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            API Key
+            {hasKey && (
+              <span className="ml-2 inline-flex items-center gap-1 text-emerald-500">
+                <CheckCircle2 className="h-2.5 w-2.5" />
+                Configured
+              </span>
+            )}
+          </label>
+          <div className="relative">
+            <input
+              type={showKey ? 'text' : 'password'}
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder={hasKey ? '••••••••' : (providerId === 'openrouter' ? 'sk-or-...' : providerId === 'claude' ? 'sk-ant-...' : 'sk-...')}
+              disabled={disabled || saving}
+              className="w-full rounded-lg border border-border/40 bg-background px-3 pr-9 py-2 text-sm font-mono placeholder:text-muted-foreground/40 focus:border-primary focus:outline-none disabled:opacity-50"
+            />
+            <button
+              type="button"
+              onClick={() => setShowKey(!showKey)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-all"
+            >
+              {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            </button>
           </div>
         </div>
 
-        <div className="space-y-3">
-          {CHAT_PROVIDERS.map((provider) => {
-            const hasKey = !!keys[provider.id]
-            const isEditing = provider.id in editing
-            return (
-              <div key={provider.id} className="rounded-lg border border-border/20 bg-background/50 p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold">{provider.label}</span>
-                    {hasKey ? (
-                      <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-500">
-                        <CheckCircle2 className="h-3 w-3" />
-                        Active
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                        <CircleDashed className="h-3 w-3" />
-                        Not set
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {hasKey && !isEditing && (
-                      <>
-                        <button
-                          onClick={() => handleTest(provider.id)}
-                          disabled={testing === provider.id}
-                          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-                        >
-                          {testing === provider.id ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <ShieldCheck className="h-3 w-3" />}
-                          Test
-                        </button>
-                        <button
-                          onClick={() => setEditing(prev => ({ ...prev, [provider.id]: '' }))}
-                          className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          Change
-                        </button>
-                        <button
-                          onClick={() => handleRemove(provider.id)}
-                          disabled={saving === provider.id}
-                          className="text-[10px] text-red-500/70 hover:text-red-500 transition-colors disabled:opacity-50"
-                        >
-                          Remove
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Model selector */}
-                {hasKey && (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Default Model</label>
-                    <CustomDropdown
-                      className="w-full"
-                      value={selectedModel[provider.id] ?? provider.models[0]}
-                      options={provider.models.map(m => ({ label: m, value: m }))}
-                      onChange={(v) => setSelectedModel(prev => ({ ...prev, [provider.id]: v as string }))}
-                    />
-                  </div>
-                )}
-
-                {/* Key input */}
-                {(!hasKey || isEditing) && (
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      API Key {isEditing && <span className="text-muted-foreground/60">(leave blank to keep current)</span>}
-                    </label>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <input
-                          type={showKeys[provider.id] ? 'text' : 'password'}
-                          value={editing[provider.id] ?? ''}
-                          onChange={(e) => setEditing(prev => ({ ...prev, [provider.id]: e.target.value }))}
-                          placeholder={provider.id === 'openrouter' ? 'sk-or-...' : provider.id === 'claude' ? 'sk-ant-...' : 'sk-...'}
-                          disabled={disabled || saving === provider.id}
-                          className="w-full rounded-lg border border-border/40 bg-background px-3 pr-8 py-2 text-sm font-mono placeholder:text-muted-foreground/40 focus:border-primary focus:outline-none disabled:opacity-50"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowKeys(prev => ({ ...prev, [provider.id]: !prev[provider.id] }))}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-all"
-                        >
-                          {showKeys[provider.id] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                        </button>
-                      </div>
-                      <button
-                        onClick={() => handleSave(provider.id)}
-                        disabled={disabled || saving === provider.id || !editing[provider.id]?.trim()}
-                        className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        {saving === provider.id ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <Check className="h-3 w-3" />}
-                        Save
-                      </button>
-                      {isEditing && (
-                        <button
-                          onClick={() => setEditing(prev => { const n = { ...prev }; delete n[provider.id]; return n })}
-                          className="flex items-center gap-1.5 rounded-lg border border-border/40 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
+        {/* Actions */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSave}
+            disabled={disabled || saving || !apiKey.trim()}
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {saving ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <Check className="h-3 w-3" />}
+            Save Key
+          </button>
+          <button
+            onClick={handleTest}
+            disabled={disabled || testing || !hasKey}
+            className="flex items-center gap-1.5 rounded-lg border border-border/40 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:border-border disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {testing ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <ShieldCheck className="h-3 w-3" />}
+            Test Connection
+          </button>
         </div>
 
         {message && (
@@ -870,7 +816,6 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
 
       <p className="text-[10px] text-muted-foreground leading-relaxed">
         API keys are stored locally at <code className="text-[10px] font-mono bg-muted/30 px-1 rounded">~/.orchestra/agent-providers.json</code> with restricted permissions (600).
-        The embedded agent calls providers directly from the desktop app.
       </p>
     </div>
   )
