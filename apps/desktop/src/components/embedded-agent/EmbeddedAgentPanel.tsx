@@ -88,7 +88,13 @@ export function EmbeddedAgentPanel({ onOpenSettings }: { onOpenSettings?: () => 
       </div>
 
       {/* Body */}
-      <MessageList messages={messages} isStreaming={isStreaming} onAction={handleAction} />
+      <MessageList
+        messages={messages}
+        isStreaming={isStreaming}
+        onAction={handleAction}
+        hasApiKey={!!providerConfig.apiKey}
+        onOpenSettings={onOpenSettings ? () => { togglePanel(); onOpenSettings() } : undefined}
+      />
 
       {/* Footer */}
       <ChatInput
