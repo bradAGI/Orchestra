@@ -38,14 +38,15 @@ func (s *Server) PostUnsandboxExecute(w http.ResponseWriter, r *http.Request) {
 
 	// Bootstrap Claude credentials when bash code references claude
 	code := body.Code
-	if body.Language == "bash" && strings.Contains(code, "claude") {
+	isClaude := body.Language == "bash" && strings.Contains(code, "claude")
+	if isClaude {
 		if creds := unsandbox.SyncClaudeCredentials(); creds != "" {
 			code = creds + "\n" + code
 		}
 	}
 
-	// Submit async — returns immediately with job_id
-	result, err := client.ExecuteAsync(r.Context(), body.Language, code, body.Network)
+	// Submit async — 900s TTL (max allowed) for all sandbox jobs
+	result, err := client.ExecuteAsync(r.Context(), body.Language, code, body.Network, map[string]any{"ttl": 900})
 	if err != nil {
 		writeJSONError(w, http.StatusBadGateway, "execution_failed", err.Error())
 		return

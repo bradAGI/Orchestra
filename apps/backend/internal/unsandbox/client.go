@@ -157,10 +157,15 @@ func (c *Client) ExecuteWithOpts(ctx context.Context, language, code, network st
 
 // ExecuteAsync submits code for asynchronous execution and returns the job ID
 // immediately without waiting for completion.
-func (c *Client) ExecuteAsync(ctx context.Context, language, code, network string) (*ExecuteResult, error) {
+func (c *Client) ExecuteAsync(ctx context.Context, language, code, network string, opts ...map[string]any) (*ExecuteResult, error) {
 	body := map[string]any{"language": language, "code": code}
 	if network != "" {
 		body["network_mode"] = network
+	}
+	for _, o := range opts {
+		for k, v := range o {
+			body[k] = v
+		}
 	}
 
 	resp, err := c.request(ctx, "POST", "/execute/async", body)

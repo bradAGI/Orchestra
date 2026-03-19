@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, Play, Terminal, Globe, RefreshCcw, KeyRound, Settings2, Zap } from 'lucide-react'
+import { ChevronDown, ChevronRight, Clock, Loader2, Play, Terminal, Globe, RefreshCcw, KeyRound, Settings2, Trash2, Zap } from 'lucide-react'
 import { CustomDropdown } from '@/components/app-shell/shared/controls'
 import { Button } from '@/components/ui/button'
 import type { BackendConfig } from '@/lib/orchestra-client'
@@ -35,6 +35,28 @@ const LANGUAGES = [
 
 const NETWORKS = ['semitrusted', 'zerotrust']
 
+const MAX_HISTORY = 50
+
+interface HistoryEntry {
+  id: string
+  ts: string
+  language: string
+  network: string
+  code: string
+  status: string
+  output: string
+  error: string
+  job_id: string
+}
+
+function loadHistory(): HistoryEntry[] {
+  try { return JSON.parse(localStorage.getItem('sandbox:history') || '[]') } catch { return [] }
+}
+
+function saveHistory(entries: HistoryEntry[]) {
+  localStorage.setItem('sandbox:history', JSON.stringify(entries.slice(0, MAX_HISTORY)))
+}
+
 export function SandboxDashboard({ config, onOpenSettings }: { config: BackendConfig | null; onOpenSettings?: () => void }) {
   const [language, setLanguage] = useState(() => localStorage.getItem('sandbox:language') || 'bash')
   const [network, setNetwork] = useState(() => localStorage.getItem('sandbox:network') || 'semitrusted')
@@ -46,6 +68,8 @@ export function SandboxDashboard({ config, onOpenSettings }: { config: BackendCo
   const [currentJobId, setCurrentJobId] = useState('')
   const [currentJobStatus, setCurrentJobStatus] = useState('')
   const [sessionLog, setSessionLog] = useState<Array<{ type: string; message: string; ts: string }>>([])
+  const [history, setHistory] = useState<HistoryEntry[]>(loadHistory)
+  const [expandedHistoryId, setExpandedHistoryId] = useState('')
   const abortRef = useRef<AbortController | null>(null)
   const logEndRef = useRef<HTMLDivElement>(null)
 
@@ -103,6 +127,19 @@ export function SandboxDashboard({ config, onOpenSettings }: { config: BackendCo
     }
   }
 
+  const addToHistory = (entry: Omit<HistoryEntry, 'id' | 'ts'>) => {
+    const newEntry: HistoryEntry = {
+      id: crypto.randomUUID(),
+      ts: new Date().toISOString(),
+      ...entry,
+    }
+    setHistory((prev) => {
+      const next = [newEntry, ...prev].slice(0, MAX_HISTORY)
+      saveHistory(next)
+      return next
+    })
+  }
+
   const handleExecute = async () => {
     if (!config || !code.trim()) return
     setExecuting(true)
@@ -139,7 +176,9 @@ export function SandboxDashboard({ config, onOpenSettings }: { config: BackendCo
       const jobId = submitData.job_id
       if (!jobId) {
         // Completed synchronously
-        setResult({ status: submitData.status || 'completed', output: submitData.output || '', error: submitData.error || '', job_id: '' })
+        const res = { status: submitData.status || 'completed', output: submitData.output || '', error: submitData.error || '', job_id: '' }
+        setResult(res)
+        addToHistory({ language, network, code, ...res })
         return
       }
 
@@ -165,12 +204,9 @@ export function SandboxDashboard({ config, onOpenSettings }: { config: BackendCo
 
         if (status === 'completed' || status === 'failed') {
           setCurrentJobStatus(status)
-          setResult({
-            status,
-            output: job.output || '',
-            error: job.error || '',
-            job_id: jobId,
-          })
+          const res = { status, output: job.output || '', error: job.error || '', job_id: jobId }
+          setResult(res)
+          addToHistory({ language, network, code, ...res })
           setProgressStatus('')
           refreshResources()
           return
@@ -374,6 +410,80 @@ export function SandboxDashboard({ config, onOpenSettings }: { config: BackendCo
             </div>
           )}
         </>
+      )}
+
+      {/* History */}
+      {history.length > 0 && (
+        <div className="rounded-xl border border-border/20 bg-muted/10 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              History ({history.length})
+            </p>
+            <button
+              onClick={() => { setHistory([]); saveHistory([]) }}
+              className="text-[10px] text-muted-foreground hover:text-red-500 transition-colors"
+              title="Clear history"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+          <div className="space-y-1 max-h-[400px] overflow-auto">
+            {history.map((entry) => (
+              <div key={entry.id} className="rounded-lg bg-background/50 border border-border/10 text-[11px]">
+                <button
+                  onClick={() => setExpandedHistoryId(expandedHistoryId === entry.id ? '' : entry.id)}
+                  className="flex items-center justify-between w-full px-3 py-1.5 text-left hover:bg-muted/20 transition-colors"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    {expandedHistoryId === entry.id
+                      ? <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+                      : <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />}
+                    <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
+                    <span className="text-muted-foreground shrink-0">
+                      {new Date(entry.ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    <span className="text-muted-foreground shrink-0">{entry.language}</span>
+                    <span className="font-mono truncate text-foreground/70">{entry.code.slice(0, 60)}</span>
+                  </div>
+                  <span className={`font-bold uppercase tracking-wider shrink-0 ml-2 ${
+                    entry.status === 'completed' ? 'text-emerald-500' :
+                    entry.status === 'failed' ? 'text-red-500' : 'text-muted-foreground'
+                  }`}>
+                    {entry.status}
+                  </span>
+                </button>
+                {expandedHistoryId === entry.id && (
+                  <div className="px-3 pb-2 space-y-2">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setCode(entry.code); setLanguage(entry.language); setNetwork(entry.network) }}
+                        className="text-[10px] text-primary hover:underline"
+                      >
+                        Load into editor
+                      </button>
+                      {entry.job_id && (
+                        <span className="text-[10px] font-mono text-muted-foreground">{entry.job_id}</span>
+                      )}
+                    </div>
+                    <pre className="rounded-lg bg-muted/20 border border-border/10 p-2 text-[10px] font-mono whitespace-pre-wrap overflow-auto max-h-[120px]">
+                      {entry.code}
+                    </pre>
+                    {entry.output && (
+                      <pre className="rounded-lg bg-background border border-border/10 p-2 text-[10px] font-mono whitespace-pre-wrap overflow-auto max-h-[200px]">
+                        {entry.output}
+                      </pre>
+                    )}
+                    {entry.error && (
+                      <pre className="rounded-lg bg-red-500/10 border border-red-500/20 p-2 text-[10px] font-mono text-red-500 whitespace-pre-wrap overflow-auto max-h-[100px]">
+                        {entry.error}
+                      </pre>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Sessions & Services */}
