@@ -10,9 +10,12 @@ import {
   saveUnsandboxConfig,
   deleteUnsandboxConfig,
   fetchUnsandboxStatus,
+  fetchAgentProviderKeys,
+  saveAgentProviderKey,
   type UnsandboxConfig,
   type UnsandboxStatus,
 } from '@/lib/orchestra-client'
+import { CHAT_PROVIDERS } from '@/components/embedded-agent/lib/types'
 import { usePlatform } from '@/hooks/use-platform'
 import { CustomDropdown } from '@/components/app-shell/shared/controls'
 
@@ -196,11 +199,8 @@ export function SettingsCard({
           )}
 
           {activeTab === 'integrations' && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                <Globe className="h-3.5 w-3.5" />
-                External Services
-              </div>
+            <div className="space-y-6">
+              <EmbeddedAgentConfigForm config={config} disabled={savingConfig || loadingConfig} />
               <UnsandboxConfigForm config={config} disabled={savingConfig || loadingConfig} />
             </div>
           )}
@@ -649,6 +649,154 @@ function BackendConfigForm({
         >
           {savingConfig ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : 'Save Backend Config'}
         </Button>
+      </div>
+    </div>
+  )
+}
+
+function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig | null; disabled: boolean }) {
+  const [keys, setKeys] = useState<Record<string, string>>({})
+  const [editing, setEditing] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState<string | null>(null)
+  const [message, setMessage] = useState('')
+  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
+  const [selectedModel, setSelectedModel] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    if (!config) return
+    fetchAgentProviderKeys(config)
+      .then((result) => {
+        const loaded: Record<string, string> = {}
+        const models: Record<string, string> = {}
+        for (const [id, info] of Object.entries(result.providers)) {
+          if (info.configured && info.api_key) {
+            loaded[id] = info.api_key
+          }
+        }
+        for (const p of CHAT_PROVIDERS) {
+          models[p.id] = p.models[0]
+        }
+        setKeys(loaded)
+        setSelectedModel(models)
+      })
+      .catch(() => {})
+  }, [config])
+
+  const handleSave = async (providerId: string) => {
+    if (!config) return
+    const key = editing[providerId]?.trim()
+    if (!key) return
+    setSaving(providerId)
+    setMessage('')
+    try {
+      await saveAgentProviderKey(config, providerId, key)
+      setKeys(prev => ({ ...prev, [providerId]: key }))
+      setEditing(prev => { const n = { ...prev }; delete n[providerId]; return n })
+      setMessage(`${providerId} key saved.`)
+    } catch (err) {
+      setMessage(`Save failed: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-border/20 bg-muted/10 p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <p className="text-sm font-bold">Embedded Agent</p>
+            <p className="text-[10px] text-muted-foreground">Configure LLM provider API keys for the chat widget</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {CHAT_PROVIDERS.map((provider) => {
+            const hasKey = !!keys[provider.id]
+            const isEditing = provider.id in editing
+            return (
+              <div key={provider.id} className="rounded-lg border border-border/20 bg-background/50 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold">{provider.label}</span>
+                    {hasKey ? (
+                      <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-500">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Active
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        <CircleDashed className="h-3 w-3" />
+                        Not set
+                      </span>
+                    )}
+                  </div>
+                  {hasKey && !isEditing && (
+                    <button
+                      onClick={() => setEditing(prev => ({ ...prev, [provider.id]: '' }))}
+                      className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Change
+                    </button>
+                  )}
+                </div>
+
+                {/* Model selector */}
+                {hasKey && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Model</label>
+                    <CustomDropdown
+                      className="w-full"
+                      value={selectedModel[provider.id] ?? provider.models[0]}
+                      options={provider.models.map(m => ({ label: m, value: m }))}
+                      onChange={(v) => setSelectedModel(prev => ({ ...prev, [provider.id]: v as string }))}
+                    />
+                  </div>
+                )}
+
+                {/* Key input */}
+                {(!hasKey || isEditing) && (
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">API Key</label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type={showKeys[provider.id] ? 'text' : 'password'}
+                          value={editing[provider.id] ?? ''}
+                          onChange={(e) => setEditing(prev => ({ ...prev, [provider.id]: e.target.value }))}
+                          placeholder={provider.id === 'openrouter' ? 'sk-or-...' : provider.id === 'claude' ? 'sk-ant-...' : 'sk-...'}
+                          disabled={disabled || saving === provider.id}
+                          className="w-full rounded-lg border border-border/40 bg-background px-3 pr-8 py-2 text-sm font-mono placeholder:text-muted-foreground/40 focus:border-primary focus:outline-none disabled:opacity-50"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowKeys(prev => ({ ...prev, [provider.id]: !prev[provider.id] }))}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-all"
+                        >
+                          {showKeys[provider.id] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => handleSave(provider.id)}
+                        disabled={disabled || saving === provider.id || !editing[provider.id]?.trim()}
+                        className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {saving === provider.id ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <Check className="h-3 w-3" />}
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {message && (
+          <p className={`text-[11px] font-medium ${message.includes('failed') ? 'text-red-500' : 'text-emerald-500'}`}>
+            {message}
+          </p>
+        )}
       </div>
     </div>
   )
