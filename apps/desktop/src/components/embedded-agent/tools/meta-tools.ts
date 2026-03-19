@@ -456,8 +456,11 @@ export function createMetaTools(allTools: ToolSet) {
         // Extract schema from the tool's parameters
         const registryEntry = TOOL_REGISTRY.find((t) => t.name === params.tool_name)
         try {
-          const jsonSchema = targetTool.parameters
-            ? zodToJsonSchema(targetTool.parameters as z.ZodType)
+          const toolAny = targetTool as Record<string, unknown>
+          const schema = toolAny.parameters ?? toolAny.inputSchema
+           
+          const jsonSchema = schema
+            ? zodToJsonSchema(schema as any)
             : { type: 'object', properties: {} }
           return {
             name: params.tool_name,

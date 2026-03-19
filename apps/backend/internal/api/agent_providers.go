@@ -54,8 +54,8 @@ func (s *Server) HandleSaveAgentProvider(w http.ResponseWriter, r *http.Request)
 	provider := strings.TrimSpace(body.Provider)
 	apiKey := strings.TrimSpace(body.APIKey)
 
-	if provider == "" || apiKey == "" {
-		writeJSONError(w, http.StatusBadRequest, "missing_fields", "both provider and api_key are required")
+	if provider == "" {
+		writeJSONError(w, http.StatusBadRequest, "missing_fields", "provider is required")
 		return
 	}
 
@@ -73,7 +73,11 @@ func (s *Server) HandleSaveAgentProvider(w http.ResponseWriter, r *http.Request)
 	}
 
 	m := loadAgentProviders()
-	m[provider] = apiKey
+	if apiKey == "" {
+		delete(m, provider)
+	} else {
+		m[provider] = apiKey
+	}
 
 	if err := saveAgentProviders(m); err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "save_failed", "failed to save provider configuration")
@@ -82,7 +86,7 @@ func (s *Server) HandleSaveAgentProvider(w http.ResponseWriter, r *http.Request)
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"provider":   provider,
-		"configured": true,
+		"configured": apiKey != "",
 	})
 }
 

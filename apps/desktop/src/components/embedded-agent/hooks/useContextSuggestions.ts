@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { BackendConfig } from '@/lib/orchestra-client'
-import { fetchIssues, fetchState } from '@/lib/orchestra-client'
+import { fetchState } from '@/lib/orchestra-client'
 
 export type ContextSuggestion = {
   id: string

@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { BackendConfig } from '@/lib/orchestra-client'
-import { fetchState } from '@/lib/orchestra-client'
-import type { EventEnvelope, SnapshotPayload } from '@/lib/orchestra-types'
-import { normalizeSnapshotPayload, normalizeEventEnvelope } from '@/lib/orchestra-client'
+import { normalizeEventEnvelope } from '@/lib/orchestra-client'
 
 export type WatchNotification = {
   id: string

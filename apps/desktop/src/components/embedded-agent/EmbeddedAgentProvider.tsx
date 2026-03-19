@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, useCallback, useRef, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef, type ReactNode } from 'react'
 import type { BackendConfig } from '@/lib/orchestra-client'
 import type { EmbeddedAgentContextValue } from './lib/types'
 import { useProviderConfig } from './hooks/useProviderConfig'
@@ -26,7 +26,7 @@ interface EmbeddedAgentProviderProps {
   children: ReactNode
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
+ 
 export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selectedProjectId, children }: EmbeddedAgentProviderProps) {
   const { providerConfig, setProviderConfig, updateProvider, availableKeys } = useProviderConfig(config)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
@@ -76,7 +76,9 @@ export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selec
   const { messages, sendMessage, isStreaming, stop, clearChat } = useEmbeddedChat(providerConfig, tools)
 
   // Keep ref updated so scheduler callbacks can access latest sendMessage
-  sendMessageRef.current = sendMessage
+  useEffect(() => {
+    sendMessageRef.current = sendMessage
+  }, [sendMessage])
 
   const togglePanel = useCallback(() => {
     setIsPanelOpen((prev) => !prev)
@@ -142,7 +144,7 @@ export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selec
   )
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
+ 
 export function useEmbeddedAgent(): EmbeddedAgentContextValue {
   const ctx = useContext(EmbeddedAgentContext)
   if (!ctx) {

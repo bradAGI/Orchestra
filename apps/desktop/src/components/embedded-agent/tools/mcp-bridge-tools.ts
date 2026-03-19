@@ -48,10 +48,9 @@ export function createMCPBridgeTools(config: BackendConfig) {
         const namespacedTools = tools.map((t) => {
           const serverName = serverMap.get((t as Record<string, unknown>).server_id as string || '') || 'unknown'
           return {
-            namespace: `${serverName}.${t.name}`,
-            name: t.name,
-            server: serverName,
             ...t,
+            namespace: `${serverName}.${t.name}`,
+            server: serverName,
           }
         })
 
