@@ -3,13 +3,12 @@ import { createPortal } from 'react-dom'
 import { Loader2, Moon, Search, Settings2, Sun, Activity, Download, AlertTriangle, RefreshCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AppTooltip } from '@/components/ui/tooltip-wrapper'
-import { Badge } from '@/components/ui/badge'
 import { periodFilters } from '@/components/app-shell/types'
 import { usePlatform } from '@/hooks/use-platform'
 import type { IssueListItem } from '@/lib/orchestra-client'
 
 export function TopBar({
-  sectionLabel,
+  sectionLabel: _sectionLabel,
   sectionTitle,
   theme,
   setTheme,
@@ -102,12 +101,9 @@ export function TopBar({
           <div className="shrink-0 flex flex-col justify-center">
             <h1 className="text-base font-black tracking-tight text-foreground leading-none">{sectionTitle}</h1>
             <div className="flex items-center gap-2 mt-1">
-              <Badge variant="outline" className="text-[8px] h-3.5 px-1 font-black uppercase tracking-[0.1em] border-primary/20 text-primary/70 bg-primary/5">
-                {sectionLabel}
-              </Badge>
               {generatedAt && (
                 <AppTooltip content="Snapshot timestamp">
-                  <span className="text-[9px] font-mono text-muted-foreground/40 tabular-nums">
+                  <span className="text-xs font-mono text-muted-foreground tabular-nums">
                     {generatedAt}
                   </span>
                 </AppTooltip>

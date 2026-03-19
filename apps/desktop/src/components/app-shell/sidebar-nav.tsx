@@ -61,7 +61,7 @@ export function SidebarNav({
       </AppTooltip>
 
       <div className="flex h-full flex-col">
-        <div className="mb-8 flex justify-center pt-6">
+        <div className="mb-1.5 flex justify-center pt-6">
           <div className="flex items-center gap-2">
             <span className="grid h-12 w-12 shrink-0 place-items-center text-foreground">
               <AppMonogramIcon className="h-10 w-10" />
