@@ -13,30 +13,35 @@ export function MessageBubble({ message, onAction }: MessageBubbleProps) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[85%] rounded-lg px-3 py-2 text-xs ${
+        className={`max-w-[85%] text-[13px] leading-relaxed ${
           isUser
-            ? 'bg-primary text-primary-foreground'
-            : 'border border-border/50 bg-muted/30'
+            ? 'rounded-2xl rounded-br-md bg-primary px-3.5 py-2.5 text-primary-foreground shadow-sm shadow-primary/10'
+            : 'rounded-2xl rounded-tl-md border border-border/20 bg-muted/15 px-3.5 py-2.5'
         }`}
       >
-        {message.content && (
-          <div className="whitespace-pre-wrap">{message.content}</div>
+        {/* Tool feedback (before text for assistant) */}
+        {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
+          <div className="mb-2">
+            <ToolFeedback
+              toolCalls={message.toolCalls}
+              toolResults={message.toolResults ?? []}
+            />
+          </div>
         )}
 
-        {message.toolCalls && message.toolCalls.length > 0 && (
-          <ToolFeedback
-            toolCalls={message.toolCalls}
-            toolResults={message.toolResults ?? []}
-          />
-        )}
-
-        {message.jsonRenderSpec && (
-          <div className="mt-1.5">
+        {/* json-render rich UI */}
+        {!isUser && message.jsonRenderSpec && (
+          <div className="mb-2">
             <JsonRenderBlock
               spec={message.jsonRenderSpec}
               onAction={(action, params) => onAction(action, params ?? {})}
             />
           </div>
+        )}
+
+        {/* Text content */}
+        {message.content && (
+          <div className="whitespace-pre-wrap break-words">{message.content}</div>
         )}
       </div>
     </div>

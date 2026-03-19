@@ -19,9 +19,7 @@ function AgentIcon({ className }: { className?: string }) {
         </linearGradient>
       </defs>
       <circle
-        cx="32"
-        cy="32"
-        r="24"
+        cx="32" cy="32" r="24"
         fill="none"
         stroke="url(#agent-logo-gradient)"
         strokeWidth="6"
@@ -30,11 +28,7 @@ function AgentIcon({ className }: { className?: string }) {
         transform="rotate(-10 32 32)"
       />
       <rect
-        x="24"
-        y="24"
-        width="16"
-        height="16"
-        rx="3"
+        x="24" y="24" width="16" height="16" rx="3"
         fill="url(#agent-logo-gradient)"
         transform="rotate(45 32 32)"
       />
@@ -61,15 +55,16 @@ function WidgetInner({ onOpenSettings }: { onOpenSettings?: () => void }) {
     <>
       {isPanelOpen && <EmbeddedAgentPanel onOpenSettings={onOpenSettings} />}
 
+      {/* Floating action button */}
       <button
         type="button"
         onClick={togglePanel}
-        className={`fixed bottom-6 right-6 z-50 grid h-14 w-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-xl ${
-          isStreaming ? 'animate-pulse' : ''
-        }`}
+        className={`fixed bottom-6 right-6 z-50 grid h-14 w-14 place-items-center rounded-full border border-primary/20 bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/30 active:scale-95 ${
+          isStreaming ? 'agent-fab-streaming' : ''
+        } ${isPanelOpen ? 'rotate-45 opacity-80' : 'rotate-0 opacity-100'}`}
         title="Orchestra Agent (Ctrl+.)"
       >
-        <AgentIcon className="h-7 w-7" />
+        <AgentIcon className="h-7 w-7 transition-transform duration-300" />
       </button>
     </>
   )
