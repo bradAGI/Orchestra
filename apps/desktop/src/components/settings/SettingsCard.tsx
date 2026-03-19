@@ -658,6 +658,7 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
   const [keys, setKeys] = useState<Record<string, string>>({})
   const [editing, setEditing] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState<string | null>(null)
+  const [testing, setTesting] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
   const [selectedModel, setSelectedModel] = useState<Record<string, string>>({})
@@ -700,13 +701,52 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
     }
   }
 
+  const handleTest = async (providerId: string) => {
+    const key = keys[providerId]
+    if (!key) return
+    setTesting(providerId)
+    setMessage('')
+    try {
+      const { createProvider } = await import('@/components/embedded-agent/lib/providers')
+      const { generateText } = await import('ai')
+      const model = selectedModel[providerId] ?? CHAT_PROVIDERS.find(p => p.id === providerId)?.models[0] ?? ''
+      const provider = createProvider(providerId, key)
+      await generateText({
+        model: provider(model),
+        prompt: 'Say "ok" and nothing else.',
+      })
+      setMessage(`${providerId} connection verified.`)
+    } catch (err) {
+      setMessage(`Test failed: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setTesting(null)
+    }
+  }
+
+  const handleRemove = async (providerId: string) => {
+    if (!config) return
+    setSaving(providerId)
+    setMessage('')
+    try {
+      await saveAgentProviderKey(config, providerId, '')
+      setKeys(prev => { const n = { ...prev }; delete n[providerId]; return n })
+      setMessage(`${providerId} key removed.`)
+    } catch (err) {
+      setMessage(`Remove failed: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  const configuredCount = Object.keys(keys).length
+
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-border/20 bg-muted/10 p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <p className="text-sm font-bold">Embedded Agent</p>
-            <p className="text-[10px] text-muted-foreground">Configure LLM provider API keys for the chat widget</p>
+            <p className="text-[10px] text-muted-foreground">LLM providers for the chat widget ({configuredCount} configured)</p>
           </div>
         </div>
 
@@ -731,20 +771,39 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
                       </span>
                     )}
                   </div>
-                  {hasKey && !isEditing && (
-                    <button
-                      onClick={() => setEditing(prev => ({ ...prev, [provider.id]: '' }))}
-                      className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      Change
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {hasKey && !isEditing && (
+                      <>
+                        <button
+                          onClick={() => handleTest(provider.id)}
+                          disabled={testing === provider.id}
+                          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                        >
+                          {testing === provider.id ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <ShieldCheck className="h-3 w-3" />}
+                          Test
+                        </button>
+                        <button
+                          onClick={() => setEditing(prev => ({ ...prev, [provider.id]: '' }))}
+                          className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          Change
+                        </button>
+                        <button
+                          onClick={() => handleRemove(provider.id)}
+                          disabled={saving === provider.id}
+                          className="text-[10px] text-red-500/70 hover:text-red-500 transition-colors disabled:opacity-50"
+                        >
+                          Remove
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 {/* Model selector */}
                 {hasKey && (
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Model</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Default Model</label>
                     <CustomDropdown
                       className="w-full"
                       value={selectedModel[provider.id] ?? provider.models[0]}
@@ -757,7 +816,9 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
                 {/* Key input */}
                 {(!hasKey || isEditing) && (
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">API Key</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      API Key {isEditing && <span className="text-muted-foreground/60">(leave blank to keep current)</span>}
+                    </label>
                     <div className="flex gap-2">
                       <div className="relative flex-1">
                         <input
@@ -784,6 +845,14 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
                         {saving === provider.id ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <Check className="h-3 w-3" />}
                         Save
                       </button>
+                      {isEditing && (
+                        <button
+                          onClick={() => setEditing(prev => { const n = { ...prev }; delete n[provider.id]; return n })}
+                          className="flex items-center gap-1.5 rounded-lg border border-border/40 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -793,11 +862,16 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
         </div>
 
         {message && (
-          <p className={`text-[11px] font-medium ${message.includes('failed') ? 'text-red-500' : 'text-emerald-500'}`}>
+          <p className={`text-[11px] font-medium ${message.includes('failed') || message.includes('Failed') ? 'text-red-500' : 'text-emerald-500'}`}>
             {message}
           </p>
         )}
       </div>
+
+      <p className="text-[10px] text-muted-foreground leading-relaxed">
+        API keys are stored locally at <code className="text-[10px] font-mono bg-muted/30 px-1 rounded">~/.orchestra/agent-providers.json</code> with restricted permissions (600).
+        The embedded agent calls providers directly from the desktop app.
+      </p>
     </div>
   )
 }
