@@ -14,11 +14,12 @@ export function useProviderConfig(config: BackendConfig | null) {
   const [models, setModels] = useState<ModelInfo[]>([])
   const [modelsLoading, setModelsLoading] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [fetchCount, setFetchCount] = useState(0)
 
-  // Fetch keys on mount
+  // Fetch keys on mount AND whenever fetchCount bumps
   useEffect(() => {
     if (!config) return
-    setLoading(true)  
+    setLoading(true) // eslint-disable-line react-hooks/set-state-in-effect
     fetchAgentProviderKeys(config)
       .then((result) => {
         const keys: Record<string, string> = {}
@@ -29,19 +30,19 @@ export function useProviderConfig(config: BackendConfig | null) {
         }
         setAvailableKeys(keys)
 
-        // Auto-select first configured provider and fetch its models
+        // Auto-select first configured provider
         const firstConfigured = CHAT_PROVIDERS.find(p => keys[p.id])
         if (firstConfigured) {
-          setProviderConfig({
+          setProviderConfig(prev => ({
             providerId: firstConfigured.id,
-            modelId: '', // will be set after models load
+            modelId: prev.modelId || '',
             apiKey: keys[firstConfigured.id],
-          })
+          }))
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [config])
+  }, [config, fetchCount])
 
   // Fetch models when provider or key changes
   useEffect(() => {
@@ -57,7 +58,6 @@ export function useProviderConfig(config: BackendConfig | null) {
       .then((fetched) => {
         if (cancelled) return
         setModels(fetched)
-        // Auto-select first model if none selected
         if (!providerConfig.modelId && fetched.length > 0) {
           setProviderConfig(prev => ({ ...prev, modelId: fetched[0].id }))
         }
@@ -81,5 +81,10 @@ export function useProviderConfig(config: BackendConfig | null) {
     })
   }, [availableKeys])
 
-  return { providerConfig, setProviderConfig, updateProvider, availableKeys, models, modelsLoading, loading }
+  // Call this to re-fetch keys from the backend (e.g. after settings change)
+  const refetchKeys = useCallback(() => {
+    setFetchCount(c => c + 1)
+  }, [])
+
+  return { providerConfig, setProviderConfig, updateProvider, availableKeys, models, modelsLoading, loading, refetchKeys }
 }

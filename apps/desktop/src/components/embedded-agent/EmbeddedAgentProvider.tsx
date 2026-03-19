@@ -28,7 +28,7 @@ interface EmbeddedAgentProviderProps {
 
  
 export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selectedProjectId, children }: EmbeddedAgentProviderProps) {
-  const { providerConfig, setProviderConfig, updateProvider, availableKeys } = useProviderConfig(config)
+  const { providerConfig, setProviderConfig, updateProvider, availableKeys, refetchKeys } = useProviderConfig(config)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
   const sendMessageRef = useRef<((text: string) => Promise<void>) | null>(null)
 
@@ -81,8 +81,11 @@ export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selec
   }, [sendMessage])
 
   const togglePanel = useCallback(() => {
-    setIsPanelOpen((prev) => !prev)
-  }, [])
+    setIsPanelOpen((prev) => {
+      if (!prev) refetchKeys() // re-fetch keys when opening panel
+      return !prev
+    })
+  }, [refetchKeys])
 
   // Destructure stable references to avoid busting useMemo on every render
   const {
