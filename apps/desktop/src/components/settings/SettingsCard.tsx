@@ -10,9 +10,12 @@ import {
   saveUnsandboxConfig,
   deleteUnsandboxConfig,
   fetchUnsandboxStatus,
+  fetchAgentProviderKeys,
+  saveAgentProviderKey,
   type UnsandboxConfig,
   type UnsandboxStatus,
 } from '@/lib/orchestra-client'
+import { CHAT_PROVIDERS } from '@/components/embedded-agent/lib/types'
 import { usePlatform } from '@/hooks/use-platform'
 import { CustomDropdown } from '@/components/app-shell/shared/controls'
 
@@ -196,11 +199,8 @@ export function SettingsCard({
           )}
 
           {activeTab === 'integrations' && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                <Globe className="h-3.5 w-3.5" />
-                External Services
-              </div>
+            <div className="space-y-6">
+              <EmbeddedAgentConfigForm config={config} disabled={savingConfig || loadingConfig} />
               <UnsandboxConfigForm config={config} disabled={savingConfig || loadingConfig} />
             </div>
           )}
@@ -650,6 +650,173 @@ function BackendConfigForm({
           {savingConfig ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : 'Save Backend Config'}
         </Button>
       </div>
+    </div>
+  )
+}
+
+function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig | null; disabled: boolean }) {
+  const [providerId, setProviderId] = useState<string>(CHAT_PROVIDERS[0].id)
+  const [modelId, setModelId] = useState<string>(CHAT_PROVIDERS[0].models[0])
+  const [apiKey, setApiKey] = useState('')
+  const [showKey, setShowKey] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [message, setMessage] = useState('')
+  const [hasKey, setHasKey] = useState(false)
+
+  const currentProvider = CHAT_PROVIDERS.find(p => p.id === providerId)
+
+  useEffect(() => {
+    if (!config) return
+    fetchAgentProviderKeys(config)
+      .then((result) => {
+        for (const p of CHAT_PROVIDERS) {
+          const info = result.providers[p.id]
+          if (info?.configured && info.api_key) {
+            setProviderId(p.id)
+            setModelId(p.models[0])
+            setHasKey(true)
+            return
+          }
+        }
+      })
+      .catch(() => {})
+  }, [config])
+
+  useEffect(() => {
+    const provider = CHAT_PROVIDERS.find(p => p.id === providerId)
+    if (provider) setModelId(provider.models[0])
+  }, [providerId])
+
+  const handleSave = async () => {
+    if (!config || !apiKey.trim()) return
+    setSaving(true)
+    setMessage('')
+    try {
+      await saveAgentProviderKey(config, providerId, apiKey.trim())
+      setHasKey(true)
+      setApiKey('')
+      setMessage('API key saved.')
+    } catch (err) {
+      setMessage(`Save failed: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleTest = async () => {
+    setTesting(true)
+    setMessage('')
+    try {
+      if (!config) throw new Error('No backend config')
+      const result = await fetchAgentProviderKeys(config)
+      const info = result.providers[providerId]
+      if (!info?.api_key) throw new Error('No API key configured for this provider')
+      const { createProvider } = await import('@/components/embedded-agent/lib/providers')
+      const { generateText } = await import('ai')
+      const provider = createProvider(providerId, info.api_key)
+      await generateText({
+        model: provider(modelId),
+        prompt: 'Say "ok" and nothing else.',
+      })
+      setMessage('Connection verified.')
+    } catch (err) {
+      setMessage(`Test failed: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-border/20 bg-muted/10 p-4 space-y-4">
+        <div className="space-y-1">
+          <p className="text-sm font-bold">Embedded Agent</p>
+          <p className="text-[10px] text-muted-foreground">Configure the LLM provider for the chat widget</p>
+        </div>
+
+        {/* Provider */}
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Provider</label>
+          <CustomDropdown
+            className="w-full"
+            value={providerId}
+            options={CHAT_PROVIDERS.map(p => ({ label: p.label, value: p.id }))}
+            onChange={(v) => setProviderId(v as string)}
+          />
+        </div>
+
+        {/* Model */}
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Model</label>
+          <CustomDropdown
+            className="w-full"
+            value={modelId}
+            options={(currentProvider?.models ?? []).map(m => ({ label: m, value: m }))}
+            onChange={(v) => setModelId(v as string)}
+          />
+        </div>
+
+        {/* API Key */}
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            API Key
+            {hasKey && (
+              <span className="ml-2 inline-flex items-center gap-1 text-emerald-500">
+                <CheckCircle2 className="h-2.5 w-2.5" />
+                Configured
+              </span>
+            )}
+          </label>
+          <div className="relative">
+            <input
+              type={showKey ? 'text' : 'password'}
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder={hasKey ? '••••••••' : (providerId === 'openrouter' ? 'sk-or-...' : providerId === 'claude' ? 'sk-ant-...' : 'sk-...')}
+              disabled={disabled || saving}
+              className="w-full rounded-lg border border-border/40 bg-background px-3 pr-9 py-2 text-sm font-mono placeholder:text-muted-foreground/40 focus:border-primary focus:outline-none disabled:opacity-50"
+            />
+            <button
+              type="button"
+              onClick={() => setShowKey(!showKey)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-all"
+            >
+              {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSave}
+            disabled={disabled || saving || !apiKey.trim()}
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {saving ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <Check className="h-3 w-3" />}
+            Save Key
+          </button>
+          <button
+            onClick={handleTest}
+            disabled={disabled || testing || !hasKey}
+            className="flex items-center gap-1.5 rounded-lg border border-border/40 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:border-border disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {testing ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <ShieldCheck className="h-3 w-3" />}
+            Test Connection
+          </button>
+        </div>
+
+        {message && (
+          <p className={`text-[11px] font-medium ${message.includes('failed') || message.includes('Failed') ? 'text-red-500' : 'text-emerald-500'}`}>
+            {message}
+          </p>
+        )}
+      </div>
+
+      <p className="text-[10px] text-muted-foreground leading-relaxed">
+        API keys are stored locally at <code className="text-[10px] font-mono bg-muted/30 px-1 rounded">~/.orchestra/agent-providers.json</code> with restricted permissions (600).
+      </p>
     </div>
   )
 }

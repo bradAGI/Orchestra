@@ -71,6 +71,7 @@ import { Command } from 'cmdk'
 import type { BackendConfig } from '@/lib/orchestra-client'
 import { AppTooltipProvider } from '@/components/ui/tooltip-wrapper'
 import { SectionErrorBoundary } from '@/components/ui/section-error-boundary'
+import { EmbeddedAgentWidget } from '@/components/embedded-agent'
 import { useBackendConfig, useNotifications, useIssueLookup, useWorkspaceMigration } from '@/hooks'
 
 /** Root application component that manages backend sync, navigation, and top-level UI state. */
@@ -1166,6 +1167,17 @@ export default function App() {
                 </SectionErrorBoundary>
               ) : null}
         </div>
+        <EmbeddedAgentWidget
+          config={config}
+          onNavigate={(section, id) => {
+            setActiveSection(section as SectionID)
+            if (section === 'SETTINGS' && id) {
+              setSettingsInitialTab(id as 'backend' | 'agents' | 'integrations' | 'shortcuts' | 'notifications')
+            }
+          }}
+          onOpenSettings={() => { setSettingsInitialTab('integrations'); setActiveSection('SETTINGS') }}
+          activeSection={activeSection}
+        />
       </AppShell>
 
       <Dialog open={inspectDialogOpen} onOpenChange={setInspectDialogOpen}>

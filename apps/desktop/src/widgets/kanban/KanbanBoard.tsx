@@ -9,7 +9,7 @@ import {
   Plus,
   Rows,
   Square,
-  Ticket,
+  ClipboardList,
   Trash2,
 } from 'lucide-react'
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react'
@@ -488,7 +488,7 @@ export function KanbanBoard({
         <div className="flex-1 rounded-xl border bg-card/50 shadow-lg overflow-hidden min-h-0 flex flex-col">
           {filteredList.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center p-12 text-center text-muted-foreground/40">
-              <Ticket className="h-12 w-12 mb-4 opacity-20" />
+              <ClipboardList className="h-12 w-12 mb-4 opacity-20" />
               <p className="text-sm italic uppercase tracking-widest font-bold">No tasks match current filters</p>
             </div>
           ) : (

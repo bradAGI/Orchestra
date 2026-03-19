@@ -189,6 +189,10 @@ func NewRouterWithPubSub(
 	protected.Post("/api/v1/config/unsandbox", server.PostUnsandboxConfig)
 	protected.Delete("/api/v1/config/unsandbox", server.DeleteUnsandboxConfig)
 
+	// Agent provider API keys (embedded agent widget)
+	protected.Get("/api/v1/config/agent-providers", server.HandleGetAgentProviders)
+	protected.Post("/api/v1/config/agent-providers", server.HandleSaveAgentProvider)
+
 	protected.Get("/api/v1/issues/{issue_identifier}", server.GetIssue)
 	protected.Get("/api/v1/issues/{issue_identifier}/logs", server.GetIssueLogs)
 	protected.Get("/api/v1/issues/{issue_identifier}/history", server.GetIssueHistory)
