@@ -150,7 +150,7 @@ export function CreateTaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl w-[90vw] bg-card border-border/30 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] p-0 overflow-hidden min-h-[55vh] max-h-[85vh] flex flex-col rounded-2xl">
+      <DialogContent className="max-w-5xl w-[90vw] bg-card border-border/30 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] p-0 overflow-hidden min-h-[55vh] max-h-[85vh] flex flex-col rounded-2xl">
         <form onSubmit={handleSubmit} className="flex flex-col h-full flex-1">
           <div className="flex-1 flex flex-col overflow-hidden px-6 pt-6 pb-4 space-y-4">
             <input
