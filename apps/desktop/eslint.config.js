@@ -32,6 +32,7 @@ export default tseslint.config(
     files: [
       'src/components/app-shell/shared/controls.tsx',
       'src/app/routes/sections.tsx',
+      'src/components/embedded-agent/EmbeddedAgentProvider.tsx',
     ],
     rules: {
       'react-refresh/only-export-components': 'off',
