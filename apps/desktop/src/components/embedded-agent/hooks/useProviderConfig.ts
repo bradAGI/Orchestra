@@ -44,14 +44,18 @@ export function useProviderConfig(config: BackendConfig | null) {
         }
         setAvailableKeys(keys)
 
-        // Auto-select first configured provider
-        const firstConfigured = CHAT_PROVIDERS.find(p => keys[p.id])
-        if (firstConfigured) {
-          setProviderConfig(prev => ({
-            providerId: firstConfigured.id,
-            modelId: prev.modelId || '',
-            apiKey: keys[firstConfigured.id],
-          }))
+        // Use saved prefs if the saved provider has a key, otherwise first configured
+        const saved = loadPrefs()
+        const savedProviderHasKey = saved.providerId && keys[saved.providerId]
+        const targetProvider = savedProviderHasKey
+          ? CHAT_PROVIDERS.find(p => p.id === saved.providerId)
+          : CHAT_PROVIDERS.find(p => keys[p.id])
+        if (targetProvider && keys[targetProvider.id]) {
+          setProviderConfig({
+            providerId: targetProvider.id,
+            modelId: saved.modelId || '',
+            apiKey: keys[targetProvider.id],
+          })
         }
       })
       .catch(() => {})

@@ -10,23 +10,20 @@ export function createProvider(providerId: string, apiKey: string) {
   if (!apiKey) throw new Error(`No API key provided for ${providerId}`)
 
   switch (providerId) {
-    case 'openrouter':
-      return createOpenAI({
-        baseURL: 'https://openrouter.ai/api/v1',
-        apiKey,
-      })
-    case 'openai':
-      return createOpenAI({
-        apiKey,
-      })
+    case 'openrouter': {
+      // OpenRouter only supports Chat Completions API, not the Responses API
+      const or = createOpenAI({ baseURL: 'https://openrouter.ai/api/v1', apiKey })
+      return (modelId: string) => or.chat(modelId)
+    }
+    case 'openai': {
+      // Use chat() for broad compatibility (Responses API is newer and not all models support it)
+      const oai = createOpenAI({ apiKey })
+      return (modelId: string) => oai.chat(modelId)
+    }
     case 'claude':
-      return createAnthropic({
-        apiKey,
-      })
+      return createAnthropic({ apiKey })
     case 'gemini':
-      return createGoogleGenerativeAI({
-        apiKey,
-      })
+      return createGoogleGenerativeAI({ apiKey })
     default:
       throw new Error(`Unknown provider: ${providerId}`)
   }
