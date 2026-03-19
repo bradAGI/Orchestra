@@ -4,10 +4,24 @@ import type { BackendConfig } from '@/lib/orchestra-client'
 import { type ChatProviderConfig, CHAT_PROVIDERS } from '../lib/types'
 import { fetchProviderModels, type ModelInfo } from '../lib/providers'
 
+const PREFS_KEY = 'orchestra-agent-provider-prefs'
+
+function loadPrefs(): { providerId?: string; modelId?: string } {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch { return {} }
+}
+
+function savePrefs(providerId: string, modelId: string) {
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify({ providerId, modelId })) } catch { /* */ }
+}
+
 export function useProviderConfig(config: BackendConfig | null) {
+  const prefs = loadPrefs()
   const [providerConfig, setProviderConfig] = useState<ChatProviderConfig>({
-    providerId: 'openrouter',
-    modelId: '',
+    providerId: (prefs.providerId as ChatProviderConfig['providerId']) ?? 'openrouter',
+    modelId: prefs.modelId ?? '',
     apiKey: '',
   })
   const [availableKeys, setAvailableKeys] = useState<Record<string, string>>({})
@@ -58,8 +72,17 @@ export function useProviderConfig(config: BackendConfig | null) {
       .then((fetched) => {
         if (cancelled) return
         setModels(fetched)
-        if (!providerConfig.modelId && fetched.length > 0) {
-          setProviderConfig(prev => ({ ...prev, modelId: fetched[0].id }))
+        if (fetched.length > 0) {
+          // Use saved model if it exists in the list, otherwise first
+          const saved = loadPrefs().modelId
+          const match = saved && fetched.find(m => m.id === saved)
+          const selectedId = match ? match.id : fetched[0].id
+          setProviderConfig(prev => {
+            if (!prev.modelId || !fetched.find(m => m.id === prev.modelId)) {
+              return { ...prev, modelId: selectedId }
+            }
+            return prev
+          })
         }
       })
       .catch(() => {
@@ -74,9 +97,11 @@ export function useProviderConfig(config: BackendConfig | null) {
   }, [providerConfig.providerId, availableKeys])
 
   const updateProvider = useCallback((providerId: ChatProviderConfig['providerId'], modelId?: string) => {
+    const newModelId = modelId ?? ''
+    savePrefs(providerId, newModelId)
     setProviderConfig({
       providerId,
-      modelId: modelId ?? '',
+      modelId: newModelId,
       apiKey: availableKeys[providerId] ?? '',
     })
   }, [availableKeys])

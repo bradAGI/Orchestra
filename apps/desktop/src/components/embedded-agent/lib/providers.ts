@@ -87,8 +87,9 @@ async function fetchOpenAIModels(baseUrl: string, apiKey: string): Promise<Model
 async function fetchOpenRouterModels(): Promise<ModelInfo[]> {
   const res = await fetch('https://openrouter.ai/api/v1/models')
   if (!res.ok) throw new Error(`${res.status}`)
-  const data = await res.json() as { data: { id: string; name: string }[] }
+  const data = await res.json() as { data: { id: string; name: string; supported_parameters?: string[] }[] }
   return data.data
+    .filter((m) => m.supported_parameters?.includes('tools'))
     .map((m) => ({ id: m.id, name: m.name || m.id }))
     .sort((a, b) => a.name.localeCompare(b.name))
 }

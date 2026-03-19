@@ -901,7 +901,10 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
             className="w-full"
             value={providerId}
             options={CHAT_PROVIDERS.map(p => ({ label: p.label, value: p.id }))}
-            onChange={(v) => { setProviderId(v as string); setModelId(''); setModels([]); setStoredKey(''); setHasKey(false) }}
+            onChange={(v) => {
+              setProviderId(v as string); setModelId(''); setModels([]); setStoredKey(''); setHasKey(false)
+              try { localStorage.setItem('orchestra-agent-provider-prefs', JSON.stringify({ providerId: v, modelId: '' })) } catch { /* */ }
+            }}
           />
         </div>
 
@@ -952,7 +955,10 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
           loading={modelsLoading}
           error={modelsError}
           hasKey={hasKey || !!apiKey.trim()}
-          onSelect={setModelId}
+          onSelect={(id) => {
+            setModelId(id)
+            try { localStorage.setItem('orchestra-agent-provider-prefs', JSON.stringify({ providerId, modelId: id })) } catch { /* */ }
+          }}
         />
 
         {/* Test */}
