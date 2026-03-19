@@ -103,7 +103,7 @@ describe('startRuntimeSync', () => {
         fetchSnapshot,
         normalizeSnapshot: normalizeSnapshotPayload,
         normalizeEnvelope: normalizeEventEnvelope,
-        createEventSource: (url) => {
+        createEventSource: (_url) => {
           const source = new FakeEventSource()
           sources.push(source)
           return source

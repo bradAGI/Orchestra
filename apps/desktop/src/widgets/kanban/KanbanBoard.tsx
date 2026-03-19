@@ -11,7 +11,6 @@ import {
   Square,
   Ticket,
   Trash2,
-  X,
 } from 'lucide-react'
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react'
 
@@ -46,7 +45,7 @@ export function KanbanBoard({
   projects = [],
   availableAgents = [],
   onInspectIssue,
-  onJumpToTerminal,
+  onJumpToTerminal: _onJumpToTerminal,
   onIssueUpdate,
   onIssueDelete,
   onStopSession,
@@ -191,7 +190,7 @@ export function KanbanBoard({
     }
   })
 
-  const uniqueStates = Array.from(new Set(enrichedIssues.map((item) => item.state))).sort()
+  const _uniqueStates = Array.from(new Set(enrichedIssues.map((item) => item.state))).sort()
 
   const filterItem = (item: EnrichedIssue) => {
     const stateMatch = stateFilter === 'all' || item.state === stateFilter

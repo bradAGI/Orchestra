@@ -1,7 +1,6 @@
 import React from 'react'
-import { History, Zap, Activity, Clock, ShieldCheck, Database, Layout, Terminal } from 'lucide-react'
+import { Zap, Activity, Clock, Layout, Terminal } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import type { SessionDetail, SessionEvent } from '@/lib/orchestra-types'
 
 interface SessionDetailViewProps {

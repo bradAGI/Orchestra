@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Loader2, Moon, Search, Settings2, Sun, Activity, Download, AlertTriangle, RefreshCcw } from 'lucide-react'
-import * as Tooltip from '@radix-ui/react-tooltip'
 import { Button } from '@/components/ui/button'
 import { AppTooltip } from '@/components/ui/tooltip-wrapper'
 import { Badge } from '@/components/ui/badge'
@@ -14,10 +13,10 @@ export function TopBar({
   sectionTitle,
   theme,
   setTheme,
-  activePeriod,
-  setActivePeriod,
+  activePeriod: _activePeriod,
+  setActivePeriod: _setActivePeriod,
   refreshPending,
-  configReady,
+  configReady: _configReady,
   onOpenSettings,
   onRefresh,
   onSearch,
@@ -28,7 +27,7 @@ export function TopBar({
   usePolling,
   onDownloadDiagnostics,
   onTogglePolling,
-  flush,
+  flush: _flush,
 }: {
   sectionLabel: string
   sectionTitle: string

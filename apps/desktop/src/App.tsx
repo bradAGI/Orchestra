@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, Database, FolderTree, ListTodo, RefreshCcw, Settings2, Cpu, Zap, FileText, Terminal } from 'lucide-react'
+import { Activity, Database, FolderTree, ListTodo, Settings2 } from 'lucide-react'
 import {
   IssueDetailView,
   CreateTaskDialog,
@@ -14,7 +14,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
-import { periodFilters, type TimelineItem } from '@/components/app-shell/types'
+import { type TimelineItem } from '@/components/app-shell/types'
 import {
   fetchAgentConfig,
   fetchAgents,
@@ -132,7 +132,7 @@ export default function App() {
   const {
     migrationFrom, setMigrationFrom,
     migrationTo, setMigrationTo,
-    migrationPlan, setMigrationPlan,
+    migrationPlan, setMigrationPlan: _setMigrationPlan,
     migrationPending,
     handleMigrationPlan,
     handleMigrationApply,
@@ -148,6 +148,7 @@ export default function App() {
   const [createTaskInitialState, setCreateTaskInitialState] = useState('Backlog')
   const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false)
   const [activeSection, setActiveSection] = useState<SectionID>('ISSUES')
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'backend' | 'agents' | 'integrations' | 'shortcuts' | 'notifications' | undefined>(undefined)
   const [activePeriod, setActivePeriod] = useState<'Today' | 'Week' | 'Month'>('Week')
   const [paletteOpen, setPaletteOpen] = useState(false)
 
@@ -182,7 +183,7 @@ export default function App() {
 
   // Ctrl+1-8 tab switching via Electron IPC (bypasses Chromium)
   useEffect(() => {
-    const bridge = (window as any).orchestraDesktop
+    const bridge = (window as unknown as Record<string, unknown>).orchestraDesktop as { onSwitchTab?: (cb: (tabNum: number) => void) => () => void } | undefined
     if (bridge?.onSwitchTab) {
       bridge.onSwitchTab((tabNum: number) => {
         if (tabNum >= 1 && tabNum <= sidebarItems.length) {
@@ -209,10 +210,10 @@ export default function App() {
 
     setOpenTerminals(prev => {
       // Always keep master-shell
-      const base = prev.some(p => p.id === 'master-shell') ? [] : [{ id: 'master-shell', title: 'System Shell' }]
-      
+      const _base = prev.some(p => p.id === 'master-shell') ? [] : [{ id: 'master-shell', title: 'System Shell' }]
+
       // Find sessions that are running but don't have a terminal window yet
-      const activeRunningIds = snapshot.running.map(r => `issue-${r.issue_identifier}`)
+      const _activeRunningIds = snapshot.running.map(r => `issue-${r.issue_identifier}`)
       const existingIds = prev.map(p => p.id)
       
       const newTerms = snapshot.running
@@ -247,11 +248,6 @@ export default function App() {
       return
     }
     setActiveSection(section)
-  }
-
-  const handleNavigate = (section: string) => {
-    handleSectionChange(section)
-    setInspectDialogOpen(false)
   }
 
   const handleCloneSession = (session: SessionSummary) => {
@@ -355,6 +351,7 @@ export default function App() {
     return () => {
       mounted = false
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, activeSection])
 
   // Fetch GitHub issues for connected projects → Kanban backlog
@@ -476,9 +473,10 @@ export default function App() {
       sync.stop()
       syncControls.current = null
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config])
 
-  const metrics = useMemo(() => {
+  const _metrics = useMemo(() => {
     if (!snapshot) {
       return {
         running: '0',
@@ -487,7 +485,7 @@ export default function App() {
       }
     }
 
-    const remaining = typeof snapshot.rate_limits?.remaining === 'number' ? String(snapshot.rate_limits.remaining) : ''
+    const _remaining = typeof snapshot.rate_limits?.remaining === 'number' ? String(snapshot.rate_limits.remaining) : ''
     const total = snapshot.codex_totals?.total_tokens ?? 0
     return {
       running: String(snapshot.counts.running ?? 0),
@@ -1127,7 +1125,7 @@ export default function App() {
               {sectionVisibility.showSandbox ? (
                 <SectionErrorBoundary name="Sandbox">
                 <section className="col-span-12 flex flex-col">
-                  <SandboxDashboard config={config} />
+                  <SandboxDashboard config={config} onOpenSettings={() => { setSettingsInitialTab('integrations'); setActiveSection('SETTINGS') }} />
                 </section>
                 </SectionErrorBoundary>
               ) : null}
@@ -1162,6 +1160,7 @@ export default function App() {
                     onNotifSoundChange={setNotifSound}
                     onNotifMutedChange={setNotifMuted}
                     onNotifVolumeChange={setNotifVolume}
+                    initialTab={settingsInitialTab}
                   />
                 </section>
                 </SectionErrorBoundary>

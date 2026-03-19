@@ -1,25 +1,9 @@
 import { useMemo, type ReactNode } from 'react'
 import { BarChart3, ChevronRight, Cpu, Folder, FolderTree, Layout, Plus, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { AppTooltip } from '@/components/ui/tooltip-wrapper'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { IssueListItem } from '@/lib/orchestra-client'
 import type { SnapshotPayload, Project, ProjectStats, GlobalStats } from '@/lib/orchestra-types'
-
-function IconButton({ icon, title, onClick, className = '' }: { icon: ReactNode; title: string; onClick?: () => void; className?: string }) {
-  return (
-    <AppTooltip content={title}>
-      <button
-        type="button"
-        aria-label={title}
-        onClick={onClick}
-        className={`grid h-8 w-8 place-items-center rounded-lg bg-transparent text-muted-foreground transition hover:bg-muted hover:text-foreground ${className}`}
-      >
-        {icon}
-      </button>
-    </AppTooltip>
-  )
-}
 
 /**
  * Main operations hub dashboard showing fleet metrics, active projects,
@@ -32,7 +16,7 @@ export function DashboardOverview({
   snapshot,
   warehouseStats,
   onProjectClick,
-  onJumpToTerminal,
+  onJumpToTerminal: _onJumpToTerminal,
   onCreateTask,
 }: {
   projects: Project[]

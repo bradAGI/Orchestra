@@ -3,12 +3,15 @@ import {
   Database,
   FileText,
   FolderTree,
-  Globe,
   ListTodo,
   Settings2,
   Terminal,
 } from 'lucide-react'
 import type { SidebarItem } from '@/components/app-shell/types'
+
+function UnsandboxIcon({ className }: { className?: string }) {
+  return <img src="/unsandbox.ico" alt="Unsandbox" className={`${className ?? ''} dark:invert`} />
+}
 
 /** Sidebar navigation items displayed in the app shell, in display order. */
 export const sidebarItems: SidebarItem[] = [
@@ -46,7 +49,7 @@ export const sidebarItems: SidebarItem[] = [
     id: 'SANDBOX',
     label: 'Sandbox',
     description: 'Remote code execution via unsandbox',
-    icon: Globe,
+    icon: UnsandboxIcon,
   },
   {
     id: 'SETTINGS',

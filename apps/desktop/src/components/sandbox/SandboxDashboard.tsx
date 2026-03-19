@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, Play, Terminal, Globe, RefreshCcw, KeyRound } from 'lucide-react'
+import { Loader2, Play, Terminal, Globe, RefreshCcw, KeyRound, Settings2 } from 'lucide-react'
 import { CustomDropdown } from '@/components/app-shell/shared/controls'
 import { Button } from '@/components/ui/button'
 import type { BackendConfig } from '@/lib/orchestra-client'
@@ -36,7 +36,7 @@ const LANGUAGES = [
 
 const NETWORKS = ['semitrusted', 'zerotrust']
 
-export function SandboxDashboard({ config }: { config: BackendConfig | null }) {
+export function SandboxDashboard({ config, onOpenSettings }: { config: BackendConfig | null; onOpenSettings?: () => void }) {
   const [language, setLanguage] = useState('bash')
   const [network, setNetwork] = useState('semitrusted')
   const [code, setCode] = useState('')
@@ -72,6 +72,7 @@ export function SandboxDashboard({ config }: { config: BackendConfig | null }) {
     if (!config) return
     fetchUnsandboxStatus(config).then(setStatus).catch(() => {})
     refreshResources()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config])
 
   const refreshResources = async () => {
@@ -126,7 +127,7 @@ export function SandboxDashboard({ config }: { config: BackendConfig | null }) {
       {/* Status bar */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Globe className="h-5 w-5 text-primary" />
+          <img src="/unsandbox.ico" alt="Unsandbox" className="h-7 w-7 dark:invert" />
           <div>
             <h2 className="text-sm font-bold">Unsandbox</h2>
             <p className="text-[10px] text-muted-foreground">Remote code execution</p>
@@ -155,11 +156,18 @@ export function SandboxDashboard({ config }: { config: BackendConfig | null }) {
           <div className="text-center space-y-1.5">
             <p className="text-sm font-medium text-foreground/80">Unsandbox credentials required</p>
             <p className="text-xs text-muted-foreground max-w-sm">
-              Set <code className="rounded bg-muted/40 px-1.5 py-0.5 text-[11px] font-mono">UNSANDBOX_PUBLIC_KEY</code> and{' '}
-              <code className="rounded bg-muted/40 px-1.5 py-0.5 text-[11px] font-mono">UNSANDBOX_SECRET_KEY</code> environment
-              variables, or create a credentials file at <code className="rounded bg-muted/40 px-1.5 py-0.5 text-[11px] font-mono">~/.unsandbox</code>
+              Add your API keys in Settings to enable remote code execution across 42+ languages.
             </p>
           </div>
+          {onOpenSettings && (
+            <button
+              onClick={onOpenSettings}
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <Settings2 className="h-3 w-3" />
+              Open Integration Settings
+            </button>
+          )}
         </div>
       )}
 

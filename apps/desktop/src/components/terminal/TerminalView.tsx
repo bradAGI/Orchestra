@@ -13,7 +13,7 @@ interface TerminalViewProps {
     theme?: 'light' | 'dark'
 }
 
-export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId, baseUrl, apiToken, onClose, initialCommand, theme }) => {
+export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId, baseUrl, apiToken, onClose: _onClose, initialCommand, theme }) => {
     const terminalRef = useRef<HTMLDivElement>(null)
     const xtermRef = useRef<Terminal | null>(null)
     const wsRef = useRef<WebSocket | null>(null)
@@ -110,7 +110,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
                 if (ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({ type: 'resize', rows, cols }))
                 }
-            } catch {}
+            } catch { /* intentionally empty */ }
         }
 
         // ResizeObserver for mosaic pane resizing
@@ -129,6 +129,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
             ws.close()
             term.dispose()
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sessionId, projectId, baseUrl, apiToken, theme])
 
     return (

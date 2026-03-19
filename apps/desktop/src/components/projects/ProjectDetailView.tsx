@@ -62,7 +62,7 @@ type ProjectTab = 'overview' | 'files' | 'git'
  */
 export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     project,
-    stats,
+    stats: _stats,
     config,
     snapshot,
     boardIssues,
@@ -161,6 +161,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         }
 
         void loadTabData()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab, config, project.id])
 
     const handleRefresh = async () => {
@@ -364,10 +365,6 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         { id: 'git', label: 'Git', icon: <GitBranch size={14} />, needsPath: true },
     ] as const
 
-    const osOptions = useMemo(() => ({
-        scrollbars: { autoHide: 'move' as const, theme: 'os-theme-custom' },
-        overflow: { x: 'hidden' as const, y: 'scroll' as const }
-    }), [])
 
     const handleDelete = async () => {
         setDeletePending(true)

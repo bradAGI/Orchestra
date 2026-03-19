@@ -105,8 +105,8 @@ export function ChangesList({
       setCommitMsg('')
       onRefresh()
       setTimeout(() => setFeedback(null), 3000)
-    } catch (err: any) {
-      setFeedback({ type: 'error', msg: err?.message || 'Commit failed' })
+    } catch (err) {
+      setFeedback({ type: 'error', msg: err instanceof Error ? err.message : 'Commit failed' })
       setTimeout(() => setFeedback(null), 5000)
     } finally {
       setLoading(false)
@@ -145,8 +145,8 @@ export function ChangesList({
                 await gitPush(config, projectId)
                 setFeedback({ type: 'success', msg: 'Pushed to remote' })
                 setTimeout(() => setFeedback(null), 3000)
-              } catch (err: any) {
-                setFeedback({ type: 'error', msg: err?.message || 'Push failed' })
+              } catch (err) {
+                setFeedback({ type: 'error', msg: err instanceof Error ? err.message : 'Push failed' })
                 setTimeout(() => setFeedback(null), 5000)
               } finally {
                 setLoading(false)

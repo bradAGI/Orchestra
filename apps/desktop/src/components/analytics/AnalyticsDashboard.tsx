@@ -281,6 +281,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     }, [stats, liveModels])
 
     // Per-project token usage (top 5 + Other)
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     const projectTokenData = useMemo(() => {
         if (!stats?.recent_sessions) return []
         const map = new Map<string, number>()
@@ -303,6 +304,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     }, [stats?.recent_sessions])
 
     // Cost over time (by date, stacked by provider)
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     const costOverTimeData = useMemo(() => {
         if (!stats?.recent_sessions) return []
         const dateMap = new Map<string, Record<string, number>>()
@@ -324,6 +326,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     }, [stats?.recent_sessions, liveModels])
 
     // Session metrics: tokens per session per day (input vs output trend lines)
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     const tokenTrendData = useMemo(() => {
         if (!stats?.recent_sessions) return []
         const dateMap = new Map<string, { inputSum: number; outputSum: number; count: number }>()

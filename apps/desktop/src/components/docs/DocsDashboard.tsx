@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { 
-    BookOpen, FileText, ChevronRight, Search, 
-    Terminal, Info, ShieldCheck, ListTree, 
+import {
+    BookOpen, FileText, ChevronRight, Search,
+    Terminal, ShieldCheck,
     RefreshCcw, Folder, FolderOpen,
-    CheckCircle2, Activity, Clock, Hash,
-    ArrowUp, Menu, LayoutList, ScrollText, Code as CodeIcon
+    Activity, Clock, Hash,
+    ArrowUp, ScrollText, Code as CodeIcon
 } from 'lucide-react'
 import type { DocItem, BackendConfig } from '@/lib/orchestra-types'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { fetchDocs, fetchDocContent } from '@/lib/orchestra-client'
 import { OverlayScrollbarsComponent, type OverlayScrollbarsComponentRef } from 'overlayscrollbars-react'
@@ -79,6 +78,7 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
 
     useEffect(() => {
         loadDocs()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [config])
 
     const handleSelectDoc = async (path: string) => {
@@ -97,7 +97,7 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
                     viewport.scrollTo({ top: 0, behavior: 'smooth' })
                 }
             }
-        } catch (err) {
+        } catch (_err) {
             setContent('# Error\nFailed to load document content.')
         } finally {
             setContentLoading(false)
@@ -110,6 +110,7 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
     const selectedPathRef = useRef(selectedPath)
     selectedPathRef.current = selectedPath
 
+    /* eslint-disable @typescript-eslint/no-explicit-any -- react-markdown component override props use untyped AST nodes */
     const markdownComponents = useMemo(() => ({
         a({href, children, ...props}: any) {
             if (href && (href.endsWith('.md') || href.includes('.md#'))) {
@@ -192,6 +193,7 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
             )
         }
     }), [theme])
+    /* eslint-enable @typescript-eslint/no-explicit-any */
 
     const generateToc = (markdown: string) => {
         const lines = markdown.split('\n')
@@ -241,6 +243,7 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
         }, [])
     }
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     const filteredDocs = useMemo(() => filterTree(docs, searchQuery), [docs, searchQuery])
 
     // Section ordering and numbering

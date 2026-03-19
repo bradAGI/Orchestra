@@ -1,4 +1,4 @@
-import type { APIErrorEnvelope, EventEnvelope, GlobalStats, IssueDetailPayload, Project, ProjectStats, SnapshotPayload, AgentConfig, DocItem, Issue, SessionDetail, SessionSummary } from '@/lib/orchestra-types'
+import type { APIErrorEnvelope, EventEnvelope, GlobalStats, Project, ProjectStats, SnapshotPayload, AgentConfig, DocItem, Issue, SessionDetail, SessionSummary } from '@/lib/orchestra-types'
 
 /** Runtime connection configuration for the orchestrator backend. */
 export type BackendConfig = {

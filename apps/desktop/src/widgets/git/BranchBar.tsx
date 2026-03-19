@@ -45,8 +45,8 @@ export function BranchBar({
     try {
       await gitCheckout(config, projectId, branch)
       onBranchChange()
-    } catch (err: any) {
-      setError(err?.message || 'Checkout failed')
+    } catch (err) {
+      setError(err instanceof Error ? err.message :'Checkout failed')
       setTimeout(() => setError(''), 4000)
     } finally {
       setLoading(false)
@@ -63,8 +63,8 @@ export function BranchBar({
       setCreating(false)
       setNewName('')
       onBranchChange()
-    } catch (err: any) {
-      setError(err?.message || 'Create branch failed')
+    } catch (err) {
+      setError(err instanceof Error ? err.message :'Create branch failed')
       setTimeout(() => setError(''), 4000)
     } finally {
       setLoading(false)

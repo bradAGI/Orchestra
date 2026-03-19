@@ -44,12 +44,14 @@ export function useIssueDetailData({
 
   useEffect(() => {
     if (diffFiles.length > 0 && !activeDiffFile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveDiffFile(diffFiles[0].path)
     }
   }, [diffFiles, activeDiffFile])
 
   useEffect(() => {
     if (activeTab === 'logs' && identifier && config) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLogsLoading(true)
       fetchIssueLogs(config, identifier, localProvider)
         .then(setLogs)
@@ -72,6 +74,7 @@ export function useIssueDetailData({
 
   useEffect(() => {
     if (activeTab === 'artifacts' && identifier && config) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setArtifactsLoading(true)
       fetchArtifacts(config, identifier, localProvider)
         .then(setArtifacts)
@@ -95,12 +98,14 @@ export function useIssueDetailData({
         .then(setReportContent)
         .catch(console.error)
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setReportContent(null)
     }
   }, [artifacts, config, identifier, localProvider])
 
   useEffect(() => {
     if (selectedArtifact && identifier && config) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setArtifactContentLoading(true)
       fetchArtifactContent(config, identifier, selectedArtifact, localProvider)
         .then(setArtifactContent)

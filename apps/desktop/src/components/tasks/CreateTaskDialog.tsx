@@ -18,10 +18,10 @@ import { AgentSelector, ProjectSelector } from '@/components/app-shell/shared/co
 export function CreateTaskDialog({
   open,
   onOpenChange,
-  config,
+  config: _config,
   initialState,
   availableAgents,
-  allTools = [],
+  allTools: _allTools = [],
   projects = [],
   initialProjectID = '',
   onSubmit,
@@ -79,13 +79,6 @@ export function CreateTaskDialog({
     }
   }, [open])
 
-  const handleToggleTool = (name: string) => {
-    setDisabledTools(prev =>
-      prev.includes(name)
-        ? prev.filter(t => t !== name)
-        : [...prev, name]
-    )
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

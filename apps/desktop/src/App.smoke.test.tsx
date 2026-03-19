@@ -988,7 +988,7 @@ describe('App smoke render', () => {
     it('runs workspace migration', async () => {
       setupDesktopBridge()
       setupFetch(defaultSnapshot(), {
-        onFetch: (url, init) => {
+        onFetch: (url, _init) => {
           if (url.includes('/api/v1/workspace/migration/plan')) {
             return new Response(JSON.stringify({ moves: [{ from: '/old', to: '/new' }] }), { status: 200 })
           }

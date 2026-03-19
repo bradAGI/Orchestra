@@ -12,7 +12,6 @@ import {
   GitBranch,
   ListChecks,
   Play,
-  Rows,
   Settings2,
   Sparkles,
   Square,
@@ -151,6 +150,7 @@ export function OverviewTab({
     }
 
     if (addedSignatures.length > 0 && previousCounts.size > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setNewPlanItemSignatures(new Set(addedSignatures))
       setLastPlanUpdateLabel(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
       const timer = window.setTimeout(() => {

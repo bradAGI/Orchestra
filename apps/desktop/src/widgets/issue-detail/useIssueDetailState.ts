@@ -46,6 +46,7 @@ export function useIssueDetailState({
   const branchName = (typed.branch_name as string) || ''
   const issueUrl = (typed.url as string) || ''
   const provider = (typed.provider as string) || ''
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const disabledToolsFromResult = (typed.disabled_tools as string[]) || []
   const updatedAt = (typed.updated_at as string) || ''
 
@@ -65,6 +66,7 @@ export function useIssueDetailState({
     description,
   })
 
+  // Sync local state from issue result props
   useEffect(() => {
     setLocalState(state)
     setLocalAssignee(assigneeId)

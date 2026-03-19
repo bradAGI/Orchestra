@@ -1,17 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Activity, Bell, Check, CheckCircle2, CircleDashed, Database, Eye, EyeOff, Github, Globe, Info, Keyboard, Loader2, Play, Plus, RefreshCcw, Settings2, ShieldCheck, SignalHigh, Terminal, Trash2, Users, Zap } from 'lucide-react'
+import { Activity, Bell, Check, CheckCircle2, CircleDashed, Database, ExternalLink, Eye, EyeOff, Github, Globe, Info, Keyboard, Loader2, Play, Plus, RefreshCcw, Settings2, ShieldCheck, SignalHigh, Terminal, Trash2, Users, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AppTooltip } from '@/components/ui/tooltip-wrapper'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
 import {
   type BackendConfig,
   type WorkspaceMigrationResult,
@@ -39,15 +30,15 @@ export function SettingsCard({
   config,
   backendProfiles,
   activeProfileId,
-  migrationPending,
-  migrationFrom,
-  migrationTo,
-  migrationPlan,
+  migrationPending: _migrationPending,
+  migrationFrom: _migrationFrom,
+  migrationTo: _migrationTo,
+  migrationPlan: _migrationPlan,
   agentConfig,
-  onMigrationFromChange,
-  onMigrationToChange,
-  onMigrationPlan,
-  onMigrationApply,
+  onMigrationFromChange: _onMigrationFromChange,
+  onMigrationToChange: _onMigrationToChange,
+  onMigrationPlan: _onMigrationPlan,
+  onMigrationApply: _onMigrationApply,
   onSaveBackendConfig,
   onSetActiveProfile,
   onCreateProfile,
@@ -59,6 +50,7 @@ export function SettingsCard({
   onNotifSoundChange,
   onNotifMutedChange,
   onNotifVolumeChange,
+  initialTab,
 }: {
   loadingConfig: boolean
   savingConfig: boolean
@@ -86,9 +78,15 @@ export function SettingsCard({
   onNotifSoundChange?: (sound: string) => void
   onNotifMutedChange?: (muted: boolean) => void
   onNotifVolumeChange?: (volume: number) => void
+  initialTab?: 'backend' | 'agents' | 'integrations' | 'shortcuts' | 'notifications'
 }) {
   const { isMac } = usePlatform()
-  const [activeTab, setActiveTab] = useState<'backend' | 'agents' | 'integrations' | 'shortcuts' | 'notifications'>('backend')
+  const [activeTab, setActiveTab] = useState<'backend' | 'agents' | 'integrations' | 'shortcuts' | 'notifications'>(initialTab ?? 'backend')
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (initialTab) setActiveTab(initialTab)
+  }, [initialTab])
 
   const tabs = [
     { id: 'backend', label: 'Backend', tooltip: 'Configure backend profiles and API connection', icon: <Database className="h-3.5 w-3.5" /> },
@@ -118,6 +116,7 @@ export function SettingsCard({
           </div>
           <button
             onClick={() => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const bridge = (window as any).orchestraDesktop
               if (bridge && typeof bridge.openExternal === 'function') {
                 void bridge.openExternal('https://github.com/Traves-Theberge/Orchestra')
@@ -386,7 +385,7 @@ function AgentConfigForm({
   onSave: (config: { commands: Record<string, string>; agent_provider: string; max_turns: number }) => Promise<void>
   disabled: boolean
 }) {
-  const [provider, setProvider] = useState(agentConfig.agent_provider || '')
+  const [provider, _setProvider] = useState(agentConfig.agent_provider || '')
   const [commands, setCommands] = useState(agentConfig.commands || {})
   const [maxTurns, setMaxTurns] = useState(agentConfig.max_turns || 10)
 
@@ -455,7 +454,7 @@ function AgentConfigForm({
 }
 
 function BackendConfigForm({
-  loadingConfig,
+  loadingConfig: _loadingConfig,
   savingConfig,
   profilesPending,
   config,
@@ -485,6 +484,7 @@ function BackendConfigForm({
   const [showToken, setShowToken] = useState(false)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setBaseUrl(config?.baseUrl ?? '')
     setApiToken(config?.apiToken ?? '')
   }, [config])
@@ -654,98 +654,6 @@ function BackendConfigForm({
   )
 }
 
-function WorkspaceMigrationDialog({
-  migrationPending,
-  config,
-  migrationFrom,
-  migrationTo,
-  migrationPlan,
-  onMigrationFromChange,
-  onMigrationToChange,
-  onMigrationPlan,
-  onMigrationApply,
-}: {
-  migrationPending: boolean
-  config: BackendConfig | null
-  migrationFrom: string
-  migrationTo: string
-  migrationPlan: WorkspaceMigrationResult | null
-  onMigrationFromChange: (value: string) => void
-  onMigrationToChange: (value: string) => void
-  onMigrationPlan: () => Promise<void>
-  onMigrationApply: () => Promise<void>
-}) {
-  const [confirmApply, setConfirmApply] = useState(false)
-
-  const handleApply = () => {
-    if (!confirmApply) {
-      setConfirmApply(true)
-      return
-    }
-    void onMigrationApply()
-    setConfirmApply(false)
-  }
-
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="h-9 rounded-full border bg-muted/50 px-4 text-foreground hover:bg-accent dark:text-foreground dark:hover:bg-accent">
-          Workspace Migration
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Workspace Migration</DialogTitle>
-          <DialogDescription>Mapped to `/api/v1/workspace/migration/plan` and `/api/v1/workspace/migrate`.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3 text-sm">
-          <label className="block">
-            <span className="mb-1 block text-muted-foreground">From</span>
-            <input
-              className="w-full rounded-md border border-border bg-background px-3 py-2"
-              value={migrationFrom}
-              onChange={(event) => onMigrationFromChange(event.target.value)}
-              placeholder="optional source path"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-muted-foreground">To</span>
-            <input
-              className="w-full rounded-md border border-border bg-background px-3 py-2"
-              value={migrationTo}
-              onChange={(event) => onMigrationToChange(event.target.value)}
-              placeholder="optional target path"
-            />
-          </label>
-          {migrationPlan ? (
-            <pre className="max-h-56 overflow-auto rounded-md border border-border bg-muted/20 p-3 text-xs">{JSON.stringify(migrationPlan, null, 2)}</pre>
-          ) : null}
-          {confirmApply ? (
-            <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/35 dark:text-amber-200">
-              Confirm migration apply. This triggers `/api/v1/workspace/migrate`.
-            </div>
-          ) : null}
-        </div>
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setConfirmApply(false)
-              void onMigrationPlan()
-            }}
-            disabled={migrationPending || !config}
-          >
-            Plan
-          </Button>
-          <Button onClick={handleApply} disabled={migrationPending || !config}>
-            {confirmApply ? 'Confirm Apply' : 'Apply'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | null; disabled: boolean }) {
   const [publicKey, setPublicKey] = useState('')
   const [secretKey, setSecretKey] = useState('')
@@ -829,8 +737,27 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
       <div className="rounded-xl border border-border/20 bg-muted/10 p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <p className="text-sm font-bold">Unsandbox</p>
-            <p className="text-[10px] text-muted-foreground">Remote code execution across 42+ languages via unsandbox.com</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-bold">Unsandbox</p>
+              <button
+                type="button"
+                onClick={() => {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const bridge = (window as any).orchestraDesktop
+                  if (bridge && typeof bridge.openExternal === 'function') {
+                    void bridge.openExternal('https://unsandbox.com')
+                  } else {
+                    window.open('https://unsandbox.com', '_blank')
+                  }
+                }}
+                className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+                title="Open unsandbox.com"
+              >
+                unsandbox.com
+                <ExternalLink className="h-2.5 w-2.5" />
+              </button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">Remote code execution across 42+ languages</p>
           </div>
           <div className="flex items-center gap-2">
             {isConfigured ? (
@@ -933,7 +860,22 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
 
       <p className="text-[10px] text-muted-foreground leading-relaxed">
         Credentials are stored at <code className="text-[10px] font-mono bg-muted/30 px-1 rounded">~/.unsandbox/accounts.csv</code> with restricted permissions (600).
-        You can also set <code className="text-[10px] font-mono bg-muted/30 px-1 rounded">UNSANDBOX_PUBLIC_KEY</code> and <code className="text-[10px] font-mono bg-muted/30 px-1 rounded">UNSANDBOX_SECRET_KEY</code> environment variables.
+        You can also set <code className="text-[10px] font-mono bg-muted/30 px-1 rounded">UNSANDBOX_PUBLIC_KEY</code> and <code className="text-[10px] font-mono bg-muted/30 px-1 rounded">UNSANDBOX_SECRET_KEY</code> environment variables.{' '}
+        <button
+          type="button"
+          onClick={() => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const bridge = (window as any).orchestraDesktop
+            if (bridge && typeof bridge.openExternal === 'function') {
+              void bridge.openExternal('https://unsandbox.com/docs')
+            } else {
+              window.open('https://unsandbox.com/docs', '_blank')
+            }
+          }}
+          className="inline-flex items-center gap-0.5 text-primary hover:underline"
+        >
+          API docs <ExternalLink className="h-2.5 w-2.5" />
+        </button>
       </p>
     </div>
   )

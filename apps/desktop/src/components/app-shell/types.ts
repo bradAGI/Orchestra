@@ -1,3 +1,4 @@
+import type { ComponentType } from 'react'
 import type { LucideIcon } from 'lucide-react'
 
 /** A single event entry displayed in the activity timeline. */
@@ -18,8 +19,8 @@ export type SidebarItem = {
   label: string
   /** Tooltip or subtitle description for the section. */
   description: string
-  /** Lucide icon component rendered alongside the label. */
-  icon: LucideIcon
+  /** Icon component rendered alongside the label (Lucide icon or custom). */
+  icon: LucideIcon | ComponentType<{ className?: string }>
 }
 
 /** Available time-range filters for dashboard views. */

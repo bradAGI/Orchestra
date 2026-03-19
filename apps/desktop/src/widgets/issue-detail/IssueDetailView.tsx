@@ -1,23 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bot, Brain, CheckCircle2, ChevronDown, ChevronRight, FileText, GitPullRequest, Github, History, Info, Loader2, Pencil, Play, Terminal, Wrench, X, Zap } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Prism } from 'react-syntax-highlighter'
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { Brain, CheckCircle2, ChevronDown, ChevronRight, FileText, GitPullRequest, Github, Info, Loader2, Pencil, Terminal, Wrench, X, Zap } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 import type { BackendConfig, IssueUpdatePayload, IssueHistoryEntry } from '@/lib/orchestra-client'
-import { fetchIssueHistory, fetchIssueDiff, fetchIssueLogs, createProjectGitHubPull, gitCommit, gitCheckout, gitMerge, gitDeleteBranch, updateProjectGitHubIssue, fetchProjectGitBranches } from '@/lib/orchestra-client'
+import { fetchIssueHistory, fetchIssueDiff, fetchIssueLogs, gitCheckout, gitMerge, gitDeleteBranch, updateProjectGitHubIssue } from '@/lib/orchestra-client'
 import type { SnapshotPayload } from '@/lib/orchestra-types'
 import type { TimelineItem } from '@/components/app-shell/types'
 import { AgentSelector, CustomDropdown, getAgentIcon } from '@/components/app-shell/shared/controls'
 import type { IssueDetailResult } from './types'
-import { extractOperationalPlanItems, extractPlanFromText, getEventIcon, parseDiff, type DiffFile, type PlanItem } from './IssueDetailUtils'
-
-function extractIssueNumber(url: string): string {
-  const match = url.match(/\/issues\/(\d+)/)
-  return match ? match[1] : ''
-}
+import { extractOperationalPlanItems, extractPlanFromText, parseDiff, type DiffFile, type PlanItem } from './IssueDetailUtils'
 
 function DescriptionEditor({ value, onChange, onBlur, theme }: {
   value: string
@@ -141,7 +133,7 @@ export function IssueDetailView({
   const [bottomTab, setBottomTab] = useState<'details' | 'plan' | 'output' | 'changes'>('details')
 
   const [issueHistory, setIssueHistory] = useState<IssueHistoryEntry[]>([])
-  const [historyLoading, setHistoryLoading] = useState(false)
+  const [_historyLoading, setHistoryLoading] = useState(false)
   const [logs, setLogs] = useState('')
   const [logsLoading, setLogsLoading] = useState(false)
   const [diffFiles, setDiffFiles] = useState<DiffFile[]>([])
@@ -266,8 +258,8 @@ export function IssueDetailView({
     return <div className="h-full flex items-center justify-center text-muted-foreground/30 text-sm italic">No issue data.</div>
   }
 
-  const stateColor = localState === 'Done' ? 'text-primary' : localState === 'In Progress' ? 'text-amber-500' : 'text-muted-foreground'
-  const stateDot = localState === 'Done' ? 'bg-primary' : localState === 'In Progress' ? 'bg-amber-500 animate-pulse' : 'bg-muted-foreground/40'
+  const _stateColor = localState === 'Done' ? 'text-primary' : localState === 'In Progress' ? 'text-amber-500' : 'text-muted-foreground'
+  const _stateDot = localState === 'Done' ? 'bg-primary' : localState === 'In Progress' ? 'bg-amber-500 animate-pulse' : 'bg-muted-foreground/40'
 
   const tabItems = [
     { id: 'details' as const, label: 'Details', icon: Info, count: undefined },

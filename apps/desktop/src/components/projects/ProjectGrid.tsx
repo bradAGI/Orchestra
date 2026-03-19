@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Folder, GitBranch, History, Search, Zap, Plus, Trash2, ChevronLeft, ChevronRight, LayoutGrid, List, ArrowUpRight, Activity } from 'lucide-react'
+import { Folder, GitBranch, History, Search, Zap, Plus, Trash2, ChevronLeft, ChevronRight, LayoutGrid, List, Activity } from 'lucide-react'
 import type { Project, ProjectStats } from '@/lib/orchestra-types'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
@@ -58,7 +58,7 @@ const ProjectListRow: React.FC<ProjectCardProps> = ({ project, stats, loading, o
     }
 
     const totalTokens = (stats?.total_input || 0) + (stats?.total_output || 0)
-    const activity = getActivityLevel(stats?.total_sessions || 0)
+    const _activity = getActivityLevel(stats?.total_sessions || 0)
 
     return (
         <div
@@ -130,7 +130,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, stats, loading, onCl
 
     const totalTokens = (stats?.total_input || 0) + (stats?.total_output || 0)
     const sessions = stats?.total_sessions || 0
-    const activity = getActivityLevel(sessions)
+    const _activity = getActivityLevel(sessions)
     const hasGitHub = !!project.remote_url
 
     return (

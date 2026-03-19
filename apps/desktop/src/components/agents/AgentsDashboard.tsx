@@ -39,8 +39,6 @@ import {
     DialogDescription,
 } from '@/components/ui/dialog'
 import { CustomDropdown, getAgentIcon } from '@/components/app-shell/shared/controls'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 
 /* ------------------------------------------------------------------ */
 /*  Types & Constants                                                  */
@@ -94,7 +92,7 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
     const [projects, setProjects] = useState<Project[]>([])
     const [mcpTools, setMcpTools] = useState<MCPTool[]>([])
     const [mcpServers, setMcpServers] = useState<MCPServer[]>([])
-    const [loading, setLoading] = useState(true)
+    const [_loading, setLoading] = useState(true)
     const [saving, setSaving] = useState<string | null>(null)
     const [error, setError] = useState('')
 
@@ -183,11 +181,13 @@ export const AgentsDashboard: React.FC<AgentsDashboardProps> = ({ config, snapsh
         }
     }
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => { loadData() }, [config, scope, selectedProjectID])
     useEffect(() => {
         if (selectedAgent) {
             syncActiveConfig(selectedAgent as Provider, configs)
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedAgent])
 
     /* ---------- instruction save ---------- */

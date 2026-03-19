@@ -42,6 +42,7 @@ export function useBackendConfig(): BackendConfigState {
     let mounted = true
     const desktopBridge = window.orchestraDesktop
     if (!desktopBridge || typeof desktopBridge.getBackendConfig !== 'function') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setErrorMessage('desktop bridge unavailable: preload API not found')
       setLoadingConfig(false)
       return () => { mounted = false }
@@ -73,6 +74,7 @@ export function useBackendConfig(): BackendConfigState {
   useEffect(() => {
     if (!config || backendProfiles.length > 0) return
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setBackendProfiles([
       { id: 'active', name: 'Active', baseUrl: config.baseUrl, apiToken: config.apiToken },
     ])

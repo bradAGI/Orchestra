@@ -45,7 +45,12 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
     const [activeTabId, setActiveTabId] = useState<string | null>(null)
     const [viewMode, setViewMode] = useState<ViewMode>('tabs')
 
-    // Keep activeTabId in sync
+    const getIdsFromNode = (node: MosaicNode<string>): string[] => {
+        if (typeof node === 'string') return [node]
+        return [...getIdsFromNode(node.first), ...getIdsFromNode(node.second)]
+    }
+
+    // Keep activeTabId in sync with active terminals
     useEffect(() => {
         if (activeTerminals.length === 0) {
             setActiveTabId(null)
@@ -81,12 +86,8 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
         if (currentIds !== activeIds) {
             setCurrentNode(buildBalancedTree(ids))
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTerminals])
-
-    const getIdsFromNode = (node: MosaicNode<string>): string[] => {
-        if (typeof node === 'string') return [node]
-        return [...getIdsFromNode(node.first), ...getIdsFromNode(node.second)]
-    }
 
     const activeTab = activeTerminals.find(t => t.id === activeTabId)
 

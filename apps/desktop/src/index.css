@@ -1,6 +1,39 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Colors — mapped from CSS custom properties */
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-border: hsl(var(--border));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-ring: hsl(var(--ring));
+  --color-input: hsl(var(--input));
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+
+  /* Border radius */
+  --radius-lg: 0.75rem;
+  --radius-md: 0.5rem;
+  --radius-sm: 0.375rem;
+}
 
 :root {
   --background: 220 20% 97%;
@@ -57,7 +90,7 @@
 }
 
 * {
-  @apply border-border;
+  border-color: var(--color-border);
 }
 
 /* Custom Themed Scrollbar (Legacy/Fallback) */
@@ -138,9 +171,11 @@ body {
   animation: spin-smooth 1s linear infinite;
 }
 
-
 body {
-  @apply bg-background text-foreground antialiased;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   margin: 0;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif;
   background-image:
@@ -169,37 +204,81 @@ body {
 }
 
 .prose-wiki h1 {
-  @apply text-4xl font-black tracking-tighter mb-10 pb-6 border-b border-border/40 text-foreground;
+  font-size: var(--text-4xl);
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid hsl(var(--border) / 0.4);
+  color: var(--color-foreground);
 }
 
 .prose-wiki h2 {
-  @apply text-2xl font-bold tracking-tight mt-16 mb-6 flex items-center gap-3 text-foreground/90;
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  margin-top: 4rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: hsl(var(--foreground) / 0.9);
 }
 
 .prose-wiki h3 {
-  @apply text-xl font-bold tracking-tight mt-10 mb-4 text-foreground/80;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+  color: hsl(var(--foreground) / 0.8);
 }
 
 .prose-wiki p {
-  @apply leading-relaxed text-[15px] mb-6 text-foreground/75;
+  line-height: 1.625;
+  font-size: 15px;
+  margin-bottom: 1.5rem;
+  color: hsl(var(--foreground) / 0.75);
 }
 
 .prose-wiki ul, .prose-wiki ol {
-  @apply my-6 ml-6 space-y-2;
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+  margin-left: 1.5rem;
+}
+
+.prose-wiki ul > * + *, .prose-wiki ol > * + * {
+  margin-top: 0.5rem;
 }
 
 .prose-wiki li {
-  @apply text-foreground/75;
+  color: hsl(var(--foreground) / 0.75);
 }
 
 .prose-wiki blockquote {
-  @apply italic border-l-4 pl-8 my-10 py-4 bg-primary/5 rounded-r-2xl border-primary/40 text-foreground/80;
+  font-style: italic;
+  border-left: 4px solid hsl(var(--primary) / 0.4);
+  padding-left: 2rem;
+  margin-top: 2.5rem;
+  margin-bottom: 2.5rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+  background: hsl(var(--primary) / 0.05);
+  border-radius: 0 1rem 1rem 0;
+  color: hsl(var(--foreground) / 0.8);
 }
 
 .prose-wiki strong {
-  @apply font-bold text-foreground;
+  font-weight: 700;
+  color: var(--color-foreground);
 }
 
 .prose-wiki a {
-  @apply no-underline border-b border-primary/30 hover:border-primary transition-colors;
+  text-decoration: none;
+  border-bottom: 1px solid hsl(var(--primary) / 0.3);
+  transition: border-color 0.15s;
+}
+
+.prose-wiki a:hover {
+  border-color: var(--color-primary);
 }

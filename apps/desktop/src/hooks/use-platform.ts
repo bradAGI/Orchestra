@@ -1,11 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 export function usePlatform() {
-  const [isMac, setIsMac] = useState(false)
-
-  useEffect(() => {
-    setIsMac(navigator.userAgent.toLowerCase().includes('mac'))
-  }, [])
+  const [isMac] = useState(() => navigator.userAgent.toLowerCase().includes('mac'))
 
   return { isMac }
 }
