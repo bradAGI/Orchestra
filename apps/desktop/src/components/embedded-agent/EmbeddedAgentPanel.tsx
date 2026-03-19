@@ -34,7 +34,6 @@ export function EmbeddedAgentPanel({ onOpenSettings }: { onOpenSettings?: () => 
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border/20 px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_6px_hsl(var(--primary)/0.5)]" />
           <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
             {providerConfig.apiKey ? providerConfig.modelId : 'Not configured'}
           </span>
