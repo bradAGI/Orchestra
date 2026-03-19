@@ -60,15 +60,15 @@ export function SidebarNav({
         </button>
       </AppTooltip>
 
-      <div className="flex h-full flex-col py-3">
-        <div className="mb-2 flex justify-center">
+      <div className="flex h-full flex-col">
+        <div className="mb-8 flex justify-center pt-6">
           <div className="flex items-center gap-2">
-            <span className="grid h-8 w-8 shrink-0 place-items-center text-foreground">
-              <AppMonogramIcon className="h-6 w-6" />
+            <span className="grid h-12 w-12 shrink-0 place-items-center text-foreground">
+              <AppMonogramIcon className="h-10 w-10" />
             </span>
             {!sidebarCollapsed ? (
               <div className="min-w-0">
-                <p className="truncate text-sm font-black uppercase tracking-[0.15em] text-foreground dark:text-muted-foreground leading-none">Orchestra</p>
+                <p className="truncate text-xl font-black uppercase tracking-[0.15em] text-foreground dark:text-muted-foreground leading-none">Orchestra</p>
               </div>
             ) : null}
           </div>
@@ -77,7 +77,7 @@ export function SidebarNav({
         <OverlayScrollbarsComponent
           element="div"
           options={osOptions}
-          className="flex-1 px-2 pt-1 min-h-0"
+          className="flex-1 px-2 pt-6 min-h-0"
         >
           <nav className="space-y-1.5" aria-label="Primary navigation">
             {items.map((item, index) => {
@@ -103,7 +103,7 @@ export function SidebarNav({
                     onKeyDown={handleNavKeyDown(index)}
                     aria-current={active ? 'page' : undefined}
                     data-testid={`sidebar-nav-${item.id}`}
-                    className={`group relative flex w-full cursor-pointer items-center gap-3.5 rounded-xl border text-left transition-all duration-300 ${sidebarCollapsed ? 'justify-center px-2 py-4' : 'px-4 py-4'
+                    className={`group relative flex w-full items-center gap-3.5 rounded-xl border text-left transition-all duration-300 ${sidebarCollapsed ? 'justify-center px-2 py-4' : 'px-4 py-4'
                       } ${active
                         ? 'border-primary/30 bg-primary/10 text-primary shadow-[0_0_15px_rgba(var(--primary),0.1)]'
                         : 'border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground'

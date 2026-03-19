@@ -93,6 +93,18 @@
   border-color: var(--color-border);
 }
 
+/* Restore cursor:pointer on interactive elements (removed in Tailwind v4) */
+button,
+[role="button"],
+a,
+select,
+summary,
+[type="button"],
+[type="submit"],
+[type="reset"] {
+  cursor: pointer;
+}
+
 /* Custom Themed Scrollbar (Legacy/Fallback) */
 ::-webkit-scrollbar {
   width: 6px;
