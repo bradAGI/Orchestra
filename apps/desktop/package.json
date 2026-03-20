@@ -95,10 +95,7 @@
     "wait-on": "^9.0.4"
   },
   "overrides": {
-    "react-mosaic-component": {
-      "react": "$react",
-      "react-dom": "$react-dom"
-    }
+    "react-dom": "$react-dom"
   },
   "build": {
     "appId": "com.orchestra.desktop",
