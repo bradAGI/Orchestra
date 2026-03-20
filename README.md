@@ -7,6 +7,14 @@ graph TB
     subgraph Desktop["Desktop App (Electron + React)"]
         UI[Dashboard / Issue Inspector]
         SSE[SSE Event Stream]
+        EA[Embedded Agent Widget]
+    end
+
+    subgraph LLM["LLM Providers"]
+        OR[OpenRouter]
+        AN[Anthropic]
+        OA[OpenAI]
+        GO[Google]
     end
 
     subgraph Backend["Backend (Go + Chi)"]
@@ -32,6 +40,8 @@ graph TB
 
     UI -->|HTTP| API
     SSE -->|SSE| PUB
+    EA -->|HTTP| API
+    EA -->|AI SDK| OR & AN & OA & GO
     API --> ORC
     ORC --> REG
     REG --> CX & CL & OC & GM
@@ -42,12 +52,30 @@ graph TB
     ORC --> MCP
 ```
 
+## Embedded Agent
+
+A floating chat widget built into the desktop app that acts as an ML-powered co-pilot. Converse with the agent via text or voice, and it uses tools to manage your tasks, navigate the UI, query the orchestrator, and render rich interactive components inline.
+
+- **Multi-provider LLM** — OpenRouter, Anthropic (Claude), OpenAI, Google (Gemini) via AI SDK 6
+- **Tool system** — 40+ tools across issues, projects, git, sessions, search, code execution, scheduling, and MCP servers
+- **Rich UI rendering** — json-render spec produces tables, cards, metrics, badges, alerts, and action buttons inline in chat
+- **Voice input** — hold-to-talk STT via Whisper
+- **Dynamic model fetching** — models loaded from each provider's API, filtered to tool-calling capable models only
+- **Searchable model selector** — type to filter through hundreds of models in Settings
+- **Watch mode** — monitors orchestrator events and notifies you of completions, failures, and retries
+- **Keyboard shortcut** — `Ctrl+.` toggles the agent panel from anywhere
+
+Configure in **Settings > Integrations** — pick a provider, enter an API key, select a model, and test the connection.
+
+See [docs/guides/embedded-agent-setup.md](docs/guides/embedded-agent-setup.md) for the full setup guide and [docs/architecture/embedded-agent.md](docs/architecture/embedded-agent.md) for architecture details.
+
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | Backend | Go 1.25, Chi router, zerolog, SQLite |
-| Desktop | Electron, React 19, TypeScript, Vite, Tailwind CSS, Radix UI |
+| Desktop | Electron, React 19, TypeScript, Vite, Tailwind CSS v4, Radix UI |
+| Embedded Agent | AI SDK 6, json-render, MCP TypeScript SDK, Whisper STT |
 | TUI | Go, Bubble Tea |
 | Agents | Codex, Claude Code, OpenCode, Gemini CLI |
 | Protocol | JSON over HTTP, Server-Sent Events, WebSocket (terminals) |
@@ -64,6 +92,7 @@ Orchestra/
 │   ├── desktop/          # Electron + React frontend
 │   │   ├── electron/     # Main process, preload, IPC bridge
 │   │   └── src/          # React app, components, state management
+│   │       └── components/embedded-agent/  # Chat widget, tools, json-render
 │   └── tui/              # Terminal UI (Bubble Tea)
 ├── packages/
 │   └── protocol/         # Shared JSON schemas for API contracts
@@ -135,6 +164,10 @@ Full documentation lives in [`docs/`](docs/index.md), structured as a DeepWiki:
 - [Frontend Architecture](docs/frontend/components.md)
 - [Operations](docs/operations/deployment.md)
 - [Getting Started](docs/guides/getting-started.md)
+- [Embedded Agent Architecture](docs/architecture/embedded-agent.md)
+- [Embedded Agent Setup](docs/guides/embedded-agent-setup.md)
+- [Embedded Agent Components](docs/frontend/embedded-agent-components.md)
+- [Agent Provider API](docs/api/agent-providers.md)
 - [Enum Reference](docs/enums.md)
 
 ## License

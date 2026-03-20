@@ -29,9 +29,14 @@ export function createNavigationTools(
 ) {
   return {
     navigate_to: tool({
-      description: 'Navigate the desktop app to a specific section.',
+      description:
+        'Navigate the app to a specific section. ' +
+        'Section mapping: ISSUES=Tasks/Issues, PROJECTS=Projects, CONSOLE=Live Console/Terminal, ' +
+        'AGENTS=Agent config, WAREHOUSE=Analytics/Token usage, SANDBOX=Code execution, ' +
+        'SETTINGS=Settings, DOCS=Documentation. ' +
+        'Use when the user asks to go to, open, or show a section.',
       inputSchema: z.object({
-        section: z.enum(SECTIONS).describe('The section to navigate to'),
+        section: z.enum(SECTIONS).describe('Section ID: ISSUES, PROJECTS, CONSOLE, AGENTS, WAREHOUSE (analytics), SANDBOX, SETTINGS, DOCS'),
       }),
       execute: async (params) => {
         onNavigate(params.section)
@@ -40,7 +45,9 @@ export function createNavigationTools(
     }),
 
     open_settings_tab: tool({
-      description: 'Open a specific tab within the Settings section.',
+      description:
+        'Open a specific tab within Settings (backend, agents, integrations, shortcuts, notifications). ' +
+        'Use when the user asks to open a specific settings tab.',
       inputSchema: z.object({
         tab: z.enum(SETTINGS_TABS).describe('The settings tab to open'),
       }),

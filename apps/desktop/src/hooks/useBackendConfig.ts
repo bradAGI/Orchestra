@@ -42,8 +42,10 @@ export function useBackendConfig(): BackendConfigState {
     let mounted = true
     const desktopBridge = window.orchestraDesktop
     if (!desktopBridge || typeof desktopBridge.getBackendConfig !== 'function') {
+      // Browser dev mode — fall back to default local backend
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setErrorMessage('desktop bridge unavailable: preload API not found')
+      setConfig({ baseUrl: 'http://127.0.0.1:4010', apiToken: 'dev-token' })
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoadingConfig(false)
       return () => { mounted = false }
     }

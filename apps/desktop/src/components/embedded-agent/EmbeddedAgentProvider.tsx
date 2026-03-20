@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, useCallback, useRef, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef, type ReactNode } from 'react'
 import type { BackendConfig } from '@/lib/orchestra-client'
 import type { EmbeddedAgentContextValue } from './lib/types'
 import { useProviderConfig } from './hooks/useProviderConfig'
@@ -14,6 +14,7 @@ import { createSearchTools } from './tools/search-tools'
 import { createCodeExecutionTools } from './tools/code-execution-tools'
 import { createSchedulerTools } from './tools/scheduler-tools'
 import { createMCPBridgeTools } from './tools/mcp-bridge-tools'
+import { createMetaTools } from './tools/meta-tools'
 
 const EmbeddedAgentContext = createContext<EmbeddedAgentContextValue | null>(null)
 
@@ -25,9 +26,9 @@ interface EmbeddedAgentProviderProps {
   children: ReactNode
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
+ 
 export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selectedProjectId, children }: EmbeddedAgentProviderProps) {
-  const { providerConfig, setProviderConfig, updateProvider, availableKeys } = useProviderConfig(config)
+  const { providerConfig, setProviderConfig, updateProvider, availableKeys, refetchKeys } = useProviderConfig(config)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
   const sendMessageRef = useRef<((text: string) => Promise<void>) | null>(null)
 
@@ -58,7 +59,7 @@ export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selec
     const codeExecutionTools = config ? createCodeExecutionTools(config) : {}
     const schedulerTools = createSchedulerTools(scheduler)
     const mcpBridgeTools = config ? createMCPBridgeTools(config) : {}
-    return {
+    const domainTools = {
       ...orchestraTools,
       ...navigationTools,
       ...gitTools,
@@ -68,16 +69,34 @@ export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selec
       ...schedulerTools,
       ...mcpBridgeTools,
     }
+    const metaTools = createMetaTools(domainTools)
+    return { ...domainTools, ...metaTools }
   }, [config, onNavigate, scheduler])
 
   const { messages, sendMessage, isStreaming, stop, clearChat } = useEmbeddedChat(providerConfig, tools)
 
   // Keep ref updated so scheduler callbacks can access latest sendMessage
-  sendMessageRef.current = sendMessage
+  useEffect(() => {
+    sendMessageRef.current = sendMessage
+  }, [sendMessage])
 
   const togglePanel = useCallback(() => {
-    setIsPanelOpen((prev) => !prev)
-  }, [])
+    setIsPanelOpen((prev) => {
+      if (!prev) refetchKeys() // re-fetch keys when opening panel
+      return !prev
+    })
+  }, [refetchKeys])
+
+  // Destructure stable references to avoid busting useMemo on every render
+  const {
+    enabled: watchEnabled, toggle: watchToggle, notifications: watchNotifications,
+    unreadCount: watchUnread, dismiss: watchDismiss, dismissAll: watchDismissAll,
+  } = watchMode
+  const { activeItems: schedActiveItems, cancel: schedCancel } = scheduler
+  const {
+    suggestions: ctxSuggestions, enabled: ctxEnabled,
+    toggle: ctxToggle, dismiss: ctxDismiss,
+  } = contextSuggestions
 
   const value = useMemo<EmbeddedAgentContextValue>(
     () => ({
@@ -93,25 +112,32 @@ export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selec
       isPanelOpen,
       togglePanel,
       watchMode: {
-        enabled: watchMode.enabled,
-        toggle: watchMode.toggle,
-        notifications: watchMode.notifications,
-        unreadCount: watchMode.unreadCount,
-        dismiss: watchMode.dismiss,
-        dismissAll: watchMode.dismissAll,
+        enabled: watchEnabled,
+        toggle: watchToggle,
+        notifications: watchNotifications,
+        unreadCount: watchUnread,
+        dismiss: watchDismiss,
+        dismissAll: watchDismissAll,
       },
       scheduler: {
-        activeItems: scheduler.activeItems,
-        cancel: scheduler.cancel,
+        activeItems: schedActiveItems,
+        cancel: schedCancel,
       },
       contextSuggestions: {
-        suggestions: contextSuggestions.suggestions,
-        enabled: contextSuggestions.enabled,
-        toggle: contextSuggestions.toggle,
-        dismiss: contextSuggestions.dismiss,
+        suggestions: ctxSuggestions,
+        enabled: ctxEnabled,
+        toggle: ctxToggle,
+        dismiss: ctxDismiss,
       },
     }),
-    [messages, isStreaming, sendMessage, stop, clearChat, providerConfig, setProviderConfig, availableKeys, updateProvider, isPanelOpen, togglePanel, watchMode, scheduler, contextSuggestions],
+    [
+      messages, isStreaming, sendMessage, stop, clearChat,
+      providerConfig, setProviderConfig, availableKeys, updateProvider,
+      isPanelOpen, togglePanel,
+      watchEnabled, watchToggle, watchNotifications, watchUnread, watchDismiss, watchDismissAll,
+      schedActiveItems, schedCancel,
+      ctxSuggestions, ctxEnabled, ctxToggle, ctxDismiss,
+    ],
   )
 
   return (
@@ -121,7 +147,7 @@ export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selec
   )
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
+ 
 export function useEmbeddedAgent(): EmbeddedAgentContextValue {
   const ctx = useContext(EmbeddedAgentContext)
   if (!ctx) {

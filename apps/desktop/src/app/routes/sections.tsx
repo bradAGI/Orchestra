@@ -1,4 +1,5 @@
 import {
+  Box,
   Cpu,
   Database,
   FileText,

@@ -16,7 +16,10 @@ import {
 export function createSessionTools(config: BackendConfig) {
   return {
     get_session_logs: tool({
-      description: 'Get the raw event timeline and logs for an issue. Returns the event history with kinds, messages, timestamps, and token usage.',
+      description:
+        'Get the event timeline for an issue session: event kinds, messages, timestamps, and token usage. ' +
+        'Use when the user asks for session logs, events, or the timeline of what happened. ' +
+        'Returns the issue summary and an array of event objects.',
       inputSchema: z.object({
         issue_identifier: z.string().describe('The issue identifier (e.g. "ISS-1")'),
       }),
@@ -38,7 +41,10 @@ export function createSessionTools(config: BackendConfig) {
     }),
 
     get_raw_logs: tool({
-      description: 'Get the raw text logs for an issue session. Useful for debugging or seeing exact agent output.',
+      description:
+        'Get raw text output from an agent session. ' +
+        'Use when the user asks for raw logs, exact output, or debugging info. ' +
+        'Returns unprocessed text — best for diagnosing agent failures.',
       inputSchema: z.object({
         issue_identifier: z.string().describe('The issue identifier (e.g. "ISS-1")'),
         provider: z.string().optional().describe('Optional provider filter'),
@@ -50,7 +56,10 @@ export function createSessionTools(config: BackendConfig) {
     }),
 
     summarize_session: tool({
-      description: 'Summarize what happened in an issue session. Fetches the event history and provides a structured summary of actions taken, tools used, token consumption, and outcome.',
+      description:
+        'Summarize what an agent did on an issue: actions taken, providers used, token consumption, and outcome. ' +
+        'Use when the user asks "what did the agent do on ISS-X?" or wants a session summary. ' +
+        'Returns a structured summary with event breakdown, token stats, and the last 10 events.',
       inputSchema: z.object({
         issue_identifier: z.string().describe('The issue identifier (e.g. "ISS-1")'),
       }),
@@ -97,7 +106,10 @@ export function createSessionTools(config: BackendConfig) {
     }),
 
     list_sessions: tool({
-      description: 'List all agent sessions, optionally filtered by project. Shows session summaries with status and timing.',
+      description:
+        'List all agent sessions, optionally filtered by project. ' +
+        'Use when the user asks to list or show sessions. ' +
+        'Returns session summaries with status, timing, and project association.',
       inputSchema: z.object({
         project_id: z.string().optional().describe('Optional project ID to filter sessions'),
       }),
@@ -108,7 +120,10 @@ export function createSessionTools(config: BackendConfig) {
     }),
 
     get_session_detail: tool({
-      description: 'Get full details for a specific agent session including all events.',
+      description:
+        'Get full details for a specific session by its UUID, including all events. ' +
+        'Use when the user asks for details on a specific session. ' +
+        'Requires session_id — get this from list_sessions or summarize_session output.',
       inputSchema: z.object({
         session_id: z.string().describe('The session UUID'),
       }),

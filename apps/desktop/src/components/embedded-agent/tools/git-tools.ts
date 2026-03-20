@@ -20,26 +20,17 @@ import {
 } from '@/lib/orchestra-client'
 
 /**
- * Creates git operation tools scoped to Orchestra projects.
- * Covers diffs, branches, commit history, and common git workflows.
+ * Creates consolidated git tools for Orchestra projects.
+ * 6 outcome-oriented tools replacing the previous 15 operation-oriented tools.
  */
 export function createGitTools(config: BackendConfig) {
   return {
-    get_commit_log: tool({
-      description: 'Get the git commit history for a project. Returns recent commits with hash, message, author, and date.',
-      inputSchema: z.object({
-        project_id: z.string().describe('The project UUID'),
-        limit: z.number().optional().default(20).describe('Max number of commits to return'),
-      }),
-      execute: async (params) => {
-        const commits = await fetchProjectGitHistory(config, params.project_id)
-        const limited = commits.slice(0, params.limit)
-        return { commits: limited, total: commits.length }
-      },
-    }),
-
-    get_git_status: tool({
-      description: 'Get the current git status (modified, untracked, staged files) for a project.',
+    git_status: tool({
+      description:
+        'Get the working tree state for a project: modified, staged, and untracked files. ' +
+        'Use when the user asks for git status, what changed, or wants to see uncommitted work. ' +
+        'Requires project_id — resolve via find_projects if the user gives a project name. ' +
+        'Returns an array of file entries with path and status.',
       inputSchema: z.object({
         project_id: z.string().describe('The project UUID'),
       }),
@@ -49,158 +40,140 @@ export function createGitTools(config: BackendConfig) {
       },
     }),
 
-    get_project_diff: tool({
-      description: 'Get the git diff for a project workspace. Optionally diff against a specific commit hash.',
+    git_history: tool({
+      description:
+        'Get commit history and/or diff for a project. ' +
+        'Use when the user asks for git log, commit history, recent changes, or diff. ' +
+        'Set include_diff=true to also return the working tree diff. ' +
+        'Requires project_id — resolve via find_projects if the user gives a project name. ' +
+        'Returns commits (hash, message, author, date) and optionally a diff string.',
       inputSchema: z.object({
         project_id: z.string().describe('The project UUID'),
-        commit_hash: z.string().optional().describe('Optional commit hash to diff against'),
+        limit: z.number().optional().default(20).describe('Max commits to return'),
+        include_diff: z.boolean().optional().default(false).describe('Also return working tree diff'),
+        diff_commit: z.string().optional().describe('Diff against a specific commit hash instead of working tree'),
       }),
       execute: async (params) => {
-        const diff = await fetchProjectGitDiff(config, params.project_id, params.commit_hash)
-        return { diff: diff || '(no changes)' }
+        const commits = await fetchProjectGitHistory(config, params.project_id)
+        const limited = commits.slice(0, params.limit)
+        const result: Record<string, unknown> = { commits: limited, total: commits.length }
+        if (params.include_diff || params.diff_commit) {
+          const diff = await fetchProjectGitDiff(config, params.project_id, params.diff_commit)
+          result.diff = diff || '(no changes)'
+        }
+        return result
       },
     }),
 
-    list_branches: tool({
-      description: 'List all git branches for a project and show the current branch.',
+    git_branches: tool({
+      description:
+        'Manage git branches: list, checkout, create, delete, or merge. ' +
+        'Use when the user asks about branches, wants to switch, create, delete, or merge one. ' +
+        'Requires project_id — resolve via find_projects if the user gives a project name. ' +
+        'For action "delete" or "merge": CONFIRM BEFORE CALLING — state what will happen and wait for user confirmation.',
       inputSchema: z.object({
         project_id: z.string().describe('The project UUID'),
+        action: z.enum(['list', 'checkout', 'create', 'delete', 'merge']).describe('Branch operation to perform'),
+        branch: z.string().optional().describe('Branch name (required for checkout, create, delete, merge)'),
       }),
       execute: async (params) => {
-        const result = await fetchProjectGitBranches(config, params.project_id)
-        return { current: result.current, branches: result.branches }
+        switch (params.action) {
+          case 'list': {
+            const result = await fetchProjectGitBranches(config, params.project_id)
+            return { current: result.current, branches: result.branches }
+          }
+          case 'checkout': {
+            if (!params.branch) return { error: 'branch name is required for checkout' }
+            await gitCheckout(config, params.project_id, params.branch)
+            return { success: true, action: 'checkout', branch: params.branch }
+          }
+          case 'create': {
+            if (!params.branch) return { error: 'branch name is required for create' }
+            await gitCreateBranch(config, params.project_id, params.branch)
+            return { success: true, action: 'create', branch: params.branch }
+          }
+          case 'delete': {
+            if (!params.branch) return { error: 'branch name is required for delete' }
+            await gitDeleteBranch(config, params.project_id, params.branch)
+            return { success: true, action: 'delete', branch: params.branch }
+          }
+          case 'merge': {
+            if (!params.branch) return { error: 'branch name is required for merge' }
+            await gitMerge(config, params.project_id, params.branch)
+            return { success: true, action: 'merge', branch: params.branch }
+          }
+        }
       },
     }),
 
-    checkout_branch: tool({
-      description: 'Check out a git branch in a project workspace.',
-      inputSchema: z.object({
-        project_id: z.string().describe('The project UUID'),
-        branch: z.string().describe('Branch name to check out'),
-      }),
-      execute: async (params) => {
-        await gitCheckout(config, params.project_id, params.branch)
-        return { success: true, branch: params.branch }
-      },
-    }),
-
-    create_branch: tool({
-      description: 'Create a new git branch in a project workspace.',
-      inputSchema: z.object({
-        project_id: z.string().describe('The project UUID'),
-        name: z.string().describe('Name of the new branch'),
-      }),
-      execute: async (params) => {
-        await gitCreateBranch(config, params.project_id, params.name)
-        return { success: true, branch: params.name }
-      },
-    }),
-
-    delete_branch: tool({
-      description: 'Delete a git branch from a project workspace. Use with caution.',
-      inputSchema: z.object({
-        project_id: z.string().describe('The project UUID'),
-        branch: z.string().describe('Branch name to delete'),
-      }),
-      execute: async (params) => {
-        await gitDeleteBranch(config, params.project_id, params.branch)
-        return { success: true, deleted: params.branch }
-      },
-    }),
-
-    git_commit: tool({
-      description: 'Create a git commit in a project workspace with a given message.',
+    git_commit_flow: tool({
+      description:
+        'Stage files and create a commit in one step. ' +
+        'Use when the user asks to commit, stage and commit, or save changes. ' +
+        'If files is omitted, only creates the commit (assumes files are already staged). ' +
+        'If unstage is provided, those files are unstaged first. ' +
+        'Requires project_id — resolve via find_projects if the user gives a project name.',
       inputSchema: z.object({
         project_id: z.string().describe('The project UUID'),
         message: z.string().describe('Commit message'),
+        files: z.array(z.string()).optional().describe('Files to stage before committing. Omit to commit already-staged files.'),
+        unstage: z.array(z.string()).optional().describe('Files to unstage before committing'),
       }),
       execute: async (params) => {
+        if (params.unstage && params.unstage.length > 0) {
+          await gitUnstage(config, params.project_id, params.unstage)
+        }
+        if (params.files && params.files.length > 0) {
+          await gitStage(config, params.project_id, params.files)
+        }
         await gitCommit(config, params.project_id, params.message)
-        return { success: true }
+        return {
+          success: true,
+          message: params.message,
+          staged: params.files || [],
+          unstaged: params.unstage || [],
+        }
       },
     }),
 
-    git_push: tool({
-      description: 'Push commits to a remote git repository.',
+    git_sync: tool({
+      description:
+        'Push or pull commits to/from a remote repository. ' +
+        'Use when the user asks to push, pull, or sync with remote. ' +
+        'Requires project_id — resolve via find_projects if the user gives a project name. ' +
+        'For direction "push": CONFIRM BEFORE CALLING — state what will be pushed and wait for user confirmation.',
       inputSchema: z.object({
         project_id: z.string().describe('The project UUID'),
+        direction: z.enum(['push', 'pull']).describe('Whether to push or pull'),
         remote: z.string().optional().default('origin').describe('Remote name'),
         branch: z.string().optional().default('main').describe('Branch name'),
       }),
       execute: async (params) => {
-        await gitPush(config, params.project_id, params.remote, params.branch)
-        return { success: true }
-      },
-    }),
-
-    git_pull: tool({
-      description: 'Pull commits from a remote git repository.',
-      inputSchema: z.object({
-        project_id: z.string().describe('The project UUID'),
-        remote: z.string().optional().default('origin').describe('Remote name'),
-        branch: z.string().optional().default('main').describe('Branch name'),
-      }),
-      execute: async (params) => {
-        await gitPull(config, params.project_id, params.remote, params.branch)
-        return { success: true }
-      },
-    }),
-
-    git_stage: tool({
-      description: 'Stage files for the next git commit.',
-      inputSchema: z.object({
-        project_id: z.string().describe('The project UUID'),
-        files: z.array(z.string()).describe('Array of file paths to stage'),
-      }),
-      execute: async (params) => {
-        await gitStage(config, params.project_id, params.files)
-        return { success: true, staged: params.files }
-      },
-    }),
-
-    git_unstage: tool({
-      description: 'Unstage files from the git index.',
-      inputSchema: z.object({
-        project_id: z.string().describe('The project UUID'),
-        files: z.array(z.string()).describe('Array of file paths to unstage'),
-      }),
-      execute: async (params) => {
-        await gitUnstage(config, params.project_id, params.files)
-        return { success: true, unstaged: params.files }
-      },
-    }),
-
-    git_merge: tool({
-      description: 'Merge a branch into the current branch.',
-      inputSchema: z.object({
-        project_id: z.string().describe('The project UUID'),
-        branch: z.string().describe('Branch name to merge'),
-      }),
-      execute: async (params) => {
-        await gitMerge(config, params.project_id, params.branch)
-        return { success: true, merged: params.branch }
+        if (params.direction === 'push') {
+          await gitPush(config, params.project_id, params.remote, params.branch)
+        } else {
+          await gitPull(config, params.project_id, params.remote, params.branch)
+        }
+        return { success: true, direction: params.direction, remote: params.remote, branch: params.branch }
       },
     }),
 
     git_stash: tool({
-      description: 'Stash uncommitted changes in a project workspace.',
+      description:
+        'Stash or restore uncommitted changes. ' +
+        'Use when the user asks to stash, stash pop, shelve, or restore stashed work. ' +
+        'Requires project_id — resolve via find_projects if the user gives a project name.',
       inputSchema: z.object({
         project_id: z.string().describe('The project UUID'),
+        action: z.enum(['save', 'pop']).default('save').describe('Whether to stash (save) or restore (pop) changes'),
       }),
       execute: async (params) => {
-        await gitStash(config, params.project_id)
-        return { success: true }
-      },
-    }),
-
-    git_stash_pop: tool({
-      description: 'Pop the most recent stash entry.',
-      inputSchema: z.object({
-        project_id: z.string().describe('The project UUID'),
-      }),
-      execute: async (params) => {
-        await gitStashPop(config, params.project_id)
-        return { success: true }
+        if (params.action === 'pop') {
+          await gitStashPop(config, params.project_id)
+        } else {
+          await gitStash(config, params.project_id)
+        }
+        return { success: true, action: params.action }
       },
     }),
   }

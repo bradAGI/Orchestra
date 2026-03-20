@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, type KeyboardEvent } from 'react'
 import { Send, Square } from 'lucide-react'
+import { VoiceInput } from './VoiceInput'
 
 interface ChatInputProps {
   onSend: (text: string) => void
@@ -32,25 +33,34 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
     [handleSend],
   )
 
+  const handleTranscription = useCallback((text: string) => {
+    setValue(prev => prev ? `${prev} ${text}` : text)
+  }, [])
+
   return (
     <div className="px-3 py-3">
-      <div className="flex items-end gap-2">
-        <textarea
-          ref={textareaRef}
-          rows={1}
-          value={value}
-          onChange={(e) => {
-            setValue(e.target.value)
-            const el = e.target
-            el.style.height = 'auto'
-            el.style.height = `${Math.min(el.scrollHeight, 120)}px`
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder="Message Orchestra Agent..."
-          disabled={disabled || isStreaming}
-          className="flex-1 resize-none rounded-xl bg-muted/10 px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/40 focus:bg-muted/20 disabled:opacity-40"
-          style={{ maxHeight: 120 }}
-        />
+      <div className="flex items-start gap-2">
+        <div className="relative flex-1">
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            value={value}
+            onChange={(e) => {
+              setValue(e.target.value)
+              const el = e.target
+              el.style.height = 'auto'
+              el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="Message Orchestra Agent..."
+            disabled={disabled || isStreaming}
+            className="w-full resize-none rounded-xl border border-border/15 bg-muted/10 pl-3.5 pr-10 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/40 focus:border-border/30 focus:bg-muted/20 disabled:opacity-40"
+            style={{ maxHeight: 120 }}
+          />
+          <div className="absolute right-1.5 top-0 flex h-[40px] items-center">
+            <VoiceInput onTranscription={handleTranscription} disabled={disabled || isStreaming} />
+          </div>
+        </div>
 
         {isStreaming ? (
           <button
@@ -73,9 +83,6 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
           </button>
         )}
       </div>
-      <p className="mt-1.5 text-center text-[9px] text-muted-foreground/30">
-        Enter to send, Shift+Enter for newline
-      </p>
     </div>
   )
 }

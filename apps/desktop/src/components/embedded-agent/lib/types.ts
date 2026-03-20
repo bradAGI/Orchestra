@@ -46,14 +46,14 @@ export type AgentProviderKeys = {
 export type WatchModeState = {
   enabled: boolean
   toggle: () => void
-  notifications: { id: string; type: string; title: string; message: string; dismissed: boolean; actions?: { label: string; action: string; params?: Record<string, unknown> }[] }[]
+  notifications: { id: string; type: 'completion' | 'failure' | 'retry' | 'stall' | 'info'; title: string; message: string; timestamp: Date; dismissed: boolean; issueIdentifier?: string; actions?: { label: string; action: string; params?: Record<string, unknown> }[] }[]
   unreadCount: number
   dismiss: (id: string) => void
   dismissAll: () => void
 }
 
 export type SchedulerState = {
-  activeItems: { id: string; type: string; message?: string; toolName?: string; firesAt: Date }[]
+  activeItems: { id: string; type: 'reminder' | 'action'; message?: string; toolName?: string; firesAt: Date; delayMinutes: number; createdAt: Date; fired: boolean; cancelled: boolean }[]
   cancel: (id: string) => void
 }
 
@@ -82,8 +82,8 @@ export type EmbeddedAgentContextValue = {
 }
 
 export const CHAT_PROVIDERS = [
-  { id: 'openrouter' as const, label: 'OpenRouter', models: ['openai/gpt-4o', 'anthropic/claude-sonnet-4', 'google/gemini-2.5-pro'] },
-  { id: 'claude' as const, label: 'Claude', models: ['claude-sonnet-4-20250514', 'claude-haiku-4-20250414'] },
-  { id: 'openai' as const, label: 'OpenAI', models: ['gpt-4o', 'gpt-4o-mini'] },
-  { id: 'gemini' as const, label: 'Gemini', models: ['gemini-2.5-pro', 'gemini-2.5-flash'] },
+  { id: 'openrouter' as const, label: 'OpenRouter' },
+  { id: 'claude' as const, label: 'Anthropic' },
+  { id: 'openai' as const, label: 'OpenAI' },
+  { id: 'gemini' as const, label: 'Google' },
 ] as const

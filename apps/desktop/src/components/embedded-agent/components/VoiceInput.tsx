@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { Mic, Loader2 } from 'lucide-react'
-import { getWhisperClient } from '@/lib/whisper-client'
+import { Mic, MicOff, Loader2 } from 'lucide-react'
 
 interface VoiceInputProps {
   onTranscription: (text: string) => void
@@ -11,61 +10,83 @@ type VoiceState = 'idle' | 'recording' | 'processing'
 
 export function VoiceInput({ onTranscription, disabled }: VoiceInputProps) {
   const [state, setState] = useState<VoiceState>('idle')
-  const clientRef = useRef(getWhisperClient())
+  const clientRef = useRef<import('@/lib/whisper-client').WhisperClient | null>(null)
 
-  const handlePointerDown = useCallback(async () => {
-    if (disabled || state !== 'idle') return
-    try {
-      setState('recording')
-      await clientRef.current.startRecording()
-    } catch (err) {
-      console.error('[VoiceInput] Failed to start recording:', err)
-      setState('idle')
+  const getClient = useCallback(async (): Promise<import('@/lib/whisper-client').WhisperClient> => {
+    if (!clientRef.current) {
+      const { createWhisperClient } = await import('@/lib/whisper-client')
+      clientRef.current = createWhisperClient()
     }
-  }, [disabled, state])
+    return clientRef.current
+  }, [])
 
-  const handlePointerUp = useCallback(async () => {
-    if (state !== 'recording') return
-    try {
-      setState('processing')
-      const audio = await clientRef.current.stopRecording()
-      if (audio.length > 0) {
-        const text = await clientRef.current.transcribe(audio)
-        if (text.trim()) {
-          onTranscription(text.trim())
-        }
+  const handleClick = useCallback(async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (disabled) return
+
+    if (state === 'idle') {
+      // Start recording
+      try {
+        const client = await getClient()
+        await client.startRecording()
+        setState('recording')
+      } catch (err) {
+        console.error('[VoiceInput] Failed to start recording:', err)
+        setState('idle')
       }
-    } catch (err) {
-      console.error('[VoiceInput] Transcription failed:', err)
-    } finally {
-      setState('idle')
+    } else if (state === 'recording') {
+      // Stop recording and transcribe
+      setState('processing')
+      try {
+        const client = await getClient()
+        const audio = await client.stopRecording()
+        if (audio.length > 0) {
+          const text = await client.transcribe(audio)
+          if (text.trim()) {
+            onTranscription(text.trim())
+          }
+        }
+      } catch (err) {
+        console.error('[VoiceInput] Transcription failed:', err)
+      } finally {
+        setState('idle')
+      }
     }
-  }, [state, onTranscription])
+  }, [disabled, state, getClient, onTranscription])
 
   return (
     <button
       type="button"
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerUp}
+      onClick={handleClick}
       disabled={disabled || state === 'processing'}
-      className={`flex size-7 shrink-0 items-center justify-center rounded-md border transition-colors ${
+      className={`flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors ${
         state === 'recording'
-          ? 'animate-pulse border-red-500 bg-red-500/20 text-red-500'
+          ? 'bg-red-500/20 text-red-500'
           : state === 'processing'
-            ? 'border-border/50 bg-muted/30 text-muted-foreground'
-            : 'border-border/50 bg-background text-muted-foreground hover:text-foreground'
-      } disabled:opacity-50`}
+            ? 'bg-muted/30 text-muted-foreground'
+            : 'text-muted-foreground/50 hover:text-foreground hover:bg-muted/20'
+      } disabled:opacity-30`}
       aria-label={
         state === 'recording'
-          ? 'Recording...'
+          ? 'Click to stop recording'
           : state === 'processing'
-            ? 'Processing...'
-            : 'Hold to talk'
+            ? 'Transcribing...'
+            : 'Click to record'
+      }
+      title={
+        state === 'recording'
+          ? 'Click to stop'
+          : state === 'processing'
+            ? 'Transcribing...'
+            : 'Voice input'
       }
     >
       {state === 'processing' ? (
         <Loader2 className="size-3.5 animate-spin" />
+      ) : state === 'recording' ? (
+        <MicOff className="size-3.5 animate-pulse" />
       ) : (
         <Mic className="size-3.5" />
       )}

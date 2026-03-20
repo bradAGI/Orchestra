@@ -19,10 +19,12 @@ This documentation covers the system architecture, API surface, backend internal
 | 1.3 | Desktop Frontend | [architecture/desktop.md](architecture/desktop.md) | Electron + React app, component hierarchy, state management |
 | 1.4 | TUI Architecture | [architecture/tui.md](architecture/tui.md) | Bubble Tea terminal dashboard, service manager |
 | 1.5 | Data Flow & Events | [architecture/data-flow.md](architecture/data-flow.md) | SSE pipeline, PubSub bus, snapshot polling, retry scheduling |
+| 1.6 | Embedded Agent | [architecture/embedded-agent.md](architecture/embedded-agent.md) | ML co-pilot widget: module structure, data flow, provider config, tool system |
 | **2** | **API** | | |
 | 2.1 | API Reference | [api/reference.md](api/reference.md) | REST endpoint catalog, request/response formats |
 | 2.2 | JSON Schemas & Types | [api/schemas.md](api/schemas.md) | Shared data structures and payload types |
 | 2.3 | SSE Events | [api/sse-events.md](api/sse-events.md) | Server-sent event stream protocol and event types |
+| 2.4 | Agent Providers | [api/agent-providers.md](api/agent-providers.md) | LLM API key storage endpoints for embedded agent |
 | **3** | **Backend** | | |
 | 3.1 | Orchestrator | [backend/orchestrator.md](backend/orchestrator.md) | Core dispatch loop, state machine, retry logic |
 | 3.2 | Agents | [backend/agents.md](backend/agents.md) | Agent providers, runner pool, command execution |
@@ -39,10 +41,12 @@ This documentation covers the system architecture, API surface, backend internal
 | 4.3 | API Client | [frontend/client.md](frontend/client.md) | TypeScript HTTP client and request helpers |
 | 4.4 | State Management | [frontend/state-management.md](frontend/state-management.md) | Runtime sync, snapshot store, event timeline |
 | 4.5 | Electron | [frontend/electron.md](frontend/electron.md) | Main process, preload, IPC bridge |
+| 4.6 | Embedded Agent Components | [frontend/embedded-agent-components.md](frontend/embedded-agent-components.md) | Widget, panel, chat, tool feedback, json-render, settings components |
 | **5** | **Guides** | | |
 | 5.1 | Getting Started | [guides/getting-started.md](guides/getting-started.md) | Setup, prerequisites, first run |
 | 5.2 | Configuration | [guides/configuration.md](guides/configuration.md) | Environment variables and config files |
 | 5.3 | Development | [guides/development.md](guides/development.md) | Local dev workflow, testing, contributing |
+| 5.4 | Embedded Agent Setup | [guides/embedded-agent-setup.md](guides/embedded-agent-setup.md) | Provider config, model selection, chat usage, troubleshooting |
 | **6** | **Operations** | | |
 | 6.1 | Deployment | [operations/deployment.md](operations/deployment.md) | Production deployment patterns |
 | 6.2 | Docker | [operations/docker.md](operations/docker.md) | Container builds and compose setup |
@@ -70,10 +74,12 @@ graph TD
     ARCH --> A3["1.3 Desktop"]
     ARCH --> A4["1.4 TUI"]
     ARCH --> A5["1.5 Data Flow"]
+    ARCH --> A6["1.6 Embedded Agent"]
 
     API --> B1["2.1 Reference"]
     API --> B2["2.2 Schemas"]
     API --> B3["2.3 SSE Events"]
+    API --> B4["2.4 Agent Providers"]
 
     BACK --> C1["3.1 Orchestrator"]
     BACK --> C2["3.2 Agents"]

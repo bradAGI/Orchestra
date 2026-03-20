@@ -28,7 +28,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 export function WatchNotifications({
   enabled,
-  onToggle,
+  onToggle: _onToggle,
   notifications,
   onDismiss,
   onDismissAll,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Activity, Bell, Check, CheckCircle2, CircleDashed, Database, ExternalLink, Eye, EyeOff, Github, Globe, Info, Keyboard, Loader2, Play, Plus, RefreshCcw, Settings2, ShieldCheck, SignalHigh, Terminal, Trash2, Users, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AppTooltip } from '@/components/ui/tooltip-wrapper'
@@ -654,39 +654,206 @@ function BackendConfigForm({
   )
 }
 
+function ModelSearchDropdown({
+  models,
+  modelId,
+  loading,
+  error,
+  hasKey,
+  onSelect,
+}: {
+  models: { id: string; name: string }[]
+  modelId: string
+  loading: boolean
+  error: string
+  hasKey: boolean
+  onSelect: (id: string) => void
+}) {
+  const [search, setSearch] = useState('')
+  const [open, setOpen] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const filtered = search
+    ? models.filter(m =>
+        m.id.toLowerCase().includes(search.toLowerCase()) ||
+        m.name.toLowerCase().includes(search.toLowerCase())
+      )
+    : models
+
+  const selectedModel = models.find(m => m.id === modelId)
+
+  if (error) {
+    return (
+      <div className="space-y-1">
+        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Model</label>
+        <p className="text-[11px] text-red-500">{error}</p>
+      </div>
+    )
+  }
+
+  if (!hasKey) {
+    return (
+      <div className="space-y-1">
+        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Model</label>
+        <p className="text-[11px] text-muted-foreground/60">Enter an API key to load models</p>
+      </div>
+    )
+  }
+
+  if (models.length === 0) {
+    return (
+      <div className="space-y-1">
+        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          Model
+          {loading && <Loader2 className="ml-1.5 inline h-2.5 w-2.5 animate-spin-smooth" />}
+        </label>
+        <p className="text-[11px] text-muted-foreground/60">Loading models...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-1 relative">
+      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        Model
+        {loading && <Loader2 className="ml-1.5 inline h-2.5 w-2.5 animate-spin-smooth" />}
+        <span className="ml-2 text-muted-foreground/40 normal-case tracking-normal font-normal">{models.length} available</span>
+      </label>
+
+      {/* Selected / search input */}
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          value={open ? search : (selectedModel?.name || modelId || '')}
+          onChange={(e) => { setSearch(e.target.value); if (!open) setOpen(true) }}
+          onFocus={() => { setOpen(true); setSearch('') }}
+          placeholder="Search models..."
+          className="w-full rounded-lg border border-border/40 bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground/40 focus:border-primary focus:outline-none"
+        />
+        {modelId && !open && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground/40">
+            {models.length} models
+          </span>
+        )}
+      </div>
+
+      {/* Dropdown list */}
+      {open && (
+        <div className="absolute z-50 mt-1 w-full max-h-[240px] overflow-y-auto rounded-lg border border-border/40 bg-card shadow-lg">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-2 text-[11px] text-muted-foreground/60">
+              No models match &ldquo;{search}&rdquo;
+            </div>
+          ) : (
+            filtered.slice(0, 100).map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => {
+                  onSelect(m.id)
+                  setSearch('')
+                  setOpen(false)
+                }}
+                className={`w-full px-3 py-1.5 text-left text-[11px] transition-colors hover:bg-muted/50 ${
+                  m.id === modelId ? 'bg-primary/10 text-primary font-bold' : 'text-foreground'
+                }`}
+              >
+                <span className="block font-mono truncate">{m.id}</span>
+                {m.name !== m.id && (
+                  <span className="block text-[10px] text-muted-foreground/60 truncate">{m.name}</span>
+                )}
+              </button>
+            ))
+          )}
+          {filtered.length > 100 && (
+            <div className="px-3 py-1.5 text-[10px] text-muted-foreground/40 border-t border-border/20">
+              Showing first 100 of {filtered.length} — type to filter
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Click-away to close */}
+      {open && (
+        <div className="fixed inset-0 z-40" onClick={() => { setOpen(false); setSearch('') }} />
+      )}
+    </div>
+  )
+}
+
 function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig | null; disabled: boolean }) {
-  const [providerId, setProviderId] = useState<string>(CHAT_PROVIDERS[0].id)
-  const [modelId, setModelId] = useState<string>(CHAT_PROVIDERS[0].models[0])
+  const savedPrefs = (() => { try { return JSON.parse(localStorage.getItem('orchestra-agent-provider-prefs') ?? '{}') } catch { return {} } })()
+  const [providerId, setProviderId] = useState<string>(savedPrefs.providerId ?? CHAT_PROVIDERS[0].id)
+  const [modelId, setModelId] = useState<string>(savedPrefs.modelId ?? '')
+  const [models, setModels] = useState<{ id: string; name: string }[]>([])
+  const [modelsLoading, setModelsLoading] = useState(false)
+  const [modelsError, setModelsError] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [showKey, setShowKey] = useState(false)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [message, setMessage] = useState('')
   const [hasKey, setHasKey] = useState(false)
+  const [storedKey, setStoredKey] = useState('')
 
-  const currentProvider = CHAT_PROVIDERS.find(p => p.id === providerId)
-
+  // Load existing config on mount — respect saved provider preference
   useEffect(() => {
     if (!config) return
     fetchAgentProviderKeys(config)
       .then((result) => {
-        for (const p of CHAT_PROVIDERS) {
-          const info = result.providers[p.id]
-          if (info?.configured && info.api_key) {
-            setProviderId(p.id)
-            setModelId(p.models[0])
-            setHasKey(true)
-            return
-          }
+        const prefs = (() => { try { return JSON.parse(localStorage.getItem('orchestra-agent-provider-prefs') ?? '{}') } catch { return {} } })()
+        // Use saved provider if it has a key, otherwise first configured
+        const target = prefs.providerId && result.providers[prefs.providerId]?.configured
+          ? prefs.providerId
+          : CHAT_PROVIDERS.find(p => result.providers[p.id]?.configured)?.id
+        if (target) {
+          const info = result.providers[target]
+          setProviderId(target)
+          setHasKey(true)
+          setStoredKey(info?.api_key ?? '')
+          if (prefs.modelId) setModelId(prefs.modelId)
         }
       })
       .catch(() => {})
   }, [config])
 
+  // Fetch models from provider API when provider or key changes
   useEffect(() => {
-    const provider = CHAT_PROVIDERS.find(p => p.id === providerId)
-    if (provider) setModelId(provider.models[0])
-  }, [providerId])
+    const key = storedKey || apiKey.trim()
+    if (!key) {
+      setModels([])
+      setModelsError('')
+      return
+    }
+
+    let cancelled = false
+    setModelsLoading(true)
+    setModelsError('')
+
+    import('@/components/embedded-agent/lib/providers')
+      .then(({ fetchProviderModels }) => fetchProviderModels(providerId, key))
+      .then((fetched) => {
+        if (cancelled) return
+        setModels(fetched)
+        if (fetched.length > 0 && !modelId) {
+          // Use saved model if it exists in list, otherwise first
+          const prefs = (() => { try { return JSON.parse(localStorage.getItem('orchestra-agent-provider-prefs') ?? '{}') } catch { return {} } })()
+          const match = prefs.modelId && fetched.find((m: { id: string }) => m.id === prefs.modelId)
+          setModelId(match ? prefs.modelId : fetched[0].id)
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setModels([])
+        setModelsError(err instanceof Error ? err.message : 'Failed to fetch models')
+      })
+      .finally(() => {
+        if (!cancelled) setModelsLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [providerId, storedKey, apiKey, modelId])
 
   const handleSave = async () => {
     if (!config || !apiKey.trim()) return
@@ -695,6 +862,7 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
     try {
       await saveAgentProviderKey(config, providerId, apiKey.trim())
       setHasKey(true)
+      setStoredKey(apiKey.trim())
       setApiKey('')
       setMessage('API key saved.')
     } catch (err) {
@@ -705,16 +873,14 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
   }
 
   const handleTest = async () => {
+    const key = storedKey || apiKey.trim()
+    if (!key || !modelId) return
     setTesting(true)
     setMessage('')
     try {
-      if (!config) throw new Error('No backend config')
-      const result = await fetchAgentProviderKeys(config)
-      const info = result.providers[providerId]
-      if (!info?.api_key) throw new Error('No API key configured for this provider')
       const { createProvider } = await import('@/components/embedded-agent/lib/providers')
       const { generateText } = await import('ai')
-      const provider = createProvider(providerId, info.api_key)
+      const provider = createProvider(providerId, key)
       await generateText({
         model: provider(modelId),
         prompt: 'Say "ok" and nothing else.',
@@ -742,18 +908,10 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
             className="w-full"
             value={providerId}
             options={CHAT_PROVIDERS.map(p => ({ label: p.label, value: p.id }))}
-            onChange={(v) => setProviderId(v as string)}
-          />
-        </div>
-
-        {/* Model */}
-        <div className="space-y-1">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Model</label>
-          <CustomDropdown
-            className="w-full"
-            value={modelId}
-            options={(currentProvider?.models ?? []).map(m => ({ label: m, value: m }))}
-            onChange={(v) => setModelId(v as string)}
+            onChange={(v) => {
+              setProviderId(v as string); setModelId(''); setModels([]); setStoredKey(''); setHasKey(false)
+              try { localStorage.setItem('orchestra-agent-provider-prefs', JSON.stringify({ providerId: v, modelId: '' })) } catch { /* */ }
+            }}
           />
         </div>
 
@@ -768,38 +926,53 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
               </span>
             )}
           </label>
-          <div className="relative">
-            <input
-              type={showKey ? 'text' : 'password'}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder={hasKey ? '••••••••' : (providerId === 'openrouter' ? 'sk-or-...' : providerId === 'claude' ? 'sk-ant-...' : 'sk-...')}
-              disabled={disabled || saving}
-              className="w-full rounded-lg border border-border/40 bg-background px-3 pr-9 py-2 text-sm font-mono placeholder:text-muted-foreground/40 focus:border-primary focus:outline-none disabled:opacity-50"
-            />
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <input
+                type={showKey ? 'text' : 'password'}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder={hasKey ? '••••••••' : (providerId === 'openrouter' ? 'sk-or-...' : providerId === 'claude' ? 'sk-ant-...' : 'sk-...')}
+                disabled={disabled || saving}
+                className="w-full rounded-lg border border-border/40 bg-background px-3 pr-9 py-2 text-sm font-mono placeholder:text-muted-foreground/40 focus:border-primary focus:outline-none disabled:opacity-50"
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey(!showKey)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-all"
+              >
+                {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              </button>
+            </div>
             <button
-              type="button"
-              onClick={() => setShowKey(!showKey)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-all"
+              onClick={handleSave}
+              disabled={disabled || saving || !apiKey.trim()}
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              {saving ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <Check className="h-3 w-3" />}
+              Save
             </button>
           </div>
         </div>
 
-        {/* Actions */}
+        {/* Model — populated from provider API with search */}
+        <ModelSearchDropdown
+          models={models}
+          modelId={modelId}
+          loading={modelsLoading}
+          error={modelsError}
+          hasKey={hasKey || !!apiKey.trim()}
+          onSelect={(id) => {
+            setModelId(id)
+            try { localStorage.setItem('orchestra-agent-provider-prefs', JSON.stringify({ providerId, modelId: id })) } catch { /* */ }
+          }}
+        />
+
+        {/* Test */}
         <div className="flex items-center gap-2">
           <button
-            onClick={handleSave}
-            disabled={disabled || saving || !apiKey.trim()}
-            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {saving ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <Check className="h-3 w-3" />}
-            Save Key
-          </button>
-          <button
             onClick={handleTest}
-            disabled={disabled || testing || !hasKey}
+            disabled={disabled || testing || !modelId || (!hasKey && !apiKey.trim())}
             className="flex items-center gap-1.5 rounded-lg border border-border/40 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:border-border disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {testing ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <ShieldCheck className="h-3 w-3" />}
@@ -815,7 +988,7 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
       </div>
 
       <p className="text-[10px] text-muted-foreground leading-relaxed">
-        API keys are stored locally at <code className="text-[10px] font-mono bg-muted/30 px-1 rounded">~/.orchestra/agent-providers.json</code> with restricted permissions (600).
+        Models are fetched directly from the provider API. API keys stored at <code className="text-[10px] font-mono bg-muted/30 px-1 rounded">~/.orchestra/agent-providers.json</code> (600).
       </p>
     </div>
   )

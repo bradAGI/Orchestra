@@ -477,6 +477,16 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config])
 
+  // Listen for data mutations from the embedded agent and refresh the board
+  useEffect(() => {
+    if (!config) return
+    const handler = () => {
+      fetchIssues(config).then(setBoardIssues).catch(() => {})
+    }
+    window.addEventListener('orchestra-data-changed', handler)
+    return () => window.removeEventListener('orchestra-data-changed', handler)
+  }, [config])
+
   const _metrics = useMemo(() => {
     if (!snapshot) {
       return {

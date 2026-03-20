@@ -12,6 +12,27 @@ import {
 } from '@/lib/orchestra-client'
 import type { JsonRenderSpec } from '../lib/types'
 
+/** Notify the host app that orchestra data was mutated so it can refresh the board. */
+function notifyDataChanged() {
+  window.dispatchEvent(new Event('orchestra-data-changed'))
+}
+
+/** Normalize state names to match what the Kanban board expects (title case). */
+function normalizeState(state: string): string {
+  const map: Record<string, string> = {
+    'backlog': 'Backlog',
+    'todo': 'Todo',
+    'to do': 'Todo',
+    'in progress': 'In Progress',
+    'in_progress': 'In Progress',
+    'review': 'Review',
+    'done': 'Done',
+    'cancelled': 'Cancelled',
+    'closed': 'Closed',
+  }
+  return map[state.toLowerCase()] ?? state
+}
+
 /**
  * Creates the set of Orchestra API tools that the embedded agent can invoke.
  * Each tool wraps an orchestra-client function and exposes it via the AI SDK
@@ -20,7 +41,11 @@ import type { JsonRenderSpec } from '../lib/types'
 export function createOrchestraTools(config: BackendConfig) {
   return {
     list_issues: tool({
-      description: 'List issues from the orchestrator, optionally filtered by state, project, or assignee.',
+      description:
+        'List issues, optionally filtered by state, project, or assignee. ' +
+        'Use when the user asks to show, list, or view issues. ' +
+        'Filters are optional — omit them to return all issues. ' +
+        'Returns an array of issue objects with identifier, title, state, and assignee.',
       inputSchema: z.object({
         state: z.string().optional().describe('Filter by issue state (e.g. "open", "in progress", "done")'),
         project_id: z.string().optional().describe('Filter by project ID'),
@@ -38,27 +63,37 @@ export function createOrchestraTools(config: BackendConfig) {
     }),
 
     create_issue: tool({
-      description: 'Create a new issue in the orchestrator.',
+      description:
+        'Create a new issue with title, description, state, project, and optional provider assignment. ' +
+        'Use when the user asks to create, add, or file a new issue, task, or ticket. ' +
+        'IMPORTANT: Always ask the user which project to assign or call list_projects/find_projects first to resolve the project_id. ' +
+        'Defaults to state="Backlog". Valid states: Backlog, Todo, In Progress, Review, Done. Returns the created issue with its identifier.',
       inputSchema: z.object({
         title: z.string().describe('Title of the issue'),
         description: z.string().optional().default('').describe('Description of the issue'),
-        state: z.string().optional().default('open').describe('Initial state of the issue'),
+        state: z.string().optional().default('Backlog').describe('Initial state: Backlog, Todo, In Progress, Review, Done'),
+        project_id: z.string().describe('Project ID to assign the issue to. Call list_projects or find_projects first to get available IDs.'),
         provider: z.string().optional().describe('Agent provider to assign (e.g. "claude", "openai")'),
       }),
       execute: async (params) => {
         const issue = await createIssue(config, {
           title: params.title,
           description: params.description,
-          state: params.state,
+          state: normalizeState(params.state),
           assignee_id: params.provider ? 'agent-' + params.provider : '',
-          project_id: '',
+          project_id: params.project_id,
         })
+        notifyDataChanged()
         return { issue }
       },
     }),
 
     update_issue: tool({
-      description: 'Update an existing issue by its identifier.',
+      description:
+        'Update fields on an existing issue by its identifier (e.g. "ISS-1"). ' +
+        'Use when the user asks to change, update, edit, or move an issue. ' +
+        'Only send the fields being changed — omitted fields are left unchanged. ' +
+        'Returns the updated issue object.',
       inputSchema: z.object({
         identifier: z.string().describe('The issue identifier (e.g. "ISS-1")'),
         title: z.string().optional().describe('New title'),
@@ -70,24 +105,34 @@ export function createOrchestraTools(config: BackendConfig) {
       }),
       execute: async (params) => {
         const { identifier, ...updates } = params
+        if (updates.state) updates.state = normalizeState(updates.state)
         const issue = await updateIssue(config, identifier, updates)
+        notifyDataChanged()
         return { issue }
       },
     }),
 
     delete_issue: tool({
-      description: 'Delete an issue by its identifier.',
+      description:
+        'Permanently delete an issue by its identifier. Cannot be undone. ' +
+        'Use when the user explicitly asks to delete or remove an issue. ' +
+        'CONFIRM BEFORE CALLING — state what will be deleted and wait for "yes". ' +
+        'Returns {success: true}.',
       inputSchema: z.object({
         identifier: z.string().describe('The issue identifier to delete'),
       }),
       execute: async (params) => {
         await deleteIssue(config, params.identifier)
+        notifyDataChanged()
         return { success: true }
       },
     }),
 
     get_orchestrator_state: tool({
-      description: 'Get the current orchestrator runtime state snapshot including all issues, agents, and sessions.',
+      description:
+        'Get the full orchestrator runtime snapshot: all issues, running/queued/retrying sessions, and agent status. ' +
+        'Use when the user asks for system status, what is running, or a runtime overview. ' +
+        'Returns a large object — summarize key points for the user.',
       inputSchema: z.object({}),
       execute: async () => {
         const state = await fetchState(config)
@@ -96,35 +141,49 @@ export function createOrchestraTools(config: BackendConfig) {
     }),
 
     dispatch_agent: tool({
-      description: 'Dispatch an agent to work on an issue by setting its state to "in progress".',
+      description:
+        'Assign an agent provider to an issue WITHOUT changing its state. ' +
+        'Use when the user asks to assign, attach, or set an agent on an issue. ' +
+        'Does NOT move the issue to In Progress — only the user can change state. ' +
+        'Returns the updated issue object.',
       inputSchema: z.object({
-        identifier: z.string().describe('The issue identifier to dispatch'),
-        provider: z.string().optional().describe('Agent provider to assign'),
+        identifier: z.string().describe('The issue identifier to assign'),
+        provider: z.string().describe('Agent provider to assign (e.g. "claude", "codex", "gemini")'),
       }),
       execute: async (params) => {
-        const updates: Record<string, string> = { state: 'in progress' }
+        const updates: Record<string, unknown> = {}
         if (params.provider) {
           updates.provider = params.provider
+          updates.assignee_id = `agent-${params.provider}`
         }
         const issue = await updateIssue(config, params.identifier, updates)
+        notifyDataChanged()
         return { issue }
       },
     }),
 
     stop_session: tool({
-      description: 'Stop the active session for an issue.',
+      description:
+        'Stop the active agent session for an issue. ' +
+        'Use when the user asks to stop, kill, or cancel a running session. ' +
+        'CONFIRM BEFORE CALLING — state which session will be stopped and wait for "yes". ' +
+        'Returns {success: true}.',
       inputSchema: z.object({
         identifier: z.string().describe('The issue identifier whose session to stop'),
         provider: z.string().optional().describe('Provider of the session to stop'),
       }),
       execute: async (params) => {
         await stopIssueSession(config, params.identifier, params.provider)
+        notifyDataChanged()
         return { success: true }
       },
     }),
 
     list_projects: tool({
-      description: 'List all projects in the orchestrator.',
+      description:
+        'List all projects in the orchestrator. ' +
+        'Use when the user asks to list, show, or view projects. ' +
+        'Returns an array of project objects with id, name, and metadata.',
       inputSchema: z.object({}),
       execute: async () => {
         const projects = await fetchProjects(config)
@@ -133,7 +192,12 @@ export function createOrchestraTools(config: BackendConfig) {
     }),
 
     render_ui: tool({
-      description: 'Render a custom UI component using a JSON render specification. The spec defines a tree of elements with types, props, and children.',
+      description:
+        'Render structured data visually using a JSON render spec. ' +
+        'Use instead of plain text when the response benefits from layout: tables, metrics, cards, code blocks, key-value pairs, or action buttons. ' +
+        'Components: Card, Stack, Divider, Metric, Table, Badge, CodeBlock, KeyValue, Button, ButtonGroup, Alert, Progress. ' +
+        'Actions: navigate, send_chat, copy_to_clipboard. ' +
+        'See system prompt for full spec structure and component props.',
       inputSchema: z.object({
         spec: z.object({
           root: z.string().describe('The key of the root element'),
