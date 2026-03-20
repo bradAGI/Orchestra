@@ -92,6 +92,15 @@ function setupDesktopBridge(overrides?: {
   return bridge
 }
 
+/** Set a controlled input's value in React 19 by using the native setter + input event. */
+function setInputValue(input: HTMLInputElement, value: string) {
+  const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+  if (nativeSetter) {
+    nativeSetter.call(input, value)
+  }
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
 // Mock fetch
 let fetchMock = vi.fn()
 let eventSourceInstances: MockEventSource[] = []
@@ -814,7 +823,7 @@ describe('App smoke render', () => {
       await screen.findByText(/Connection Profiles/i)
 
       const urlInput = screen.getByPlaceholderText('http://127.0.0.1:4010') as HTMLInputElement
-      fireEvent.change(urlInput, { target: { value: 'http://127.0.0.1:9999' } })
+      setInputValue(urlInput, 'http://127.0.0.1:9999')
 
       await waitFor(() => {
         expect(urlInput.value).toBe('http://127.0.0.1:9999')
@@ -839,7 +848,7 @@ describe('App smoke render', () => {
       fireEvent.click(screen.getByTestId('sidebar-nav-SETTINGS'))
       await screen.findByText(/Connection Profiles/i)
 
-      fireEvent.change(screen.getByPlaceholderText('http://127.0.0.1:4010'), { target: { value: 'not-a-url' } })
+      setInputValue(screen.getByPlaceholderText('http://127.0.0.1:4010') as HTMLInputElement, 'not-a-url')
       fireEvent.click(screen.getByRole('button', { name: 'Save Backend Config' }))
 
       await waitFor(() => {
