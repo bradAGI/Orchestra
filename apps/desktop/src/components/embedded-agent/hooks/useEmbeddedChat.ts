@@ -111,6 +111,37 @@ function saveMessages(messages: ChatMessage[]): void {
   }
 }
 
+/** Map raw provider/network errors to user-friendly messages. */
+function formatProviderError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err)
+  const lower = raw.toLowerCase()
+
+  // HTTP status codes
+  if (lower.includes('503') || lower.includes('service unavailable') || lower.includes('overloaded')) {
+    return 'Model temporarily unavailable. Try again or switch to a different model.'
+  }
+  if (lower.includes('401') || lower.includes('403') || lower.includes('unauthorized') || lower.includes('forbidden') || lower.includes('invalid.*key') || lower.includes('api key')) {
+    return 'API key invalid or expired. Update in Settings.'
+  }
+  if (lower.includes('429') || lower.includes('rate limit') || lower.includes('too many requests')) {
+    return 'Rate limit exceeded. Wait a moment and try again.'
+  }
+  if (lower.includes('500') || lower.includes('internal server error')) {
+    return 'The model provider returned an internal error. Try again shortly.'
+  }
+  if (lower.includes('502') || lower.includes('bad gateway')) {
+    return 'The model provider is temporarily unreachable. Try again shortly.'
+  }
+
+  // Network-level failures
+  if (lower.includes('fetch failed') || lower.includes('networkerror') || lower.includes('failed to fetch') || lower.includes('econnrefused') || lower.includes('enotfound') || lower.includes('network')) {
+    return 'Network error. Check your connection.'
+  }
+
+  // Fallback: return the raw message but cap length to avoid dumping stack traces
+  return raw.length > 300 ? raw.slice(0, 300) + '...' : raw
+}
+
 export function useEmbeddedChat(
   providerConfig: ChatProviderConfig,
   tools: ToolSet
@@ -246,8 +277,7 @@ export function useEmbeddedChat(
             return prev
           })
         } else {
-          const errorText =
-            err instanceof Error ? err.message : 'An unknown error occurred'
+          const errorText = formatProviderError(err)
           setMessages((prev) => {
             const updated = [...prev]
             const last = updated[updated.length - 1]

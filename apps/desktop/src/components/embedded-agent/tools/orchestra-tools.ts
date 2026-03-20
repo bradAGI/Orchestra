@@ -12,6 +12,11 @@ import {
 } from '@/lib/orchestra-client'
 import type { JsonRenderSpec } from '../lib/types'
 
+/** Notify the host app that orchestra data was mutated so it can refresh the board. */
+function notifyDataChanged() {
+  window.dispatchEvent(new Event('orchestra-data-changed'))
+}
+
 /**
  * Creates the set of Orchestra API tools that the embedded agent can invoke.
  * Each tool wraps an orchestra-client function and exposes it via the AI SDK
@@ -60,6 +65,7 @@ export function createOrchestraTools(config: BackendConfig) {
           assignee_id: params.provider ? 'agent-' + params.provider : '',
           project_id: '',
         })
+        notifyDataChanged()
         return { issue }
       },
     }),
@@ -82,6 +88,7 @@ export function createOrchestraTools(config: BackendConfig) {
       execute: async (params) => {
         const { identifier, ...updates } = params
         const issue = await updateIssue(config, identifier, updates)
+        notifyDataChanged()
         return { issue }
       },
     }),
@@ -97,6 +104,7 @@ export function createOrchestraTools(config: BackendConfig) {
       }),
       execute: async (params) => {
         await deleteIssue(config, params.identifier)
+        notifyDataChanged()
         return { success: true }
       },
     }),
@@ -129,6 +137,7 @@ export function createOrchestraTools(config: BackendConfig) {
           updates.assignee_id = `agent-${params.provider}`
         }
         const issue = await updateIssue(config, params.identifier, updates)
+        notifyDataChanged()
         return { issue }
       },
     }),
@@ -145,6 +154,7 @@ export function createOrchestraTools(config: BackendConfig) {
       }),
       execute: async (params) => {
         await stopIssueSession(config, params.identifier, params.provider)
+        notifyDataChanged()
         return { success: true }
       },
     }),

@@ -6,6 +6,25 @@ import { fetchProviderModels, type ModelInfo } from '../lib/providers'
 
 const PREFS_KEY = 'orchestra-agent-provider-prefs'
 
+/** Preferred default models per provider — tried in order, falls back to first available. */
+const PREFERRED_DEFAULTS: Record<string, string[]> = {
+  openrouter: ['anthropic/claude-sonnet-4', 'openai/gpt-4o', 'google/gemini-2.5-flash'],
+  openai: ['gpt-4o'],
+  claude: ['claude-sonnet-4-6'],
+  gemini: ['gemini-2.5-flash'],
+}
+
+/** Pick the best default model from a fetched list based on provider preferences. */
+function pickDefaultModel(providerId: string, models: ModelInfo[]): string {
+  const preferred = PREFERRED_DEFAULTS[providerId]
+  if (preferred) {
+    for (const id of preferred) {
+      if (models.find(m => m.id === id)) return id
+    }
+  }
+  return models[0].id
+}
+
 function loadPrefs(): { providerId?: string; modelId?: string } {
   try {
     const raw = localStorage.getItem(PREFS_KEY)
@@ -77,10 +96,10 @@ export function useProviderConfig(config: BackendConfig | null) {
         if (cancelled) return
         setModels(fetched)
         if (fetched.length > 0) {
-          // Use saved model if it exists in the list, otherwise first
+          // Use saved model if it exists in the list, otherwise pick a smart default
           const saved = loadPrefs().modelId
           const match = saved && fetched.find(m => m.id === saved)
-          const selectedId = match ? match.id : fetched[0].id
+          const selectedId = match ? match.id : pickDefaultModel(providerConfig.providerId, fetched)
           setProviderConfig(prev => {
             if (!prev.modelId || !fetched.find(m => m.id === prev.modelId)) {
               return { ...prev, modelId: selectedId }
