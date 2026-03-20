@@ -10,6 +10,21 @@ import {
 } from 'lucide-react'
 import type { SidebarItem } from '@/components/app-shell/types'
 
+function SandboxIcon({ className, size }: { className?: string; size?: number }) {
+  const s = size || 24
+  return (
+    <svg className={className} width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {/* bucket */}
+      <path d="M5 10h14l-1.5 9a1 1 0 0 1-1 .85H7.5a1 1 0 0 1-1-.85L5 10z" />
+      <path d="M6 10l-.5-2.5A1 1 0 0 1 6.5 6h11a1 1 0 0 1 1 1.5L18 10" />
+      {/* shovel handle */}
+      <line x1="17" y1="2" x2="20" y2="8" />
+      {/* shovel head */}
+      <path d="M19 7l2 1-1.5 2.5-2-1z" />
+    </svg>
+  )
+}
+
 /** Sidebar navigation items displayed in the app shell, in display order. */
 export const sidebarItems: SidebarItem[] = [
   {
@@ -46,7 +61,7 @@ export const sidebarItems: SidebarItem[] = [
     id: 'SANDBOX',
     label: 'Sandbox',
     description: 'Remote code execution',
-    icon: Box,
+    icon: SandboxIcon,
   },
   {
     id: 'SETTINGS',

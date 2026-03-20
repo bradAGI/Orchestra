@@ -257,9 +257,9 @@ function buildHeaders(config: BackendConfig): HeadersInit {
   return headers
 }
 
-async function requestJSON<T>(config: BackendConfig, path: string, init?: RequestInit): Promise<T> {
+async function requestJSON<T>(config: BackendConfig, path: string, init?: RequestInit, timeoutMs = 30000): Promise<T> {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 30000)
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
     const response = await fetch(new URL(path, config.baseUrl).toString(), {
@@ -1519,7 +1519,7 @@ export async function executeUnsandbox(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ language, code, network: network || 'semitrusted' }),
-  })
+  }, 150000)
 }
 
 /** An active or completed Unsandbox execution session. */

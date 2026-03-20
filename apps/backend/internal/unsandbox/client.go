@@ -117,7 +117,7 @@ func (c *Client) Execute(ctx context.Context, language, code string) (*ExecuteRe
 
 // ExecuteWithOpts runs code with optional network mode.
 func (c *Client) ExecuteWithOpts(ctx context.Context, language, code, network string) (*ExecuteResult, error) {
-	body := map[string]string{"language": language, "code": code}
+	body := map[string]any{"language": language, "code": code, "timeout": 120}
 	if network != "" {
 		body["network_mode"] = network
 	}
@@ -152,6 +152,60 @@ func (c *Client) ExecuteWithOpts(ctx context.Context, language, code, network st
 		return c.WaitForJob(ctx, result.JobID)
 	}
 
+	return result, nil
+}
+
+// ExecuteAsync submits code for asynchronous execution and returns the job ID
+// immediately without waiting for completion.
+func (c *Client) ExecuteAsync(ctx context.Context, language, code, network string, opts ...map[string]any) (*ExecuteResult, error) {
+	body := map[string]any{"language": language, "code": code}
+	if network != "" {
+		body["network_mode"] = network
+	}
+	for _, o := range opts {
+		for k, v := range o {
+			body[k] = v
+		}
+	}
+
+	resp, err := c.request(ctx, "POST", "/execute/async", body)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &ExecuteResult{Raw: resp}
+	if v, ok := resp["job_id"].(string); ok {
+		result.JobID = v
+	}
+	if v, ok := resp["status"].(string); ok {
+		result.Status = v
+	}
+	return result, nil
+}
+
+// GetJob retrieves the current status and output of a job.
+func (c *Client) GetJob(ctx context.Context, jobID string) (*ExecuteResult, error) {
+	resp, err := c.request(ctx, "GET", "/jobs/"+jobID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &ExecuteResult{Raw: resp, JobID: jobID}
+	if v, ok := resp["status"].(string); ok {
+		result.Status = v
+	}
+	if v, ok := resp["output"].(string); ok {
+		result.Output = v
+	}
+	if v, ok := resp["stdout"].(string); ok && result.Output == "" {
+		result.Output = v
+	}
+	if v, ok := resp["error"].(string); ok {
+		result.Error = v
+	}
+	if v, ok := resp["stderr"].(string); ok && result.Error == "" {
+		result.Error = v
+	}
 	return result, nil
 }
 
@@ -234,8 +288,32 @@ func (c *Client) CreateSession(ctx context.Context, language string, network str
 	return s, nil
 }
 
+// ShellSessionAsync runs a command in a session and returns immediately with
+// the job ID, without waiting for completion.
+func (c *Client) ShellSessionAsync(ctx context.Context, sessionID, command string) (*ExecuteResult, error) {
+	body := map[string]string{"language": "bash", "code": command}
+	resp, err := c.request(ctx, "POST", "/sessions/"+sessionID+"/execute", body)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &ExecuteResult{Raw: resp}
+	if v, ok := resp["job_id"].(string); ok {
+		result.JobID = v
+	}
+	if v, ok := resp["status"].(string); ok {
+		result.Status = v
+	}
+	if v, ok := resp["output"].(string); ok {
+		result.Output = v
+	}
+	if v, ok := resp["stdout"].(string); ok && result.Output == "" {
+		result.Output = v
+	}
+	return result, nil
+}
+
 // ShellSession runs a command in an existing session and returns output.
-// Uses language=bash + code=command to match the unsandbox execute API.
 func (c *Client) ShellSession(ctx context.Context, sessionID, command string) (*ExecuteResult, error) {
 	body := map[string]string{"language": "bash", "code": command}
 	resp, err := c.request(ctx, "POST", "/sessions/"+sessionID+"/execute", body)

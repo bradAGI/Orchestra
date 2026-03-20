@@ -1,14 +1,10 @@
 package agents
 
 import (
-	"archive/tar"
 	"bufio"
-	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/base64"
 	"fmt"
-	"io"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -264,80 +260,12 @@ func (r *UnsandboxRunner) RunTurn(ctx context.Context, request TurnRequest, onEv
 // syncCredentials reads local Claude credentials and returns shell commands
 // to inject them into the container with secure permissions.
 func syncCredentials() string {
-	u, err := user.Current()
-	if err != nil {
-		return ""
-	}
-
-	credFile := filepath.Join(u.HomeDir, ".claude", ".credentials.json")
-	data, err := os.ReadFile(credFile)
-	if err != nil {
-		return ""
-	}
-
-	b64 := base64.StdEncoding.EncodeToString(data)
-	lines := []string{
-		"umask 077 && mkdir -p ~/.claude",
-		fmt.Sprintf("printf '%%s' %s | base64 -d > ~/.claude/.credentials.json", shellQuote(b64)),
-		"chmod 600 ~/.claude/.credentials.json",
-		"chmod 700 ~/.claude",
-	}
-
-	// Settings files (non-fatal)
-	for _, name := range []string{"settings.json", "settings.local.json"} {
-		settingsPath := filepath.Join(u.HomeDir, ".claude", name)
-		sData, err := os.ReadFile(settingsPath)
-		if err != nil {
-			continue
-		}
-		sB64 := base64.StdEncoding.EncodeToString(sData)
-		lines = append(lines, fmt.Sprintf("printf '%%s' %s | base64 -d > ~/.claude/%s", shellQuote(sB64), shellQuote(name)))
-	}
-
-	return strings.Join(lines, "\n")
+	return unsandbox.SyncClaudeCredentials()
 }
 
 // extractTarGz extracts a gzipped tarball into a directory.
 func extractTarGz(data []byte, destDir string) error {
-	gr, err := gzip.NewReader(bytes.NewReader(data))
-	if err != nil {
-		return err
-	}
-	defer gr.Close()
-
-	tr := tar.NewReader(gr)
-	for {
-		header, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-
-		target := filepath.Join(destDir, filepath.Clean(header.Name))
-		// Prevent path traversal
-		if !strings.HasPrefix(target, filepath.Clean(destDir)+string(os.PathSeparator)) && target != filepath.Clean(destDir) {
-			continue
-		}
-
-		switch header.Typeflag {
-		case tar.TypeDir:
-			os.MkdirAll(target, 0755)
-		case tar.TypeReg:
-			os.MkdirAll(filepath.Dir(target), 0755)
-			f, err := os.Create(target)
-			if err != nil {
-				continue
-			}
-			io.Copy(f, tr)
-			f.Close()
-		case tar.TypeSymlink:
-			os.MkdirAll(filepath.Dir(target), 0755)
-			os.Symlink(header.Linkname, target)
-		}
-	}
-	return nil
+	return unsandbox.ExtractTarGz(data, destDir)
 }
 
 // detectGitRemote tries to find the origin remote URL for a workspace path.

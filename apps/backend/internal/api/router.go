@@ -181,6 +181,7 @@ func NewRouterWithPubSub(
 	// Unsandbox remote execution
 	protected.Get("/api/v1/unsandbox/status", server.GetUnsandboxStatus)
 	protected.Post("/api/v1/unsandbox/execute", server.PostUnsandboxExecute)
+	protected.Get("/api/v1/unsandbox/jobs/*", server.GetUnsandboxJob)
 	protected.Get("/api/v1/unsandbox/sessions", server.GetUnsandboxSessions)
 	protected.Get("/api/v1/unsandbox/services", server.GetUnsandboxServices)
 
