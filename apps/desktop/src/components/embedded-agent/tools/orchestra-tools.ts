@@ -45,11 +45,11 @@ export function createOrchestraTools(config: BackendConfig) {
       description:
         'Create a new issue with title, description, state, and optional provider assignment. ' +
         'Use when the user asks to create, add, or file a new issue, task, or ticket. ' +
-        'Defaults to state="open". Returns the created issue object with its identifier.',
+        'Defaults to state="backlog". Valid states: backlog, todo, in progress, review, done. Returns the created issue with its identifier.',
       inputSchema: z.object({
         title: z.string().describe('Title of the issue'),
         description: z.string().optional().default('').describe('Description of the issue'),
-        state: z.string().optional().default('open').describe('Initial state of the issue'),
+        state: z.string().optional().default('backlog').describe('Initial state: backlog, todo, in progress, review, done'),
         provider: z.string().optional().describe('Agent provider to assign (e.g. "claude", "openai")'),
       }),
       execute: async (params) => {
