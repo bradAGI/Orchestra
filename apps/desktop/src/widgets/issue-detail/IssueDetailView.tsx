@@ -597,7 +597,16 @@ export function IssueDetailView({
                     }
                   })
 
-                  if (parsed.length === 0) {
+                  // Deduplicate entries with same kind+ts+content
+                  const seen = new Set<string>()
+                  const deduplicated = parsed.filter((e) => {
+                    const key = `${e.kind}|${e.ts}|${e.label}|${e.content.slice(0, 100)}`
+                    if (seen.has(key)) return false
+                    seen.add(key)
+                    return true
+                  })
+
+                  if (deduplicated.length === 0) {
                     return (
                       <div className="h-full flex flex-col items-center justify-center text-muted-foreground/20 gap-3">
                         <Terminal size={36} />
@@ -608,7 +617,7 @@ export function IssueDetailView({
 
                   return (
                     <div className="p-4 space-y-3">
-                      {parsed.map((entry) => {
+                      {deduplicated.map((entry) => {
                         const isExpanded = expandedOutputEntries.has(entry.idx)
                         const toggleExpand = () => setExpandedOutputEntries(prev => {
                           const next = new Set(prev)
