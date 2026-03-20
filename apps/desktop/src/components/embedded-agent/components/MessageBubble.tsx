@@ -14,9 +14,16 @@ export function MessageBubble({ message, onAction, isStreaming }: MessageBubbleP
   const isUser = message.role === 'user'
 
   // Don't render an empty assistant bubble while waiting for content
-  if (!isUser && !message.content && (!message.toolCalls || message.toolCalls.length === 0) && !message.jsonRenderSpec) {
+  const hasContent = !!message.content
+  const hasTools = !!(message.toolCalls && message.toolCalls.length > 0)
+  const hasRender = !!message.jsonRenderSpec
+
+  if (!isUser && !hasContent && !hasTools && !hasRender) {
     return null
   }
+
+  // If assistant has only tool calls (no text or render yet), show tools without bubble styling
+  const toolsOnly = !isUser && !hasContent && !hasRender && hasTools
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -24,7 +31,9 @@ export function MessageBubble({ message, onAction, isStreaming }: MessageBubbleP
         className={`max-w-[85%] text-[13px] leading-relaxed ${
           isUser
             ? 'rounded-2xl rounded-br-md bg-primary px-3.5 py-2.5 text-primary-foreground shadow-sm shadow-primary/10'
-            : 'rounded-2xl rounded-tl-md border border-border/20 bg-muted/15 px-3.5 py-2.5'
+            : toolsOnly
+              ? ''
+              : 'rounded-2xl rounded-tl-md border border-border/20 bg-muted/15 px-3.5 py-2.5'
         }`}
       >
         {/* Tool feedback (before text for assistant) */}
