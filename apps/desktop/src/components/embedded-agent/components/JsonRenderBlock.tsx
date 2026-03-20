@@ -11,12 +11,23 @@ function formatCellValue(val: unknown): string {
   if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') return String(val)
   if (Array.isArray(val)) return val.map(formatCellValue).join(', ')
   if (typeof val === 'object') {
-    // Try to extract a meaningful string from common patterns
     const obj = val as Record<string, unknown>
+    // Handle json-render component specs embedded in cells (e.g. Badge)
+    if ('type' in obj && 'props' in obj && typeof obj.props === 'object') {
+      const props = obj.props as Record<string, unknown>
+      return String(props.label ?? props.value ?? props.message ?? props.title ?? obj.type)
+    }
+    // Try common keys
     if ('name' in obj) return String(obj.name)
     if ('label' in obj) return String(obj.label)
     if ('value' in obj) return String(obj.value)
     if ('id' in obj) return String(obj.id)
+    if ('text' in obj) return String(obj.text)
+    if ('status' in obj) return String(obj.status)
+    if ('state' in obj) return String(obj.state)
+    // Boolean-like objects
+    if ('configured' in obj) return obj.configured ? 'Yes' : 'No'
+    if ('enabled' in obj) return obj.enabled ? 'Yes' : 'No'
     // Fallback: compact JSON
     try { return JSON.stringify(val) } catch { return '[object]' }
   }
