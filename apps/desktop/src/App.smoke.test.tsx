@@ -92,13 +92,17 @@ function setupDesktopBridge(overrides?: {
   return bridge
 }
 
-/** Set a controlled input's value in React 19 by using the native setter + input event. */
+/** Set a controlled input's value in React 19 by using the native setter + both change and input events. */
 function setInputValue(input: HTMLInputElement, value: string) {
   const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
   if (nativeSetter) {
     nativeSetter.call(input, value)
+  } else {
+    // Fallback for environments where prototype descriptor is unavailable
+    Object.defineProperty(input, 'value', { value, writable: true, configurable: true })
   }
   input.dispatchEvent(new Event('input', { bubbles: true }))
+  input.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
 // Mock fetch
