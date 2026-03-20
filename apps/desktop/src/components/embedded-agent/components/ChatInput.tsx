@@ -39,7 +39,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
 
   return (
     <div className="px-3 py-3">
-      <div className="flex items-end gap-2">
+      <div className="flex items-start gap-2">
         <div className="relative flex-1">
           <textarea
             ref={textareaRef}
@@ -83,9 +83,6 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
           </button>
         )}
       </div>
-      <p className="mt-1.5 text-center text-[9px] text-muted-foreground/30">
-        Enter to send, Shift+Enter for newline
-      </p>
     </div>
   )
 }
