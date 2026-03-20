@@ -64,13 +64,15 @@ export function createOrchestraTools(config: BackendConfig) {
 
     create_issue: tool({
       description:
-        'Create a new issue with title, description, state, and optional provider assignment. ' +
+        'Create a new issue with title, description, state, project, and optional provider assignment. ' +
         'Use when the user asks to create, add, or file a new issue, task, or ticket. ' +
+        'IMPORTANT: Always ask the user which project to assign or call list_projects/find_projects first to resolve the project_id. ' +
         'Defaults to state="Backlog". Valid states: Backlog, Todo, In Progress, Review, Done. Returns the created issue with its identifier.',
       inputSchema: z.object({
         title: z.string().describe('Title of the issue'),
         description: z.string().optional().default('').describe('Description of the issue'),
         state: z.string().optional().default('Backlog').describe('Initial state: Backlog, Todo, In Progress, Review, Done'),
+        project_id: z.string().describe('Project ID to assign the issue to. Call list_projects or find_projects first to get available IDs.'),
         provider: z.string().optional().describe('Agent provider to assign (e.g. "claude", "openai")'),
       }),
       execute: async (params) => {
@@ -79,7 +81,7 @@ export function createOrchestraTools(config: BackendConfig) {
           description: params.description,
           state: normalizeState(params.state),
           assignee_id: params.provider ? 'agent-' + params.provider : '',
-          project_id: '',
+          project_id: params.project_id,
         })
         notifyDataChanged()
         return { issue }
