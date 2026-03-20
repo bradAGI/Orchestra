@@ -106,7 +106,7 @@ func (r *CommandRunner) RunTurn(ctx context.Context, request TurnRequest, onEven
 	}
 
 	cmd := exec.CommandContext(cmdCtx, "sh", "-lc", resolvedCommand)
-	cmd.Env = append(os.Environ(), "ORCHESTRA_SESSION_ID="+sessionID)
+	cmd.Env = safeSubprocessEnv(sessionID)
 	cmd.Dir = request.Workspace
 
 	stdout, err := cmd.StdoutPipe()
@@ -771,6 +771,24 @@ func firstInt64(payload map[string]any, keys ...string) int64 {
 		}
 	}
 	return 0
+}
+
+// safeSubprocessEnv returns a whitelist of environment variables for agent
+// subprocesses, avoiding leaking secrets from the parent process.
+func safeSubprocessEnv(sessionID string) []string {
+	allowed := []string{
+		"PATH", "HOME", "USER", "SHELL", "LANG", "LC_ALL",
+		"TMPDIR", "TEMP", "TMP",
+		"ORCHESTRA_WORKSPACE_ROOT", "ORCHESTRA_SERVER_HOST", "ORCHESTRA_SERVER_PORT",
+	}
+	env := make([]string, 0, len(allowed)+1)
+	for _, key := range allowed {
+		if val, ok := os.LookupEnv(key); ok {
+			env = append(env, key+"="+val)
+		}
+	}
+	env = append(env, "ORCHESTRA_SESSION_ID="+sessionID)
+	return env
 }
 
 func shellQuote(value string) string {

@@ -29,10 +29,13 @@ jobs:
           go-sum-path: apps/backend/go.sum
 
       - name: Write PR body to file
-        env:
-          PR_BODY: ${{ github.event.pull_request.body }}
-        shell: bash
-        run: printf '%s' "${PR_BODY}" > /tmp/pr_body.md
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = context.payload.pull_request.body || '';
+            fs.writeFileSync('/tmp/pr_body.md', body);
+
 
       - name: Validate PR description format
         run: go run ./apps/backend/cmd/orchestra check-pr-body /tmp/pr_body.md
