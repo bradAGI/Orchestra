@@ -28,12 +28,12 @@ export function MessageBubble({ message, onAction, isStreaming }: MessageBubbleP
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[85%] text-[13px] leading-relaxed ${
+        className={`text-[13px] leading-relaxed ${
           isUser
-            ? 'rounded-2xl rounded-br-md bg-primary px-3.5 py-2.5 text-primary-foreground shadow-sm shadow-primary/10'
+            ? 'max-w-[85%] rounded-2xl rounded-br-md bg-primary px-3.5 py-2.5 text-primary-foreground shadow-sm shadow-primary/10'
             : toolsOnly
-              ? ''
-              : 'rounded-2xl rounded-tl-md border border-border/20 bg-muted/15 px-3.5 py-2.5'
+              ? 'w-full'
+              : 'w-full rounded-2xl rounded-tl-md border border-border/20 bg-muted/15 px-3.5 py-2.5'
         }`}
       >
         {/* Tool feedback (before text for assistant) */}
