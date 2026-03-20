@@ -120,6 +120,7 @@ func TestGetIssueReturnsRunningIssue(t *testing.T) {
 		IssueID:         "issue-1",
 		IssueIdentifier: "MT-649",
 		State:           "In Progress",
+		Provider:        "CODEX",
 		SessionID:       "thread-1-turn-1",
 	}})
 
@@ -139,8 +140,8 @@ func TestGetIssueReturnsRunningIssue(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if payload["status"] != "running" {
-		t.Fatalf("expected running status, got %v", payload["status"])
+	if payload["status"] != "RUNNING" {
+		t.Fatalf("expected RUNNING status, got %v", payload["status"])
 	}
 	if payload["issue_identifier"] != "MT-649" {
 		t.Fatalf("expected MT-649, got %v", payload["issue_identifier"])

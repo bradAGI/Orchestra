@@ -393,6 +393,11 @@ func (s *Server) GetIssue(w http.ResponseWriter, r *http.Request) {
 		"tracked":       map[string]any{},
 	}
 
+	// Populate provider from running entry when available
+	if runtime.Running != nil && runtime.Running.Provider != "" {
+		response["provider"] = runtime.Running.Provider
+	}
+
 	// Merge tracker issue details if available
 	if issueDetails != nil {
 		response["title"] = issueDetails.Title

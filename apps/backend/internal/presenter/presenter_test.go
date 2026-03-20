@@ -82,8 +82,8 @@ func TestIssuePayloadFindsRunningIssue(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected issue payload")
 	}
-	if payload["status"] != "running" {
-		t.Fatalf("expected running status, got %v", payload["status"])
+	if payload["status"] != "RUNNING" {
+		t.Fatalf("expected RUNNING status, got %v", payload["status"])
 	}
 	running, _ := payload["running"].(map[string]any)
 	if running["session_log_path"] != "/tmp/run.log" {
@@ -100,8 +100,8 @@ func TestIssuePayloadFindsRetryIssueIncludesState(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected retry issue payload")
 	}
-	if payload["status"] != "retrying" {
-		t.Fatalf("expected retrying status, got %v", payload["status"])
+	if payload["status"] != "RETRYING" {
+		t.Fatalf("expected RETRYING status, got %v", payload["status"])
 	}
 	retry, _ := payload["retry"].(map[string]any)
 	if retry["state"] != "Todo" {

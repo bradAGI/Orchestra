@@ -51,7 +51,7 @@ func TestCheckFailsWhenProviderCommandMissing(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected check failure for missing provider command")
 	}
-	if !strings.Contains(err.Error(), "agent command missing for provider mystery") {
+	if !strings.Contains(err.Error(), "agent command missing for provider MYSTERY") {
 		t.Fatalf("unexpected check error: %v", err)
 	}
 }

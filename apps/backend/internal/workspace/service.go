@@ -114,11 +114,13 @@ func (s Service) RunBeforeRunHook(workspacePath string, hooks Hooks) (HookResult
 }
 
 // RunAfterRunHook executes the after_run hook script in the given workspace directory.
+// Failures are intentionally swallowed so that after-run hooks never block the pipeline.
 func (s Service) RunAfterRunHook(workspacePath string, hooks Hooks) (HookResult, error) {
 	if hooks.AfterRun == "" {
 		return HookResult{}, nil
 	}
-	return RunHook("after_run", hooks.AfterRun, workspacePath, s.timeoutOrDefault())
+	result, _ := RunHook("after_run", hooks.AfterRun, workspacePath, s.timeoutOrDefault())
+	return result, nil
 }
 
 // ListArtifacts returns relative paths of all files in the workspace for the given issue,
