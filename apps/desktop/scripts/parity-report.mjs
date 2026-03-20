@@ -33,13 +33,7 @@ const checks = [
     args: ['run', 'build'],
     cwd: desktopRoot,
   },
-  {
-    id: 'backend_tests',
-    command: 'go',
-    args: ['test', './...'],
-    cwd: backendRoot,
-    extraEnv: { GOWORK: 'off' },
-  },
+  // backend_tests removed: covered by dedicated orchestra-backend CI workflow
   {
     id: 'smoke_go_open_host',
     command: 'npm',
