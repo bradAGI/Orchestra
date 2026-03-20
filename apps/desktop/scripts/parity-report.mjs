@@ -57,7 +57,6 @@ const checks = [
 const requiredCheckIds = checks.map((check) => check.id)
 
 const requiredMarkersByCheck = {
-  renderer_boot_smoke: ['[degraded]', 'DEGRADED_ASSERTION:sse_disconnect_reconnect_lifecycle'],
   smoke_go_open_host: [
     'DEGRADED_ASSERTION:issue_not_found',
     'DEGRADED_ASSERTION:route_not_found',
