@@ -8,7 +8,7 @@ Orchestra's backend is containerized using a multi-stage Docker build that produ
 
 ```mermaid
 flowchart LR
-    subgraph Stage1["Stage 1: build (golang:1.24)"]
+    subgraph Stage1["Stage 1: build (golang:1.25)"]
         COPY_MOD[Copy go.mod + go.sum]
         MOD_DL[go mod download]
         COPY_SRC[Copy backend source]
@@ -35,7 +35,7 @@ flowchart LR
 
 | Step | Command | Purpose |
 |------|---------|---------|
-| Base image | `golang:1.24` | Go build toolchain |
+| Base image | `golang:1.25` | Go build toolchain |
 | Copy module files | `COPY apps/backend/go.mod apps/backend/go.sum` | Enable dependency caching |
 | Download deps | `go mod download` | Cache module downloads in a separate layer |
 | Copy source | `COPY apps/backend ./apps/backend` | Copy application source |

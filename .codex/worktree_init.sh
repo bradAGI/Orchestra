@@ -3,14 +3,12 @@ set -eo pipefail
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
-project_root="$repo_root/elixir"
-
-if ! command -v mise >/dev/null 2>&1; then
-  echo "mise is required. Install it from https://mise.jdx.dev/getting-started.html" >&2
-  exit 1
-fi
+project_root="$repo_root"
 
 cd "$project_root"
-mise trust
 
-make setup
+# Install backend dependencies
+cd apps/backend && go mod download && cd "$project_root"
+
+# Install frontend dependencies
+cd apps/desktop && npm ci && cd "$project_root"
