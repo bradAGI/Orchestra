@@ -40,24 +40,27 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
   return (
     <div className="px-3 py-3">
       <div className="flex items-end gap-2">
-        <textarea
-          ref={textareaRef}
-          rows={1}
-          value={value}
-          onChange={(e) => {
-            setValue(e.target.value)
-            const el = e.target
-            el.style.height = 'auto'
-            el.style.height = `${Math.min(el.scrollHeight, 120)}px`
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder="Message Orchestra Agent..."
-          disabled={disabled || isStreaming}
-          className="flex-1 resize-none rounded-xl bg-muted/10 px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/40 focus:bg-muted/20 disabled:opacity-40"
-          style={{ maxHeight: 120 }}
-        />
-
-        <VoiceInput onTranscription={handleTranscription} disabled={disabled || isStreaming} />
+        <div className="relative flex-1">
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            value={value}
+            onChange={(e) => {
+              setValue(e.target.value)
+              const el = e.target
+              el.style.height = 'auto'
+              el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="Message Orchestra Agent..."
+            disabled={disabled || isStreaming}
+            className="w-full resize-none rounded-xl bg-muted/10 pl-3.5 pr-10 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/40 focus:bg-muted/20 disabled:opacity-40"
+            style={{ maxHeight: 120 }}
+          />
+          <div className="absolute right-1.5 top-1/2 -translate-y-1/2">
+            <VoiceInput onTranscription={handleTranscription} disabled={disabled || isStreaming} />
+          </div>
+        </div>
 
         {isStreaming ? (
           <button

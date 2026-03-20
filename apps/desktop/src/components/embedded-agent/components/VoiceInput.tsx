@@ -49,13 +49,13 @@ export function VoiceInput({ onTranscription, disabled }: VoiceInputProps) {
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
       disabled={disabled || state === 'processing'}
-      className={`flex size-7 shrink-0 items-center justify-center rounded-md border transition-colors ${
+      className={`flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors ${
         state === 'recording'
-          ? 'animate-pulse border-red-500 bg-red-500/20 text-red-500'
+          ? 'animate-pulse bg-red-500/20 text-red-500'
           : state === 'processing'
-            ? 'border-border/50 bg-muted/30 text-muted-foreground'
-            : 'border-border/50 bg-background text-muted-foreground hover:text-foreground'
-      } disabled:opacity-50`}
+            ? 'bg-muted/30 text-muted-foreground'
+            : 'text-muted-foreground/50 hover:text-foreground hover:bg-muted/20'
+      } disabled:opacity-30`}
       aria-label={
         state === 'recording'
           ? 'Recording...'
