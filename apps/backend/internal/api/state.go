@@ -126,13 +126,13 @@ func (s *Server) CreateGitHubPR(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated,pr)
+	writeJSON(w, http.StatusCreated, pr)
 }
 
 // GetState handles GET /api/v1/state by returning the current orchestrator
 // snapshot formatted by the presenter layer.
 func (s *Server) GetState(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK,presenter.StatePayload(s.orchestrator.Snapshot()))
+	writeJSON(w, http.StatusOK, presenter.StatePayload(s.orchestrator.Snapshot()))
 }
 
 // GetIssues handles GET /api/v1/issues by listing issues with optional
@@ -195,7 +195,7 @@ func (s *Server) GetSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK,map[string]any{"issues": issues})
+	writeJSON(w, http.StatusOK, map[string]any{"issues": issues})
 }
 
 // PostIssue handles POST /api/v1/issues by creating a new issue with the given
@@ -232,7 +232,7 @@ func (s *Server) PostIssue(w http.ResponseWriter, r *http.Request) {
 
 	s.logger.Info().Str("id", issue.ID).Str("identifier", issue.Identifier).Msg("issue created successfully")
 
-	writeJSON(w, http.StatusCreated,issue)
+	writeJSON(w, http.StatusCreated, issue)
 }
 
 // PostRefresh handles POST /api/v1/refresh by queuing an orchestrator refresh
@@ -265,7 +265,7 @@ func (s *Server) GetIssue(w http.ResponseWriter, r *http.Request) {
 
 		history, _ := s.orchestrator.GetHistory(r.Context(), issue.ID)
 
-		writeJSON(w, http.StatusOK,map[string]any{
+		writeJSON(w, http.StatusOK, map[string]any{
 			"issue_id":         issue.ID,
 			"issue_identifier": issue.Identifier,
 			"title":            issue.Title,
@@ -423,7 +423,7 @@ func (s *Server) GetIssue(w http.ResponseWriter, r *http.Request) {
 		response["base_sha"] = issueDetails.BaseSHA
 	}
 
-	writeJSON(w, http.StatusOK,response)
+	writeJSON(w, http.StatusOK, response)
 }
 
 // PatchIssue handles PATCH /api/v1/issues/{issue_identifier} by applying
@@ -461,7 +461,7 @@ func (s *Server) PatchIssue(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusOK,issue)
+	writeJSON(w, http.StatusOK, issue)
 }
 
 // GetIssueHistory handles GET /api/v1/issues/{issue_identifier}/history by
@@ -489,7 +489,7 @@ func (s *Server) GetIssueHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK,map[string]any{"history": history})
+	writeJSON(w, http.StatusOK, map[string]any{"history": history})
 }
 
 // GetIssueLogs handles GET /api/v1/issues/{issue_identifier}/logs by serving
@@ -559,7 +559,7 @@ func (s *Server) GetArtifacts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK,map[string]any{"artifacts": artifacts})
+	writeJSON(w, http.StatusOK, map[string]any{"artifacts": artifacts})
 }
 
 // GetArtifactContent handles GET /api/v1/issues/{issue_identifier}/artifacts/*
@@ -668,7 +668,7 @@ func (s *Server) GetIssueDiff(w http.ResponseWriter, r *http.Request) {
 // agent command mappings, default provider, and max turns setting.
 func (s *Server) GetAgentConfig(w http.ResponseWriter, _ *http.Request) {
 	commands, provider := s.orchestrator.GetAgentConfig()
-	writeJSON(w, http.StatusOK,map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"commands":       commands,
 		"agent_provider": provider,
 		"max_turns":      s.orchestrator.GetMaxTurns(),
@@ -694,7 +694,7 @@ func (s *Server) PatchAgentConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	// Return updated config
 	commands, provider := s.orchestrator.GetAgentConfig()
-	writeJSON(w, http.StatusOK,map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"commands":       commands,
 		"agent_provider": provider,
 		"max_turns":      s.orchestrator.GetMaxTurns(),
@@ -766,7 +766,7 @@ func (s *Server) DeleteIssue(w http.ResponseWriter, r *http.Request) {
 // agent providers.
 func (s *Server) GetAgents(w http.ResponseWriter, _ *http.Request) {
 	providers := s.orchestrator.GetProviders()
-	writeJSON(w, http.StatusOK,map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"agents": providers,
 	})
 }
@@ -781,7 +781,7 @@ func (s *Server) GetAgentConfigs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK,map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"configs": configs,
 	})
 }
@@ -808,7 +808,7 @@ func (s *Server) PostAgentConfigNew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated,map[string]string{"path": path})
+	writeJSON(w, http.StatusCreated, map[string]string{"path": path})
 }
 
 // PostAgentConfigUpdate handles POST /api/v1/config/agents/items by updating
@@ -853,7 +853,7 @@ func (s *Server) GetMCPTools(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	mcpReg := s.orchestrator.GetMCPRegistry()
 	if mcpReg == nil {
-		writeJSON(w, http.StatusOK,map[string]any{"tools": []any{}})
+		writeJSON(w, http.StatusOK, map[string]any{"tools": []any{}})
 		return
 	}
 
@@ -863,7 +863,7 @@ func (s *Server) GetMCPTools(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK,map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"tools": tools,
 	})
 }
@@ -876,7 +876,7 @@ func (s *Server) GetMCPServers(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, "db_failed", "database operation failed")
 		return
 	}
-	writeJSON(w, http.StatusOK,map[string]any{"servers": servers})
+	writeJSON(w, http.StatusOK, map[string]any{"servers": servers})
 }
 
 // PostMCPServer handles POST /api/v1/mcp/servers by creating a new MCP server
@@ -910,7 +910,7 @@ func (s *Server) PostMCPServer(w http.ResponseWriter, r *http.Request) {
 	newReg.StartAll(r.Context())
 	s.orchestrator.SetMCPRegistry(newReg, allServers)
 
-	writeJSON(w, http.StatusCreated,server)
+	writeJSON(w, http.StatusCreated, server)
 }
 
 // DeleteMCPServer handles DELETE /api/v1/mcp/servers/{id} by removing the MCP

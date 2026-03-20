@@ -31,14 +31,14 @@ const (
 // ContentBlock is a typed content element within a message.
 type ContentBlock struct {
 	Type       string `json:"type"`                 // "text", "reasoning", "tool-call", "tool-result", "image", "file"
-	Text       string `json:"text,omitempty"`        // for text and reasoning blocks
-	ToolCallID string `json:"toolCallId,omitempty"`  // for tool-call and tool-result
-	ToolName   string `json:"toolName,omitempty"`    // for tool-call and tool-result
-	Input      any    `json:"input,omitempty"`       // for tool-call
-	Output     any    `json:"output,omitempty"`      // for tool-result
-	IsError    bool   `json:"isError,omitempty"`     // for tool-result
-	MediaType  string `json:"mediaType,omitempty"`   // for image and file
-	Data       string `json:"data,omitempty"`        // base64 for image and file
+	Text       string `json:"text,omitempty"`       // for text and reasoning blocks
+	ToolCallID string `json:"toolCallId,omitempty"` // for tool-call and tool-result
+	ToolName   string `json:"toolName,omitempty"`   // for tool-call and tool-result
+	Input      any    `json:"input,omitempty"`      // for tool-call
+	Output     any    `json:"output,omitempty"`     // for tool-result
+	IsError    bool   `json:"isError,omitempty"`    // for tool-result
+	MediaType  string `json:"mediaType,omitempty"`  // for image and file
+	Data       string `json:"data,omitempty"`       // base64 for image and file
 }
 
 // Usage tracks token consumption.
@@ -65,7 +65,7 @@ type OutputTokenDetail struct {
 
 // --- Content Block Builders ---
 
-func TextBlock(t string) ContentBlock    { return ContentBlock{Type: "text", Text: t} }
+func TextBlock(t string) ContentBlock      { return ContentBlock{Type: "text", Text: t} }
 func ReasoningBlock(t string) ContentBlock { return ContentBlock{Type: "reasoning", Text: t} }
 
 func ToolCallBlock(toolName string, input any, toolCallID string) ContentBlock {

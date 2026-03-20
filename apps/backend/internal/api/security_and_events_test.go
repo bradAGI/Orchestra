@@ -115,7 +115,7 @@ func TestProtectedEndpointsRequireBearerTokenOnLoopbackWhenConfigured(t *testing
 func TestAPICorsPreflightAllowsLoopbackOrigin(t *testing.T) {
 	router := NewRouter(zerolog.Nop(), orchestrator.NewService(), &config.Config{WorkspaceRoot: t.TempDir(), Host: "127.0.0.1", APIToken: ""})
 	req := httptest.NewRequest(http.MethodOptions, "/api/v1/state", nil)
-	req.Header.Set("Origin", "http://127.0.0.1:3000")
+	req.Header.Set("Origin", "http://127.0.0.1:5173")
 	req.Header.Set("Access-Control-Request-Method", http.MethodGet)
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
@@ -123,7 +123,7 @@ func TestAPICorsPreflightAllowsLoopbackOrigin(t *testing.T) {
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected 200 preflight response, got %d", res.Code)
 	}
-	if allowOrigin := res.Header().Get("Access-Control-Allow-Origin"); allowOrigin != "http://127.0.0.1:3000" {
+	if allowOrigin := res.Header().Get("Access-Control-Allow-Origin"); allowOrigin != "http://127.0.0.1:5173" {
 		t.Fatalf("expected reflected allow origin header, got %q", allowOrigin)
 	}
 	if allowMethods := res.Header().Get("Access-Control-Allow-Methods"); !strings.Contains(allowMethods, http.MethodGet) {

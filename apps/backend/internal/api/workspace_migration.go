@@ -68,7 +68,7 @@ func (s *Server) GetWorkspaceMigrationPlan(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	writeJSON(w, http.StatusOK,map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"from":   filepath.Clean(from),
 		"to":     filepath.Clean(to),
 		"result": result,

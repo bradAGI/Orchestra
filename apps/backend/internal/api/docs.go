@@ -25,7 +25,7 @@ func (s *Server) GetDocs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK,map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"docs": docs,
 	})
 }

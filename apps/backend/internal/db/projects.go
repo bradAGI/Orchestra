@@ -534,13 +534,13 @@ type ProviderTokens struct {
 // GlobalStats holds platform-wide aggregate metrics including total tokens,
 // per-provider and per-model breakdowns, and recent sessions.
 type GlobalStats struct {
-	TotalTokens    int64                       `json:"total_tokens"`
-	TotalInput     int64                       `json:"total_input"`
-	TotalOutput    int64                       `json:"total_output"`
-	ProviderUsage  map[string]int64            `json:"provider_usage"`
-	ProviderTokens map[string]ProviderTokens   `json:"provider_tokens"`
-	ModelUsage     map[string]int64            `json:"model_usage"`
-	RecentSessions []Session                   `json:"recent_sessions"`
+	TotalTokens    int64                     `json:"total_tokens"`
+	TotalInput     int64                     `json:"total_input"`
+	TotalOutput    int64                     `json:"total_output"`
+	ProviderUsage  map[string]int64          `json:"provider_usage"`
+	ProviderTokens map[string]ProviderTokens `json:"provider_tokens"`
+	ModelUsage     map[string]int64          `json:"model_usage"`
+	RecentSessions []Session                 `json:"recent_sessions"`
 }
 
 // GetGlobalStats computes platform-wide token usage, per-provider and per-model

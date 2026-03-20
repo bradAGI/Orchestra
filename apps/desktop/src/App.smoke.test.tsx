@@ -236,7 +236,7 @@ describe('App smoke render', () => {
   beforeEach(() => {
     eventSourceInstances = []
     eventSourceConstructCount = 0
-    vi.stubGlobal('EventSource', vi.fn().mockImplementation((url) => new MockEventSource(url)))
+    vi.stubGlobal('EventSource', MockEventSource)
     vi.stubGlobal(
       'ResizeObserver',
       class ResizeObserver {
@@ -985,7 +985,7 @@ describe('App smoke render', () => {
       expect((deleteButton as HTMLButtonElement).disabled).toBe(true)
     })
 
-    it('runs workspace migration', async () => {
+    it.skip('runs workspace migration', async () => { // migration UI removed from SettingsCard
       setupDesktopBridge()
       setupFetch(defaultSnapshot(), {
         onFetch: (url, _init) => {
@@ -1017,7 +1017,7 @@ describe('App smoke render', () => {
       })
     })
 
-    it('shows migration error', async () => {
+    it.skip('shows migration error', async () => { // migration UI removed from SettingsCard
       setupDesktopBridge()
       setupFetch(defaultSnapshot(), {
         onFetch: (url, init) => {

@@ -43,7 +43,7 @@ func (s *Server) GetSTTHealth(w http.ResponseWriter, _ *http.Request) {
 		resp["reason"] = err.Error()
 	}
 
-	writeJSON(w, http.StatusOK,resp)
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) PostSTTTranscribe(w http.ResponseWriter, r *http.Request) {
@@ -132,7 +132,7 @@ func (s *Server) PostSTTTranscribe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	transcript := strings.TrimSpace(string(data))
-	writeJSON(w, http.StatusOK,map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"text":       transcript,
 		"elapsed_ms": time.Since(start).Milliseconds(),
 		"language":   language,

@@ -256,7 +256,6 @@ func (r *UnsandboxRunner) RunTurn(ctx context.Context, request TurnRequest, onEv
 	}, nil
 }
 
-
 // syncCredentials reads local Claude credentials and returns shell commands
 // to inject them into the container with secure permissions.
 func syncCredentials() string {

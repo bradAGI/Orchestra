@@ -17,7 +17,7 @@ import (
 func (s *Server) GetUnsandboxConfig(w http.ResponseWriter, r *http.Request) {
 	pk, sk := loadUnsandboxKeys()
 
-	writeJSON(w, http.StatusOK,map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"configured": pk != "" && sk != "",
 		"public_key": pk,
 		"has_secret": sk != "",
@@ -52,7 +52,7 @@ func (s *Server) PostUnsandboxConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK,map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"configured": true,
 		"public_key": pk,
 		"has_secret": true,
@@ -69,7 +69,7 @@ func (s *Server) DeleteUnsandboxConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = os.Remove(csvPath)
 
-	writeJSON(w, http.StatusOK,map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"configured": false,
 	})
 }

@@ -991,7 +991,6 @@ func writeOpenCodeModel(home string, model ProviderModelConfig) error {
 	return writeOpenCodeConfig(home, cfg)
 }
 
-
 /* ================================================================== */
 /*  Generic helpers                                                    */
 /* ================================================================== */
