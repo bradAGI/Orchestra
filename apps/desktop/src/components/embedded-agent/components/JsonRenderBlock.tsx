@@ -6,6 +6,23 @@ interface JsonRenderBlockProps {
   onAction?: (actionName: string, params?: Record<string, unknown>) => void
 }
 
+function formatCellValue(val: unknown): string {
+  if (val == null) return ''
+  if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') return String(val)
+  if (Array.isArray(val)) return val.map(formatCellValue).join(', ')
+  if (typeof val === 'object') {
+    // Try to extract a meaningful string from common patterns
+    const obj = val as Record<string, unknown>
+    if ('name' in obj) return String(obj.name)
+    if ('label' in obj) return String(obj.label)
+    if ('value' in obj) return String(obj.value)
+    if ('id' in obj) return String(obj.id)
+    // Fallback: compact JSON
+    try { return JSON.stringify(val) } catch { return '[object]' }
+  }
+  return String(val)
+}
+
 export function JsonRenderBlock({ spec, onAction }: JsonRenderBlockProps) {
   if (!spec?.root || !spec?.elements) return null
 
@@ -79,7 +96,7 @@ export function JsonRenderBlock({ spec, onAction }: JsonRenderBlockProps) {
                 {rows.map((row, i) => (
                   <tr key={i} className="border-b border-border/10 transition-colors hover:bg-muted/10">
                     {columns.map((col, j) => (
-                      <td key={col.key} className={`py-2 px-3 ${j === 0 ? 'font-mono font-bold text-primary/80' : ''}`}>{String(row[col.key] ?? '')}</td>
+                      <td key={col.key} className={`py-2 px-3 ${j === 0 ? 'font-mono font-bold text-primary/80' : ''}`}>{formatCellValue(row[col.key])}</td>
                     ))}
                   </tr>
                 ))}
