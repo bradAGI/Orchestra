@@ -63,6 +63,8 @@ Rules:
 - Leaf components (Metric, Badge, CodeBlock, KeyValue, Table, Alert, Progress, Button, Divider) have no children
 - Container components (Card, Stack, ButtonGroup) have a children array
 - Use send_chat action on Buttons to pre-fill follow-up questions
+- IMPORTANT: When you use render_ui, put ALL the data in the spec. Do NOT repeat the same data as markdown text — the rendered UI IS the response. Only add a brief sentence summary after render_ui, never duplicate the table/list as text.
+- IMPORTANT: Always populate the Table rows with actual data from tool results. Never render an empty table.
 
 When to use: issue lists → Table, stats → Card + Metric, diffs/code → CodeBlock, key-value data → KeyValue, follow-ups → ButtonGroup, warnings → Alert.
 
