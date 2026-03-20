@@ -19,11 +19,11 @@ The Orchestra protocol layer defines a shared set of JSON schemas (draft-07) in 
 | `issue.create.request.schema.json` | Request | `object` | Body for `POST /api/v1/issues` |
 | `issue.update.request.schema.json` | Request | `object` | Body for `PATCH /api/v1/issues/:identifier` |
 | `issue.response.schema.json` | Response | `object` | Detailed single-issue response with runtime data |
-| `issues.list.response.schema.json` | Response | `array` | Array of issue objects |
+| `issues.list.response.schema.json` | Response | `object` | Wrapped issue list with total count |
 | `project.create.request.schema.json` | Request | `object` | Body for `POST /api/v1/projects` |
 | `project.response.schema.json` | Response | `object` | Single project with optional stats |
 | `projects.list.response.schema.json` | Response | `array` | Array of project objects |
-| `sessions.list.response.schema.json` | Response | `array` | Array of session summaries |
+| `sessions.list.response.schema.json` | Response | `object` | Wrapped session list with total count |
 | `session.detail.response.schema.json` | Response | `object` | Single session with event timeline |
 | `agents.list.response.schema.json` | Response | `array` | Array of agent config entries |
 | `agent.config.response.schema.json` | Response | `object` | Single agent config file |
@@ -88,7 +88,8 @@ The schema is identical to the create request except no fields are required. Any
 
 ### Issue list response
 
-**Root type:** `array`
+**Endpoint:** `GET /api/v1/issues`
+**Root type:** `object` — `{"issues": Issue[], "total": number}`
 **Item required fields:** `id`, `identifier`, `title`, `state`
 
 | Field | Type | Required | Description |
@@ -203,7 +204,8 @@ Same item shape as the project response, excluding the stats fields (`total_sess
 
 ### Sessions list response
 
-**Root type:** `array`
+**Endpoint:** `GET /api/v1/sessions`
+**Root type:** `object` — `{"sessions": Session[], "total": number}`
 **Item required fields:** `id`, `provider`, `created_at`
 
 | Field | Type | Required | Description |
@@ -292,7 +294,6 @@ This is the primary polling/snapshot endpoint (`GET /api/v1/state`). Also sent a
 | `retrying` | RetryEntry[] | Scheduled retries |
 | `codex_totals` | CodexTotals | Cumulative token and time totals |
 | `rate_limits` | any | Provider rate-limit info (nullable) |
-| `mcp_servers` | `Record<string, string>` | MCP server name to status map |
 
 ### RunningEntry
 
@@ -599,7 +600,6 @@ classDiagram
         +RetryEntry[] retrying
         +CodexTotals codex_totals
         +object rate_limits
-        +Record mcp_servers
     }
 
     class SnapshotCounts {
