@@ -198,11 +198,12 @@ export function KanbanBoard({
     return stateMatch && projectMatch
   }
 
-  const backlogItems = enrichedIssues.filter((i) => i.state === 'Backlog').filter(filterItem)
-  const todoItems = enrichedIssues.filter((i) => i.state === 'Todo').filter(filterItem)
-  const inProgressItems = enrichedIssues.filter((i) => i.state === 'In Progress').filter(filterItem)
-  const reviewItems = enrichedIssues.filter((i) => i.state === 'Review').filter(filterItem)
-  const doneItemsList = enrichedIssues.filter((i) => i.state === 'Done').filter(filterItem)
+  const stateIs = (s: string, target: string) => s.toLowerCase() === target.toLowerCase()
+  const backlogItems = enrichedIssues.filter((i) => stateIs(i.state, 'Backlog')).filter(filterItem)
+  const todoItems = enrichedIssues.filter((i) => stateIs(i.state, 'Todo')).filter(filterItem)
+  const inProgressItems = enrichedIssues.filter((i) => stateIs(i.state, 'In Progress')).filter(filterItem)
+  const reviewItems = enrichedIssues.filter((i) => stateIs(i.state, 'Review')).filter(filterItem)
+  const doneItemsList = enrichedIssues.filter((i) => stateIs(i.state, 'Done')).filter(filterItem)
 
   const columns = [
     { id: 'backlog', title: 'Backlog', items: backlogItems, icon: <div className="h-2 w-2 rounded-full border-2 border-muted-foreground/40" /> },
