@@ -142,15 +142,16 @@ export function createOrchestraTools(config: BackendConfig) {
 
     dispatch_agent: tool({
       description:
-        'Dispatch an agent to work on an issue by setting its state to "in progress" and assigning a provider. ' +
-        'Use when the user asks to dispatch, assign, or start an agent on an issue. ' +
+        'Assign an agent provider to an issue WITHOUT changing its state. ' +
+        'Use when the user asks to assign, attach, or set an agent on an issue. ' +
+        'Does NOT move the issue to In Progress — only the user can change state. ' +
         'Returns the updated issue object.',
       inputSchema: z.object({
-        identifier: z.string().describe('The issue identifier to dispatch'),
-        provider: z.string().optional().describe('Agent provider to assign'),
+        identifier: z.string().describe('The issue identifier to assign'),
+        provider: z.string().describe('Agent provider to assign (e.g. "claude", "codex", "gemini")'),
       }),
       execute: async (params) => {
-        const updates: Record<string, unknown> = { state: 'In Progress' }
+        const updates: Record<string, unknown> = {}
         if (params.provider) {
           updates.provider = params.provider
           updates.assignee_id = `agent-${params.provider}`
