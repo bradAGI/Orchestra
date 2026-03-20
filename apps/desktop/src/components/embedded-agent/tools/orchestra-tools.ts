@@ -17,6 +17,22 @@ function notifyDataChanged() {
   window.dispatchEvent(new Event('orchestra-data-changed'))
 }
 
+/** Normalize state names to match what the Kanban board expects (title case). */
+function normalizeState(state: string): string {
+  const map: Record<string, string> = {
+    'backlog': 'Backlog',
+    'todo': 'Todo',
+    'to do': 'Todo',
+    'in progress': 'In Progress',
+    'in_progress': 'In Progress',
+    'review': 'Review',
+    'done': 'Done',
+    'cancelled': 'Cancelled',
+    'closed': 'Closed',
+  }
+  return map[state.toLowerCase()] ?? state
+}
+
 /**
  * Creates the set of Orchestra API tools that the embedded agent can invoke.
  * Each tool wraps an orchestra-client function and exposes it via the AI SDK
@@ -50,18 +66,18 @@ export function createOrchestraTools(config: BackendConfig) {
       description:
         'Create a new issue with title, description, state, and optional provider assignment. ' +
         'Use when the user asks to create, add, or file a new issue, task, or ticket. ' +
-        'Defaults to state="backlog". Valid states: backlog, todo, in progress, review, done. Returns the created issue with its identifier.',
+        'Defaults to state="Backlog". Valid states: Backlog, Todo, In Progress, Review, Done. Returns the created issue with its identifier.',
       inputSchema: z.object({
         title: z.string().describe('Title of the issue'),
         description: z.string().optional().default('').describe('Description of the issue'),
-        state: z.string().optional().default('backlog').describe('Initial state: backlog, todo, in progress, review, done'),
+        state: z.string().optional().default('Backlog').describe('Initial state: Backlog, Todo, In Progress, Review, Done'),
         provider: z.string().optional().describe('Agent provider to assign (e.g. "claude", "openai")'),
       }),
       execute: async (params) => {
         const issue = await createIssue(config, {
           title: params.title,
           description: params.description,
-          state: params.state,
+          state: normalizeState(params.state),
           assignee_id: params.provider ? 'agent-' + params.provider : '',
           project_id: '',
         })
@@ -87,6 +103,7 @@ export function createOrchestraTools(config: BackendConfig) {
       }),
       execute: async (params) => {
         const { identifier, ...updates } = params
+        if (updates.state) updates.state = normalizeState(updates.state)
         const issue = await updateIssue(config, identifier, updates)
         notifyDataChanged()
         return { issue }
@@ -131,7 +148,7 @@ export function createOrchestraTools(config: BackendConfig) {
         provider: z.string().optional().describe('Agent provider to assign'),
       }),
       execute: async (params) => {
-        const updates: Record<string, unknown> = { state: 'in progress' }
+        const updates: Record<string, unknown> = { state: 'In Progress' }
         if (params.provider) {
           updates.provider = params.provider
           updates.assignee_id = `agent-${params.provider}`
