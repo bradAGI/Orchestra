@@ -1,22 +1,13 @@
-#### Context
+## Context
 
-<!-- Why is this change needed? Length <= 240 chars -->
+<!-- Why is this change needed? -->
 
-#### TL;DR
+## Summary
 
-*<!-- A short description of what we are changing. Use simple language. Assume reader is not familiar with this code. Length <= 120 chars -->*
+-
 
-#### Summary
+## Test Plan
 
-- <!-- Details of the changes in bullet points -->
-- <!-- Keep them high level -->
-- <!-- Each item <= 120 chars -->
-
-#### Alternatives
-
-- <!-- What alternatives have been considered? Why not? -->
-
-#### Test Plan
-
-- [ ] `make -C elixir all`
-- [ ] <!-- Additional targeted checks (list below) -->
+- [ ] Backend: `go test ./...` from `apps/backend/`
+- [ ] Desktop: `npx vitest run` from `apps/desktop/`
+- [ ]
