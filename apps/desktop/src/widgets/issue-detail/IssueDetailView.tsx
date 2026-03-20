@@ -65,7 +65,7 @@ function DescriptionEditor({ value, onChange, onBlur, theme }: {
 
   return (
     <div
-      className="flex-1 min-h-0 rounded-lg border border-transparent hover:border-border/30 cursor-text transition-all group/md relative overflow-auto"
+      className="flex-1 min-h-0 rounded-lg cursor-text transition-all group/md relative overflow-auto"
       onClick={() => setEditing(true)}
     >
       <div className="absolute top-2 right-2 opacity-0 group-hover/md:opacity-100 transition-opacity">
