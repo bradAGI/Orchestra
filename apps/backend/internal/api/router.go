@@ -77,6 +77,7 @@ func NewRouterWithPubSub(
 	r.Use(middleware.Recoverer)
 	r.Use(RequestLogger(logger))
 	r.Use(RateLimit(20, 60)) // 20 req/s sustained, 60 burst
+	r.Use(securityHeaders)
 	r.Use(contentTypeGuard)
 	r.Use(middleware.Timeout(30 * time.Second))
 	r.Use(cors.Handler(cors.Options{
@@ -172,8 +173,9 @@ func NewRouterWithPubSub(
 	protected.Post("/api/v1/issues/{issue_identifier}/pr", server.CreateGitHubPR)
 	protected.Get("/api/v1/warehouse/stats", server.GetWarehouseStats)
 	protected.Get("/api/v1/telemetry/health", server.GetTelemetryHealth)
-	r.Get("/api/v1/github/login", server.HandleGitHubLogin)
-	r.Get("/api/v1/github/callback", server.HandleGitHubCallback)
+	oauthRateLimited := r.With(RateLimit(5, 10))
+	oauthRateLimited.Get("/api/v1/github/login", server.HandleGitHubLogin)
+	oauthRateLimited.Get("/api/v1/github/callback", server.HandleGitHubCallback)
 
 	protected.Post("/api/v1/refresh", server.PostRefresh)
 	protected.Post("/api/v1/workspace/migrate", server.PostWorkspaceMigrate)
@@ -249,6 +251,16 @@ func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(staticassets.NotFoundHTML))
 }
 
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		next.ServeHTTP(w, r)
+	})
+}
+
 func contentTypeGuard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -302,9 +314,15 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func corsAllowedOrigins(host string) []string {
 	allowlist := []string{
-		"http://127.0.0.1:*",
-		"http://localhost:*",
-		"http://[::1]:*",
+		"http://127.0.0.1:4010",
+		"http://127.0.0.1:5173",
+		"http://127.0.0.1:5174",
+		"http://localhost:4010",
+		"http://localhost:5173",
+		"http://localhost:5174",
+		"http://[::1]:4010",
+		"http://[::1]:5173",
+		"http://[::1]:5174",
 	}
 
 	trimmed := strings.TrimSpace(strings.Trim(host, "[]"))

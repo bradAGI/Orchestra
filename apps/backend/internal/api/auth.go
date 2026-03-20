@@ -21,11 +21,14 @@ func requireBearerToken(token string) func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			// Fallback: accept token via query parameter (needed for SSE/EventSource
-			// which cannot set Authorization headers).
+			// Fallback: accept token via query parameter only for SSE endpoints
+			// (EventSource cannot set Authorization headers). Restricted to
+			// known SSE paths to limit query-param token exposure in logs.
 			if qToken := r.URL.Query().Get("token"); qToken == token {
-				next.ServeHTTP(w, r)
-				return
+				if strings.HasSuffix(r.URL.Path, "/events") || strings.HasSuffix(r.URL.Path, "/logs") {
+					next.ServeHTTP(w, r)
+					return
+				}
 			}
 			writeJSONError(w, http.StatusUnauthorized, "unauthorized", "missing or invalid bearer token")
 		})

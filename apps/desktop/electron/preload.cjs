@@ -9,8 +9,20 @@ contextBridge.exposeInMainWorld('orchestraDesktop', {
   deleteBackendProfile: (profileId) => ipcRenderer.invoke('orchestra:delete-backend-profile', profileId),
   getAgentTokens: () => ipcRenderer.invoke('orchestra:get-agent-tokens'),
   setAgentToken: (name, value) => ipcRenderer.invoke('orchestra:set-agent-token', { name, value }),
-  openExternal: (url) => ipcRenderer.invoke('orchestra:open-external', url),
-  openPath: (targetPath) => ipcRenderer.invoke('orchestra:open-path', targetPath),
+  openExternal: (url) => {
+    if (typeof url !== 'string') throw new Error('URL must be a string')
+    const parsed = new URL(url)
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new Error('Only http and https URLs are allowed')
+    }
+    return ipcRenderer.invoke('orchestra:open-external', url)
+  },
+  openPath: (targetPath) => {
+    if (typeof targetPath !== 'string' || targetPath.trim() === '') {
+      throw new Error('Path must be a non-empty string')
+    }
+    return ipcRenderer.invoke('orchestra:open-path', targetPath)
+  },
   selectFolder: () => ipcRenderer.invoke('orchestra:select-folder'),
   getScaleFactor: () => 1,
   onSwitchTab: (callback) => ipcRenderer.on('orchestra:switch-tab', (_event, tabNum) => callback(tabNum)),

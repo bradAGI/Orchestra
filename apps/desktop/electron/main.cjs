@@ -120,19 +120,27 @@ async function startManagedBackend() {
     cwd: path.dirname(backendBin),
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
-      ...process.env,
+      PATH: process.env.PATH,
+      HOME: process.env.HOME,
+      USERPROFILE: process.env.USERPROFILE,
+      TMPDIR: process.env.TMPDIR,
+      TEMP: process.env.TEMP,
+      TMP: process.env.TMP,
+      LANG: process.env.LANG,
       ORCHESTRA_SERVER_HOST: '127.0.0.1',
       ORCHESTRA_SERVER_PORT: String(port),
       ORCHESTRA_WORKSPACE_ROOT: workspaceRoot,
       ORCHESTRA_API_TOKEN: token,
+      ORCHESTRA_TOKEN_KEY: process.env.ORCHESTRA_TOKEN_KEY,
     },
   })
 
+  const maskToken = (text) => text.replaceAll(token, '****')
   child.stdout.on('data', (chunk) => {
-    process.stdout.write(`[orchestrad] ${chunk}`)
+    process.stdout.write(`[orchestrad] ${maskToken(chunk.toString())}`)
   })
   child.stderr.on('data', (chunk) => {
-    process.stderr.write(`[orchestrad] ${chunk}`)
+    process.stderr.write(`[orchestrad] ${maskToken(chunk.toString())}`)
   })
 
   const baseUrl = `http://127.0.0.1:${port}`
@@ -238,7 +246,8 @@ async function persistTokens() {
     if (safeStorage.isEncryptionAvailable()) {
       encrypted[key] = safeStorage.encryptString(value).toString('base64')
     } else {
-      encrypted[key] = value // Fallback if encryption unavailable
+      console.warn('WARNING: safeStorage encryption unavailable — skipping token persistence for', key)
+      continue
     }
   }
   await fs.writeFile(file, JSON.stringify(encrypted, null, 2), 'utf-8')
@@ -348,12 +357,31 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: app.isPackaged,
+      sandbox: true,
     },
   })
 
   // Remove the menu entirely for a cleaner look
   Menu.setApplicationMenu(null)
+
+  // Enforce Content Security Policy on all responses
+  win.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self'; " +
+          "script-src 'self'; " +
+          "style-src 'self' 'unsafe-inline'; " +
+          "img-src 'self' data: blob:; " +
+          "font-src 'self'; " +
+          "connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*; " +
+          "media-src 'self' blob:; " +
+          "worker-src 'self' blob:"
+        ],
+      },
+    })
+  })
 
   win.webContents.on('did-fail-load', (_event, code, description, url) => {
     console.error('did-fail-load', { code, description, url })
@@ -407,7 +435,7 @@ ipcMain.handle('orchestra:set-agent-token', async (_event, { name, value }) => {
 
 ipcMain.handle('orchestra:get-backend-config', () => {
   const active = getActiveProfile()
-  return { baseUrl: active.baseUrl, apiToken: active.apiToken, agentTokens }
+  return { baseUrl: active.baseUrl, apiToken: active.apiToken, agentTokensCount: Object.keys(agentTokens).length }
 })
 
 ipcMain.handle('orchestra:set-backend-config', async (_event, nextConfig) => {

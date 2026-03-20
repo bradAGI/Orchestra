@@ -10,7 +10,7 @@ services:
       ORCHESTRA_SERVER_PORT: 4010
       ORCHESTRA_WORKSPACE_ROOT: /var/lib/orchestra/workspaces
     ports:
-      - "4010:4010"
+      - "127.0.0.1:4010:4010"
     volumes:
       - orchestra-workspaces:/var/lib/orchestra/workspaces
     restart: unless-stopped
