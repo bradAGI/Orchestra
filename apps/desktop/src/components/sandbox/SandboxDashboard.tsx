@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, Play, Terminal, Globe, RefreshCcw, KeyRound, Settings2 } from 'lucide-react'
+import { Loader2, Play, Terminal, Globe, RefreshCcw, KeyRound, Settings2, Box } from 'lucide-react'
 import { CustomDropdown } from '@/components/app-shell/shared/controls'
 import { Button } from '@/components/ui/button'
 import type { BackendConfig } from '@/lib/orchestra-client'
@@ -127,9 +127,9 @@ export function SandboxDashboard({ config, onOpenSettings }: { config: BackendCo
       {/* Status bar */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img src="/unsandbox.ico" alt="Unsandbox" className="h-7 w-7 dark:invert" />
+          <Box className="h-5 w-5 text-primary" />
           <div>
-            <h2 className="text-sm font-bold">Unsandbox</h2>
+            <h2 className="text-sm font-bold">Sandbox</h2>
             <p className="text-[10px] text-muted-foreground">Remote code execution</p>
           </div>
         </div>

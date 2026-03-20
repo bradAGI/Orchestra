@@ -6,7 +6,6 @@ import { useEmbeddedAgent } from './EmbeddedAgentProvider'
 import { MessageList } from './components/MessageList'
 import { ChatInput } from './components/ChatInput'
 import { WatchNotifications, WatchToggle } from './components/WatchNotifications'
-import { ContextSuggestions } from './components/ContextSuggestions'
 import { SchedulePanel } from './components/SchedulePanel'
 
 export function EmbeddedAgentPanel({ onOpenSettings }: { onOpenSettings?: () => void }) {
@@ -20,7 +19,6 @@ export function EmbeddedAgentPanel({ onOpenSettings }: { onOpenSettings?: () => 
     togglePanel,
     watchMode,
     scheduler,
-    contextSuggestions,
   } = useEmbeddedAgent()
 
   const handleAction = useCallback(
@@ -107,15 +105,6 @@ export function EmbeddedAgentPanel({ onOpenSettings }: { onOpenSettings?: () => 
           notifications={watchMode.notifications}
           onDismiss={watchMode.dismiss}
           onDismissAll={watchMode.dismissAll}
-          onAction={handleAction}
-        />
-      )}
-
-      {/* Context-aware suggestions */}
-      {contextSuggestions.enabled && contextSuggestions.suggestions.length > 0 && (
-        <ContextSuggestions
-          suggestions={contextSuggestions.suggestions}
-          onDismiss={contextSuggestions.dismiss}
           onAction={handleAction}
         />
       )}
