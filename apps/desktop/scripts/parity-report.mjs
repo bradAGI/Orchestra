@@ -38,6 +38,7 @@ const checks = [
     command: 'go',
     args: ['test', './...'],
     cwd: backendRoot,
+    extraEnv: { GOWORK: 'off' },
   },
   {
     id: 'smoke_go_open_host',
@@ -76,7 +77,7 @@ function runCheck(check) {
   return new Promise((resolve) => {
     const child = spawn(check.command, check.args, {
       cwd: check.cwd,
-      env: process.env,
+      env: { ...process.env, ...(check.extraEnv || {}) },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
 
