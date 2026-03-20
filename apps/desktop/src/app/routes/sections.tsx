@@ -45,7 +45,7 @@ export const sidebarItems: SidebarItem[] = [
   {
     id: 'SANDBOX',
     label: 'Sandbox',
-    description: 'Remote code execution via unsandbox',
+    description: 'Remote code execution',
     icon: Box,
   },
   {
