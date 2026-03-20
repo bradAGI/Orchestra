@@ -2,7 +2,29 @@
 
 **Date:** 2026-03-18
 **Epic:** [#32](https://github.com/Traves-Theberge/Orchestra/issues/32)
-**Status:** Reviewed
+**Status:** Implemented (2026-03-19)
+
+---
+
+## Implementation Notes
+
+The following deviations from the original design were made during implementation:
+
+1. **Custom renderer instead of @json-render/react Renderer** — `JsonRenderBlock` uses a custom component tree built with `defineRegistry()` rather than the library's `<Renderer>` component. This gave full control over Tailwind styling and table cell rendering (including object values and horizontal scroll for wide tables).
+
+2. **Chat Completions API for OpenRouter/OpenAI** — The spec did not specify API style. In practice, OpenRouter only supports Chat Completions (not the Responses API), and OpenAI's Chat Completions API has broader model compatibility. Both providers use `provider.chat(modelId)` in `lib/providers.ts`.
+
+3. **Browser dev mode fallback** — `useProviderConfig` detects when the backend is unavailable (non-Electron dev mode) and allows direct key entry in the config form, bypassing backend key storage.
+
+4. **State normalization for Kanban board** — Issue states created by the agent (e.g., "Backlog") are normalized to match the Kanban board's case-insensitive filtering, ensuring new issues appear in the correct column.
+
+5. **Model selection persistence via localStorage** — Provider ID and model ID are saved under `orchestra-agent-provider-prefs` in localStorage. On mount, the saved preference is restored and validated against the fetched model list.
+
+6. **Active tools filtering** — Not all tools are sent to the model context. `experimental_activeTools` limits the visible tools to a core set; specialized tools (git, sessions, code, scheduling, MCP) are discovered via `search_tools` meta-tool, reducing context overhead.
+
+7. **Provider selector moved to Settings** — The original design placed provider/model dropdowns in the panel header. Implementation moves them to Settings > Integrations for a cleaner chat panel.
+
+8. **dispatch_agent only sets provider** — The original action handler also set issue state to "in progress". The implementation only assigns the provider; state transitions are handled by the orchestrator's execution worker.
 
 ---
 
