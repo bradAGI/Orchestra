@@ -57,7 +57,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
             className="w-full resize-none rounded-xl border border-border/15 bg-muted/10 pl-3.5 pr-10 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/40 focus:border-border/30 focus:bg-muted/20 disabled:opacity-40"
             style={{ maxHeight: 120 }}
           />
-          <div className="absolute right-1.5 top-1/2 -translate-y-1/2">
+          <div className="absolute right-1.5 top-0 flex h-[40px] items-center">
             <VoiceInput onTranscription={handleTranscription} disabled={disabled || isStreaming} />
           </div>
         </div>
