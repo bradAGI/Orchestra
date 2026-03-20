@@ -32,8 +32,8 @@ export function MessageBubble({ message, onAction, isStreaming }: MessageBubbleP
           isUser
             ? 'max-w-[85%] rounded-2xl rounded-br-md bg-primary px-3.5 py-2.5 text-primary-foreground shadow-sm shadow-primary/10'
             : toolsOnly
-              ? 'w-full'
-              : 'w-full rounded-2xl rounded-tl-md border border-border/20 bg-muted/15 px-3.5 py-2.5'
+              ? 'w-full overflow-hidden'
+              : 'w-full rounded-2xl rounded-tl-md border border-border/20 bg-muted/15 px-3.5 py-2.5 overflow-hidden'
         }`}
       >
         {/* Tool feedback (before text for assistant) */}

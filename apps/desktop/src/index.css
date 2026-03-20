@@ -351,6 +351,11 @@ body {
   color: hsl(var(--primary));
   text-decoration: none;
   border-bottom: 1px solid hsl(var(--primary) / 0.3);
+  word-break: break-all;
+}
+.agent-markdown {
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .agent-markdown hr {
   border: none;

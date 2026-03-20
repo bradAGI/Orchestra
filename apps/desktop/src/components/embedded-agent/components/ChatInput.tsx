@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, type KeyboardEvent } from 'react'
 import { Send, Square } from 'lucide-react'
+import { VoiceInput } from './VoiceInput'
 
 interface ChatInputProps {
   onSend: (text: string) => void
@@ -32,6 +33,10 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
     [handleSend],
   )
 
+  const handleTranscription = useCallback((text: string) => {
+    setValue(prev => prev ? `${prev} ${text}` : text)
+  }, [])
+
   return (
     <div className="px-3 py-3">
       <div className="flex items-end gap-2">
@@ -51,6 +56,8 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
           className="flex-1 resize-none rounded-xl bg-muted/10 px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/40 focus:bg-muted/20 disabled:opacity-40"
           style={{ maxHeight: 120 }}
         />
+
+        <VoiceInput onTranscription={handleTranscription} disabled={disabled || isStreaming} />
 
         {isStreaming ? (
           <button
