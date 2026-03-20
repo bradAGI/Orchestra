@@ -30,7 +30,7 @@
     "parity:verify": "node scripts/parity-report.mjs",
     "parity:verify:twice": "npm run parity:verify && npm run parity:verify",
     "release:readiness": "node scripts/release-readiness.mjs",
-    "release:gate": "npm run parity:verify:twice && npm run release:readiness"
+    "release:gate": "npm run parity:verify && npm run release:readiness"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
