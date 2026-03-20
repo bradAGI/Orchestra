@@ -13,6 +13,11 @@ interface MessageBubbleProps {
 export function MessageBubble({ message, onAction, isStreaming }: MessageBubbleProps) {
   const isUser = message.role === 'user'
 
+  // Don't render an empty assistant bubble while waiting for content
+  if (!isUser && !message.content && (!message.toolCalls || message.toolCalls.length === 0) && !message.jsonRenderSpec) {
+    return null
+  }
+
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
