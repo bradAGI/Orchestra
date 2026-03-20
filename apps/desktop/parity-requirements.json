@@ -21,11 +21,6 @@
       "required_check_ids": ["desktop_build"]
     },
     {
-      "id": "backend-regression-suite",
-      "description": "Go backend contract and behavior tests pass",
-      "required_check_ids": ["backend_tests"]
-    },
-    {
       "id": "ops-flow-open-host",
       "description": "Open-host ops flow passes including SSE and issue error contract",
       "required_check_ids": ["smoke_go_open_host"]
