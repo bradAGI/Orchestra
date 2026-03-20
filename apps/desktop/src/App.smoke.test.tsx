@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { BridgeProfilesPayload, SnapshotPayload } from '@/lib/orchestra-types'
 
 vi.mock('@/components/terminal/TerminalView', () => ({
@@ -90,19 +91,6 @@ function setupDesktopBridge(overrides?: {
 
   window.orchestraDesktop = bridge
   return bridge
-}
-
-/** Set a controlled input's value in React 19 by using the native setter + both change and input events. */
-function setInputValue(input: HTMLInputElement, value: string) {
-  const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-  if (nativeSetter) {
-    nativeSetter.call(input, value)
-  } else {
-    // Fallback for environments where prototype descriptor is unavailable
-    Object.defineProperty(input, 'value', { value, writable: true, configurable: true })
-  }
-  input.dispatchEvent(new Event('input', { bubbles: true }))
-  input.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
 // Mock fetch
@@ -815,7 +803,8 @@ describe('App smoke render', () => {
   })
 
   describe('settings', () => {
-    it.skip('saves backend config from settings form', async () => { // React 19 + jsdom: fireEvent.change/native setter unreliable for controlled inputs in CI
+    it('saves backend config from settings form', async () => {
+      const user = userEvent.setup()
       const bridge = setupDesktopBridge()
       setupFetch(defaultSnapshot())
 
@@ -826,15 +815,12 @@ describe('App smoke render', () => {
       // Wait for form to be ready
       await screen.findByText(/Connection Profiles/i)
 
-      const urlInput = screen.getByPlaceholderText('http://127.0.0.1:4010') as HTMLInputElement
-      setInputValue(urlInput, 'http://127.0.0.1:9999')
-
-      await waitFor(() => {
-        expect(urlInput.value).toBe('http://127.0.0.1:9999')
-      })
+      const urlInput = screen.getByPlaceholderText('http://127.0.0.1:4010')
+      await user.clear(urlInput)
+      await user.type(urlInput, 'http://127.0.0.1:9999')
 
       const saveButton = await screen.findByRole('button', { name: 'Save Backend Config' })
-      fireEvent.click(saveButton)
+      await user.click(saveButton)
 
       await waitFor(() => {
         expect(bridge.setBackendConfig).toHaveBeenCalledWith(
@@ -843,7 +829,8 @@ describe('App smoke render', () => {
       })
     })
 
-    it.skip('shows backend config validation error for invalid URL', async () => { // React 19 + jsdom: fireEvent.change unreliable for controlled inputs in CI
+    it('shows backend config validation error for invalid URL', async () => {
+      const user = userEvent.setup()
       setupDesktopBridge()
       setupFetch(defaultSnapshot())
 
@@ -852,8 +839,10 @@ describe('App smoke render', () => {
       fireEvent.click(screen.getByTestId('sidebar-nav-SETTINGS'))
       await screen.findByText(/Connection Profiles/i)
 
-      setInputValue(screen.getByPlaceholderText('http://127.0.0.1:4010') as HTMLInputElement, 'not-a-url')
-      fireEvent.click(screen.getByRole('button', { name: 'Save Backend Config' }))
+      const urlInput = screen.getByPlaceholderText('http://127.0.0.1:4010')
+      await user.clear(urlInput)
+      await user.type(urlInput, 'not-a-url')
+      await user.click(screen.getByRole('button', { name: 'Save Backend Config' }))
 
       await waitFor(() => {
         expect(screen.getByText(/base URL must be a valid absolute URL/i)).toBeTruthy()
