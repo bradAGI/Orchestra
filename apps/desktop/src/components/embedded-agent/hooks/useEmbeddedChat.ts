@@ -66,7 +66,9 @@ Rules:
 - IMPORTANT: When you use render_ui, put ALL the data in the spec. Do NOT repeat the same data as markdown text — the rendered UI IS the response. Only add a brief sentence summary after render_ui, never duplicate the table/list as text.
 - IMPORTANT: Always populate the Table rows with actual data from tool results. Never render an empty table.
 
-When to use: issue lists → Table, stats → Card + Metric, diffs/code → CodeBlock, key-value data → KeyValue, follow-ups → ButtonGroup, warnings → Alert.
+When to use: issue lists → Table, project lists → Table, stats → Card + Metric, diffs/code → CodeBlock, key-value data → KeyValue, follow-ups → ButtonGroup, warnings → Alert.
+
+ALWAYS use render_ui for: listing issues, listing projects, showing orchestrator state, any tabular data. NEVER output markdown tables — always use render_ui Table instead.
 
 # RESPONSE STYLE
 

@@ -783,8 +783,9 @@ function ModelSearchDropdown({
 }
 
 function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig | null; disabled: boolean }) {
-  const [providerId, setProviderId] = useState<string>(CHAT_PROVIDERS[0].id)
-  const [modelId, setModelId] = useState<string>('')
+  const savedPrefs = (() => { try { return JSON.parse(localStorage.getItem('orchestra-agent-provider-prefs') ?? '{}') } catch { return {} } })()
+  const [providerId, setProviderId] = useState<string>(savedPrefs.providerId ?? CHAT_PROVIDERS[0].id)
+  const [modelId, setModelId] = useState<string>(savedPrefs.modelId ?? '')
   const [models, setModels] = useState<{ id: string; name: string }[]>([])
   const [modelsLoading, setModelsLoading] = useState(false)
   const [modelsError, setModelsError] = useState('')
@@ -796,19 +797,22 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
   const [hasKey, setHasKey] = useState(false)
   const [storedKey, setStoredKey] = useState('')
 
-  // Load existing config on mount
+  // Load existing config on mount — respect saved provider preference
   useEffect(() => {
     if (!config) return
     fetchAgentProviderKeys(config)
       .then((result) => {
-        for (const p of CHAT_PROVIDERS) {
-          const info = result.providers[p.id]
-          if (info?.configured && info.api_key) {
-            setProviderId(p.id)
-            setHasKey(true)
-            setStoredKey(info.api_key)
-            return
-          }
+        const prefs = (() => { try { return JSON.parse(localStorage.getItem('orchestra-agent-provider-prefs') ?? '{}') } catch { return {} } })()
+        // Use saved provider if it has a key, otherwise first configured
+        const target = prefs.providerId && result.providers[prefs.providerId]?.configured
+          ? prefs.providerId
+          : CHAT_PROVIDERS.find(p => result.providers[p.id]?.configured)?.id
+        if (target) {
+          const info = result.providers[target]
+          setProviderId(target)
+          setHasKey(true)
+          setStoredKey(info?.api_key ?? '')
+          if (prefs.modelId) setModelId(prefs.modelId)
         }
       })
       .catch(() => {})
@@ -833,7 +837,10 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
         if (cancelled) return
         setModels(fetched)
         if (fetched.length > 0 && !modelId) {
-          setModelId(fetched[0].id)
+          // Use saved model if it exists in list, otherwise first
+          const prefs = (() => { try { return JSON.parse(localStorage.getItem('orchestra-agent-provider-prefs') ?? '{}') } catch { return {} } })()
+          const match = prefs.modelId && fetched.find((m: { id: string }) => m.id === prefs.modelId)
+          setModelId(match ? prefs.modelId : fetched[0].id)
         }
       })
       .catch((err) => {
