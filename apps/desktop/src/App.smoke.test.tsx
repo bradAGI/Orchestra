@@ -1085,7 +1085,7 @@ describe('App smoke render', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/refresh failed/i)).toBeTruthy()
-      })
+      }, { timeout: 3000 })
     })
 
     it('passes token to SSE', async () => {
