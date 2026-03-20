@@ -813,7 +813,12 @@ describe('App smoke render', () => {
       // Wait for form to be ready
       await screen.findByText(/Connection Profiles/i)
 
-      fireEvent.change(screen.getByPlaceholderText('http://127.0.0.1:4010'), { target: { value: 'http://127.0.0.1:9999' } })
+      const urlInput = screen.getByPlaceholderText('http://127.0.0.1:4010') as HTMLInputElement
+      fireEvent.change(urlInput, { target: { value: 'http://127.0.0.1:9999' } })
+
+      await waitFor(() => {
+        expect(urlInput.value).toBe('http://127.0.0.1:9999')
+      })
 
       const saveButton = await screen.findByRole('button', { name: 'Save Backend Config' })
       fireEvent.click(saveButton)
