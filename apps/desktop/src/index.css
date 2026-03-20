@@ -320,19 +320,32 @@ body {
   width: 100%;
   border-collapse: collapse;
   margin: 0.5em 0;
-  font-size: 0.9em;
+  font-size: 0.85em;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border) / 0.2);
 }
 .agent-markdown th, .agent-markdown td {
-  padding: 0.3em 0.5em;
-  border: 1px solid hsl(var(--border) / 0.3);
+  padding: 0.5em 0.75em;
   text-align: left;
+  border-bottom: 1px solid hsl(var(--border) / 0.1);
 }
 .agent-markdown th {
   font-weight: 700;
-  font-size: 0.85em;
+  font-size: 0.8em;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: hsl(var(--muted-foreground));
+  letter-spacing: 0.08em;
+  color: hsl(var(--muted-foreground) / 0.7);
+  background: hsl(var(--muted) / 0.15);
+  border-bottom: 1px solid hsl(var(--border) / 0.2);
+}
+.agent-markdown tr:hover td {
+  background: hsl(var(--muted) / 0.08);
+}
+.agent-markdown td:first-child {
+  font-family: ui-monospace, monospace;
+  font-weight: 700;
+  color: hsl(var(--primary) / 0.8);
 }
 .agent-markdown a {
   color: hsl(var(--primary));
