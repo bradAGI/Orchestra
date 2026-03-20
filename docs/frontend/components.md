@@ -18,16 +18,14 @@ All navigation is driven by the `SectionID` type defined in `apps/desktop/src/ap
 
 | SectionID | Label | Category | Description |
 |-----------|-------|----------|-------------|
-| `DASHBOARD` | Operations | Operations | Fleet monitoring and command hub |
-| `RUNNING` | Running | Operations | Live running task queue |
 | `ISSUES` | Tasks | Tracker | Task board and inspector |
 | `PROJECTS` | Projects | Workspace | Local workspace grouping |
+| `CONSOLE` | Live Console | Runtime | Multi-agent terminal dock |
 | `AGENTS` | Agents | Compute | Global agent configurations |
 | `WAREHOUSE` | Analytics | Analytics | Token usage and session archives |
 | `SANDBOX` | Sandbox | Compute | Remote code execution via unsandbox |
 | `SETTINGS` | Settings | System | Backend and migration controls |
 | `DOCS` | Documentation | Knowledge | User and engineering guides |
-| `CONSOLE` | Live Console | Runtime | Multi-agent terminal dock |
 
 The `getSectionVisibility()` function returns a `SectionVisibility` record mapping each section to a boolean, used by `App.tsx` to conditionally render the appropriate view component.
 
@@ -46,16 +44,14 @@ graph LR
     SB -->|"SectionID"| CA
     TB -->|"Status / Controls"| CA
 
-    CA --> DASH[DashboardOverview]
-    CA --> RUN[OperationsQueueCard]
     CA --> ISS[KanbanBoard + IssueDetailView]
     CA --> PROJ[ProjectGrid / ProjectDetailView]
+    CA --> CON[TerminalMultiplexer]
     CA --> AGT[AgentsDashboard]
     CA --> WH[AnalyticsDashboard]
     CA --> SBX[SandboxDashboard]
     CA --> SET[SettingsCard]
     CA --> DOC[DocsDashboard]
-    CA --> CON[TerminalMultiplexer]
 ```
 
 The `App.tsx` component is the root orchestrator. It:

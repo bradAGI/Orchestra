@@ -9,45 +9,29 @@
 
 Orchestra's codebase demonstrates solid security foundations — pinned CI actions, distroless Docker images, proper file permissions, and encrypted token storage. However, several medium-severity issues were identified in Electron sandboxing, environment variable handling, missing security headers, and authentication patterns that should be addressed.
 
-**Findings:** 2 HIGH, 8 MEDIUM, 3 LOW severity issues identified.
+**Findings:** 2 HIGH, 8 MEDIUM, 3 LOW severity issues identified. As of 2026-03-20, 6 findings have been resolved (both HIGHs, 4 MEDIUMs). Remaining: 4 MEDIUM, 2 LOW.
 
 ---
 
 ## 1. Electron Security
 
-### 1.1 Sandbox Disabled in Development — HIGH
+### 1.1 ~~Sandbox Disabled in Development~~ — ~~HIGH~~ FIXED
 
-**File:** `apps/desktop/electron/main.cjs:351`
+**File:** `apps/desktop/electron/main.cjs`
 
-`sandbox: app.isPackaged` disables the Chromium sandbox in development mode. If a renderer vulnerability is exploited during development, there is no process-level isolation.
+**Resolved:** `sandbox: true` is now set unconditionally.
 
-**Fix:** Set `sandbox: true` unconditionally. Use a CLI flag (`--no-sandbox`) for explicit dev override if needed.
+### 1.2 ~~Environment Variables Leaked to Backend Subprocess~~ — ~~MEDIUM~~ FIXED
 
-### 1.2 Environment Variables Leaked to Backend Subprocess — MEDIUM
+**File:** `apps/desktop/electron/main.cjs`
 
-**File:** `apps/desktop/electron/main.cjs:122-128`
+**Resolved:** Environment variables are now explicitly whitelisted (PATH, HOME, USERPROFILE, TMPDIR, LANG, plus ORCHESTRA_* vars).
 
-`...process.env` passes all parent environment variables (potentially including API keys, tokens, credentials) to the managed backend subprocess.
+### 1.3 ~~API Token Visible in Console Output~~ — ~~MEDIUM~~ FIXED
 
-**Fix:** Whitelist only required variables:
-```javascript
-env: {
-  PATH: process.env.PATH,
-  HOME: process.env.HOME,
-  ORCHESTRA_SERVER_HOST: '127.0.0.1',
-  ORCHESTRA_SERVER_PORT: String(port),
-  ORCHESTRA_WORKSPACE_ROOT: workspaceRoot,
-  ORCHESTRA_API_TOKEN: token,
-}
-```
+**File:** `apps/desktop/electron/main.cjs`
 
-### 1.3 API Token Visible in Console Output — MEDIUM
-
-**File:** `apps/desktop/electron/main.cjs:131-136`
-
-Backend subprocess stdout/stderr is piped to the parent console. The generated API token could appear in logs if the backend echoes it.
-
-**Fix:** Mask/redact the token value in piped output.
+**Resolved:** Token is now masked via `maskToken` function before output.
 
 ### 1.4 Plaintext Token Fallback — MEDIUM
 
@@ -67,14 +51,9 @@ if (safeStorage.isEncryptionAvailable()) {
 
 ## 2. Preload & IPC Security
 
-### 2.1 Missing Content Security Policy — HIGH
+### 2.1 ~~Missing Content Security Policy~~ — ~~HIGH~~ FIXED
 
-No CSP headers are defined in the Electron app or backend responses. XSS in the renderer could inline arbitrary scripts.
-
-**Fix:** Add CSP via `session.webRequest.onHeadersReceived` in main.cjs:
-```javascript
-"default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:*"
-```
+**Resolved:** CSP is now enforced in `apps/desktop/electron/main.cjs` via `session.webRequest.onHeadersReceived`.
 
 ### 2.2 IPC Handlers Lack Input Validation — MEDIUM
 
@@ -103,24 +82,13 @@ Query parameters appear in server logs, browser history, proxy logs, and Referer
 
 **Fix:** Implement a temporary token exchange or use secure session cookies for SSE.
 
-### 3.2 Missing Security Response Headers — MEDIUM
+### 3.2 ~~Missing Security Response Headers~~ — ~~MEDIUM~~ FIXED
 
-No `X-Content-Type-Options`, `X-Frame-Options`, or `Strict-Transport-Security` headers on API responses.
+**Resolved:** `securityHeaders` middleware in `router.go` now sets `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and `Permissions-Policy`.
 
-**Fix:** Add a middleware in `router.go`:
-```go
-w.Header().Set("X-Content-Type-Options", "nosniff")
-w.Header().Set("X-Frame-Options", "DENY")
-w.Header().Set("X-XSS-Protection", "1; mode=block")
-```
+### 3.3 ~~No Rate Limiting on OAuth Endpoints~~ — ~~MEDIUM~~ FIXED
 
-### 3.3 No Rate Limiting on OAuth Endpoints — MEDIUM
-
-**File:** `apps/backend/internal/api/router.go:175-176`
-
-GitHub login/callback endpoints are not protected by the `RateLimit(20, 60)` middleware applied elsewhere.
-
-**Fix:** Apply rate limiting (e.g., 5 requests per 10 seconds) to OAuth endpoints.
+**Resolved:** OAuth endpoints now use a separate `oauthRateLimited` router with `RateLimit(5, 10)` applied.
 
 ### 3.4 CORS Allows Any Loopback Port — LOW
 
@@ -202,26 +170,26 @@ PR body is written to a file via shell expansion. Malicious PR body content coul
 
 ## 8. Summary Table
 
-| # | Issue | Severity | Location |
-|---|-------|----------|----------|
-| 1.1 | Sandbox disabled in dev | HIGH | main.cjs:351 |
-| 2.1 | Missing CSP headers | HIGH | main.cjs, router.go |
-| 1.2 | Env vars leaked to child | MEDIUM | main.cjs:122-128 |
-| 1.3 | Token in console output | MEDIUM | main.cjs:131-136 |
-| 1.4 | Plaintext token fallback | MEDIUM | main.cjs:241 |
-| 2.2 | IPC input validation | MEDIUM | preload.cjs:12,14 |
-| 3.1 | Query param token auth | MEDIUM | auth.go:24-29 |
-| 3.2 | Missing security headers | MEDIUM | router.go |
-| 3.3 | No OAuth rate limiting | MEDIUM | router.go:175-176 |
-| 5.2 | Port exposed to 0.0.0.0 | MEDIUM | compose.yml:12-13 |
-| 6.2 | PR body shell injection | MEDIUM | pr-description-lint.yml:31-38 |
-| 3.4 | CORS any loopback port | LOW | router.go:303-327 |
-| 4.2 | Subprocess env inheritance | LOW | command_runner.go:109 |
+| # | Issue | Severity | Location | Status |
+|---|-------|----------|----------|--------|
+| 1.1 | Sandbox disabled in dev | HIGH | main.cjs | **FIXED** |
+| 2.1 | Missing CSP headers | HIGH | main.cjs | **FIXED** |
+| 1.2 | Env vars leaked to child | MEDIUM | main.cjs | **FIXED** |
+| 1.3 | Token in console output | MEDIUM | main.cjs | **FIXED** |
+| 1.4 | Plaintext token fallback | MEDIUM | main.cjs:241 | Open |
+| 2.2 | IPC input validation | MEDIUM | preload.cjs:12,14 | Open |
+| 3.1 | Query param token auth | MEDIUM | auth.go:24-29 | Open |
+| 3.2 | Missing security headers | MEDIUM | router.go | **FIXED** |
+| 3.3 | No OAuth rate limiting | MEDIUM | router.go | **FIXED** |
+| 5.2 | Port exposed to 0.0.0.0 | MEDIUM | compose.yml:12-13 | Open |
+| 6.2 | PR body shell injection | MEDIUM | pr-description-lint.yml:31-38 | Open |
+| 3.4 | CORS any loopback port | LOW | router.go:303-327 | Open |
+| 4.2 | Subprocess env inheritance | LOW | command_runner.go:109 | Open |
 
 ---
 
 ## 9. Recommended Priority
 
-1. **Immediate:** Enable sandbox unconditionally, add CSP headers, add security response headers, fix PR body injection
-2. **Next sprint:** Whitelist env vars, validate IPC inputs, enforce token encryption, add OAuth rate limiting
-3. **Backlog:** Replace query param token auth, add audit logging, enforce HTTPS in production, restrict CORS ports
+1. ~~**Immediate:** Enable sandbox unconditionally, add CSP headers, add security response headers~~ — **ALL DONE**
+2. **Next sprint:** ~~Whitelist env vars~~ (done), validate IPC inputs, enforce token encryption, ~~add OAuth rate limiting~~ (done), fix PR body injection
+3. **Backlog:** Replace query param token auth, add audit logging, enforce HTTPS in production, restrict CORS ports, bind compose port to 127.0.0.1

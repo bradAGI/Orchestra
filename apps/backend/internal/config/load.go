@@ -37,7 +37,7 @@ func Load() (Config, error) {
 	agentProvider := getenvOrEmpty("ORCHESTRA_AGENT_PROVIDER")
 	agentMaxTurnsRaw := getenvOrEmpty("ORCHESTRA_AGENT_MAX_TURNS")
 
-	agentCommandCodex := getenvOrEmpty("ORCHESTRA_AGENT_COMMAND_CODCEX") // Fixed typo if it exists elsewhere
+	agentCommandCodex := getenvOrEmpty("ORCHESTRA_AGENT_COMMAND_CODEX")
 	agentCommandClaude := getenvOrEmpty("ORCHESTRA_AGENT_COMMAND_CLAUDE")
 	agentCommandOpenCode := getenvOrEmpty("ORCHESTRA_AGENT_COMMAND_OPENCODE")
 	agentCommandGemini := getenvOrEmpty("ORCHESTRA_AGENT_COMMAND_GEMINI")

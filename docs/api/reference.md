@@ -236,11 +236,23 @@ Manage remote execution environments via the unsandbox/unturf/permacomputer plat
 |--------|------|-------------|
 | `GET` | `/api/v1/unsandbox/status` | Unsandbox connection status |
 | `POST` | `/api/v1/unsandbox/execute` | Execute a command in unsandbox |
+| `GET` | `/api/v1/unsandbox/jobs/*` | Get unsandbox job result by path |
 | `GET` | `/api/v1/unsandbox/sessions` | List unsandbox execution sessions |
 | `GET` | `/api/v1/unsandbox/services` | List available unsandbox services |
 | `GET` | `/api/v1/config/unsandbox` | Get unsandbox configuration (API keys) |
 | `POST` | `/api/v1/config/unsandbox` | Update unsandbox configuration |
 | `DELETE` | `/api/v1/config/unsandbox` | Delete unsandbox configuration |
+
+---
+
+### Agent Provider Keys
+
+Manage embedded agent provider API keys (Anthropic, OpenAI, Google).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/config/agent-providers` | Get stored agent provider API keys |
+| `POST` | `/api/v1/config/agent-providers` | Save agent provider API keys |
 
 ---
 
@@ -315,5 +327,6 @@ sequenceDiagram
 | Telemetry & STT | 3 |
 | Documentation | 2 |
 | Workspace Migration | 2 |
-| Unsandbox | 7 |
-| **Total** | **93** |
+| Unsandbox | 8 |
+| Agent Provider Keys | 2 |
+| **Total** | **96** |

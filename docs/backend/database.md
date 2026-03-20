@@ -58,10 +58,10 @@ erDiagram
         text project_id FK
         text session_uuid
         text provider
-        text model
         text branch
         text issue_id
         datetime created_at
+        text model "migration"
     }
 
     events {
@@ -90,8 +90,8 @@ erDiagram
         text blocked_by
         text provider
         text disabled_tools
-        text base_sha
         datetime created_at
+        text base_sha "migration"
         datetime updated_at
     }
 
