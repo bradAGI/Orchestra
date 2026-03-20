@@ -20,7 +20,7 @@ export function JsonRenderBlock({ spec, onAction }: JsonRenderBlockProps) {
     switch (el.type) {
       case 'Card':
         return (
-          <div key={key} className={`rounded-xl border border-border/30 bg-gradient-to-b from-card to-muted/5 shadow-sm overflow-hidden ${p.padding === 'sm' ? 'p-3' : p.padding === 'lg' ? 'p-6' : 'p-4'}`}>
+          <div key={key} className={`rounded-xl border border-border/30 bg-gradient-to-b from-card to-muted/5 shadow-sm overflow-x-auto ${p.padding === 'sm' ? 'p-3' : p.padding === 'lg' ? 'p-6' : 'p-4'}`}>
             {(p.title || p.description) && (
               <div className="mb-3">
                 {p.title && <p className="text-sm font-bold text-foreground">{String(p.title)}</p>}
@@ -66,8 +66,8 @@ export function JsonRenderBlock({ spec, onAction }: JsonRenderBlockProps) {
         const columns = (p.columns ?? []) as { key: string; label: string }[]
         const rows = (p.rows ?? []) as Record<string, unknown>[]
         return (
-          <div key={key} className="rounded-lg border border-border/20 overflow-hidden">
-            <table className="w-full text-[11px]">
+          <div key={key} className="rounded-lg border border-border/20 overflow-x-auto">
+            <table className="w-full text-[11px] min-w-max">
               <thead>
                 <tr className="bg-muted/20">
                   {columns.map((col) => (
