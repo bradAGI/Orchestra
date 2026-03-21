@@ -33,6 +33,15 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 
+/** Convert git SSH URLs to HTTPS so browsers can open them. */
+function sshToHttps(url: string): string {
+    if (url.startsWith('git@')) {
+        // git@github.com:owner/repo.git → https://github.com/owner/repo
+        return url.replace(/^git@([^:]+):/, 'https://$1/').replace(/\.git$/, '')
+    }
+    return url.replace(/\.git$/, '')
+}
+
 /** Props for the {@link ProjectDetailView} component. */
 interface ProjectDetailViewProps {
     project: Project
@@ -368,9 +377,11 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                         ) : null}
 
                         {project.remote_url && (
-                            <AppTooltip content="Open repository">
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => void openExternal(project.remote_url)}>
-                                    <Globe size={13} />
+                            <AppTooltip content="Open repository in browser">
+                                <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground gap-1.5"
+                                    onClick={() => void openExternal(sshToHttps(project.remote_url))}>
+                                    <Globe size={12} />
+                                    Repo
                                 </Button>
                             </AppTooltip>
                         )}
