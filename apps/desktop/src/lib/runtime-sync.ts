@@ -18,6 +18,8 @@ type RuntimeSyncHandlers = {
   onStatus: (message: string) => void
   /** Called when an error occurs during sync. */
   onError: (message: string) => void
+  /** Called when a GitHub connection or disconnection event is received. */
+  onGitHubChange?: (eventType: string, projectId: string) => void
 }
 
 /**
@@ -179,6 +181,24 @@ export function startRuntimeSync(config: BackendConfig, handlers: RuntimeSyncHan
     for (const eventType of lifecycleEventTypes) {
       stream.addEventListener(eventType, (event) => {
         pushEnvelope(eventType, (event as { data?: string }).data ?? '')
+      })
+    }
+
+    // GitHub connection/disconnection events trigger a project list refresh.
+    for (const ghEventType of ['GITHUB_CONNECTED', 'GITHUB_DISCONNECTED']) {
+      stream.addEventListener(ghEventType, (event) => {
+        try {
+          const dataText = (event as { data?: string }).data ?? ''
+          const parsed = dataText ? JSON.parse(dataText) as Record<string, unknown> : {}
+          const projectId = (parsed.project_id as string) || ''
+          if (handlers.onGitHubChange) {
+            handlers.onGitHubChange(ghEventType, projectId)
+          }
+        } catch {
+          if (handlers.onGitHubChange) {
+            handlers.onGitHubChange(ghEventType, '')
+          }
+        }
       })
     }
 

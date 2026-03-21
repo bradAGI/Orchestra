@@ -1,17 +1,19 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
-import { createGitHubPR, type BackendConfig } from '@/lib/orchestra-client'
+import { createGitHubPR, fetchDefaultBranch, type BackendConfig } from '@/lib/orchestra-client'
 
 export function useIssueDetailPR({
   config,
   identifier,
   title,
   description,
+  projectId,
 }: {
   config: BackendConfig | null
   identifier: string
   title: string
   description: string
+  projectId: string
 }) {
   const [prPending, setPrPending] = useState(false)
   const [prResult, setPrResult] = useState<{ url: string; number: number } | null>(null)
@@ -19,6 +21,17 @@ export function useIssueDetailPR({
   const [prTitle, setPrTitle] = useState('')
   const [prBody, setPrBody] = useState('')
   const [prHead, setPrHead] = useState('')
+  const [defaultBranch, setDefaultBranch] = useState('main')
+
+  // Fetch default branch when project context is available
+  useEffect(() => {
+    if (!config || !projectId) return
+    fetchDefaultBranch(config, projectId)
+      .then(setDefaultBranch)
+      .catch(() => {
+        // Keep the fallback default
+      })
+  }, [config, projectId])
 
   const handleCreatePR = () => {
     setPrTitle(title || `feat(${identifier}): solution implementation`)
@@ -35,7 +48,7 @@ export function useIssueDetailPR({
         title: prTitle,
         body: prBody,
         head: prHead,
-        base: 'main',
+        base: defaultBranch,
       })
       setPrResult(response)
       setPrDialogOpen(false)

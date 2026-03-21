@@ -364,8 +364,8 @@ export default function App() {
 
     Promise.all(connected.map(async (p) => {
       try {
-        const ghIssues = await fetchProjectGitHubIssues(config, p.id)
-        return ghIssues.map(gh => ({
+        const ghData = await fetchProjectGitHubIssues(config, p.id)
+        return ghData.issues.map(gh => ({
           id: `github-${gh.number}`, issue_id: `github-${gh.number}`,
           identifier: `GH-${gh.number}`, issue_identifier: `GH-${gh.number}`,
           title: gh.title, description: gh.body, state: 'Backlog',
@@ -454,6 +454,10 @@ export default function App() {
             setStatusMessage('Protected host detected. Add bearer token in Settings -> Backend Configuration.')
           }
           setLoadingState(false)
+        },
+        onGitHubChange: (_eventType, _projectId) => {
+          // Refresh project list when GitHub connection status changes via SSE
+          fetchProjects(config).then(setProjects).catch(() => {})
         },
       },
       {

@@ -64,6 +64,7 @@ export function useIssueDetailState({
     identifier,
     title,
     description,
+    projectId,
   })
 
   // Sync local state from issue result props

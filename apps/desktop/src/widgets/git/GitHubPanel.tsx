@@ -8,10 +8,22 @@ import {
   updateProjectGitHubIssue,
   createProjectGitHubPull,
   fetchProjectGitBranches,
+  fetchDefaultBranch,
 } from '@/lib/orchestra-client'
 
 type SubTab = 'issues' | 'prs'
 type IssueFilter = 'open' | 'closed' | 'all'
+
+function friendlyErrorMessage(err: unknown): { summary: string; detail: string } {
+  const raw = err instanceof Error ? err.message : String(err)
+  if (/unauthorized|401/i.test(raw)) {
+    return { summary: 'GitHub authentication failed. Reconnect in project settings.', detail: raw }
+  }
+  if (/rate.limit|429/i.test(raw)) {
+    return { summary: 'GitHub rate limit exceeded. Please wait and try again.', detail: raw }
+  }
+  return { summary: 'Failed to load GitHub data.', detail: raw }
+}
 
 export function GitHubPanel({
   projectId,
@@ -39,23 +51,91 @@ export function GitHubPanel({
   const [newPRHead, setNewPRHead] = useState('')
   const [newPRBase, setNewPRBase] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<{ summary: string; detail: string } | null>(null)
+
+  // Pagination state
+  const [issuePage, setIssuePage] = useState(1)
+  const [issueHasMore, setIssueHasMore] = useState(false)
+  const [prPage, setPrPage] = useState(1)
+  const [prHasMore, setPrHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+
+  // Default branch for PR base
+  const [defaultBranch, setDefaultBranch] = useState('main')
 
   const loadData = useCallback(async () => {
+    setLoadError(null)
     try {
       const [issueData, prData, branchData] = await Promise.all([
         fetchProjectGitHubIssues(config, projectId, issueFilter === 'all' ? 'all' : issueFilter),
         fetchProjectGitHubPulls(config, projectId),
         fetchProjectGitBranches(config, projectId),
       ])
-      setIssues(issueData)
-      setPRs(prData)
+      setIssues(issueData.issues)
+      setIssueHasMore(issueData.has_more)
+      setIssuePage(1)
+      setPRs(prData.pulls)
+      setPrHasMore(prData.has_more)
+      setPrPage(1)
       setBranches(branchData.branches || [])
     } catch (err) {
       console.error('github load failed', err)
+      setLoadError(friendlyErrorMessage(err))
     }
   }, [config, projectId, issueFilter])
 
+  // Fetch default branch on mount
+  useEffect(() => {
+    fetchDefaultBranch(config, projectId)
+      .then((branch) => {
+        setDefaultBranch(branch)
+        setNewPRBase(branch)
+      })
+      .catch(() => {
+        // Keep the fallback default
+      })
+  }, [config, projectId])
+
   useEffect(() => { loadData() }, [loadData])
+
+  // Set default base branch when PR form opens
+  useEffect(() => {
+    if (showCreatePR && !newPRBase) {
+      setNewPRBase(defaultBranch)
+    }
+  }, [showCreatePR, defaultBranch, newPRBase])
+
+  const loadMoreIssues = async () => {
+    if (loadingMore) return
+    setLoadingMore(true)
+    try {
+      const nextPage = issuePage + 1
+      const data = await fetchProjectGitHubIssues(config, projectId, issueFilter === 'all' ? 'all' : issueFilter, nextPage)
+      setIssues((prev) => [...prev, ...data.issues])
+      setIssueHasMore(data.has_more)
+      setIssuePage(nextPage)
+    } catch (err) {
+      console.error('load more issues failed', err)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  const loadMorePRs = async () => {
+    if (loadingMore) return
+    setLoadingMore(true)
+    try {
+      const nextPage = prPage + 1
+      const data = await fetchProjectGitHubPulls(config, projectId, nextPage)
+      setPRs((prev) => [...prev, ...data.pulls])
+      setPrHasMore(data.has_more)
+      setPrPage(nextPage)
+    } catch (err) {
+      console.error('load more PRs failed', err)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   async function handleCreateIssue() {
     if (!newIssueTitle.trim() || loading) return
@@ -137,6 +217,17 @@ export function GitHubPanel({
 
       {!collapsed && (
         <div className="px-3 pb-3">
+          {/* Error state */}
+          {loadError && (
+            <div className="mb-2 p-2 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <p className="text-[11px] text-red-400 font-medium">{loadError.summary}</p>
+              <details className="mt-1">
+                <summary className="text-[9px] text-red-400/60 cursor-pointer">Details</summary>
+                <pre className="text-[9px] text-red-400/50 mt-1 whitespace-pre-wrap break-all">{loadError.detail}</pre>
+              </details>
+            </div>
+          )}
+
           {/* Sub-tabs */}
           <div className="flex gap-2 mb-2">
             <button
@@ -240,10 +331,19 @@ export function GitHubPanel({
                     )}
                   </div>
                 ))}
-                {issues.length === 0 && (
+                {issues.length === 0 && !loadError && (
                   <div className="text-[10px] text-muted-foreground/50 text-center py-2">No issues</div>
                 )}
               </div>
+              {issueHasMore && (
+                <button
+                  onClick={() => void loadMoreIssues()}
+                  disabled={loadingMore}
+                  className="w-full mt-1 py-1 text-[10px] font-bold uppercase tracking-widest text-primary hover:text-primary/80 disabled:opacity-40"
+                >
+                  {loadingMore ? 'Loading...' : 'Load more...'}
+                </button>
+              )}
             </div>
           )}
 
@@ -321,10 +421,19 @@ export function GitHubPanel({
                     </span>
                   </button>
                 ))}
-                {prs.length === 0 && (
+                {prs.length === 0 && !loadError && (
                   <div className="text-[10px] text-muted-foreground/50 text-center py-2">No pull requests</div>
                 )}
               </div>
+              {prHasMore && (
+                <button
+                  onClick={() => void loadMorePRs()}
+                  disabled={loadingMore}
+                  className="w-full mt-1 py-1 text-[10px] font-bold uppercase tracking-widest text-primary hover:text-primary/80 disabled:opacity-40"
+                >
+                  {loadingMore ? 'Loading...' : 'Load more...'}
+                </button>
+              )}
             </div>
           )}
         </div>

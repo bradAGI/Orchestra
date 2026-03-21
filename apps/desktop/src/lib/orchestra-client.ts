@@ -1027,10 +1027,13 @@ export type GitBranches = {
  * @param config - Backend connection configuration.
  * @param projectId - The project UUID.
  * @param state - Issue state filter (defaults to "open").
- * @returns Array of GitHub issue records.
+ * @param page - Page number for pagination (defaults to 1).
+ * @returns Paginated response with issues array and has_more flag.
  */
-export async function fetchProjectGitHubIssues(config: BackendConfig, projectId: string, state: string = 'open'): Promise<GitHubIssue[]> {
-  return requestJSON<GitHubIssue[]>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/issues?state=${state}`)
+export async function fetchProjectGitHubIssues(
+  config: BackendConfig, projectId: string, state: string = 'open', page: number = 1
+): Promise<{ issues: GitHubIssue[]; has_more: boolean }> {
+  return requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/issues?state=${state}&page=${page}`)
 }
 
 /**
@@ -1044,13 +1047,27 @@ export async function fetchProjectGitBranches(config: BackendConfig, projectId: 
 }
 
 /**
+ * Fetches the default branch name for a project's repository.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @returns The default branch name (e.g. "main").
+ */
+export async function fetchDefaultBranch(config: BackendConfig, projectId: string): Promise<string> {
+  const result = await requestJSON<{ branch: string }>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/default-branch`)
+  return result.branch
+}
+
+/**
  * Fetches GitHub pull requests for a project.
  * @param config - Backend connection configuration.
  * @param projectId - The project UUID.
- * @returns Array of GitHub PR records.
+ * @param page - Page number for pagination (defaults to 1).
+ * @returns Paginated response with pulls array and has_more flag.
  */
-export async function fetchProjectGitHubPulls(config: BackendConfig, projectId: string): Promise<GitHubPR[]> {
-  return requestJSON<GitHubPR[]>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/pulls`)
+export async function fetchProjectGitHubPulls(
+  config: BackendConfig, projectId: string, page: number = 1
+): Promise<{ pulls: GitHubPR[]; has_more: boolean }> {
+  return requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/pulls?page=${page}`)
 }
 
 /**

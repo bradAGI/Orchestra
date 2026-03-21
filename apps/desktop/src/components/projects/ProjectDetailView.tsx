@@ -97,20 +97,12 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     const [deletePending, setDeletePending] = useState(false)
     const [deleteError, setDeleteError] = useState('')
     const [githubIssues, setGithubIssues] = useState<GitHubIssue[]>([])
-    const refreshTimersRef = React.useRef<number[]>([])
-
-    useEffect(() => {
-        return () => {
-            refreshTimersRef.current.forEach(id => window.clearTimeout(id))
-            refreshTimersRef.current = []
-        }
-    }, [])
 
     // Fetch GitHub issues on mount (for backlog in overview)
     useEffect(() => {
         if (!config || !project.github_token) return
         fetchProjectGitHubIssues(config, project.id, 'open')
-            .then(setGithubIssues)
+            .then((data) => setGithubIssues(data.issues))
             .catch(() => setGithubIssues([]))
     }, [config, project.id, project.github_token])
 
@@ -120,7 +112,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         if (activeTab !== 'overview') return
         const interval = setInterval(() => {
             fetchProjectGitHubIssues(config, project.id, 'open')
-                .then(setGithubIssues)
+                .then((data) => setGithubIssues(data.issues))
                 .catch(() => {})
         }, 60000)
         return () => clearInterval(interval)
@@ -189,15 +181,6 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         window.open(url, '_blank', 'noopener,noreferrer')
     }
 
-    const scheduleProjectRefreshAfterGitHubAuth = () => {
-        const delays = [2000, 4000, 7000, 11000]
-        for (const delay of delays) {
-            const id = window.setTimeout(() => {
-                void onRefreshProjects()
-            }, delay)
-            refreshTimersRef.current.push(id)
-        }
-    }
 
     const handleConnectGitHub = async () => {
         if (!config || !project.id) return
@@ -205,7 +188,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         const loginUrl = `${config.baseUrl}/api/v1/github/login?project_id=${project.id}`
         try {
             await openExternalTarget(loginUrl)
-            scheduleProjectRefreshAfterGitHubAuth()
+            // SSE GITHUB_CONNECTED event will trigger project list refresh automatically
         } catch (err) {
             console.error('Failed to launch GitHub authentication:', err)
             setGitHubActionError(err instanceof Error ? err.message : 'Failed to start GitHub authentication')
@@ -214,11 +197,13 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
 
     const handleDisconnectGitHub = async () => {
         if (!config || !project.id) return
+        const confirmed = window.confirm('Disconnect GitHub from this project? You can reconnect later.')
+        if (!confirmed) return
         setGitHubActionError('')
         setGitHubDisconnectPending(true)
         try {
             await disconnectProjectGitHub(config, project.id)
-            await onRefreshProjects()
+            // SSE GITHUB_DISCONNECTED event will trigger project list refresh automatically
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Failed to disconnect GitHub'
             setGitHubActionError(message)
