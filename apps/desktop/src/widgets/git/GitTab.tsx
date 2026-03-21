@@ -141,8 +141,8 @@ export function GitTab({
         {/* Right panel: Diff viewer */}
         <div className="flex-1 overflow-hidden">
           <DiffViewer
-            diff={diff}
-            fileName={selectedFile ?? undefined}
+            filePath={selectedFile ?? null}
+            diff={diff || null}
             mode={diffMode}
             onModeChange={setDiffMode}
           />

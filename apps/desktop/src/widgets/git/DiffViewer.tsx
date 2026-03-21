@@ -106,28 +106,28 @@ function lineStyle(type: 'add' | 'del' | 'ctx' | 'empty'): string {
 }
 
 export function DiffViewer({
+  filePath,
   diff,
-  fileName,
   mode,
   onModeChange,
 }: {
-  diff: string
-  fileName?: string
-  mode: 'split' | 'unified'
-  onModeChange: (mode: 'split' | 'unified') => void
+  filePath: string | null
+  diff: string | null
+  mode: 'unified' | 'split'
+  onModeChange: (mode: 'unified' | 'split') => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
-  const hunks = useMemo(() => parseDiff(diff), [diff])
+  const hunks = useMemo(() => (diff ? parseDiff(diff) : []), [diff])
   const splitRows = useMemo(() => (mode === 'split' ? buildSplitRows(hunks) : []), [hunks, mode])
 
   useEffect(() => {
-    scrollRef.current?.scrollTo(0, 0)
+    if (scrollRef.current?.scrollTo) scrollRef.current.scrollTo(0, 0)
   }, [diff])
 
-  if (!diff) {
+  if (filePath === null || diff === null) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-        Select a file or commit to view diff
+        Select a file to view its diff
       </div>
     )
   }
@@ -136,8 +136,8 @@ export function DiffViewer({
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border/40 bg-card sticky top-0 z-10 shrink-0">
-        {fileName && (
-          <span className="font-mono text-[11px] text-foreground truncate mr-4">{fileName}</span>
+        {filePath && (
+          <span className="font-mono text-[11px] text-foreground truncate mr-4">{filePath}</span>
         )}
         <div className="flex gap-1 ml-auto">
           <button

@@ -135,7 +135,7 @@ export function PRReviewView({
       {/* Content */}
       <div className="flex-1 overflow-hidden">
         {tab === 'files' ? (
-          <DiffViewer diff={diffText} mode={diffMode} onModeChange={setDiffMode} />
+          <DiffViewer filePath={`PR #${pr.number}: ${pr.title}`} diff={diffText || null} mode={diffMode} onModeChange={setDiffMode} />
         ) : (
           <div className="overflow-y-auto h-full p-4 space-y-3">
             {reviews.map((review, i) => (
