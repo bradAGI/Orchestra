@@ -1,2 +1,5 @@
 export { GitTab } from './GitTab'
 export { DiffViewer } from './DiffViewer'
+export { StagingArea } from './StagingArea'
+export { CommitBar } from './CommitBar'
+export { ResizableSplit } from './ResizableSplit'

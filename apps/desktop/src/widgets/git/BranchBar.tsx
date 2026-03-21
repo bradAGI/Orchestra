@@ -9,12 +9,18 @@ export function BranchBar({
   currentBranch,
   branches,
   onBranchChange,
+  aheadBehind,
+  onPush,
+  onPull,
 }: {
   projectId: string
   config: BackendConfig
   currentBranch: string
   branches: string[]
   onBranchChange: () => void
+  aheadBehind?: { ahead: number; behind: number }
+  onPush?: () => void
+  onPull?: () => void
 }) {
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
@@ -147,6 +153,24 @@ export function BranchBar({
         )}
       </div>
 
+      {onPull && (
+        <button
+          onClick={onPull}
+          disabled={loading}
+          className="rounded-md px-2.5 py-1 text-[10px] font-bold text-muted-foreground/50 bg-muted/10 border border-border/20 hover:bg-muted/30 hover:text-foreground transition-all"
+        >
+          Pull{aheadBehind && aheadBehind.behind > 0 ? ` ↓${aheadBehind.behind}` : ''}
+        </button>
+      )}
+      {onPush && (
+        <button
+          onClick={onPush}
+          disabled={loading}
+          className="rounded-md px-2.5 py-1 text-[10px] font-bold text-muted-foreground/50 bg-muted/10 border border-border/20 hover:bg-muted/30 hover:text-foreground transition-all"
+        >
+          Push{aheadBehind && aheadBehind.ahead > 0 ? ` ↑${aheadBehind.ahead}` : ''}
+        </button>
+      )}
       <div className="ml-1 relative shrink-0" ref={stashRef}>
         <button
           onClick={() => setStashOpen((v) => !v)}
