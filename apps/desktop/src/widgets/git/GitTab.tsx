@@ -15,6 +15,7 @@ import {
   gitFetch,
   gitMerge,
   gitDeleteBranch,
+  createGitHubRepo,
 } from '@/lib/orchestra-client'
 import { BranchBar } from './BranchBar'
 import { StagingArea } from './StagingArea'
@@ -24,6 +25,7 @@ import { DiffViewer } from './DiffViewer'
 import { GitHubPanel } from './GitHubPanel'
 import { PRReviewView } from './PRReviewView'
 import { ResizableSplit } from './ResizableSplit'
+import { CreateRepoDialog } from './CreateRepoDialog'
 
 type SubTab = 'changes' | 'history' | 'github'
 
@@ -75,6 +77,7 @@ export function GitTab({
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('changes')
   const [activePR, setActivePR] = useState<GitHubPR | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [showCreateRepo, setShowCreateRepo] = useState(false)
 
   const loadAll = useCallback(async () => {
     if (!config) return
@@ -229,6 +232,13 @@ export function GitTab({
     }
   }, [config, project.id, loadAll])
 
+  const handleCreateRepo = useCallback(async (opts: { name: string; description: string; private: boolean }) => {
+    if (!config) return
+    await createGitHubRepo(config, project.id, opts)
+    setShowCreateRepo(false)
+    loadAll()
+  }, [config, project.id, loadAll])
+
   if (!config) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
@@ -238,7 +248,6 @@ export function GitTab({
   }
 
   const hasGitHub = !!(project.github_owner && project.github_repo)
-  const visibleTabs = hasGitHub ? subTabs : subTabs.filter((t) => t.key !== 'github')
 
   return (
     <div className="flex flex-col h-full overflow-hidden relative">
@@ -272,7 +281,7 @@ export function GitTab({
 
       {/* Sub-tabs */}
       <div className="flex items-center gap-1 px-3 py-1.5 border-b border-border/40 shrink-0 bg-card/20">
-        {visibleTabs.map((tab) => (
+        {subTabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveSubTab(tab.key)}
@@ -343,15 +352,33 @@ export function GitTab({
       )}
 
       {/* GitHub tab */}
-      {activeSubTab === 'github' && hasGitHub && (
-        <div className="flex-1 overflow-auto">
-          <GitHubPanel
-            projectId={project.id}
-            config={config}
-            githubToken={project.github_token ?? ''}
-            onOpenPR={setActivePR}
-          />
-        </div>
+      {activeSubTab === 'github' && (
+        hasGitHub ? (
+          <div className="flex-1 overflow-auto">
+            <GitHubPanel
+              projectId={project.id}
+              config={config}
+              githubToken={project.github_token ?? ''}
+              onOpenPR={setActivePR}
+            />
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center space-y-3">
+              <p className="text-muted-foreground text-sm">No GitHub repository connected</p>
+              {project.github_token ? (
+                <button
+                  onClick={() => setShowCreateRepo(true)}
+                  className="px-4 py-2 text-[11px] font-bold uppercase tracking-widest rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-all"
+                >
+                  Create GitHub Repository
+                </button>
+              ) : (
+                <p className="text-[10px] text-muted-foreground/50">Connect GitHub first to create a repository</p>
+              )}
+            </div>
+          </div>
+        )
       )}
 
       {/* PR Review overlay */}
@@ -361,6 +388,14 @@ export function GitTab({
           config={config}
           pr={activePR}
           onClose={() => setActivePR(null)}
+        />
+      )}
+
+      {showCreateRepo && (
+        <CreateRepoDialog
+          projectName={project.name}
+          onCancel={() => setShowCreateRepo(false)}
+          onCreate={handleCreateRepo}
         />
       )}
     </div>
