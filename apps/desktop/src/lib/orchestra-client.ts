@@ -1455,6 +1455,41 @@ export async function gitStashPop(config: BackendConfig, projectId: string): Pro
   await requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/stash/pop`, { method: 'POST' })
 }
 
+export type StashEntry = { ref: string; message: string }
+
+export async function gitStashList(config: BackendConfig, projectId: string): Promise<StashEntry[]> {
+  const data = await requestJSON<StashEntry[]>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/stash/list`)
+  return data || []
+}
+
+export async function gitStashApply(config: BackendConfig, projectId: string, ref: string): Promise<void> {
+  await requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/stash/apply`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ref })
+  })
+}
+
+export async function gitStashDrop(config: BackendConfig, projectId: string, ref: string): Promise<void> {
+  await requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/stash/drop`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ref })
+  })
+}
+
+export type ConflictStatus = { in_merge: boolean; files: string[] }
+
+export async function gitGetConflicts(config: BackendConfig, projectId: string): Promise<ConflictStatus> {
+  return requestJSON<ConflictStatus>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/conflicts`)
+}
+
+export async function gitMergeAbort(config: BackendConfig, projectId: string): Promise<void> {
+  await requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/merge/abort`, { method: 'POST' })
+}
+
+export async function gitConflictResolve(config: BackendConfig, projectId: string, file: string): Promise<void> {
+  await requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/resolve`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file })
+  })
+}
+
 /**
  * Fetches reviews for a GitHub pull request.
  * @param config - Backend connection configuration.
