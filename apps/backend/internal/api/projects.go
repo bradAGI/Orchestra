@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -17,6 +18,8 @@ import (
 	ghutil "github.com/orchestra/orchestra/apps/backend/internal/utils/github"
 	"github.com/orchestra/orchestra/apps/backend/internal/workspace"
 )
+
+var aheadBehindRe = regexp.MustCompile(`\[(?:ahead (\d+))?(?:, )?(?:behind (\d+))?\]`)
 
 func (s *Server) PostGitCommit(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "project_id")
@@ -533,7 +536,7 @@ func (s *Server) GetProjectGitStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cmd := exec.CommandContext(r.Context(), "git", "status", "--porcelain")
+	cmd := exec.CommandContext(r.Context(), "git", "status", "--porcelain", "--branch")
 	cmd.Dir = project.RootPath
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -542,23 +545,41 @@ func (s *Server) GetProjectGitStatus(w http.ResponseWriter, r *http.Request) {
 			Str("project_id", projectID).
 			Str("output", string(out)).
 			Msg("git status failed")
-		writeJSON(w, http.StatusOK, []any{})
+		writeJSON(w, http.StatusOK, map[string]any{
+			"files":  []any{},
+			"branch": map[string]int{"ahead": 0, "behind": 0},
+		})
 		return
 	}
 
 	lines := strings.Split(string(out), "\n")
-	var status []map[string]string
+	var files []map[string]string
+	branchInfo := map[string]int{"ahead": 0, "behind": 0}
 	for _, line := range lines {
+		if strings.HasPrefix(line, "## ") {
+			if m := aheadBehindRe.FindStringSubmatch(line); m != nil {
+				if m[1] != "" {
+					branchInfo["ahead"], _ = strconv.Atoi(m[1])
+				}
+				if m[2] != "" {
+					branchInfo["behind"], _ = strconv.Atoi(m[2])
+				}
+			}
+			continue
+		}
 		if len(line) < 4 {
 			continue
 		}
-		status = append(status, map[string]string{
-			"status": strings.TrimSpace(line[:2]),
+		files = append(files, map[string]string{
+			"status": line[:2],
 			"path":   strings.TrimSpace(line[3:]),
 		})
 	}
 
-	writeJSON(w, http.StatusOK, status)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"files":  files,
+		"branch": branchInfo,
+	})
 }
 
 func (s *Server) GetProjectGitStats(w http.ResponseWriter, r *http.Request) {
