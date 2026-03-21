@@ -7,6 +7,7 @@ import {
   KeyboardSensor,
   useSensor,
   useSensors,
+  useDroppable,
   type DragStartEvent,
   type DragEndEvent,
 } from '@dnd-kit/core'
@@ -127,6 +128,19 @@ function GhostCard({ entry }: { entry: GitStatusEntry }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Droppable zone wrapper                                             */
+/* ------------------------------------------------------------------ */
+
+function DroppableZone({ id, children, className }: { id: string; children: React.ReactNode; className?: string }) {
+  const { setNodeRef, isOver } = useDroppable({ id })
+  return (
+    <div ref={setNodeRef} className={`${className ?? ''} ${isOver ? 'ring-1 ring-primary/40' : ''}`}>
+      {children}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -222,7 +236,7 @@ export function StagingArea({
               </button>
             )}
           </div>
-          <div className="flex-1 overflow-y-auto">
+          <DroppableZone id="unstaged-zone" className="flex-1 overflow-y-auto">
             <SortableContext items={unstagedIds} strategy={verticalListSortingStrategy}>
               {unstaged.map((entry) => (
                 <FileRow
@@ -240,7 +254,7 @@ export function StagingArea({
                 No unstaged changes
               </div>
             )}
-          </div>
+          </DroppableZone>
         </div>
 
         {/* Staged section (bottom) */}
@@ -266,7 +280,7 @@ export function StagingArea({
               </button>
             )}
           </div>
-          <div className="flex-1 overflow-y-auto">
+          <DroppableZone id="staged-zone" className="flex-1 overflow-y-auto">
             <SortableContext items={stagedIds} strategy={verticalListSortingStrategy}>
               {staged.map((entry) => (
                 <FileRow
@@ -284,7 +298,7 @@ export function StagingArea({
                 No staged changes
               </div>
             )}
-          </div>
+          </DroppableZone>
         </div>
       </div>
 

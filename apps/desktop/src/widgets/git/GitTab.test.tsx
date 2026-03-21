@@ -43,6 +43,7 @@ const mockProject = {
   github_owner: '',
   github_repo: '',
   github_token: '',
+  remote_url: '',
 }
 
 const mockConfig = { baseUrl: 'http://localhost:4010', apiToken: 'test-token' }

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect } from 'react'
+import { Fragment, useMemo, useRef, useEffect } from 'react'
 
 type DiffLine = {
   type: 'add' | 'del' | 'ctx'
@@ -55,9 +55,15 @@ type SplitRow = {
   rightType: 'add' | 'del' | 'ctx' | 'empty'
 }
 
-function buildSplitRows(hunks: Hunk[]): SplitRow[] {
-  const rows: SplitRow[] = []
+type SplitHunk = {
+  header: string
+  rows: SplitRow[]
+}
+
+function buildSplitHunks(hunks: Hunk[]): SplitHunk[] {
+  const result: SplitHunk[] = []
   for (const hunk of hunks) {
+    const rows: SplitRow[] = []
     const lines = hunk.lines
     let i = 0
     while (i < lines.length) {
@@ -93,8 +99,9 @@ function buildSplitRows(hunks: Hunk[]): SplitRow[] {
         i++
       }
     }
+    result.push({ header: hunk.header, rows })
   }
-  return rows
+  return result
 }
 
 function lineStyle(type: 'add' | 'del' | 'ctx' | 'empty'): string {
@@ -118,7 +125,7 @@ export function DiffViewer({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const hunks = useMemo(() => (diff ? parseDiff(diff) : []), [diff])
-  const splitRows = useMemo(() => (mode === 'split' ? buildSplitRows(hunks) : []), [hunks, mode])
+  const splitHunks = useMemo(() => (mode === 'split' ? buildSplitHunks(hunks) : []), [hunks, mode])
 
   useEffect(() => {
     if (scrollRef.current?.scrollTo) scrollRef.current.scrollTo(0, 0)
@@ -161,8 +168,8 @@ export function DiffViewer({
           <table className="w-full border-collapse">
             <tbody>
               {hunks.map((hunk, hi) => (
-                <>{/* Fragment key on hunk header */}
-                  <tr key={`h-${hi}`}>
+                <Fragment key={`h-${hi}`}>
+                  <tr>
                     <td colSpan={3} className="px-3 py-1 text-[10px] text-muted-foreground/60 bg-muted/10 select-none">
                       {hunk.header}
                     </td>
@@ -176,35 +183,37 @@ export function DiffViewer({
                       </td>
                     </tr>
                   ))}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>
         ) : (
           <table className="w-full border-collapse">
             <tbody>
-              {hunks.map((hunk, hi) => (
-                <tr key={`sh-${hi}`}>
-                  <td colSpan={4} className="px-3 py-1 text-[10px] text-muted-foreground/60 bg-muted/10 select-none">
-                    {hunk.header}
-                  </td>
-                </tr>
-              ))}
-              {splitRows.map((row, ri) => (
-                <tr key={ri}>
-                  <td className={`w-10 text-right pr-1 select-none align-top text-muted-foreground/30 ${lineStyle(row.leftType)}`}>
-                    {row.leftNum ?? ''}
-                  </td>
-                  <td className={`w-1/2 px-2 whitespace-pre-wrap break-all ${lineStyle(row.leftType)}`}>
-                    {row.leftContent}
-                  </td>
-                  <td className={`w-10 text-right pr-1 select-none align-top text-muted-foreground/30 ${lineStyle(row.rightType)}`}>
-                    {row.rightNum ?? ''}
-                  </td>
-                  <td className={`w-1/2 px-2 whitespace-pre-wrap break-all ${lineStyle(row.rightType)}`}>
-                    {row.rightContent}
-                  </td>
-                </tr>
+              {splitHunks.map((sh, hi) => (
+                <Fragment key={`sh-${hi}`}>
+                  <tr>
+                    <td colSpan={4} className="px-3 py-1 text-[10px] text-muted-foreground/60 bg-muted/10 select-none">
+                      {sh.header}
+                    </td>
+                  </tr>
+                  {sh.rows.map((row, ri) => (
+                    <tr key={ri}>
+                      <td className={`w-10 text-right pr-1 select-none align-top text-muted-foreground/30 ${lineStyle(row.leftType)}`}>
+                        {row.leftNum ?? ''}
+                      </td>
+                      <td className={`w-1/2 px-2 whitespace-pre-wrap break-all ${lineStyle(row.leftType)}`}>
+                        {row.leftContent}
+                      </td>
+                      <td className={`w-10 text-right pr-1 select-none align-top text-muted-foreground/30 ${lineStyle(row.rightType)}`}>
+                        {row.rightNum ?? ''}
+                      </td>
+                      <td className={`w-1/2 px-2 whitespace-pre-wrap break-all ${lineStyle(row.rightType)}`}>
+                        {row.rightContent}
+                      </td>
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>
