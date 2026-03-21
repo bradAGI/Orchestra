@@ -278,11 +278,6 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
       <Dialog open={!!projectToDelete} onOpenChange={(open) => !open && setProjectToDelete(null)}>
         <DialogContent className="sm:max-w-lg bg-popover border-border p-8">
           <DialogHeader>
-            <div className="flex justify-center mb-4">
-              <div className="h-14 w-14 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
-                <Trash2 className="text-red-500" size={24} />
-              </div>
-            </div>
             <DialogTitle className="text-xl font-black text-foreground text-center">
               Remove Project
             </DialogTitle>
