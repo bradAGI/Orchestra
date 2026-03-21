@@ -592,67 +592,49 @@ func (s *Server) GetIssueDiff(w http.ResponseWriter, r *http.Request) {
 	identifier := chi.URLParam(r, "issue_identifier")
 	provider := r.URL.Query().Get("provider")
 
-	// Try the project directory first (agents run in the actual project)
 	if s.db != nil {
-		issues, searchErr := s.orchestrator.SearchIssues(r.Context(), identifier)
-		if searchErr == nil && len(issues) > 0 && issues[0].ProjectID != "" {
-			project, projErr := s.db.GetProjectByID(r.Context(), issues[0].ProjectID)
+		issue, fetchErr := s.orchestrator.FetchIssueByIdentifier(r.Context(), identifier)
+		if fetchErr == nil && issue != nil && issue.ProjectID != "" {
+			project, projErr := s.db.GetProjectByID(r.Context(), issue.ProjectID)
 			if projErr == nil && project.RootPath != "" && filepath.IsAbs(project.RootPath) {
-				// Show only uncommitted changes (staged + unstaged) for this task
-				// Auto-commit should have committed agent work, so this shows what's pending review
-				var allDiff []byte
 
-				// Staged changes
-				cmd := exec.CommandContext(r.Context(), "git", "diff", "--cached")
-				cmd.Dir = project.RootPath
-				if staged, _ := cmd.CombinedOutput(); len(staged) > 0 {
-					allDiff = append(allDiff, staged...)
-				}
+				// Branch-scoped diff: use base_sha...branch_name when available
+				if issue.BaseSHA != "" && issue.BranchName != "" {
+					var allDiff []byte
 
-				// Unstaged changes
-				cmd2 := exec.CommandContext(r.Context(), "git", "diff")
-				cmd2.Dir = project.RootPath
-				if unstaged, _ := cmd2.CombinedOutput(); len(unstaged) > 0 {
-					allDiff = append(allDiff, unstaged...)
-				}
-
-				// If no uncommitted changes, show the most recent commit's diff
-				// (the auto-commit from the agent run)
-				if len(allDiff) == 0 {
-					cmd3 := exec.CommandContext(r.Context(), "git", "diff", "HEAD~1..HEAD")
-					cmd3.Dir = project.RootPath
-					if committed, _ := cmd3.CombinedOutput(); len(committed) > 0 {
-						allDiff = append(allDiff, committed...)
+					// Committed changes on branch relative to base
+					committed, err := git.BranchDiff(r.Context(), project.RootPath, issue.BaseSHA, issue.BranchName)
+					if err == nil && len(committed) > 0 {
+						allDiff = append(allDiff, []byte(committed)...)
 					}
-				}
 
-				// Include untracked (new) files
-				cmd3 := exec.CommandContext(r.Context(), "git", "ls-files", "--others", "--exclude-standard")
-				cmd3.Dir = project.RootPath
-				untrackedList, _ := cmd3.Output()
-				for _, fname := range strings.Split(strings.TrimSpace(string(untrackedList)), "\n") {
-					fname = strings.TrimSpace(fname)
-					if fname == "" {
-						continue
+					// Uncommitted changes inside the worktree (if it exists)
+					wtPath := filepath.Join(s.worktreeRoot, project.ID, issue.BranchName)
+					if info, statErr := os.Stat(wtPath); statErr == nil && info.IsDir() {
+						uncommitted, err := git.WorktreeDiff(r.Context(), wtPath)
+						if err == nil && len(uncommitted) > 0 {
+							allDiff = append(allDiff, []byte(uncommitted)...)
+						}
 					}
-					cmd4 := exec.CommandContext(r.Context(), "git", "diff", "--no-index", "/dev/null", fname)
-					cmd4.Dir = project.RootPath
-					if out4, err := cmd4.CombinedOutput(); err != nil || len(out4) > 0 {
-						allDiff = append(allDiff, out4...)
-					}
-				}
 
-				if len(allDiff) > 0 {
 					w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 					w.WriteHeader(http.StatusOK)
 					_, _ = w.Write(allDiff)
+					return
+				}
+
+				// Legacy fallback: no base_sha/branch_name on this issue
+				if diff := s.legacyDiff(r, project.RootPath); len(diff) > 0 {
+					w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+					w.WriteHeader(http.StatusOK)
+					_, _ = w.Write(diff)
 					return
 				}
 			}
 		}
 	}
 
-	// Fallback to workspace-based diff
+	// Final fallback to workspace-based diff
 	diff, err := s.orchestrator.GetDiff(identifier, provider)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "diff_failed", "failed to compute diff")
@@ -662,6 +644,54 @@ func (s *Server) GetIssueDiff(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(diff))
+}
+
+// legacyDiff computes a diff for issues that lack base_sha/branch_name metadata.
+// It collects staged, unstaged, last-commit, and untracked file diffs from the
+// given project root directory.
+func (s *Server) legacyDiff(r *http.Request, rootPath string) []byte {
+	var allDiff []byte
+
+	// Staged changes
+	cmd := exec.CommandContext(r.Context(), "git", "diff", "--cached")
+	cmd.Dir = rootPath
+	if staged, _ := cmd.CombinedOutput(); len(staged) > 0 {
+		allDiff = append(allDiff, staged...)
+	}
+
+	// Unstaged changes
+	cmd2 := exec.CommandContext(r.Context(), "git", "diff")
+	cmd2.Dir = rootPath
+	if unstaged, _ := cmd2.CombinedOutput(); len(unstaged) > 0 {
+		allDiff = append(allDiff, unstaged...)
+	}
+
+	// If no uncommitted changes, show the most recent commit's diff
+	if len(allDiff) == 0 {
+		cmd3 := exec.CommandContext(r.Context(), "git", "diff", "HEAD~1..HEAD")
+		cmd3.Dir = rootPath
+		if committed, _ := cmd3.CombinedOutput(); len(committed) > 0 {
+			allDiff = append(allDiff, committed...)
+		}
+	}
+
+	// Include untracked (new) files
+	cmd3 := exec.CommandContext(r.Context(), "git", "ls-files", "--others", "--exclude-standard")
+	cmd3.Dir = rootPath
+	untrackedList, _ := cmd3.Output()
+	for _, fname := range strings.Split(strings.TrimSpace(string(untrackedList)), "\n") {
+		fname = strings.TrimSpace(fname)
+		if fname == "" {
+			continue
+		}
+		cmd4 := exec.CommandContext(r.Context(), "git", "diff", "--no-index", "/dev/null", fname)
+		cmd4.Dir = rootPath
+		if out4, err := cmd4.CombinedOutput(); err != nil || len(out4) > 0 {
+			allDiff = append(allDiff, out4...)
+		}
+	}
+
+	return allDiff
 }
 
 // GetAgentConfig handles GET /api/v1/config/agents by returning the current
