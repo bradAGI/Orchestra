@@ -1,7 +1,7 @@
 # Test Registry
 
 > **Last updated:** 2026-03-21
-> **Total:** 52 files, 397 tests (267 backend, 25 TUI, 105 desktop)
+> **Total:** 49 files, 397 tests (267 backend, 25 TUI, 105 desktop)
 > **Skipped:** 2 (desktop migration UI tests — feature removed)
 
 ---
@@ -170,51 +170,410 @@
 
 **File:** `apps/backend/internal/api/ratelimit_test.go`
 
-#### Other API tests (8 tests)
+#### terminal_auth_test.go (4 tests)
 
-| File | Tests | What they cover |
-|------|-------|----------------|
-| `terminal_auth_test.go` | 4 | Token auth: unset, bearer, query, wrong |
-| `static_test.go` | 2 | Dashboard HTML, live status sections |
-| `workspace_migration_test.go` | 2 | Migration dry-run and apply |
+| Test | What it validates |
+|------|-------------------|
+| `TestIsTerminalAuthorizedAllowsWhenTokenUnset` | Allows access when no token configured |
+| `TestIsTerminalAuthorizedAcceptsBearerHeader` | Accepts valid bearer token in header |
+| `TestIsTerminalAuthorizedAcceptsTokenQuery` | Accepts token via query parameter |
+| `TestIsTerminalAuthorizedRejectsMissingOrWrongToken` | Rejects missing or incorrect tokens |
+
+**File:** `apps/backend/internal/api/terminal_auth_test.go`
+
+#### static_test.go (2 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestGetDashboardServesHTML` | Dashboard endpoint serves HTML content |
+| `TestDashboardIncludesCoreLiveStatusSections` | Dashboard contains live status sections |
+
+**File:** `apps/backend/internal/api/static_test.go`
+
+#### workspace_migration_test.go (2 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestPostWorkspaceMigrateDryRun` | Migration dry-run returns plan without mutation |
+| `TestPostWorkspaceMigrateApply` | Migration apply executes the plan |
+
+**File:** `apps/backend/internal/api/workspace_migration_test.go`
 
 ---
 
 ### internal/orchestrator — State machine (59 tests)
 
-| File | Tests | What they cover |
-|------|-------|----------------|
-| `dispatch_test.go` | 42 | Enqueuing, claiming, concurrency limits, retry scheduling, revalidation, blockers, token accumulation |
-| `refresh_test.go` | 11 | Refresh reconciliation, stalled runs, blocked issues, retry backfill, assignment drops |
-| `reconcile_test.go` | 3 | Terminal removal, state updates, token accumulation |
-| `state_test.go` | 2 | Refresh coalescing, snapshot counts |
-| `soak_test.go` | 1 | 1200-cycle correctness soak test |
+#### dispatch_test.go (42 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestPerformRefreshEnqueuesCandidatesUpToConcurrency` | Enqueues candidates respecting concurrency limit |
+| `TestShouldRetryAttemptHonorsMaxRetryPolicy` | Retry stops after max attempts |
+| `TestPerformRefreshHonorsPerStateConcurrencyLimit` | Per-state concurrency limit enforced |
+| `TestPerformRefreshSkipsIssuesNotAssignedToWorker` | Skips issues assigned to other workers |
+| `TestPerformRefreshSkipsCandidatesOutsideActiveStates` | Skips candidates not in active states |
+| `TestPerformRefreshSkipsTodoBlockedByNonTerminalIssue` | Skips todo blocked by non-terminal issue |
+| `TestPerformRefreshAllowsTodoBlockedOnlyByTerminalIssues` | Allows todo when blockers are terminal |
+| `TestReleaseDueRetriesMovesToRunning` | Releases due retries into running state |
+| `TestReleaseDueRetriesRespectsPerStateConcurrencyLimits` | Retry release respects concurrency |
+| `TestReleaseDueRetriesUsesRetryStateAsRunningState` | Retry uses original state when running |
+| `TestRecordRunFailureCreatesRetryAndRemovesRunning` | Failure creates retry entry, removes running |
+| `TestRecordRunFailureDerivesTotalTokensWhenMissing` | Derives total tokens from input+output |
+| `TestRecordRunSuccessRemovesRunningEntry` | Success removes running entry |
+| `TestClaimNextRunnableClaimsOnlyOnceUntilRelease` | Claim is exclusive until release |
+| `TestRecordRunResultAccumulatesTotals` | Run result accumulates token totals |
+| `TestRecordRunFailureStopsRetryAfterMaxAttempts` | Stops retrying after max attempts |
+| `TestNextRetryDueHonorsBackoffBounds` | Retry backoff stays within bounds |
+| `TestComputeRetryDueUsesAttemptFloorOfOne` | Retry due uses minimum attempt of 1 |
+| `TestComputeRetryDueSquaresAttemptBeforeApplyingJitter` | Backoff squares attempt before jitter |
+| `TestRetryJitterStableWithinSameMinuteForSameIssue` | Jitter is stable within same minute |
+| `TestRetryJitterDiffersAcrossIssueIDs` | Jitter differs per issue ID |
+| `TestRecordRunEventUpdatesRunningStatus` | Run event updates running entry status |
+| `TestShouldContinueTurnHonorsMaxTurns` | Stops after max turns reached |
+| `TestShouldContinueTurnChecksTrackerState` | Checks tracker state before continuing |
+| `TestShouldContinueTurnStopsWhenIssueUnassigned` | Stops when issue is unassigned |
+| `TestShouldContinueTurnStopsWhenTodoBlockedByNonTerminal` | Stops when todo blocked by non-terminal |
+| `TestPrepareNextTurnIncrementsTurnAndReleasesClaim` | Next turn increments turn, releases claim |
+| `TestRecordRunSuccessAccumulatesSecondsRun` | Success accumulates seconds_run |
+| `TestRecordRunEventUpdatesRateLimits` | Run event updates rate limits |
+| `TestRecordRunEventUpdatesNestedRateLimits` | Run event updates nested rate limits |
+| `TestRecordRunEventPreservesExistingLastEventAndMessageWhenEmpty` | Preserves last_event and message when empty |
+| `TestRecordRunEventDerivesTotalTokensWhenMissing` | Derives total tokens from event usage |
+| `TestRecordRunEventUpdatesRateLimitsFromParamsEnvelope` | Rate limits from params envelope |
+| `TestRecordRunEventUpdatesRateLimitsFromJSONStringEnvelope` | Rate limits from JSON string envelope |
+| `TestRecordRunEventUpdatesRateLimitsFromArrayEnvelope` | Rate limits from array envelope |
+| `TestRevalidateClaimedIssueRemovesMissingIssue` | Removes claimed issue not found in tracker |
+| `TestRevalidateClaimedIssueRemovesTerminalIssue` | Removes claimed issue in terminal state |
+| `TestRevalidateClaimedIssueRemovesUnassignedIssue` | Removes claimed issue no longer assigned |
+| `TestRevalidateClaimedIssueRemovesTodoBlockedByNonTerminal` | Removes todo blocked by non-terminal |
+| `TestRevalidateClaimedIssueUpdatesStateForActiveIssue` | Updates state for active claimed issue |
+| `TestRevalidateClaimedIssueReturnsErrorOnTrackerFailure` | Returns error on tracker failure |
+| `TestPerformRefreshCarriesDescriptionIntoRunningEntry` | Carries description into running entry |
+
+**File:** `apps/backend/internal/orchestrator/dispatch_test.go`
+
+#### refresh_test.go (11 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestPerformRefreshReconcilesRunningEntries` | Reconciles running entries during refresh |
+| `TestPerformRefreshClearsClaimsForReconciledOutIssues` | Clears claims for reconciled-out issues |
+| `TestPerformRefreshMovesStalledClaimedRunToRetry` | Moves stalled claimed run to retry |
+| `TestPerformRefreshDropsStalledRunAfterMaxAttempts` | Drops stalled run after max attempts |
+| `TestPerformRefreshDoesNotRetryUnclaimedOldRun` | Does not retry unclaimed old runs |
+| `TestPerformRefreshDropsRunningIssueNoLongerAssignedToWorker` | Drops running issue no longer assigned |
+| `TestPerformRefreshDropsRunningTodoBlockedByNonTerminal` | Drops running todo blocked by non-terminal |
+| `TestPerformRefreshClearsPendingFlagOnError` | Clears pending flag on error |
+| `TestPerformRefreshDropsRetryEntriesForTerminalIssuesButKeepsMissing` | Drops terminal retries, keeps missing |
+| `TestPerformRefreshBackfillsRetryStateFromTracker` | Backfills retry state from tracker |
+| `TestPerformRefreshDropsRetryEntriesNotDispatchableByAssignmentOrBlockers` | Drops non-dispatchable retry entries |
+
+**File:** `apps/backend/internal/orchestrator/refresh_test.go`
+
+#### reconcile_test.go (3 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestReconcileRunningStatesRemovesTerminalAndInactive` | Removes terminal and inactive entries |
+| `TestReconcileRunningStatesUpdatesStateFromRefresh` | Updates state from refresh data |
+| `TestReconcileRunningStatesAccumulatesTotalsForRemovedEntries` | Accumulates totals for removed entries |
+
+**File:** `apps/backend/internal/orchestrator/reconcile_test.go`
+
+#### state_test.go (2 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestQueueRefreshCoalesces` | Refresh requests coalesce |
+| `TestSnapshotIncludesCounts` | Snapshot includes correct counts |
+
+**File:** `apps/backend/internal/orchestrator/state_test.go`
+
+#### soak_test.go (1 test)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestOrchestratorSoakRefreshDispatchRetryLoop` | 1200-cycle correctness soak test |
+
+**File:** `apps/backend/internal/orchestrator/soak_test.go`
 
 ---
 
-### Other backend packages (102 tests)
+### internal/app — Execution tick lifecycle (13 tests)
 
-| File | Tests | What they cover |
-|------|-------|----------------|
-| `app/run_test.go` | 13 | Execution tick lifecycle, retry events, rate limits, hooks |
-| `config/load_test.go` | 9 | Env vars, workflow overrides, defaults, validation |
-| `db/crypto_test.go` | 6 | AES-256-GCM encrypt/decrypt roundtrip, edge cases |
-| `workspace/service_test.go` | 6 | Worktree create/reuse/remove, hook behavior |
-| `workflow/frontmatter_test.go` | 5 | YAML frontmatter parsing |
-| `specs/pr_body_test.go` | 5 | PR body linting |
-| `prompt/builder_test.go` | 6 | Prompt template rendering |
-| `workspace/path_guard_test.go` | 4 | Path sanitization, traversal rejection |
-| `observability/pubsub_test.go` | 4 | Pub/sub publish, subscribe, timestamps |
-| `logfile/logfile_test.go` | 3 | Session log creation, symlinks |
-| `telemetry/watcher_test.go` | 3 | Token extraction, idempotent rescan |
-| `workspace/migration_test.go` | 3 | Migration planning and execution |
-| `specs/check_test.go` | 3 | Workflow validation |
-| `workspace/hooks_test.go` | 2 | Hook execution, timeout |
-| `workflow/store_test.go` | 2 | Workflow loading, path switching |
-| `tracker/memory/client_test.go` | 9 | Candidate filtering, state fetching, ordering |
-| `utils/git/worktree_test.go` | 10 | Worktree CRUD, pruning, diffs |
-| `runtime/identity_test.go` | 1 | Token requirements by host |
-| `tools/linear_executor_test.go` | 1 | Tracker query execution |
+| Test | What it validates |
+|------|-------------------|
+| `TestNewTrackerClientUsesMemoryWhenEndpointUnset` | Falls back to memory tracker when endpoint unset |
+| `TestPublishRunEventIncludesIssueAndProvider` | Run event includes issue and provider fields |
+| `TestPublishLifecycleEventPublishesTypedEnvelope` | Lifecycle event publishes typed envelope |
+| `TestProcessExecutionTickPublishesSuccessLifecycleEvents` | Tick publishes success lifecycle events |
+| `TestProcessExecutionTickPublishesFailureAndRetryLifecycleEvents` | Tick publishes failure and retry events |
+| `TestProcessExecutionTickDoesNotPublishRetryWhenAttemptExceedsMax` | No retry event when max attempts exceeded |
+| `TestPublishRefreshRetryLifecycleEventsPublishesOnlyNewEntries` | Retry events only for new entries |
+| `TestClassifyRefreshRetryCause` | Classifies refresh retry cause |
+| `TestProcessExecutionTickPreservesRateLimitsFromMixedNestedEnvelope` | Preserves rate limits from mixed envelope |
+| `TestProcessExecutionTickSkipsBeforeRunHookAfterFirstTurn` | Skips before-run hook after first turn |
+| `TestProcessExecutionTickPublishesBeforeRunHookFailureCause` | Publishes before-run hook failure cause |
+| `TestPublishRefreshRetryLifecycleEventsSuppressesDueAtOnlyChanges` | Suppresses due_at-only changes |
+| `TestPublishRefreshRetryLifecycleEventsCarriesCompleteFields` | Retry events carry complete fields |
+
+**File:** `apps/backend/internal/app/run_test.go`
+
+---
+
+### internal/config — Configuration loading (9 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestLoad_UsesOrchestraEnv` | Loads config from ORCHESTRA_ env vars |
+| `TestLoad_AgentProviderAndCommandsFromEnv` | Agent provider and commands from env |
+| `TestLoad_ParsesTrackerAndConcurrencyOverridesFromEnv` | Tracker and concurrency overrides |
+| `TestLoad_UsesWorkflowOverridesWhenEnvUnset` | Falls back to workflow overrides |
+| `TestLoad_UsesDefaultsWhenWorkflowFileIsMissing` | Defaults when workflow file missing |
+| `TestLoad_ParsesWorkflowListValuesForTrackerFields` | Parses list values for tracker fields |
+| `TestLoad_InvalidPortReturnsError` | Invalid port returns error |
+| `TestLoad_InvalidAgentMaxTurnsFallsBackToDefault` | Invalid max turns falls back to default |
+| `TestLoad_InvalidMaxConcurrentFallsBackToDefault` | Invalid max concurrent falls back to default |
+
+**File:** `apps/backend/internal/config/load_test.go`
+
+---
+
+### internal/db — Database crypto (6 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestEncryptDecryptRoundTrip` | AES-256-GCM encrypt/decrypt round trip |
+| `TestEncryptDecryptEmptyString` | Encrypt/decrypt empty string |
+| `TestDecryptPlaintextPassthrough` | Plaintext passthrough on decrypt |
+| `TestDecryptWithWrongKey` | Decrypt with wrong key fails |
+| `TestEncryptWithoutKeyReturnsPlaintext` | Encrypt without key returns plaintext |
+| `TestDecryptEncryptedTokenWithoutKeyErrors` | Decrypt encrypted token without key errors |
+
+**File:** `apps/backend/internal/db/crypto_test.go`
+
+---
+
+### internal/logfile — Session logging (3 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestWriteSessionLogCreatesSessionAndLatest` | Creates session log and latest symlink |
+| `TestResetLatestLogCreatesWorkingSymlink` | Resets latest log symlink |
+| `TestWriteSessionLogSanitizesPaths` | Sanitizes paths in session log names |
+
+**File:** `apps/backend/internal/logfile/logfile_test.go`
+
+---
+
+### internal/observability — Pub/sub (4 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestPubSubPublishSubscribe` | Publish and subscribe deliver events |
+| `TestPubSubUnsubscribeStopsDelivery` | Unsubscribe stops event delivery |
+| `TestPubSubPublishSetsTimestampWhenMissing` | Sets timestamp when missing |
+| `TestPubSubPublishPreservesProvidedTimestamp` | Preserves provided timestamp |
+
+**File:** `apps/backend/internal/observability/pubsub_test.go`
+
+---
+
+### internal/presenter — State presentation (7 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestStatePayloadIncludesRunningAndRetrying` | State payload includes running and retrying |
+| `TestStatePayloadIncludesTotalsAndRateLimits` | State payload includes totals and rate limits |
+| `TestStatePayloadHumanizesLongMessages` | State payload humanizes long messages |
+| `TestIssuePayloadFindsRunningIssue` | Issue payload finds running issue |
+| `TestIssuePayloadFindsRetryIssueIncludesState` | Issue payload finds retry issue with state |
+| `TestIssuePayloadMissingIssue` | Issue payload returns not found for missing |
+| `TestHumanizeMessageTruncatesLongInput` | Humanize truncates long input |
+
+**File:** `apps/backend/internal/presenter/presenter_test.go`
+
+---
+
+### internal/prompt — Prompt template rendering (6 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestBuildRendersWorkflowPromptTemplate` | Renders workflow prompt template |
+| `TestBuildFailsWhenTemplateMissingField` | Fails when template references missing field |
+| `TestBuildSupportsLowercaseLiquidStyleKeysAndIssueParityFields` | Supports lowercase keys and parity fields |
+| `TestBuildRendersDescriptionInTemplate` | Renders description in template |
+| `TestBuildFailsWhenWorkflowPromptIsEmpty` | Fails when workflow prompt is empty |
+| `TestBuildFailsWhenWorkflowFileMissing` | Fails when workflow file is missing |
+
+**File:** `apps/backend/internal/prompt/builder_test.go`
+
+---
+
+### internal/runtime — Identity (1 test)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestHostRequiresToken` | Token requirements by host |
+
+**File:** `apps/backend/internal/runtime/identity_test.go`
+
+---
+
+### internal/specs — Workflow and PR validation (8 tests)
+
+#### check_test.go (3 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestCheckPassesForValidWorkflow` | Check passes for valid workflow |
+| `TestCheckFailsForEmptyPrompt` | Check fails for empty prompt |
+| `TestCheckFailsWhenProviderCommandMissing` | Check fails when provider command missing |
+
+**File:** `apps/backend/internal/specs/check_test.go`
+
+#### pr_body_test.go (5 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestLintPRBodyValid` | Valid PR body passes lint |
+| `TestLintPRBodyDetectsMissingHeadingAndPlaceholder` | Detects missing heading and placeholder |
+| `TestCaptureSection` | Captures markdown section content |
+| `TestCheckPRBodyEndToEndValid` | End-to-end valid PR body |
+| `TestCheckPRBodyEndToEndReportsTemplateViolations` | End-to-end template violation reporting |
+
+**File:** `apps/backend/internal/specs/pr_body_test.go`
+
+---
+
+### internal/telemetry — Token watcher (3 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestExtractTokens` | Extracts token usage from output |
+| `TestScanGeminiJSON_IdempotentRescan` | Gemini JSON scan is idempotent |
+| `TestScanOpenCodeSQLite_IdempotentRescan` | OpenCode SQLite scan is idempotent |
+
+**File:** `apps/backend/internal/telemetry/watcher_test.go`
+
+---
+
+### internal/tools — Tool execution (1 test)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestExecuteTrackerQueryCandidates` | Tracker query execution returns candidates |
+
+**File:** `apps/backend/internal/tools/linear_executor_test.go`
+
+---
+
+### internal/tracker/memory — In-memory tracker (9 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestFetchCandidateIssuesFiltersByActiveState` | Filters candidates by active state |
+| `TestFetchIssueStatesByIDs` | Fetches issue states by IDs |
+| `TestFetchIssuesByIDs` | Fetches issues by IDs |
+| `TestFetchIssuesByStates` | Fetches issues by states |
+| `TestFetchIssueStatesByIDsSupportsLargeInput` | Supports large input for state fetch |
+| `TestFetchCandidateIssuesReturnsDeterministicOrder` | Candidate fetch returns deterministic order |
+| `TestNewClientWithWorkerAssigneesMarksAssignment` | Worker assignees mark assignment |
+| `TestMemoryClientPreservesRichIssueFields` | Preserves rich issue fields |
+| `TestDeleteIssue` | Deletes issue from memory store |
+
+**File:** `apps/backend/internal/tracker/memory/client_test.go`
+
+---
+
+### internal/utils/git — Git worktree operations (10 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestWorktreeAdd_NewBranch` | Adds worktree with new branch |
+| `TestWorktreeAdd_ExistingBranch` | Adds worktree with existing branch |
+| `TestWorktreeRemove` | Removes worktree |
+| `TestWorktreeRemove_NonExistent` | Handles removal of non-existent worktree |
+| `TestWorktreePrune` | Prunes stale worktree entries |
+| `TestWorktreeList` | Lists worktrees |
+| `TestHeadSHA` | Returns HEAD SHA |
+| `TestBranchDiff_OnlyShowsBranchChanges` | Branch diff shows only branch changes |
+| `TestWorktreeDiff_UncommittedChanges` | Worktree diff shows uncommitted changes |
+| `TestIsGitRepo` | Detects git repository |
+
+**File:** `apps/backend/internal/utils/git/worktree_test.go`
+
+---
+
+### internal/workflow — Workflow loading (7 tests)
+
+#### frontmatter_test.go (5 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestParse_WithFrontMatterAndPrompt` | Parses frontmatter with prompt |
+| `TestParse_WithoutFrontMatter` | Parses file without frontmatter |
+| `TestParse_InvalidFrontMatterYAMLReturnsError` | Invalid YAML returns error |
+| `TestParse_FrontMatterMustBeMap` | Frontmatter must be a map |
+| `TestParse_EmptyFrontMatterAllowed` | Empty frontmatter allowed |
+
+**File:** `apps/backend/internal/workflow/frontmatter_test.go`
+
+#### store_test.go (2 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestStoreCurrentAndForceReload` | Store current and force reload |
+| `TestStoreSetPath` | Store set path switches workflow |
+
+**File:** `apps/backend/internal/workflow/store_test.go`
+
+---
+
+### internal/workspace — Workspace management (15 tests)
+
+#### service_test.go (6 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestEnsureWorktree_CreatesNewWorktree` | Creates new worktree |
+| `TestEnsureWorktree_ReusesExisting` | Reuses existing worktree |
+| `TestRemoveWorktree` | Removes worktree |
+| `TestWorktreePath` | Returns correct worktree path |
+| `TestRunBeforeRunHookReturnsErrorOnFailure` | Before-run hook failure returns error |
+| `TestRunAfterRunHookIgnoresFailureButRunsHook` | After-run hook ignores failure |
+
+**File:** `apps/backend/internal/workspace/service_test.go`
+
+#### path_guard_test.go (4 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestWorkspacePath_SanitizesIdentifier` | Sanitizes workspace identifier |
+| `TestValidateWorkspacePath_RejectsRoot` | Rejects root path |
+| `TestValidateWorkspacePath_RejectsOutsideRoot` | Rejects path outside root |
+| `TestValidateWorkspacePath_RejectsSymlinkEscape` | Rejects symlink escape |
+
+**File:** `apps/backend/internal/workspace/path_guard_test.go`
+
+#### migration_test.go (3 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestPlanWorkspaceMigrationRenameRoot` | Plans migration with root rename |
+| `TestExecuteWorkspaceMigrationDryRunNoMutation` | Dry run does not mutate |
+| `TestExecuteWorkspaceMigrationMovesEntriesOnConflictAwarePlan` | Moves entries with conflict-aware plan |
+
+**File:** `apps/backend/internal/workspace/migration_test.go`
+
+#### hooks_test.go (2 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `TestRunHook_Success` | Hook execution succeeds |
+| `TestRunHook_Timeout` | Hook times out correctly |
+
+**File:** `apps/backend/internal/workspace/hooks_test.go`
 
 ---
 
@@ -261,52 +620,88 @@
 
 ---
 
-## Desktop (TypeScript) — 105 tests across 14 files
+## Desktop (TypeScript) — 105 tests across 11 files
 
-### lib/orchestra-client.test.ts (16 tests)
+### lib/orchestra-client.test.ts (15 tests)
 
 | Test | What it validates |
 |------|-------------------|
-| `normalizeSnapshotPayload returns safe defaults` | Malformed payload handling |
-| `normalizeSnapshotPayload normalizes mixed values` | Field normalization |
-| `normalizeEventEnvelope normalizes valid payload` | Event envelope parsing |
-| `normalizeEventEnvelope applies fallback values` | Fallback for malformed envelopes |
-| `executes state -> refresh -> migration plan -> apply` | Full operator flow contracts |
-| `returns normalized API errors` | UI-safe error display |
-| `rejects blank issue identifiers` | Pre-network validation |
-| `omits Authorization when token empty` | Header handling |
-| `falls back to request_failed for non-json` | Non-JSON error responses |
-| `omits migration query params when blank` | Optional param handling |
-| `trims from/to values in migration apply` | Input sanitization |
-| `isUnauthorizedError detects unauthorized` | Error classification |
-| `isUnauthorizedError returns false for others` | Negative case |
-| `requestText returns text content` | Text endpoint success path |
-| `requestText throws APIError for errors` | Text endpoint error path |
+| `returns safe defaults for malformed payloads` | Malformed payload handling |
+| `normalizes snapshot fields from mixed payload values` | Field normalization |
+| `normalizes valid event payload` | Event envelope parsing |
+| `applies fallback values for malformed envelopes` | Fallback for malformed envelopes |
+| `executes state -> refresh -> migration plan -> migration apply with expected contracts` | Full operator flow contracts |
+| `returns normalized API errors for UI-safe display` | UI-safe error display |
+| `rejects blank issue identifiers before network request` | Pre-network validation |
+| `omits Authorization header when api token is empty` | Header handling |
+| `falls back to request_failed error for non-json error responses` | Non-JSON error responses |
+| `omits workspace migration query params when from/to are blank` | Optional param handling |
+| `trims from/to values in migration apply body` | Input sanitization |
+| `detects unauthorized display strings and error instances` | Error classification |
+| `returns false for non-unauthorized errors` | Negative case |
+| `requestText returns text content for successful responses` | Text endpoint success path |
+| `requestText throws APIError for error responses` | Text endpoint error path |
 
 **File:** `apps/desktop/src/lib/orchestra-client.test.ts`
 
-### lib/runtime-sync.test.ts (7 tests)
+### lib/runtime-sync.test.ts (6 tests)
 
 | Test | What it validates |
 |------|-------------------|
-| `passes bearer token as query param` | Token in SSE URL |
-| `reconnects after error and uses polling` | Reconnection fallback |
-| `applies exponential reconnect backoff` | Backoff timing |
-| `does not create duplicate polling loops` | Polling deduplication |
-| `keeps timers and streams bounded` | Resource cleanup |
+| `passes bearer token as query param when SSE is used` | Token in SSE URL |
+| `reconnects stream after error and uses polling fallback` | Reconnection fallback |
+| `applies exponential reconnect backoff and resets after open` | Backoff timing |
+| `does not create duplicate polling loops across repeated stream errors` | Polling deduplication |
+| `keeps timer and stream counts bounded during reconnect churn` | Resource cleanup |
 | `cancels pending reconnect work on stop` | Stop cleanup |
 
 **File:** `apps/desktop/src/lib/runtime-sync.test.ts`
 
-### lib/validation.test.ts (13 tests)
+### lib/validation.test.ts (19 tests)
+
+#### validateTaskTitle (4 tests)
 
 | Test | What it validates |
 |------|-------------------|
-| `validateTaskTitle` (4) | Empty, too short, too long, valid |
-| `validateTaskDescription` (3) | Too long, valid, empty |
-| `validateUrl` (3) | Empty, valid, invalid |
-| `validateBaseUrl` (5) | Empty, http, https, invalid protocol, invalid URL |
-| `validateProjectPath` (4) | Empty, unix, windows, relative |
+| `returns error for empty title` | Empty title rejected |
+| `returns error for too short title` | Too-short title rejected |
+| `returns error for too long title` | Too-long title rejected |
+| `returns empty string for valid title` | Valid title accepted |
+
+#### validateTaskDescription (3 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `returns error for too long description` | Too-long description rejected |
+| `returns empty string for valid description` | Valid description accepted |
+| `returns empty string for empty description` | Empty description accepted |
+
+#### validateUrl (3 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `returns empty string when URL is empty` | Empty URL accepted |
+| `returns empty string for valid URL` | Valid URL accepted |
+| `returns error for invalid URL` | Invalid URL rejected |
+
+#### validateBaseUrl (5 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `returns error for empty URL` | Empty base URL rejected |
+| `returns empty string for valid http URL` | HTTP URL accepted |
+| `returns empty string for valid https URL` | HTTPS URL accepted |
+| `returns error for invalid protocol` | Invalid protocol rejected |
+| `returns error for invalid URL` | Invalid URL rejected |
+
+#### validateProjectPath (4 tests)
+
+| Test | What it validates |
+|------|-------------------|
+| `returns error for empty path` | Empty path rejected |
+| `returns empty string for absolute unix path` | Unix path accepted |
+| `returns empty string for absolute windows path` | Windows path accepted |
+| `returns error for relative path` | Relative path rejected |
 
 **File:** `apps/desktop/src/lib/validation.test.ts`
 
@@ -389,13 +784,13 @@
 | Test | What it validates |
 |------|-------------------|
 | `renders title input and description textarea` | Input rendering |
-| `submit button disabled when title empty` | Validation guard |
-| `submit button disabled when no project` | Project required |
+| `submit button is disabled when title is empty` | Validation guard |
+| `submit button is disabled when no project is selected` | Project required |
 | `shows title validation error for too-short titles` | Validation feedback |
 
 **File:** `apps/desktop/src/components/tasks/CreateTaskDialog.test.tsx`
 
-### App.smoke.test.tsx (27 tests, 2 skipped)
+### App.smoke.test.tsx (29 tests, 2 skipped)
 
 | Test | What it validates |
 |------|-------------------|
@@ -411,17 +806,17 @@
 | `opens project detail` | Project navigation |
 | `deletes a project` | Project deletion flow |
 | `warns on missing project path` | Path validation |
-| ~~`saves backend config from settings form`~~ | _Skipped: React 19 + jsdom_ |
-| ~~`shows backend config validation error`~~ | _Skipped: React 19 + jsdom_ |
+| `saves backend config from settings form` | Settings persistence |
+| `shows backend config validation error for invalid URL` | Settings validation |
 | `creates backend profile from settings` | Profile creation |
 | `switches backend profile` | Profile switching |
 | `reconnects SSE on profile switch` | SSE reconnection |
-| `deletes non-default profile` | Profile deletion |
-| `disables profile delete when only one` | Guard |
+| `deletes non-default profile from settings` | Profile deletion |
+| `disables profile delete when only one profile exists` | Guard |
 | ~~`runs workspace migration`~~ | _Skipped: migration UI removed_ |
 | ~~`shows migration error`~~ | _Skipped: migration UI removed_ |
 | `shows refresh status` | Refresh feedback |
-| `shows refresh failure error` | Error display |
+| `shows refresh failure error in runtime strip` | Error display |
 | `passes token to SSE` | Token in SSE URL |
 | `sidebar navigation` | Section switching |
 | `arrow key navigation in sidebar` | Keyboard nav |
