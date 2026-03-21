@@ -360,7 +360,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
 
     const pathExists = project.path_exists !== false
     const tabs = [
-        { id: 'overview', label: 'Overview', icon: <Layers size={14} />, needsPath: false },
+        { id: 'overview', label: 'Project Tasks', icon: <Layers size={14} />, needsPath: false },
         { id: 'files', label: 'Files', icon: <FileText size={14} />, needsPath: true },
         { id: 'git', label: 'Git', icon: <GitBranch size={14} />, needsPath: true },
     ] as const
