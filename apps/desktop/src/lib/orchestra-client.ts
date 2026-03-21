@@ -1010,6 +1010,22 @@ export async function deleteMCPServer(config: BackendConfig, id: string): Promis
   })
 }
 
+/** Options for creating a new GitHub repository through the orchestrator. */
+export type CreateRepoOptions = {
+  name: string
+  description?: string
+  private: boolean
+}
+
+/** Result returned after creating a GitHub repository. */
+export type CreateRepoResult = {
+  full_name: string
+  html_url: string
+  clone_url: string
+  owner: string
+  repo: string
+}
+
 /** A GitHub issue retrieved through the orchestrator's GitHub integration. */
 export type GitHubIssue = {
   number: number
@@ -1158,6 +1174,25 @@ export async function createProjectGitHubPull(config: BackendConfig, projectId: 
 export async function disconnectProjectGitHub(config: BackendConfig, projectId: string): Promise<void> {
   await requestJSON<void>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/disconnect`, {
     method: 'POST',
+  })
+}
+
+/**
+ * Creates a new GitHub repository for a project through the orchestrator.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ * @param opts - Repository creation options (name, description, visibility).
+ * @returns The created repository details.
+ */
+export async function createGitHubRepo(
+  config: BackendConfig,
+  projectId: string,
+  opts: CreateRepoOptions
+): Promise<CreateRepoResult> {
+  return requestJSON<CreateRepoResult>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/create-repo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(opts),
   })
 }
 
