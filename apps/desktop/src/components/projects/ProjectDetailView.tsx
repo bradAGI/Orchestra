@@ -493,17 +493,16 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                         )}
 
                         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                            <DialogTrigger asChild>
-                                <AppTooltip content="Remove project from workspace">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="h-8 w-8 p-0 text-red-500 hover:text-red-400 hover:bg-red-500/10 border-red-500/20"
-                                    >
-                                        <Trash2 size={14} />
-                                    </Button>
-                                </AppTooltip>
-                            </DialogTrigger>
+                            <AppTooltip content="Remove project from workspace">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 text-red-500 hover:text-red-400 hover:bg-red-500/10 border-red-500/20"
+                                    onClick={() => setIsDeleteDialogOpen(true)}
+                                >
+                                    <Trash2 size={14} />
+                                </Button>
+                            </AppTooltip>
                             <DialogContent className="sm:max-w-md bg-popover border-border shadow-2xl">
                                 <DialogHeader>
                                     <DialogTitle className="text-xl font-bold text-foreground flex items-center gap-2">
