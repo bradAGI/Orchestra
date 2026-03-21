@@ -404,7 +404,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                             {project.remote_url && (
                                 <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 gap-1 h-5 px-1.5 cursor-default">
                                     <GitBranch size={10} />
-                                    Git Managed
+                                    Git Remote
                                 </Badge>
                             )}
                             {project.github_token ? (
