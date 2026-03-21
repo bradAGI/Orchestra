@@ -19,12 +19,6 @@ function relativeTime(dateStr: string): string {
   return `${months}mo ago`
 }
 
-function initials(author: string): string {
-  const parts = author.split(/[\s@]+/).filter(Boolean)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return (author.slice(0, 2) || '??').toUpperCase()
-}
-
 export function CommitTimeline({
   commits,
   selectedHash,
@@ -57,7 +51,7 @@ export function CommitTimeline({
         </div>
       </div>
 
-      {/* List */}
+      {/* Commit list */}
       <div className="flex-1 overflow-y-auto">
         {filtered.map((commit) => {
           const hash = commit.hash ?? ''
@@ -66,18 +60,39 @@ export function CommitTimeline({
             <button
               key={hash}
               onClick={() => onSelectCommit(hash)}
-              className={`w-full text-left flex items-start gap-2.5 px-3 py-2 hover:bg-muted/10 transition-colors ${
-                selected ? 'border-l-2 border-primary bg-primary/5' : 'border-l-2 border-transparent'
+              data-selected={selected}
+              className={`w-full text-left flex items-stretch gap-0 px-3 py-2 hover:bg-muted/10 transition-colors ${
+                selected ? 'bg-primary/5' : ''
               }`}
             >
-              <div className="w-7 h-7 rounded-full bg-muted/30 flex items-center justify-center text-[9px] font-bold text-muted-foreground shrink-0 mt-0.5">
-                {initials(commit.author ?? '')}
+              {/* Timeline column */}
+              <div className="relative flex flex-col items-center w-5 shrink-0 mr-2.5">
+                {/* Vertical line */}
+                <div className="absolute inset-0 left-1/2 -translate-x-1/2 w-[2px] bg-primary/20" />
+                {/* Dot */}
+                <div
+                  data-testid="timeline-dot"
+                  className={`relative mt-1.5 w-2 h-2 rounded-full border-2 ${
+                    selected
+                      ? 'bg-primary border-primary'
+                      : 'bg-background border-primary/50'
+                  }`}
+                />
               </div>
+
+              {/* Content */}
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-foreground truncate">{commit.message}</div>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="font-mono text-[9px] text-muted-foreground/60">{hash.slice(0, 7)}</span>
-                  <span className="text-[9px] text-muted-foreground/40">{relativeTime(commit.date)}</span>
+                  <span className="font-mono text-[9px] bg-muted/20 rounded px-1 py-px text-muted-foreground/60">
+                    {hash.slice(0, 7)}
+                  </span>
+                  {commit.author && (
+                    <span className="text-[10px] text-muted-foreground/70">{commit.author}</span>
+                  )}
+                  <span className="text-[9px] text-muted-foreground/40">
+                    {relativeTime(commit.date)}
+                  </span>
                 </div>
               </div>
             </button>
