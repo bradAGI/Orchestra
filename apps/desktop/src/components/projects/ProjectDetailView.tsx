@@ -102,7 +102,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     useEffect(() => {
         if (!config || !project.github_token) return
         fetchProjectGitHubIssues(config, project.id, 'open')
-            .then((data) => setGithubIssues(data.issues))
+            .then((data) => setGithubIssues(data?.issues ?? []))
             .catch(() => setGithubIssues([]))
     }, [config, project.id, project.github_token])
 
@@ -112,7 +112,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         if (activeTab !== 'overview') return
         const interval = setInterval(() => {
             fetchProjectGitHubIssues(config, project.id, 'open')
-                .then((data) => setGithubIssues(data.issues))
+                .then((data) => setGithubIssues(data?.issues ?? []))
                 .catch(() => {})
         }, 60000)
         return () => clearInterval(interval)

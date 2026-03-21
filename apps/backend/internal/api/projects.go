@@ -661,8 +661,7 @@ func (s *Server) GetProjectGitHubIssues(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
-		// No GitHub connection - return empty array
-		writeJSON(w, http.StatusOK, []any{})
+		writeJSON(w, http.StatusOK, map[string]any{"issues": []any{}, "has_more": false})
 		return
 	}
 
@@ -820,7 +819,7 @@ func (s *Server) GetProjectGitHubPulls(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
-		writeJSON(w, http.StatusOK, []any{})
+		writeJSON(w, http.StatusOK, map[string]any{"pulls": []any{}, "has_more": false})
 		return
 	}
 

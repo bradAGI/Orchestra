@@ -365,7 +365,7 @@ export default function App() {
     Promise.all(connected.map(async (p) => {
       try {
         const ghData = await fetchProjectGitHubIssues(config, p.id)
-        return ghData.issues.map(gh => ({
+        return (ghData?.issues ?? []).map(gh => ({
           id: `github-${gh.number}`, issue_id: `github-${gh.number}`,
           identifier: `GH-${gh.number}`, issue_identifier: `GH-${gh.number}`,
           title: gh.title, description: gh.body, state: 'Backlog',
