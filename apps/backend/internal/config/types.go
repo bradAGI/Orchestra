@@ -18,6 +18,8 @@ type Config struct {
 	Port int
 	// WorkspaceRoot is the filesystem directory where agent workspaces are created.
 	WorkspaceRoot string
+	// WorktreeRoot is the directory where per-issue git worktrees are created.
+	WorktreeRoot string
 	// APIToken is the bearer token required for non-loopback API requests.
 	APIToken string
 	// WorkflowFile is the path to the WORKFLOW.md file used for prompt templates and config overrides.

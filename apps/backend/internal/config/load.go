@@ -31,6 +31,7 @@ func Load() (Config, error) {
 	host := getenvOrEmpty("ORCHESTRA_SERVER_HOST")
 	portRaw := getenvOrEmpty("ORCHESTRA_SERVER_PORT")
 	workspaceRoot := getenvOrEmpty("ORCHESTRA_WORKSPACE_ROOT")
+	worktreeRoot := getenvOrEmpty("ORCHESTRA_WORKTREE_ROOT")
 	apiToken := getenvOrEmpty("ORCHESTRA_API_TOKEN")
 	workflowPath := getenvOrDefault("ORCHESTRA_WORKFLOW_FILE", "WORKFLOW.md")
 	workflowPath = resolveWorkflowPath(strings.TrimSpace(workflowPath))
@@ -236,10 +237,15 @@ func Load() (Config, error) {
 		}
 	}
 
+	if strings.TrimSpace(worktreeRoot) == "" {
+		worktreeRoot = filepath.Join(os.Getenv("HOME"), ".orchestra", "worktrees")
+	}
+
 	return Config{
 		Host:                     strings.TrimSpace(host),
 		Port:                     port,
 		WorkspaceRoot:            strings.TrimSpace(workspaceRoot),
+		WorktreeRoot:             worktreeRoot,
 		APIToken:                 strings.TrimSpace(apiToken),
 		WorkflowFile:             strings.TrimSpace(workflowPath),
 		AgentProvider:            strings.TrimSpace(strings.ToUpper(agentProvider)),

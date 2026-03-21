@@ -47,6 +47,7 @@ type RunningEntry struct {
 	SessionID       string   `json:"session_id"`
 	Provider        string   `json:"provider"`
 	SessionLogPath  string   `json:"session_log_path,omitempty"`
+	WorktreePath    string   `json:"worktree_path,omitempty"`
 	DisabledTools   []string `json:"disabled_tools,omitempty"`
 	TurnCount       int64    `json:"turn_count"`
 	LastEvent       string   `json:"last_event"`
