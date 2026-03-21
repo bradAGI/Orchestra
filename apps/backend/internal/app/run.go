@@ -89,9 +89,12 @@ func Run(logger zerolog.Logger) error {
 	}
 	orchestratorService.SetAgentRegistry(agentRegistry, cfg.AgentCommands, cfg.AgentProvider)
 
-	workspaceService := workspace.Service{Root: cfg.WorkspaceRoot}
+	workspaceService := workspace.Service{Root: cfg.WorktreeRoot}
 	orchestratorService.SetWorkspaceService(workspaceService)
 	orchestratorService.SetWorkspaceRoot(cfg.WorkspaceRoot)
+
+	// Prune stale worktree references left over from previous crashes.
+	pruneAllWorktrees(warehouseDB, workspaceService, logger)
 
 	// Initialize MCP (Merge Config + DB)
 	allMCPServers := make(map[string]string)
@@ -112,9 +115,9 @@ func Run(logger zerolog.Logger) error {
 
 	router := api.NewRouterWithPubSub(logger, orchestratorService, &cfg, pubsub, warehouseDB, termManager)
 
-	cleanupTerminalWorkspaces(orchestratorService, trackerClient, workspaceService, cfg.WorkspaceHooks, logger)
+	cleanupTerminalWorkspaces(orchestratorService, trackerClient, workspaceService, cfg.WorkspaceHooks, warehouseDB, logger)
 
-	go startGarbageCollector(orchestratorService, warehouseDB, cfg.WorkspaceRoot, cfg.TelemetryRetentionDays, logger)
+	go startGarbageCollector(orchestratorService, warehouseDB, workspaceService, cfg.TelemetryRetentionDays, logger)
 	go startRefreshWorker(orchestratorService, pubsub, logger)
 	go telemetry.StartWatcher(context.Background(), warehouseDB, cfg.ProjectRoots, telemetry.Options{
 		Providers:       cfg.TelemetryProviders,
@@ -868,7 +871,7 @@ func extractGitHubIssueNumber(url string) int {
 
 // cleanupTerminalWorkspaces removes workspaces for issues that have reached a
 // terminal state, called once at startup to reclaim disk space.
-func cleanupTerminalWorkspaces(service *orchestrator.Service, trackerClient tracker.Client, workspaceService workspace.Service, hooks workspace.Hooks, logger zerolog.Logger) {
+func cleanupTerminalWorkspaces(service *orchestrator.Service, trackerClient tracker.Client, workspaceService workspace.Service, hooks workspace.Hooks, warehouseDB *db.DB, logger zerolog.Logger) {
 	if trackerClient == nil {
 		return
 	}
@@ -879,16 +882,26 @@ func cleanupTerminalWorkspaces(service *orchestrator.Service, trackerClient trac
 		return
 	}
 
+	ctx := context.Background()
 	for _, issue := range issues {
-		if err := workspaceService.RemoveIssueWorkspaces(issue.Identifier, "", hooks); err != nil {
-			logger.Warn().Err(err).Str("issue_identifier", issue.Identifier).Msg("startup workspace cleanup failed")
+		if issue.BranchName == "" || issue.ProjectID == "" {
+			continue
+		}
+		project, projErr := warehouseDB.GetProjectByID(ctx, issue.ProjectID)
+		if projErr != nil {
+			logger.Warn().Err(projErr).Str("project_id", issue.ProjectID).Msg("startup cleanup: project lookup failed")
+			continue
+		}
+		wtPath := workspaceService.WorktreePath(project.ID, issue.BranchName)
+		if err := workspaceService.RemoveWorktree(project.RootPath, wtPath, hooks); err != nil {
+			logger.Warn().Err(err).Str("issue_identifier", issue.Identifier).Msg("startup worktree cleanup failed")
 		}
 	}
 }
 
-// startGarbageCollector runs hourly to prune old database events and remove
-// orphaned workspaces that are no longer associated with active runs.
-func startGarbageCollector(service *orchestrator.Service, warehouseDB *db.DB, root string, retentionDays int, logger zerolog.Logger) {
+// startGarbageCollector runs hourly to prune old database events and clean up
+// stale git worktree references for all known projects.
+func startGarbageCollector(service *orchestrator.Service, warehouseDB *db.DB, workspaceService workspace.Service, retentionDays int, logger zerolog.Logger) {
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
 
@@ -908,41 +921,28 @@ func startGarbageCollector(service *orchestrator.Service, warehouseDB *db.DB, ro
 				}
 			}
 
-			active := service.GetActiveWorkspaceIdentifiers()
-			activeSet := make(map[string]struct{})
-			for _, id := range active {
-				activeSet[id] = struct{}{}
-			}
+			// Prune stale worktree references for each known project.
+			pruneAllWorktrees(warehouseDB, workspaceService, logger)
+		}
+	}
+}
 
-			entries, err := os.ReadDir(root)
-			if err != nil {
-				continue
-			}
-
-			for _, entry := range entries {
-				if !entry.IsDir() {
-					continue
-				}
-				name := entry.Name()
-				if _, ok := activeSet[name]; ok {
-					continue
-				}
-
-				// Check if it's an orchestra workspace (safety check)
-				marker := filepath.Join(root, name, ".orchestra")
-				if _, err := os.Stat(marker); os.IsNotExist(err) {
-					continue
-				}
-
-				// Check age - don't delete brand new workspaces that might be initializing
-				info, err := entry.Info()
-				if err == nil && time.Since(info.ModTime()) < 2*time.Hour {
-					continue
-				}
-
-				logger.Info().Str("workspace", name).Msg("cleaning up orphaned workspace")
-				_ = os.RemoveAll(filepath.Join(root, name))
-			}
+// pruneAllWorktrees iterates all known projects and prunes stale worktree refs.
+func pruneAllWorktrees(warehouseDB *db.DB, workspaceService workspace.Service, logger zerolog.Logger) {
+	if warehouseDB == nil {
+		return
+	}
+	projects, err := warehouseDB.GetProjects(context.Background())
+	if err != nil {
+		logger.Warn().Err(err).Msg("worktree prune: failed to list projects")
+		return
+	}
+	for _, p := range projects {
+		if p.RootPath == "" {
+			continue
+		}
+		if err := workspaceService.PruneWorktrees(p.RootPath); err != nil {
+			logger.Warn().Err(err).Str("project", p.Name).Msg("worktree prune failed")
 		}
 	}
 }
