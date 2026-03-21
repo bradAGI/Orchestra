@@ -293,7 +293,7 @@ export function GitTab({
     <div className="flex flex-col h-full overflow-hidden relative">
       {/* Branch bar */}
       <div className="flex items-center border-b border-border/40 shrink-0 bg-card/30">
-        <div className="flex-1 min-w-0 overflow-hidden">
+        <div className="flex-1 min-w-0 overflow-visible">
           <BranchBar
             projectId={project.id}
             config={config}

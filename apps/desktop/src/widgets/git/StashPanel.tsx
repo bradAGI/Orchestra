@@ -8,7 +8,7 @@ interface StashPanelProps {
 
 export function StashPanel({ stashes, onStash, onApply, onDrop }: StashPanelProps) {
   return (
-    <div className="absolute right-0 top-full mt-1 bg-card border border-border/40 rounded-xl shadow-lg z-20 py-1 min-w-[260px] max-h-[300px] overflow-y-auto">
+    <div className="absolute right-0 top-full mt-1 bg-card border border-border/40 rounded-xl shadow-lg z-50 py-1 min-w-[260px] max-h-[300px] overflow-y-auto">
       {/* Header */}
       <div className="px-3 py-1.5 flex items-center justify-between border-b border-border/20">
         <span className="text-[10px] font-bold text-muted-foreground/70">

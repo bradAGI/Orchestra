@@ -182,7 +182,7 @@ export function BranchBar({
         </button>
 
         {dropdownOpen && (
-          <div className="absolute left-0 top-full mt-1 bg-card border border-border/40 rounded-xl shadow-lg z-20 py-1 min-w-[240px] max-h-[300px] overflow-y-auto">
+          <div className="absolute left-0 top-full mt-1 bg-card border border-border/40 rounded-xl shadow-lg z-50 py-1 min-w-[240px] max-h-[300px] overflow-y-auto">
             {/* Local branches section */}
             <div className="px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">
               Local Branches
