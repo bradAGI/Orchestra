@@ -1,19 +1,55 @@
 package app
 
 import (
+	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/orchestra/orchestra/apps/backend/internal/agents"
 	"github.com/orchestra/orchestra/apps/backend/internal/config"
+	"github.com/orchestra/orchestra/apps/backend/internal/db"
 	"github.com/orchestra/orchestra/apps/backend/internal/observability"
 	"github.com/orchestra/orchestra/apps/backend/internal/orchestrator"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker/memory"
 	"github.com/orchestra/orchestra/apps/backend/internal/workspace"
 	"github.com/rs/zerolog"
 )
+
+// testProjectSetup creates a temporary git repo and a SQLite DB with a project
+// pointing at it, returning the workspace root, project ID, and DB handle.
+func testProjectSetup(t *testing.T) (workspaceRoot string, projectID string, warehouseDB *db.DB) {
+	t.Helper()
+	workspaceRoot = t.TempDir()
+	repoDir := filepath.Join(workspaceRoot, "repo")
+	if err := os.MkdirAll(repoDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Initialize a bare-minimum git repo with one commit so HEAD exists.
+	for _, args := range [][]string{
+		{"git", "init", repoDir},
+		{"git", "-C", repoDir, "config", "user.email", "test@test.com"},
+		{"git", "-C", repoDir, "config", "user.name", "test"},
+		{"git", "-C", repoDir, "commit", "--allow-empty", "-m", "init"},
+	} {
+		cmd := exec.Command(args[0], args[1:]...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%v failed: %s", args, out)
+		}
+	}
+	dbPath := filepath.Join(workspaceRoot, "warehouse.db")
+	warehouseDB, err := db.Connect(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projectID, err = warehouseDB.UpsertProject(context.Background(), repoDir, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return workspaceRoot, projectID, warehouseDB
+}
 
 func TestNewTrackerClientUsesMemoryWhenEndpointUnset(t *testing.T) {
 	client := newTrackerClient(config.Config{}, nil)
@@ -72,17 +108,18 @@ func TestPublishLifecycleEventPublishesTypedEnvelope(t *testing.T) {
 }
 
 func TestProcessExecutionTickPublishesSuccessLifecycleEvents(t *testing.T) {
+	workspaceRoot, projectID, warehouseDB := testProjectSetup(t)
 	service := orchestrator.NewService()
 	now := time.Now().UTC().Format(time.RFC3339)
 	service.SetRunningForTest([]orchestrator.RunningEntry{{
 		IssueID:         "1",
 		IssueIdentifier: "ORC-1",
+		ProjectID:       projectID,
 		State:           "Todo",
 		StartedAt:       now,
 		LastEventAt:     now,
 	}})
 
-	workspaceRoot := t.TempDir()
 	registry := agents.NewRegistry(map[string]string{"opencode": "printf '{\"event\":\"turn.completed\",\"message\":\"ok\"}\\n'"})
 	pubsub := observability.NewPubSub()
 	ch, unsub := pubsub.Subscribe(16)
@@ -102,7 +139,7 @@ func TestProcessExecutionTickPublishesSuccessLifecycleEvents(t *testing.T) {
 		nil,
 		workspace.Hooks{},
 		pubsub,
-		nil,
+		warehouseDB,
 		nil,
 		nil,
 		zerolog.Nop(),
@@ -134,17 +171,18 @@ func TestProcessExecutionTickPublishesSuccessLifecycleEvents(t *testing.T) {
 }
 
 func TestProcessExecutionTickPublishesFailureAndRetryLifecycleEvents(t *testing.T) {
+	workspaceRoot, projectID, warehouseDB := testProjectSetup(t)
 	service := orchestrator.NewService()
 	now := time.Now().UTC().Format(time.RFC3339)
 	service.SetRunningForTest([]orchestrator.RunningEntry{{
 		IssueID:         "1",
 		IssueIdentifier: "ORC-1",
+		ProjectID:       projectID,
 		State:           "Todo",
 		StartedAt:       now,
 		LastEventAt:     now,
 	}})
 
-	workspaceRoot := t.TempDir()
 	registry := agents.NewRegistry(map[string]string{"opencode": "exit 2"})
 	pubsub := observability.NewPubSub()
 	ch, unsub := pubsub.Subscribe(16)
@@ -164,7 +202,7 @@ func TestProcessExecutionTickPublishesFailureAndRetryLifecycleEvents(t *testing.
 		nil,
 		workspace.Hooks{},
 		pubsub,
-		nil,
+		warehouseDB,
 		nil,
 		nil,
 		zerolog.Nop(),
@@ -211,19 +249,20 @@ func TestProcessExecutionTickPublishesFailureAndRetryLifecycleEvents(t *testing.
 }
 
 func TestProcessExecutionTickDoesNotPublishRetryWhenAttemptExceedsMax(t *testing.T) {
+	workspaceRoot, projectID, warehouseDB := testProjectSetup(t)
 	service := orchestrator.NewService()
 	service.SetRetryPolicy(1, 1*time.Second, 1*time.Minute)
 	now := time.Now().UTC().Format(time.RFC3339)
 	service.SetRunningForTest([]orchestrator.RunningEntry{{
 		IssueID:         "1",
 		IssueIdentifier: "ORC-1",
+		ProjectID:       projectID,
 		State:           "Todo",
 		TurnCount:       1,
 		StartedAt:       now,
 		LastEventAt:     now,
 	}})
 
-	workspaceRoot := t.TempDir()
 	registry := agents.NewRegistry(map[string]string{"opencode": "exit 2"})
 	pubsub := observability.NewPubSub()
 	ch, unsub := pubsub.Subscribe(16)
@@ -243,7 +282,7 @@ func TestProcessExecutionTickDoesNotPublishRetryWhenAttemptExceedsMax(t *testing
 		nil,
 		workspace.Hooks{},
 		pubsub,
-		nil,
+		warehouseDB,
 		nil,
 		nil,
 		zerolog.Nop(),
@@ -358,17 +397,18 @@ func TestClassifyRefreshRetryCause(t *testing.T) {
 }
 
 func TestProcessExecutionTickPreservesRateLimitsFromMixedNestedEnvelope(t *testing.T) {
+	workspaceRoot, projectID, warehouseDB := testProjectSetup(t)
 	service := orchestrator.NewService()
 	now := time.Now().UTC().Format(time.RFC3339)
 	service.SetRunningForTest([]orchestrator.RunningEntry{{
 		IssueID:         "1",
 		IssueIdentifier: "ORC-1",
+		ProjectID:       projectID,
 		State:           "Todo",
 		StartedAt:       now,
 		LastEventAt:     now,
 	}})
 
-	workspaceRoot := t.TempDir()
 	registry := agents.NewRegistry(map[string]string{"opencode": "printf '%s\\n' '{\"event\":\"thread/rate_limits\",\"meta\":{\"data\":[{\"rate_limits\":{\"remaining\":9,\"reset_at\":\"soon\"}}]}}' '{\"event\":\"turn.completed\",\"usage\":{\"inputTokens\":3,\"outputTokens\":2}}'"})
 
 	service.SetMaxTurns(10)
@@ -385,7 +425,7 @@ func TestProcessExecutionTickPreservesRateLimitsFromMixedNestedEnvelope(t *testi
 		nil,
 		workspace.Hooks{},
 		nil,
-		nil,
+		warehouseDB,
 		nil,
 		nil,
 		zerolog.Nop(),
@@ -402,18 +442,19 @@ func TestProcessExecutionTickPreservesRateLimitsFromMixedNestedEnvelope(t *testi
 }
 
 func TestProcessExecutionTickSkipsBeforeRunHookAfterFirstTurn(t *testing.T) {
+	workspaceRoot, projectID, warehouseDB := testProjectSetup(t)
 	service := orchestrator.NewService()
 	now := time.Now().UTC().Format(time.RFC3339)
 	service.SetRunningForTest([]orchestrator.RunningEntry{{
 		IssueID:         "1",
 		IssueIdentifier: "ORC-1",
+		ProjectID:       projectID,
 		State:           "In Progress",
 		TurnCount:       1,
 		StartedAt:       now,
 		LastEventAt:     now,
 	}})
 
-	workspaceRoot := t.TempDir()
 	registry := agents.NewRegistry(map[string]string{"opencode": "printf '{\"event\":\"turn.completed\"}\\n'"})
 	hooks := workspace.Hooks{BeforeRun: "echo ran > before-run.txt"}
 
@@ -431,31 +472,35 @@ func TestProcessExecutionTickSkipsBeforeRunHookAfterFirstTurn(t *testing.T) {
 		nil,
 		hooks,
 		nil,
-		nil,
+		warehouseDB,
 		nil,
 		nil,
 		zerolog.Nop(),
 	)
 
-	workspacePath := filepath.Join(workspaceRoot, "ORC-1")
+	// The worktree path is now under workspaceRoot/<projectID>/orc-1, not workspaceRoot/ORC-1.
+	// Check that before-run.txt does NOT exist in the worktree.
+	branchName := "orc-1"
+	workspacePath := filepath.Join(workspaceRoot, projectID, branchName)
 	if _, err := os.Stat(filepath.Join(workspacePath, "before-run.txt")); !os.IsNotExist(err) {
 		t.Fatalf("expected before_run hook to be skipped after first turn, stat err=%v", err)
 	}
 }
 
 func TestProcessExecutionTickPublishesBeforeRunHookFailureCause(t *testing.T) {
+	workspaceRoot, projectID, warehouseDB := testProjectSetup(t)
 	service := orchestrator.NewService()
 	now := time.Now().UTC().Format(time.RFC3339)
 	service.SetRunningForTest([]orchestrator.RunningEntry{{
 		IssueID:         "1",
 		IssueIdentifier: "ORC-1",
+		ProjectID:       projectID,
 		State:           "Todo",
 		TurnCount:       0,
 		StartedAt:       now,
 		LastEventAt:     now,
 	}})
 
-	workspaceRoot := t.TempDir()
 	registry := agents.NewRegistry(map[string]string{"opencode": "printf '{\"event\":\"turn.completed\"}\\n'"})
 	pubsub := observability.NewPubSub()
 	ch, unsub := pubsub.Subscribe(16)
@@ -475,7 +520,7 @@ func TestProcessExecutionTickPublishesBeforeRunHookFailureCause(t *testing.T) {
 		nil,
 		workspace.Hooks{BeforeRun: "exit 14"},
 		pubsub,
-		nil,
+		warehouseDB,
 		nil,
 		nil,
 		zerolog.Nop(),

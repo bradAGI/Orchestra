@@ -280,46 +280,70 @@ func processExecutionTick(
 		}
 	}
 
-	// If the task belongs to a project, use the project's root_path as the workspace
-	// so the agent operates on the actual codebase, not an empty temp directory.
+	// Require a project with a valid git repo to dispatch into a per-issue worktree.
 	var workspacePath string
 	var effectiveWorkspaceRoot string
 	var created bool
 	var createRes workspace.HookResult
 	var err error
 	var resolvedProject db.Project
-	if entry.ProjectID != "" && warehouseDB != nil {
-		project, projErr := warehouseDB.GetProjectByID(context.Background(), entry.ProjectID)
-		resolvedProject = project
-		if projErr != nil {
-			logger.Warn().Err(projErr).Str("issue_id", entry.IssueID).Str("project_id", entry.ProjectID).Msg("failed to lookup project for workspace")
-		} else if project.RootPath == "" || !filepath.IsAbs(project.RootPath) {
-			logger.Warn().Str("issue_id", entry.IssueID).Str("root_path", project.RootPath).Msg("project root path is empty or not absolute")
-		} else if info, statErr := os.Stat(project.RootPath); statErr != nil || !info.IsDir() {
-			logger.Warn().Str("issue_id", entry.IssueID).Str("root_path", project.RootPath).Msg("project root path does not exist or is not a directory")
-		} else {
-			workspacePath = project.RootPath
-			effectiveWorkspaceRoot = filepath.Dir(project.RootPath)
-			logger.Info().Str("issue_id", entry.IssueID).Str("project_path", workspacePath).Msg("using project root as workspace")
-		}
-	} else {
-		logger.Info().Str("issue_id", entry.IssueID).Str("project_id", entry.ProjectID).Bool("db_nil", warehouseDB == nil).Msg("skipping project workspace lookup")
-	}
-	if effectiveWorkspaceRoot == "" {
-		effectiveWorkspaceRoot = workspaceRoot
+
+	if entry.ProjectID == "" || warehouseDB == nil {
+		logger.Error().Str("issue_id", entry.IssueID).Str("project_id", entry.ProjectID).Bool("db_nil", warehouseDB == nil).Msg("issue has no project or db is nil; cannot dispatch")
+		service.RecordRunFailure(entry.IssueID, activeProviderName, entry.IssueIdentifier, entry.TurnCount+1, service.NextRetryDue(entry.IssueID, entry.TurnCount+1), fmt.Errorf("no project or database"))
+		publishSnapshot(pubsub, service)
+		return
 	}
 
-	if workspacePath == "" {
-		// Fallback to the generated workspace if no project path available
-		publishLifecycleEvent(pubsub, "HOOK_STARTED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create"})
-		var ensureErr error
-		workspacePath, created, createRes, ensureErr = workspaceService.EnsureIssueWorkspace(entry.IssueIdentifier, activeProviderName, workspaceHooks)
-		if ensureErr != nil {
-			err = ensureErr
+	project, projErr := warehouseDB.GetProjectByID(context.Background(), entry.ProjectID)
+	if projErr != nil {
+		logger.Error().Err(projErr).Str("issue_id", entry.IssueID).Str("project_id", entry.ProjectID).Msg("failed to lookup project for workspace")
+		service.RecordRunFailure(entry.IssueID, activeProviderName, entry.IssueIdentifier, entry.TurnCount+1, service.NextRetryDue(entry.IssueID, entry.TurnCount+1), projErr)
+		publishSnapshot(pubsub, service)
+		return
+	}
+	resolvedProject = project
+
+	if project.RootPath == "" || !filepath.IsAbs(project.RootPath) {
+		errMsg := fmt.Errorf("project root path is empty or not absolute: %q", project.RootPath)
+		logger.Error().Str("issue_id", entry.IssueID).Str("root_path", project.RootPath).Msg(errMsg.Error())
+		service.RecordRunFailure(entry.IssueID, activeProviderName, entry.IssueIdentifier, entry.TurnCount+1, service.NextRetryDue(entry.IssueID, entry.TurnCount+1), errMsg)
+		publishSnapshot(pubsub, service)
+		return
+	}
+	if info, statErr := os.Stat(project.RootPath); statErr != nil || !info.IsDir() {
+		errMsg := fmt.Errorf("project root path does not exist or is not a directory: %s", project.RootPath)
+		logger.Error().Str("issue_id", entry.IssueID).Str("root_path", project.RootPath).Msg(errMsg.Error())
+		service.RecordRunFailure(entry.IssueID, activeProviderName, entry.IssueIdentifier, entry.TurnCount+1, service.NextRetryDue(entry.IssueID, entry.TurnCount+1), errMsg)
+		publishSnapshot(pubsub, service)
+		return
+	}
+	if !gitutil.IsGitRepo(project.RootPath) {
+		errMsg := fmt.Errorf("project root is not a git repository: %s", project.RootPath)
+		logger.Error().Str("issue_id", entry.IssueID).Str("root_path", project.RootPath).Msg(errMsg.Error())
+		service.RecordRunFailure(entry.IssueID, activeProviderName, entry.IssueIdentifier, entry.TurnCount+1, service.NextRetryDue(entry.IssueID, entry.TurnCount+1), errMsg)
+		publishSnapshot(pubsub, service)
+		return
+	}
+
+	effectiveWorkspaceRoot = filepath.Dir(project.RootPath)
+
+	branchName := strings.ToLower(strings.ReplaceAll(entry.IssueIdentifier, " ", "-"))
+	publishLifecycleEvent(pubsub, "HOOK_STARTED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create"})
+
+	var wtPath string
+	var baseSHA string
+	wtPath, baseSHA, created, err = workspaceService.EnsureWorktree(project.RootPath, project.ID, branchName, workspaceHooks)
+	if err == nil {
+		workspacePath = wtPath
+		service.SetWorktreePath(entry.IssueID, wtPath)
+		logger.Info().Str("issue_id", entry.IssueID).Str("worktree", wtPath).Bool("created", created).Msg("worktree ready")
+
+		if created && baseSHA != "" {
+			if _, updateErr := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"base_sha": baseSHA, "branch_name": branchName}); updateErr != nil {
+				logger.Warn().Err(updateErr).Msg("failed to store base_sha/branch_name on issue")
+			}
 		}
-	} else {
-		publishLifecycleEvent(pubsub, "HOOK_STARTED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create"})
-		publishLifecycleEvent(pubsub, "HOOK_COMPLETED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create", "reused": true})
 	}
 	if err != nil {
 		publishLifecycleEvent(pubsub, "HOOK_FAILED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create", "error": err.Error(), "output": createRes.Output})
@@ -364,47 +388,7 @@ func processExecutionTick(
 	}
 
 	if entry.TurnCount == 0 {
-		// Start from main to ensure clean state
-		if workspacePath != "" {
-			if checkoutErr := gitutil.Checkout(context.Background(), workspacePath, "main"); checkoutErr != nil {
-				logger.Warn().Err(checkoutErr).Msg("could not checkout main before task start")
-			}
-		}
-
-		// Record base SHA before any changes
-		if workspacePath != "" {
-			headCmd := exec.Command("git", "rev-parse", "HEAD")
-			headCmd.Dir = workspacePath
-			if headOut, headErr := headCmd.Output(); headErr == nil {
-				baseSHA := strings.TrimSpace(string(headOut))
-				if baseSHA != "" {
-					if _, updateErr := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"base_sha": baseSHA}); updateErr != nil {
-						logger.Warn().Err(updateErr).Msg("failed to store base SHA on issue")
-					}
-				}
-			}
-		}
-
-		// Create a git branch for this task so changes don't collide with other agents
-		if workspacePath != "" && entry.ProjectID != "" {
-			branchName := strings.ToLower(strings.ReplaceAll(entry.IssueIdentifier, " ", "-"))
-			if branchErr := gitutil.CreateBranch(context.Background(), workspacePath, branchName); branchErr != nil {
-				// Branch may already exist — try checking it out instead
-				checkoutCmd := exec.Command("git", "checkout", branchName)
-				checkoutCmd.Dir = workspacePath
-				if checkoutErr := checkoutCmd.Run(); checkoutErr != nil {
-					logger.Warn().Err(branchErr).Str("branch", branchName).Msg("could not create or checkout branch; continuing on current branch")
-				} else {
-					logger.Info().Str("branch", branchName).Msg("checked out existing task branch")
-				}
-			} else {
-				logger.Info().Str("branch", branchName).Msg("created task branch")
-				// Store branch name on the issue
-				if _, updateErr := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"branch_name": branchName}); updateErr != nil {
-					logger.Warn().Err(updateErr).Msg("failed to store branch name on issue")
-				}
-			}
-		}
+		// Branch creation and base SHA recording are handled by EnsureWorktree above.
 
 		publishLifecycleEvent(pubsub, "HOOK_STARTED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "before_run"})
 		if res, err := workspaceService.RunBeforeRunHook(workspacePath, workspaceHooks); err != nil {
@@ -691,7 +675,6 @@ func processExecutionTick(
 	}
 
 	// Push the task branch to remote
-	branchName := strings.ToLower(strings.ReplaceAll(entry.IssueIdentifier, " ", "-"))
 	if pushErr := gitutil.Push(context.Background(), workspacePath, "origin", branchName); pushErr != nil {
 		logger.Warn().Err(pushErr).Msg("auto-push failed (remote may not be configured)")
 	} else {

@@ -1322,6 +1322,20 @@ func (s *Service) RecordRunResult(issueID string, provider string, sessionID str
 	delete(s.claimed, issueID)
 }
 
+// SetWorktreePath stores the worktree directory on the running entry so other
+// subsystems (cleanup, terminal CWD) can locate the agent's working directory.
+func (s *Service) SetWorktreePath(issueID, wtPath string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for idx, entry := range s.running {
+		if entry.IssueID == issueID {
+			entry.WorktreePath = wtPath
+			s.running[idx] = entry
+			break
+		}
+	}
+}
+
 // RecordRunArtifact updates the running entry with the session ID and log file path.
 func (s *Service) RecordRunArtifact(issueID string, provider string, sessionID string, logPath string) {
 	s.mu.Lock()
