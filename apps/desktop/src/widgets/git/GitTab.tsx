@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw } from 'lucide-react'
 import type { Project } from '@/lib/orchestra-types'
-import type { BackendConfig, GitCommit, GitStatusEntry, GitHubPR } from '@/lib/orchestra-client'
+import type { BackendConfig, GitCommit, GitStatusEntry, GitHubPR, StashEntry, ConflictStatus } from '@/lib/orchestra-client'
 import {
   fetchProjectGitHistory,
   fetchProjectGitStatus,
@@ -16,6 +16,12 @@ import {
   gitMerge,
   gitDeleteBranch,
   createGitHubRepo,
+  gitStashList,
+  gitStashApply,
+  gitStashDrop,
+  gitGetConflicts,
+  gitMergeAbort,
+  gitConflictResolve,
 } from '@/lib/orchestra-client'
 import { BranchBar } from './BranchBar'
 import { StagingArea } from './StagingArea'
@@ -26,6 +32,8 @@ import { GitHubPanel } from './GitHubPanel'
 import { PRReviewView } from './PRReviewView'
 import { ResizableSplit } from './ResizableSplit'
 import { CreateRepoDialog } from './CreateRepoDialog'
+import { StashPanel } from './StashPanel'
+import { ConflictBanner } from './ConflictBanner'
 
 type SubTab = 'changes' | 'history' | 'github'
 
@@ -78,6 +86,8 @@ export function GitTab({
   const [activePR, setActivePR] = useState<GitHubPR | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [showCreateRepo, setShowCreateRepo] = useState(false)
+  const [stashes, setStashes] = useState<StashEntry[]>([])
+  const [conflicts, setConflicts] = useState<ConflictStatus>({ in_merge: false, files: [] })
 
   const loadAll = useCallback(async () => {
     if (!config) return
@@ -94,6 +104,12 @@ export function GitTab({
       setFiles(statusData.files)
       setAheadBehind(statusData.branch)
       setCommits(historyData)
+      const [stashData, conflictData] = await Promise.all([
+        gitStashList(config, project.id),
+        gitGetConflicts(config, project.id),
+      ])
+      setStashes(stashData)
+      setConflicts(conflictData)
     } catch (err) {
       console.error('git load failed', err)
     } finally {
@@ -239,6 +255,30 @@ export function GitTab({
     loadAll()
   }, [config, project.id, loadAll])
 
+  const handleStashApply = useCallback(async (ref: string) => {
+    if (!config) return
+    try { await gitStashApply(config, project.id, ref); loadAll() }
+    catch (err) { console.error('stash apply failed', err) }
+  }, [config, project.id, loadAll])
+
+  const handleStashDrop = useCallback(async (ref: string) => {
+    if (!config) return
+    try { await gitStashDrop(config, project.id, ref); loadAll() }
+    catch (err) { console.error('stash drop failed', err) }
+  }, [config, project.id, loadAll])
+
+  const handleConflictResolve = useCallback(async (file: string) => {
+    if (!config) return
+    try { await gitConflictResolve(config, project.id, file); loadAll() }
+    catch (err) { console.error('resolve failed', err) }
+  }, [config, project.id, loadAll])
+
+  const handleMergeAbort = useCallback(async () => {
+    if (!config) return
+    try { await gitMergeAbort(config, project.id); loadAll() }
+    catch (err) { console.error('merge abort failed', err) }
+  }, [config, project.id, loadAll])
+
   if (!config) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
@@ -267,6 +307,9 @@ export function GitTab({
             onFetch={handleFetch}
             onMerge={handleMerge}
             onDeleteBranch={handleDeleteBranch}
+            stashes={stashes}
+            onStashApply={handleStashApply}
+            onStashDrop={handleStashDrop}
           />
         </div>
         <button
@@ -298,6 +341,8 @@ export function GitTab({
 
       {/* Changes tab */}
       {activeSubTab === 'changes' && (
+        <div className="flex flex-col flex-1 overflow-hidden min-h-0">
+        <ConflictBanner conflicts={conflicts} onResolve={handleConflictResolve} onAbort={handleMergeAbort} />
         <ResizableSplit
           left={
             <div className="flex flex-col h-full">
@@ -328,6 +373,7 @@ export function GitTab({
             />
           }
         />
+        </div>
       )}
 
       {/* History tab */}

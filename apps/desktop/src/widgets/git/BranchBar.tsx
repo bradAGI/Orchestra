@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { GitBranch, ChevronDown, Archive } from 'lucide-react'
-import type { BackendConfig } from '@/lib/orchestra-client'
+import type { BackendConfig, StashEntry } from '@/lib/orchestra-client'
 import { gitCheckout, gitCreateBranch, gitStash, gitStashPop } from '@/lib/orchestra-client'
+import { StashPanel } from './StashPanel'
 
 interface BranchBarProps {
   projectId: string
@@ -16,6 +17,9 @@ interface BranchBarProps {
   onFetch?: () => void
   onMerge?: (branch: string) => void
   onDeleteBranch?: (branch: string) => void
+  stashes?: StashEntry[]
+  onStashApply?: (ref: string) => void
+  onStashDrop?: (ref: string) => void
 }
 
 export function BranchBar({
@@ -31,6 +35,9 @@ export function BranchBar({
   onFetch,
   onMerge,
   onDeleteBranch,
+  stashes,
+  onStashApply,
+  onStashDrop,
 }: BranchBarProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -335,20 +342,13 @@ export function BranchBar({
           Stash
         </button>
         {stashOpen && (
-          <div className="absolute right-0 top-full mt-1 bg-card border border-border/40 rounded-xl shadow-lg z-20 py-1 min-w-[120px]">
-            <button
-              onClick={handleStash}
-              className="w-full text-left px-3 py-1.5 text-[11px] text-foreground hover:bg-muted/20"
-            >
-              Stash Changes
-            </button>
-            <button
-              onClick={handleStashPop}
-              className="w-full text-left px-3 py-1.5 text-[11px] text-foreground hover:bg-muted/20"
-            >
-              Pop Stash
-            </button>
-          </div>
+          <StashPanel
+            stashes={stashes ?? []}
+            onStash={handleStash}
+            onApply={(ref) => { setStashOpen(false); onStashApply?.(ref) }}
+            onDrop={(ref) => { setStashOpen(false); onStashDrop?.(ref) }}
+            onClose={() => setStashOpen(false)}
+          />
         )}
       </div>
     </div>
