@@ -858,6 +858,15 @@ export async function gitPull(config: BackendConfig, projectId: string, remote =
 }
 
 /**
+ * Fetches from all remotes for a project repository.
+ * @param config - Backend connection configuration.
+ * @param projectId - The project UUID.
+ */
+export async function gitFetch(config: BackendConfig, projectId: string): Promise<void> {
+  await requestJSON(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/fetch`, { method: 'POST' })
+}
+
+/**
  * Creates a GitHub pull request for an issue through the orchestrator.
  * @param config - Backend connection configuration.
  * @param issueIdentifier - Human-readable issue identifier.
@@ -1033,6 +1042,7 @@ export type GitHubPR = {
 export type GitBranches = {
   current: string
   branches: string[]
+  remotes?: string[]
 }
 
 /**
