@@ -446,6 +446,57 @@ func ListPRComments(ctx context.Context, owner, repo, token string, prNumber int
 	return comments, nil
 }
 
+// CreateRepoRequest represents the payload for creating a GitHub repository.
+type CreateRepoRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Private     bool   `json:"private"`
+}
+
+// CreateRepoResponse represents the response from creating a GitHub repository.
+type CreateRepoResponse struct {
+	FullName string `json:"full_name"`
+	CloneURL string `json:"clone_url"`
+	SSHURL   string `json:"ssh_url"`
+	HTMLURL  string `json:"html_url"`
+}
+
+// CreateRepository creates a new GitHub repository for the authenticated user.
+func CreateRepository(ctx context.Context, token string, opts CreateRepoRequest) (*CreateRepoResponse, error) {
+	url := "https://api.github.com/user/repos"
+
+	body, err := json.Marshal(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "token "+token)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, apiError(resp)
+	}
+
+	var repo CreateRepoResponse
+	if err := json.NewDecoder(resp.Body).Decode(&repo); err != nil {
+		return nil, err
+	}
+
+	return &repo, nil
+}
+
 // CreatePullRequest creates a new pull request in the given GitHub repository.
 func CreatePullRequest(ctx context.Context, owner, repo, token string, pr PRRequest) (*PRResponse, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls", owner, repo)
