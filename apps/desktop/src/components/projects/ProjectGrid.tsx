@@ -1,437 +1,623 @@
-import React, { useState } from 'react'
-import { Folder, GitBranch, History, Search, Zap, Plus, Trash2, ChevronLeft, ChevronRight, LayoutGrid, List, Activity } from 'lucide-react'
+import React, { useState, useMemo, useCallback } from 'react'
+import {
+  Folder, FolderOpen, GitBranch, Search, Plus, Trash2,
+  ChevronRight, ChevronDown, FolderTree, List, RefreshCcw,
+  ExternalLink, Zap, History, Activity, ArrowUpDown, ArrowUp, ArrowDown,
+} from 'lucide-react'
 import type { Project, ProjectStats } from '@/lib/orchestra-types'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { AppTooltip } from '../ui/tooltip-wrapper'
 
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog"
 
-/** Props for an individual project card in the grid or list view. */
-interface ProjectCardProps {
-    /** The project record to display. */
-    project: Project
-    /** Optional statistics for the project. */
-    stats?: ProjectStats
-    /** Whether the card is in a loading/skeleton state. */
-    loading?: boolean
-    /** Callback invoked when the card is clicked. */
-    onClick: (id: string) => void
-    /** Optional callback to delete this project. */
-    onDelete?: (project: Project) => void
-}
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function formatTokens(n: number): string {
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`
-    return String(n)
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`
+  return String(n)
 }
 
-function getActivityLevel(sessions: number): { label: string; color: string; pulse: boolean } {
-    if (sessions >= 20) return { label: 'High', color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/20', pulse: true }
-    if (sessions >= 5) return { label: 'Active', color: 'text-primary bg-primary/15 border-primary/20', pulse: false }
-    if (sessions >= 1) return { label: 'Low', color: 'text-amber-400 bg-amber-500/15 border-amber-500/20', pulse: false }
-    return { label: 'Idle', color: 'text-muted-foreground/40 bg-muted/20 border-border/30', pulse: false }
+function relativeTime(iso: string): string {
+  if (!iso) return '—'
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  if (days < 30) return `${days}d ago`
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-const ProjectListRow: React.FC<ProjectCardProps> = ({ project, stats, loading, onClick, onDelete }) => {
-    if (loading) {
-        return (
-            <div className="flex items-center gap-4 p-4 bg-muted/20 border border-border/40 rounded-xl animate-pulse h-16">
-                <Skeleton className="h-8 w-8 rounded-lg" />
-                <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-1/4" />
-                    <Skeleton className="h-3 w-1/2" />
-                </div>
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-24" />
-            </div>
-        )
+function getViewMode(): 'tree' | 'list' {
+  try {
+    const v = localStorage.getItem('orchestra:projects:viewMode')
+    return v === 'list' ? 'list' : 'tree'
+  } catch { return 'tree' }
+}
+
+function saveViewMode(mode: 'tree' | 'list') {
+  try { localStorage.setItem('orchestra:projects:viewMode', mode) } catch { /* */ }
+}
+
+// ---------------------------------------------------------------------------
+// Folder tree builder
+// ---------------------------------------------------------------------------
+
+type TreeNode = {
+  /** Segment name (directory component or project name) */
+  name: string
+  /** Full path up to and including this segment */
+  path: string
+  /** Project at this node (leaf), if any */
+  project?: Project
+  /** Child directories/projects */
+  children: TreeNode[]
+}
+
+function buildTree(projects: Project[]): TreeNode[] {
+  const root: TreeNode = { name: '', path: '', children: [] }
+
+  for (const project of projects) {
+    const parts = project.root_path.split('/').filter(Boolean)
+    let current = root
+
+    for (let i = 0; i < parts.length; i++) {
+      const segment = parts[i]
+      const fullPath = '/' + parts.slice(0, i + 1).join('/')
+      let child = current.children.find(c => c.name === segment && !c.project)
+
+      if (i === parts.length - 1) {
+        // Leaf: this is the project
+        current.children.push({
+          name: project.name,
+          path: fullPath,
+          project,
+          children: [],
+        })
+      } else {
+        // Intermediate directory
+        if (!child) {
+          child = { name: segment, path: fullPath, children: [] }
+          current.children.push(child)
+        }
+        current = child
+      }
     }
+  }
 
-    const totalTokens = (stats?.total_input || 0) + (stats?.total_output || 0)
-    const _activity = getActivityLevel(stats?.total_sessions || 0)
+  // Sort: directories first (alphabetically), then projects (alphabetically)
+  const sortChildren = (node: TreeNode) => {
+    node.children.sort((a, b) => {
+      const aIsDir = !a.project && a.children.length > 0
+      const bIsDir = !b.project && b.children.length > 0
+      if (aIsDir && !bIsDir) return -1
+      if (!aIsDir && bIsDir) return 1
+      return a.name.localeCompare(b.name)
+    })
+    node.children.forEach(sortChildren)
+  }
+  sortChildren(root)
 
-    return (
-        <div
-            onClick={() => onClick(project.id)}
-            className="group relative flex items-center gap-4 p-3 rounded-xl border border-border/40 bg-gradient-to-r from-card via-card to-muted/10 hover:border-primary/30 transition-all cursor-pointer overflow-hidden"
+  // Collapse single-child directory chains (e.g., /home/user/dev → home/user/dev)
+  const collapse = (node: TreeNode): TreeNode => {
+    node.children = node.children.map(collapse)
+    if (!node.project && node.children.length === 1 && !node.children[0].project) {
+      const child = node.children[0]
+      return {
+        name: node.name ? `${node.name}/${child.name}` : child.name,
+        path: child.path,
+        project: child.project,
+        children: child.children,
+      }
+    }
+    return node
+  }
+
+  const collapsed = collapse(root)
+  return collapsed.children
+}
+
+// ---------------------------------------------------------------------------
+// Tree view components
+// ---------------------------------------------------------------------------
+
+function TreeDirectory({
+  node,
+  stats,
+  depth,
+  expanded,
+  onToggle,
+  onProjectClick,
+  onDeleteProject,
+}: {
+  node: TreeNode
+  stats: Record<string, ProjectStats>
+  depth: number
+  expanded: Record<string, boolean>
+  onToggle: (path: string) => void
+  onProjectClick: (id: string) => void
+  onDeleteProject: (project: Project) => void
+}) {
+  const isOpen = expanded[node.path] ?? (depth === 0)
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => onToggle(node.path)}
+        className="group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted/20"
+        style={{ paddingLeft: `${depth * 20 + 8}px` }}
+      >
+        {isOpen ? (
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
+        )}
+        {isOpen ? (
+          <FolderOpen className="h-4 w-4 shrink-0 text-primary/60" />
+        ) : (
+          <Folder className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+        )}
+        <span className="text-xs font-mono text-muted-foreground/70 truncate">{node.name}</span>
+        <span className="text-[9px] text-muted-foreground/30 ml-auto shrink-0">
+          {countProjects(node)}
+        </span>
+      </button>
+
+      {isOpen && (
+        <div>
+          {node.children.map((child) =>
+            child.project ? (
+              <TreeProjectRow
+                key={child.project.id}
+                project={child.project}
+                stats={stats[child.project.id]}
+                depth={depth + 1}
+                onClick={onProjectClick}
+                onDelete={onDeleteProject}
+              />
+            ) : (
+              <TreeDirectory
+                key={child.path}
+                node={child}
+                stats={stats}
+                depth={depth + 1}
+                expanded={expanded}
+                onToggle={onToggle}
+                onProjectClick={onProjectClick}
+                onDeleteProject={onDeleteProject}
+              />
+            )
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function countProjects(node: TreeNode): number {
+  if (node.project) return 1
+  return node.children.reduce((sum, c) => sum + countProjects(c), 0)
+}
+
+function TreeProjectRow({
+  project,
+  stats,
+  depth,
+  onClick,
+  onDelete,
+}: {
+  project: Project
+  stats?: ProjectStats
+  depth: number
+  onClick: (id: string) => void
+  onDelete: (project: Project) => void
+}) {
+  const totalTokens = (stats?.total_input || 0) + (stats?.total_output || 0)
+  const hasGit = !!project.remote_url
+
+  return (
+    <div
+      onClick={() => onClick(project.id)}
+      className="group relative flex items-center gap-3 rounded-lg py-2 pr-3 transition-all cursor-pointer hover:bg-muted/15"
+      style={{ paddingLeft: `${depth * 20 + 28}px` }}
+    >
+      <div className="h-8 w-8 rounded-lg bg-primary/8 border border-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:border-primary group-hover:text-primary-foreground transition-all duration-300">
+        <Folder className="w-4 h-4 text-primary group-hover:text-primary-foreground" strokeWidth={2} />
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-bold truncate group-hover:text-primary transition-colors">{project.name}</span>
+          {hasGit && (
+            <GitBranch className="h-3 w-3 shrink-0 text-muted-foreground/30" />
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-5 shrink-0 text-muted-foreground/40">
+        <div className="flex items-center gap-1 text-[10px] tabular-nums">
+          <History className="h-3 w-3" />
+          <span className="font-bold">{stats?.total_sessions || 0}</span>
+        </div>
+        <div className="flex items-center gap-1 text-[10px] tabular-nums">
+          <Zap className="h-3 w-3" />
+          <span className="font-bold">{formatTokens(totalTokens)}</span>
+        </div>
+        <span className="text-[10px] w-16 text-right">{relativeTime(stats?.last_active || '')}</span>
+      </div>
+
+      <div className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 w-6 p-0 text-muted-foreground/30 hover:text-red-500"
+          data-testid="project-delete-btn"
+          onClick={(e) => { e.stopPropagation(); onDelete(project) }}
         >
-            <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-r from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          <Trash2 size={12} />
+        </Button>
+      </div>
+    </div>
+  )
+}
 
-            <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
-                <Folder className="w-5 h-5 text-primary group-hover:text-primary-foreground" strokeWidth={2} />
+// ---------------------------------------------------------------------------
+// List view components
+// ---------------------------------------------------------------------------
+
+type SortKey = 'name' | 'path' | 'sessions' | 'tokens' | 'active'
+type SortDir = 'asc' | 'desc'
+
+function SortHeader({ label, sortKey, currentKey, currentDir, onSort }: {
+  label: string
+  sortKey: SortKey
+  currentKey: SortKey
+  currentDir: SortDir
+  onSort: (key: SortKey) => void
+}) {
+  const active = currentKey === sortKey
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(sortKey)}
+      className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-muted-foreground/50 hover:text-foreground transition-colors"
+    >
+      {label}
+      {active ? (
+        currentDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+      ) : (
+        <ArrowUpDown className="h-3 w-3 opacity-0 group-hover/header:opacity-50" />
+      )}
+    </button>
+  )
+}
+
+function ListView({
+  projects,
+  stats,
+  onProjectClick,
+  onDeleteProject,
+}: {
+  projects: Project[]
+  stats: Record<string, ProjectStats>
+  onProjectClick: (id: string) => void
+  onDeleteProject: (project: Project) => void
+}) {
+  const [sortKey, setSortKey] = useState<SortKey>('name')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
+
+  const handleSort = useCallback((key: SortKey) => {
+    if (key === sortKey) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDir('asc')
+    }
+  }, [sortKey])
+
+  const sorted = useMemo(() => {
+    const arr = [...projects]
+    const dir = sortDir === 'asc' ? 1 : -1
+    arr.sort((a, b) => {
+      const sa = stats[a.id]
+      const sb = stats[b.id]
+      switch (sortKey) {
+        case 'name': return dir * a.name.localeCompare(b.name)
+        case 'path': return dir * a.root_path.localeCompare(b.root_path)
+        case 'sessions': return dir * ((sa?.total_sessions || 0) - (sb?.total_sessions || 0))
+        case 'tokens': {
+          const ta = (sa?.total_input || 0) + (sa?.total_output || 0)
+          const tb = (sb?.total_input || 0) + (sb?.total_output || 0)
+          return dir * (ta - tb)
+        }
+        case 'active': {
+          const da = sa?.last_active ? new Date(sa.last_active).getTime() : 0
+          const db = sb?.last_active ? new Date(sb.last_active).getTime() : 0
+          return dir * (da - db)
+        }
+        default: return 0
+      }
+    })
+    return arr
+  }, [projects, stats, sortKey, sortDir])
+
+  return (
+    <div className="flex flex-col">
+      {/* Table header */}
+      <div className="group/header flex items-center gap-3 px-4 py-2 border-b border-border/20">
+        <div className="w-8" /> {/* icon spacer */}
+        <div className="flex-1 min-w-0">
+          <SortHeader label="Name" sortKey="name" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+        </div>
+        <div className="w-48 hidden lg:block">
+          <SortHeader label="Path" sortKey="path" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+        </div>
+        <div className="w-20 text-right">
+          <SortHeader label="Sessions" sortKey="sessions" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+        </div>
+        <div className="w-20 text-right">
+          <SortHeader label="Tokens" sortKey="tokens" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+        </div>
+        <div className="w-20 text-right">
+          <SortHeader label="Active" sortKey="active" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+        </div>
+        <div className="w-7" /> {/* action spacer */}
+      </div>
+
+      {/* Rows */}
+      {sorted.map((project) => {
+        const s = stats[project.id]
+        const totalTokens = (s?.total_input || 0) + (s?.total_output || 0)
+        const hasGit = !!project.remote_url
+        return (
+          <div
+            key={project.id}
+            onClick={() => onProjectClick(project.id)}
+            className="group flex items-center gap-3 px-4 py-2.5 border-b border-border/10 cursor-pointer transition-colors hover:bg-muted/10"
+          >
+            <div className="h-8 w-8 rounded-lg bg-primary/8 border border-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:border-primary group-hover:text-primary-foreground transition-all duration-300">
+              <Folder className="w-4 h-4 text-primary group-hover:text-primary-foreground" strokeWidth={2} />
             </div>
 
             <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold truncate group-hover:text-primary transition-colors">{project.name}</h3>
-                </div>
-                <span className="text-[10px] text-muted-foreground/40 font-mono truncate block">{project.root_path}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold truncate group-hover:text-primary transition-colors">{project.name}</span>
+                {hasGit && <GitBranch className="h-3 w-3 shrink-0 text-muted-foreground/30" />}
+              </div>
             </div>
 
-            <div className="flex items-center gap-6 shrink-0">
-                <div className="text-right">
-                    <span className="text-xs font-black tabular-nums">{stats?.total_sessions || 0}</span>
-                    <span className="text-[8px] uppercase text-muted-foreground/40 font-bold tracking-wider ml-1">sessions</span>
-                </div>
-                <div className="text-right">
-                    <span className="text-xs font-black tabular-nums">{formatTokens(totalTokens)}</span>
-                    <span className="text-[8px] uppercase text-muted-foreground/40 font-bold tracking-wider ml-1">tokens</span>
-                </div>
+            <div className="w-48 hidden lg:block">
+              <span className="text-[10px] font-mono text-muted-foreground/40 truncate block">{project.root_path}</span>
             </div>
 
-            <div className="pr-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 text-muted-foreground/40 hover:text-red-500"
-                    data-testid="project-delete-btn"
-                    onClick={(e) => {
-                        e.stopPropagation()
-                        onDelete?.(project)
-                    }}
-                >
-                    <Trash2 size={13} />
-                </Button>
+            <div className="w-20 text-right">
+              <span className="text-xs font-bold tabular-nums text-muted-foreground/60">{s?.total_sessions || 0}</span>
             </div>
-        </div>
-    )
-}
 
-const ProjectCard: React.FC<ProjectCardProps> = ({ project, stats, loading, onClick, onDelete }) => {
-    if (loading) {
-        return (
-            <div className="h-64 bg-muted/20 border border-border/30 rounded-2xl animate-pulse p-6 space-y-4">
-                <div className="flex items-center gap-3">
-                    <Skeleton className="h-12 w-12 rounded-xl" />
-                    <div className="space-y-2 flex-1">
-                        <Skeleton className="h-5 w-3/4" />
-                        <Skeleton className="h-3 w-1/2" />
-                    </div>
-                </div>
-                <Skeleton className="h-1 w-full rounded-full" />
-                <div className="grid grid-cols-3 gap-2">
-                    <Skeleton className="h-16 rounded-xl" />
-                    <Skeleton className="h-16 rounded-xl" />
-                    <Skeleton className="h-16 rounded-xl" />
-                </div>
+            <div className="w-20 text-right">
+              <span className="text-xs font-bold tabular-nums text-muted-foreground/60">{formatTokens(totalTokens)}</span>
             </div>
+
+            <div className="w-20 text-right">
+              <span className="text-[10px] text-muted-foreground/40">{relativeTime(s?.last_active || '')}</span>
+            </div>
+
+            <div className="w-7 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 text-muted-foreground/30 hover:text-red-500"
+                onClick={(e) => { e.stopPropagation(); onDeleteProject(project) }}
+              >
+                <Trash2 size={12} />
+              </Button>
+            </div>
+          </div>
         )
-    }
-
-    const totalTokens = (stats?.total_input || 0) + (stats?.total_output || 0)
-    const sessions = stats?.total_sessions || 0
-    const _activity = getActivityLevel(sessions)
-    const hasGitHub = !!project.remote_url
-
-    return (
-        <div
-            onClick={() => onClick(project.id)}
-            className="group relative overflow-hidden bg-gradient-to-b from-card via-card to-muted/20 border border-border/50 rounded-2xl cursor-pointer transition-all duration-500 hover:border-primary/30 hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-0.5 flex flex-col"
-        >
-            {/* Hover glow overlay */}
-            <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.05] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-            {/* Delete button */}
-            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10 translate-y-1 group-hover:translate-y-0">
-                <AppTooltip content="Remove project">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 bg-background/80 backdrop-blur-sm border border-border/50 text-muted-foreground/60 hover:text-red-500 hover:border-red-500/30 shadow-sm"
-                        data-testid="project-delete-btn"
-                        onClick={(e) => {
-                            e.stopPropagation()
-                            onDelete?.(project)
-                        }}
-                    >
-                        <Trash2 size={12} />
-                    </Button>
-                </AppTooltip>
-            </div>
-
-            {/* Header */}
-            <div className="px-5 pt-5 pb-4">
-                <div className="flex items-start gap-3.5">
-                    <div className="h-12 w-12 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center text-primary shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-500 shadow-lg shadow-primary/5">
-                        <Folder className="w-6 h-6" strokeWidth={2} />
-                    </div>
-                    <div className="min-w-0 flex-1 pt-0.5">
-                        <h3 className="text-[15px] font-black tracking-tight truncate group-hover:text-primary transition-colors leading-tight">{project.name}</h3>
-                        <p className="text-[10px] text-muted-foreground/40 font-mono truncate mt-1">{project.root_path}</p>
-                    </div>
-                </div>
-
-                {/* Status badges */}
-                <div className="flex items-center gap-2 mt-3">
-                    {hasGitHub && (
-                        <Badge variant="outline" className="text-[7px] font-black uppercase tracking-widest h-4 px-1.5 text-muted-foreground/50 border-border/30">
-                            <GitBranch size={8} className="mr-0.5" />
-                            Git
-                        </Badge>
-                    )}
-                </div>
-            </div>
-
-            {/* Stats row */}
-            <div className="mt-auto px-4 pb-4">
-                <div className="grid grid-cols-3 gap-2">
-                    <div className="relative rounded-xl bg-background/50 border border-border/30 px-3 py-2.5 text-center overflow-hidden group/stat">
-                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/[0.02] to-transparent opacity-0 group-hover/stat:opacity-100 transition-opacity" />
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                            <History size={10} className="text-primary/50" strokeWidth={2.5} />
-                        </div>
-                        <p className="text-sm font-black tabular-nums leading-none">{sessions}</p>
-                        <p className="text-[7px] uppercase font-bold text-muted-foreground/40 tracking-widest mt-1">Sessions</p>
-                    </div>
-                    <div className="relative rounded-xl bg-background/50 border border-border/30 px-3 py-2.5 text-center overflow-hidden group/stat">
-                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/[0.02] to-transparent opacity-0 group-hover/stat:opacity-100 transition-opacity" />
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                            <Zap size={10} className="text-primary/50" strokeWidth={2.5} />
-                        </div>
-                        <p className="text-sm font-black tabular-nums leading-none">{formatTokens(totalTokens)}</p>
-                        <p className="text-[7px] uppercase font-bold text-muted-foreground/40 tracking-widest mt-1">Tokens</p>
-                    </div>
-                    <div className="relative rounded-xl bg-background/50 border border-border/30 px-3 py-2.5 text-center overflow-hidden group/stat">
-                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/[0.02] to-transparent opacity-0 group-hover/stat:opacity-100 transition-opacity" />
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                            <Activity size={10} className="text-primary/50" strokeWidth={2.5} />
-                        </div>
-                        <p className="text-sm font-black tabular-nums leading-none">
-                            {stats?.last_active ? new Date(stats.last_active).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—'}
-                        </p>
-                        <p className="text-[7px] uppercase font-bold text-muted-foreground/40 tracking-widest mt-1">Last Active</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Bottom accent line */}
-            <div className="h-[2px] bg-gradient-to-r from-transparent via-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-        </div>
-    )
+      })}
+    </div>
+  )
 }
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 
 interface ProjectGridProps {
-    projects: Project[]
-    stats: Record<string, ProjectStats>
-    loading: boolean
-    onProjectClick: (id: string) => void
-    onAddProject?: () => void
-    onDeleteProject?: (id: string) => void
+  projects: Project[]
+  stats: Record<string, ProjectStats>
+  loading: boolean
+  onProjectClick: (id: string) => void
+  onAddProject?: () => void
+  onDeleteProject?: (id: string) => void
 }
 
-const LOADING_PROJECT_PLACEHOLDER: Project = {
-    id: '__loading__',
-    name: 'Loading',
-    root_path: '',
-    remote_url: '',
-}
-
-/**
- * Displays a grid (or list) of project cards with search, sorting, and pagination.
- * Supports toggling between grid and list layout modes.
- */
 export const ProjectGrid: React.FC<ProjectGridProps> = ({
-    projects,
-    stats,
-    loading,
-    onProjectClick,
-    onAddProject,
-    onDeleteProject
+  projects,
+  stats,
+  loading,
+  onProjectClick,
+  onAddProject,
+  onDeleteProject,
 }) => {
-    const [search, setSearch] = useState('')
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-    const [currentPage, setCurrentPage] = useState(1)
-    const [projectToDelete, setProjectToDelete] = useState<Project | null>(null)
-    const ITEMS_PER_PAGE = 12
+  const [search, setSearch] = useState('')
+  const [viewMode, setViewMode] = useState<'tree' | 'list'>(getViewMode)
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null)
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
-    const filtered = projects.filter(p =>
-        p.name.toLowerCase().includes(search.toLowerCase()) ||
-        p.root_path.toLowerCase().includes(search.toLowerCase())
-    )
+  const filtered = useMemo(() =>
+    projects.filter(p =>
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.root_path.toLowerCase().includes(search.toLowerCase())
+    ), [projects, search])
 
-    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
-    const currentItems = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+  const tree = useMemo(() => buildTree(filtered), [filtered])
 
-    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setSearch(e.target.value)
-        setCurrentPage(1)
+  const toggleExpanded = useCallback((path: string) => {
+    setExpanded(prev => ({ ...prev, [path]: !prev[path] }))
+  }, [])
+
+  const handleViewMode = useCallback((mode: 'tree' | 'list') => {
+    setViewMode(mode)
+    saveViewMode(mode)
+  }, [])
+
+  const handleDeleteConfirm = () => {
+    if (projectToDelete && onDeleteProject) {
+      onDeleteProject(projectToDelete.id)
+      setProjectToDelete(null)
     }
+  }
 
-    const handleDeleteConfirm = () => {
-        if (projectToDelete && onDeleteProject) {
-            onDeleteProject(projectToDelete.id)
-            setProjectToDelete(null)
-        }
-    }
-
-    if (loading && projects.length === 0) {
-        return (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 p-6">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <ProjectCard key={i} project={LOADING_PROJECT_PLACEHOLDER} loading onClick={() => { }} />
-                ))}
-            </div>
-        )
-    }
-
+  if (loading && projects.length === 0) {
     return (
-        <div className="flex flex-col h-full bg-transparent">
-            {/* Header bar */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-border/40 sticky top-0 bg-background/80 backdrop-blur-xl z-20">
-                <div className="flex items-center gap-4">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
-                        <input
-                            type="text"
-                            placeholder="Search projects..."
-                            value={search}
-                            onChange={handleSearchChange}
-                            className="w-64 pl-9 pr-4 h-9 bg-muted/30 border border-border/40 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all placeholder:text-muted-foreground/30"
-                        />
-                    </div>
-                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/30">
-                        {filtered.length} project{filtered.length !== 1 ? 's' : ''}
-                    </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <Button variant="default" size="sm" onClick={onAddProject} className="h-8 gap-1.5 bg-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 shadow-lg shadow-primary/20 px-3">
-                        <Plus size={14} />
-                        Add Project
-                    </Button>
-                    <div className="flex items-center bg-muted/20 p-0.5 rounded-lg border border-border/30">
-                        <button
-                            className={`h-7 w-7 rounded-md flex items-center justify-center transition-all ${viewMode === 'grid' ? 'bg-primary/15 text-primary shadow-sm' : 'text-muted-foreground/40 hover:text-foreground'}`}
-                            onClick={() => setViewMode('grid')}
-                        >
-                            <LayoutGrid size={14} />
-                        </button>
-                        <button
-                            className={`h-7 w-7 rounded-md flex items-center justify-center transition-all ${viewMode === 'list' ? 'bg-primary/15 text-primary shadow-sm' : 'text-muted-foreground/40 hover:text-foreground'}`}
-                            onClick={() => setViewMode('list')}
-                        >
-                            <List size={14} />
-                        </button>
-                    </div>
-                </div>
+      <div className="flex flex-col gap-2 p-5">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} className="flex items-center gap-3 p-3 rounded-lg animate-pulse">
+            <Skeleton className="h-8 w-8 rounded-lg" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-1/4" />
+              <Skeleton className="h-3 w-1/2" />
             </div>
-
-            {/* Content */}
-            <div className="flex-1 flex flex-col overflow-hidden min-h-0 custom-scrollbar">
-                {filtered.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-32 text-center">
-                        <div className="p-6 rounded-2xl bg-muted/10 border border-border/20 mb-6">
-                            <Folder size={48} className="text-muted-foreground/15" strokeWidth={1.5} />
-                        </div>
-                        <h2 className="text-lg font-black tracking-tight mb-1">{search ? 'No matches' : 'No Projects'}</h2>
-                        <p className="text-muted-foreground/40 max-w-xs text-xs">
-                            {search ? `Nothing matched "${search}"` : 'Add a local repository to get started.'}
-                        </p>
-                    </div>
-                ) : (
-                    <div className="flex-1 flex flex-col justify-between">
-                        {viewMode === 'grid' ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-5">
-                                {currentItems.map((project) => (
-                                    <ProjectCard
-                                        key={project.id}
-                                        project={project}
-                                        stats={stats[project.id]}
-                                        onClick={onProjectClick}
-                                        onDelete={setProjectToDelete}
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="flex flex-col gap-1.5 p-4">
-                                {currentItems.map((project) => (
-                                    <ProjectListRow
-                                        key={project.id}
-                                        project={project}
-                                        stats={stats[project.id]}
-                                        onClick={onProjectClick}
-                                        onDelete={setProjectToDelete}
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && filtered.length > 0 && (
-                <div className="flex items-center justify-between px-6 py-2.5 border-t border-border/30">
-                    <span className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest tabular-nums">
-                        {startIndex + 1}–{Math.min(startIndex + ITEMS_PER_PAGE, filtered.length)} of {filtered.length}
-                    </span>
-                    <div className="flex items-center gap-1">
-                        <button
-                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                            disabled={currentPage === 1}
-                            className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground/40 hover:text-foreground hover:bg-muted/30 transition-all disabled:opacity-20"
-                        >
-                            <ChevronLeft size={14} />
-                        </button>
-                        {[...Array(totalPages)].map((_, i) => (
-                            <button
-                                key={i}
-                                onClick={() => setCurrentPage(i + 1)}
-                                className={`h-7 min-w-[28px] rounded-md text-[10px] font-bold transition-all ${currentPage === i + 1
-                                    ? 'bg-primary text-primary-foreground shadow-sm'
-                                    : 'text-muted-foreground/40 hover:text-foreground hover:bg-muted/20'
-                                }`}
-                            >
-                                {i + 1}
-                            </button>
-                        ))}
-                        <button
-                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                            disabled={currentPage === totalPages}
-                            className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground/40 hover:text-foreground hover:bg-muted/30 transition-all disabled:opacity-20"
-                        >
-                            <ChevronRight size={14} />
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Delete Confirmation Dialog */}
-            <Dialog open={!!projectToDelete} onOpenChange={(open) => !open && setProjectToDelete(null)}>
-                <DialogContent className="sm:max-w-md bg-popover border-border">
-                    <DialogHeader>
-                        <DialogTitle className="text-lg font-black text-foreground flex items-center gap-2">
-                            <Trash2 className="text-red-500" size={18} />
-                            Remove Project
-                        </DialogTitle>
-                        <DialogDescription className="text-muted-foreground pt-2 text-left text-sm">
-                            Remove <span className="text-foreground font-bold">{projectToDelete?.name}</span> from your workspace?
-                            <div className="bg-muted/20 border border-border/30 p-2 rounded-lg mt-3 font-mono text-[10px] text-muted-foreground/60 truncate">
-                                {projectToDelete?.root_path}
-                            </div>
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter className="mt-4">
-                        <Button variant="ghost" onClick={() => setProjectToDelete(null)} className="text-muted-foreground hover:text-foreground text-xs">
-                            Cancel
-                        </Button>
-                        <Button variant="destructive" onClick={handleDeleteConfirm} className="bg-red-600 hover:bg-red-500 text-white font-bold text-xs">
-                            Remove
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </div>
+          </div>
+        ))}
+      </div>
     )
+  }
+
+  return (
+    <div className="flex flex-col h-full bg-transparent">
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-border/40 sticky top-0 bg-background/80 backdrop-blur-xl z-20">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
+            <input
+              type="text"
+              placeholder="Search projects..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-64 pl-9 pr-4 h-9 bg-muted/30 border border-border/40 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all placeholder:text-muted-foreground/30"
+            />
+          </div>
+          <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/30">
+            {filtered.length} project{filtered.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button variant="default" size="sm" onClick={onAddProject} className="h-8 gap-1.5 bg-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 shadow-lg shadow-primary/20 px-3">
+            <Plus size={14} />
+            Add Project
+          </Button>
+          <div className="flex items-center bg-muted/20 p-0.5 rounded-lg border border-border/30">
+            <AppTooltip content="Folder tree">
+              <button
+                className={`h-7 w-7 rounded-md flex items-center justify-center transition-all ${viewMode === 'tree' ? 'bg-primary/15 text-primary shadow-sm' : 'text-muted-foreground/40 hover:text-foreground'}`}
+                onClick={() => handleViewMode('tree')}
+              >
+                <FolderTree size={14} />
+              </button>
+            </AppTooltip>
+            <AppTooltip content="List view">
+              <button
+                className={`h-7 w-7 rounded-md flex items-center justify-center transition-all ${viewMode === 'list' ? 'bg-primary/15 text-primary shadow-sm' : 'text-muted-foreground/40 hover:text-foreground'}`}
+                onClick={() => handleViewMode('list')}
+              >
+                <List size={14} />
+              </button>
+            </AppTooltip>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-auto min-h-0">
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-32 text-center">
+            <div className="p-6 rounded-2xl bg-muted/10 border border-border/20 mb-6">
+              <Folder size={48} className="text-muted-foreground/15" strokeWidth={1.5} />
+            </div>
+            <h2 className="text-lg font-black tracking-tight mb-1">{search ? 'No matches' : 'No Projects'}</h2>
+            <p className="text-muted-foreground/40 max-w-xs text-xs">
+              {search ? `Nothing matched "${search}"` : 'Add a local repository to get started.'}
+            </p>
+          </div>
+        ) : viewMode === 'tree' ? (
+          <div className="py-2 px-2">
+            {tree.map((node) =>
+              node.project ? (
+                <TreeProjectRow
+                  key={node.project.id}
+                  project={node.project}
+                  stats={stats[node.project.id]}
+                  depth={0}
+                  onClick={onProjectClick}
+                  onDelete={setProjectToDelete}
+                />
+              ) : (
+                <TreeDirectory
+                  key={node.path}
+                  node={node}
+                  stats={stats}
+                  depth={0}
+                  expanded={expanded}
+                  onToggle={toggleExpanded}
+                  onProjectClick={onProjectClick}
+                  onDeleteProject={setProjectToDelete}
+                />
+              )
+            )}
+          </div>
+        ) : (
+          <ListView
+            projects={filtered}
+            stats={stats}
+            onProjectClick={onProjectClick}
+            onDeleteProject={setProjectToDelete}
+          />
+        )}
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!projectToDelete} onOpenChange={(open) => !open && setProjectToDelete(null)}>
+        <DialogContent className="sm:max-w-md bg-popover border-border">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black text-foreground flex items-center gap-2">
+              <Trash2 className="text-red-500" size={18} />
+              Remove Project
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground pt-2 text-left text-sm">
+              Remove <span className="text-foreground font-bold">{projectToDelete?.name}</span> from your workspace?
+              <div className="bg-muted/20 border border-border/30 p-2 rounded-lg mt-3 font-mono text-[10px] text-muted-foreground/60 truncate">
+                {projectToDelete?.root_path}
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button variant="ghost" onClick={() => setProjectToDelete(null)} className="text-muted-foreground hover:text-foreground text-xs">
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteConfirm} className="bg-red-600 hover:bg-red-500 text-white font-bold text-xs">
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
 }
