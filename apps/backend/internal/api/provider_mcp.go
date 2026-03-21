@@ -100,8 +100,7 @@ func (s *Server) GetProviderMCPServers(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(servers)
+	writeJSON(w, http.StatusOK, servers)
 }
 
 // AddProviderMCPServer adds an MCP server to a provider's native config file.
@@ -151,9 +150,7 @@ func (s *Server) AddProviderMCPServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusCreated, map[string]string{"status": "ok"})
 }
 
 // DeleteProviderMCPServer removes an MCP server from a provider's native config file.

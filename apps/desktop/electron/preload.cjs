@@ -21,6 +21,10 @@ contextBridge.exposeInMainWorld('orchestraDesktop', {
     if (typeof targetPath !== 'string' || targetPath.trim() === '') {
       throw new Error('Path must be a non-empty string')
     }
+    // Require absolute path: Unix `/` or Windows drive letter (e.g. C:\)
+    if (!targetPath.startsWith('/') && !/^[a-zA-Z]:[/\\]/.test(targetPath)) {
+      throw new Error('Path must be absolute')
+    }
     return ipcRenderer.invoke('orchestra:open-path', targetPath)
   },
   selectFolder: () => ipcRenderer.invoke('orchestra:select-folder'),

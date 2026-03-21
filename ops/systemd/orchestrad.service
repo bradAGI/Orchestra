@@ -10,6 +10,20 @@ Environment=ORCHESTRA_SERVER_PORT=4010
 ExecStart=/usr/local/bin/orchestrad
 Restart=always
 RestartSec=2
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/%i/.orchestra
+CapabilityBoundingSet=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
 
 [Install]
 WantedBy=multi-user.target

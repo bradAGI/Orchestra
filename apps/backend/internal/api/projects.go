@@ -51,8 +51,7 @@ func (s *Server) PostGitCommit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (s *Server) PostGitPush(w http.ResponseWriter, r *http.Request) {
@@ -100,8 +99,7 @@ func (s *Server) PostGitPush(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (s *Server) PostGitPull(w http.ResponseWriter, r *http.Request) {
@@ -148,8 +146,7 @@ func (s *Server) PostGitPull(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (s *Server) GetProjects(w http.ResponseWriter, r *http.Request) {
@@ -172,8 +169,7 @@ func (s *Server) GetProjects(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(projects)
+	writeJSON(w, http.StatusOK, projects)
 }
 
 func (s *Server) GetProject(w http.ResponseWriter, r *http.Request) {
@@ -195,8 +191,7 @@ func (s *Server) GetProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stats)
+	writeJSON(w, http.StatusOK, stats)
 }
 
 func (s *Server) GetWarehouseStats(w http.ResponseWriter, r *http.Request) {
@@ -212,8 +207,7 @@ func (s *Server) GetWarehouseStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stats)
+	writeJSON(w, http.StatusOK, stats)
 }
 
 func (s *Server) CreateProject(w http.ResponseWriter, r *http.Request) {
@@ -263,9 +257,7 @@ func (s *Server) CreateProject(w http.ResponseWriter, r *http.Request) {
 		_ = s.db.UpdateProjectGitHubInfo(r.Context(), id, owner, repo)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"id": id})
+	writeJSON(w, http.StatusCreated, map[string]string{"id": id})
 }
 
 func (s *Server) GetSessions(w http.ResponseWriter, r *http.Request) {
@@ -323,8 +315,7 @@ func (s *Server) GetSessionDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(session)
+	writeJSON(w, http.StatusOK, session)
 }
 
 func (s *Server) DeleteProject(w http.ResponseWriter, r *http.Request) {
@@ -377,8 +368,7 @@ func (s *Server) RefreshProject(w http.ResponseWriter, r *http.Request) {
 		_ = s.db.UpdateProjectGitHubInfo(r.Context(), projectID, owner, repo)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 type FileNode struct {
@@ -470,8 +460,7 @@ func (s *Server) GetProjectFileTree(w http.ResponseWriter, r *http.Request) {
 		Int("node_count", len(tree)).
 		Msg("returning file tree")
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tree)
+	writeJSON(w, http.StatusOK, tree)
 }
 
 func redactProjectToken(token string) string {
@@ -553,8 +542,7 @@ func (s *Server) GetProjectGitStatus(w http.ResponseWriter, r *http.Request) {
 			Str("project_id", projectID).
 			Str("output", string(out)).
 			Msg("git status failed")
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]any{})
+		writeJSON(w, http.StatusOK, []any{})
 		return
 	}
 
@@ -570,8 +558,7 @@ func (s *Server) GetProjectGitStatus(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(status)
+	writeJSON(w, http.StatusOK, status)
 }
 
 func (s *Server) GetProjectGitStats(w http.ResponseWriter, r *http.Request) {
@@ -587,8 +574,7 @@ func (s *Server) GetProjectGitStats(w http.ResponseWriter, r *http.Request) {
 	gitDir := filepath.Join(project.RootPath, ".git")
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
 		s.logger.Debug().Str("path", gitDir).Msg(".git directory does not exist at root_path")
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]any{})
+		writeJSON(w, http.StatusOK, []any{})
 		return
 	}
 
@@ -605,8 +591,7 @@ func (s *Server) GetProjectGitStats(w http.ResponseWriter, r *http.Request) {
 			Str("project_id", projectID).
 			Str("output", string(out)).
 			Msg("git log command failed")
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]any{})
+		writeJSON(w, http.StatusOK, []any{})
 		return
 	}
 
@@ -633,8 +618,7 @@ func (s *Server) GetProjectGitStats(w http.ResponseWriter, r *http.Request) {
 		Int("history_count", len(history)).
 		Msg("returning git history to UI")
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(history)
+	writeJSON(w, http.StatusOK, history)
 }
 
 func (s *Server) GetProjectGitDiff(w http.ResponseWriter, r *http.Request) {
@@ -678,8 +662,7 @@ func (s *Server) GetProjectGitHubIssues(w http.ResponseWriter, r *http.Request) 
 
 	if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
 		// No GitHub connection - return empty array
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]any{})
+		writeJSON(w, http.StatusOK, []any{})
 		return
 	}
 
@@ -694,8 +677,7 @@ func (s *Server) GetProjectGitHubIssues(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(issues)
+	writeJSON(w, http.StatusOK, issues)
 }
 
 func (s *Server) GetProjectGitBranches(w http.ResponseWriter, r *http.Request) {
@@ -735,8 +717,7 @@ func (s *Server) GetProjectGitBranches(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"current":  current,
 		"branches": branches,
 	})
@@ -773,9 +754,7 @@ func (s *Server) CreateProjectGitHubIssue(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(issue)
+	writeJSON(w, http.StatusCreated, issue)
 }
 
 func (s *Server) UpdateProjectGitHubIssue(w http.ResponseWriter, r *http.Request) {
@@ -812,8 +791,7 @@ func (s *Server) UpdateProjectGitHubIssue(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(issue)
+	writeJSON(w, http.StatusOK, issue)
 }
 
 func (s *Server) GetProjectGitHubPulls(w http.ResponseWriter, r *http.Request) {
@@ -825,8 +803,7 @@ func (s *Server) GetProjectGitHubPulls(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]any{})
+		writeJSON(w, http.StatusOK, []any{})
 		return
 	}
 
@@ -837,8 +814,7 @@ func (s *Server) GetProjectGitHubPulls(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(prs)
+	writeJSON(w, http.StatusOK, prs)
 }
 
 func (s *Server) GetProjectGitHubPullDiff(w http.ResponseWriter, r *http.Request) {
@@ -904,9 +880,7 @@ func (s *Server) CreateProjectGitHubPull(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(pr)
+	writeJSON(w, http.StatusCreated, pr)
 }
 
 func (s *Server) PostGitCheckout(w http.ResponseWriter, r *http.Request) {
@@ -942,8 +916,7 @@ func (s *Server) PostGitCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (s *Server) PostGitMerge(w http.ResponseWriter, r *http.Request) {
@@ -972,8 +945,7 @@ func (s *Server) PostGitMerge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (s *Server) PostGitCreateBranch(w http.ResponseWriter, r *http.Request) {
@@ -1009,9 +981,7 @@ func (s *Server) PostGitCreateBranch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusCreated, map[string]string{"status": "ok"})
 }
 
 func (s *Server) DeleteGitBranch(w http.ResponseWriter, r *http.Request) {
@@ -1041,8 +1011,7 @@ func (s *Server) DeleteGitBranch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (s *Server) PostGitStage(w http.ResponseWriter, r *http.Request) {
@@ -1078,8 +1047,7 @@ func (s *Server) PostGitStage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (s *Server) PostGitUnstage(w http.ResponseWriter, r *http.Request) {
@@ -1115,8 +1083,7 @@ func (s *Server) PostGitUnstage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (s *Server) PostGitStash(w http.ResponseWriter, r *http.Request) {
@@ -1139,8 +1106,7 @@ func (s *Server) PostGitStash(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (s *Server) PostGitStashPop(w http.ResponseWriter, r *http.Request) {
@@ -1163,8 +1129,7 @@ func (s *Server) PostGitStashPop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (s *Server) GetPRReviews(w http.ResponseWriter, r *http.Request) {
@@ -1195,8 +1160,7 @@ func (s *Server) GetPRReviews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(reviews)
+	writeJSON(w, http.StatusOK, reviews)
 }
 
 func (s *Server) PostPRReview(w http.ResponseWriter, r *http.Request) {
@@ -1232,8 +1196,7 @@ func (s *Server) PostPRReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (s *Server) PostPRMerge(w http.ResponseWriter, r *http.Request) {
@@ -1275,8 +1238,7 @@ func (s *Server) PostPRMerge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (s *Server) GetPRComments(w http.ResponseWriter, r *http.Request) {
@@ -1307,6 +1269,5 @@ func (s *Server) GetPRComments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(comments)
+	writeJSON(w, http.StatusOK, comments)
 }

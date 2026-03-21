@@ -106,8 +106,7 @@ func (s *Server) GetProviderPermissions(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(perms)
+	writeJSON(w, http.StatusOK, perms)
 }
 
 func (s *Server) PostProviderPermissions(w http.ResponseWriter, r *http.Request) {
@@ -145,8 +144,7 @@ func (s *Server) PostProviderPermissions(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 /* ================================================================== */
@@ -178,8 +176,7 @@ func (s *Server) GetProviderModel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(model)
+	writeJSON(w, http.StatusOK, model)
 }
 
 func (s *Server) PostProviderModel(w http.ResponseWriter, r *http.Request) {
@@ -217,8 +214,7 @@ func (s *Server) PostProviderModel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 /* ================================================================== */
@@ -254,8 +250,7 @@ func (s *Server) GetProviderHooks(w http.ResponseWriter, r *http.Request) {
 		hooks = []ProviderHook{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(hooks)
+	writeJSON(w, http.StatusOK, hooks)
 }
 
 func (s *Server) PostProviderHooks(w http.ResponseWriter, r *http.Request) {
@@ -294,8 +289,7 @@ func (s *Server) PostProviderHooks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 /* ================================================================== */

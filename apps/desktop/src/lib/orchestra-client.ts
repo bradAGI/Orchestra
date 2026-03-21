@@ -300,6 +300,39 @@ async function requestJSON<T>(config: BackendConfig, path: string, init?: Reques
   }
 }
 
+async function requestText(config: BackendConfig, path: string, init?: RequestInit, timeoutMs = 30000): Promise<string> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    const response = await fetch(new URL(path, config.baseUrl).toString(), {
+      ...init,
+      signal: init?.signal ?? controller.signal,
+      headers: {
+        ...buildHeaders(config),
+        ...(init?.headers ?? {}),
+      },
+    })
+
+    if (!response.ok) {
+      let parsed: APIErrorEnvelope | null = null
+      try {
+        parsed = (await response.json()) as APIErrorEnvelope
+      } catch {
+        parsed = null
+      }
+      if (parsed?.error?.code && parsed?.error?.message) {
+        throw new APIError(parsed.error.code, parsed.error.message)
+      }
+      throw new APIError('request_failed', `${response.status} ${response.statusText}`)
+    }
+
+    return response.text()
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 /**
  * Applies a partial update (PATCH) to an existing issue.
  * @param config - Backend connection configuration.
@@ -575,16 +608,8 @@ export async function fetchIssueLogs(config: BackendConfig, issueIdentifier: str
   }
   const url = new URL(`/api/v1/issues/${encodeURIComponent(normalized)}/logs`, config.baseUrl)
   if (provider) url.searchParams.set('provider', provider)
-  
-  const response = await fetch(url.toString(), {
-    headers: buildHeaders(config),
-  })
 
-  if (!response.ok) {
-    throw new APIError('logs_not_found', 'failed to fetch issue logs')
-  }
-
-  return response.text()
+  return requestText(config, url.pathname + url.search)
 }
 
 /**
@@ -617,15 +642,7 @@ export async function fetchIssueDiff(config: BackendConfig, issueIdentifier: str
   const url = new URL(`/api/v1/issues/${encodeURIComponent(normalized)}/diff`, config.baseUrl)
   if (provider) url.searchParams.set('provider', provider)
 
-  const response = await fetch(url.toString(), {
-    headers: buildHeaders(config),
-  })
-
-  if (!response.ok) {
-    throw new APIError('diff_failed', 'failed to fetch workspace diff')
-  }
-
-  return response.text()
+  return requestText(config, url.pathname + url.search)
 }
 
 /**
@@ -663,15 +680,7 @@ export async function fetchArtifactContent(config: BackendConfig, issueIdentifie
   const url = new URL(`/api/v1/issues/${encodeURIComponent(normalized)}/artifacts/${encodeURIComponent(relPath)}`, config.baseUrl)
   if (provider) url.searchParams.set('provider', provider)
 
-  const response = await fetch(url.toString(), {
-    headers: buildHeaders(config),
-  })
-
-  if (!response.ok) {
-    throw new APIError('fetch_failed', 'failed to fetch artifact content')
-  }
-
-  return response.text()
+  return requestText(config, url.pathname + url.search)
 }
 
 /**
@@ -744,13 +753,7 @@ export async function fetchProjectTree(config: BackendConfig, projectId: string,
  * @returns The file content as a string.
  */
 export async function fetchProjectFileContent(config: BackendConfig, projectId: string, path: string): Promise<string> {
-  const response = await fetch(`${config.baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/file?path=${encodeURIComponent(path)}`, {
-    headers: buildHeaders(config),
-  })
-  if (!response.ok) {
-    throw new Error(`failed to fetch project file content (${response.status} ${response.statusText})`)
-  }
-  return response.text()
+  return requestText(config, `/api/v1/projects/${encodeURIComponent(projectId)}/file?path=${encodeURIComponent(path)}`)
 }
 
 /**
@@ -784,15 +787,7 @@ export async function fetchProjectGitStatus(config: BackendConfig, projectId: st
  */
 export async function fetchProjectGitDiff(config: BackendConfig, projectId: string, hash?: string): Promise<string> {
   const query = hash ? `?hash=${encodeURIComponent(hash)}` : ''
-  const response = await fetch(`${config.baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/git/diff${query}`, {
-    headers: buildHeaders(config),
-  })
-
-  if (!response.ok) {
-    throw new APIError('diff_failed', 'failed to fetch project git diff')
-  }
-
-  return response.text()
+  return requestText(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/diff${query}`)
 }
 
 /**
@@ -1066,10 +1061,7 @@ export async function fetchProjectGitHubPulls(config: BackendConfig, projectId: 
  * @returns The PR diff as a string.
  */
 export async function fetchProjectGitHubPullDiff(config: BackendConfig, projectId: string, number: number): Promise<string> {
-  const response = await fetch(`${config.baseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/github/pulls/${encodeURIComponent(String(number))}/diff`, {
-    headers: buildHeaders(config),
-  })
-  return response.text()
+  return requestText(config, `/api/v1/projects/${encodeURIComponent(projectId)}/github/pulls/${encodeURIComponent(String(number))}/diff`)
 }
 
 /**

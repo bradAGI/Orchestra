@@ -541,12 +541,21 @@ ipcMain.handle('orchestra:delete-backend-profile', async (_event, profileId) => 
 })
 
 ipcMain.handle('orchestra:open-external', async (_event, url) => {
-  if (url) await shell.openExternal(url)
+  if (!url || typeof url !== 'string') return
+  const parsed = new URL(url)
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('Only http and https URLs are allowed')
+  }
+  await shell.openExternal(url)
 })
 
 ipcMain.handle('orchestra:open-path', async (_event, targetPath) => {
   if (!targetPath || typeof targetPath !== 'string') {
     return
+  }
+  // Require absolute path: Unix `/` or Windows drive letter (e.g. C:\)
+  if (!targetPath.startsWith('/') && !/^[a-zA-Z]:[/\\]/.test(targetPath)) {
+    throw new Error('Path must be absolute')
   }
   await shell.openPath(targetPath)
 })
