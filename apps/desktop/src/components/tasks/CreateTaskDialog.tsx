@@ -265,14 +265,14 @@ export function CreateTaskDialog({
                 size="sm"
                 onClick={() => onOpenChange(false)}
                 disabled={pending}
-                className="text-muted-foreground/40 hover:text-foreground h-7 px-3 text-[10px] font-bold uppercase tracking-widest"
+                className="text-muted-foreground/40 hover:text-foreground h-10 px-5 text-xs font-bold uppercase tracking-widest"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={pending || !title.trim() || !projectID}
-                className="h-7 px-4 bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 font-bold uppercase tracking-widest text-[10px] disabled:opacity-30"
+                className="h-10 px-6 bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 font-bold uppercase tracking-widest text-xs disabled:opacity-30"
               >
                 {pending ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : 'Create'}
               </Button>
