@@ -49,6 +49,7 @@ type PullRequest struct {
 	Title   string `json:"title"`
 	Body    string `json:"body"`
 	State   string `json:"state"`
+	Draft   bool   `json:"draft"`
 	HTMLURL string `json:"html_url"`
 	DiffURL string `json:"diff_url"`
 	Head    struct {
@@ -76,9 +77,28 @@ type CreateIssueRequest struct {
 
 // UpdateIssueRequest represents the payload for updating a GitHub issue.
 type UpdateIssueRequest struct {
-	Title *string `json:"title,omitempty"`
-	Body  *string `json:"body,omitempty"`
-	State *string `json:"state,omitempty"`
+	Title     *string  `json:"title,omitempty"`
+	Body      *string  `json:"body,omitempty"`
+	State     *string  `json:"state,omitempty"`
+	Assignees []string `json:"assignees,omitempty"`
+	Labels    []string `json:"labels,omitempty"`
+}
+
+// apiError reads the response body and returns a descriptive error for GitHub API failures.
+// Handles 401 (auth expired) and 429 (rate limit) specially.
+func apiError(resp *http.Response) error {
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("GitHub authentication failed (401). Reconnect GitHub in project settings. Details: %s", string(respBody))
+	}
+	if resp.StatusCode == http.StatusTooManyRequests {
+		retryAfter := resp.Header.Get("Retry-After")
+		if retryAfter == "" {
+			retryAfter = "60"
+		}
+		return fmt.Errorf("GitHub rate limit exceeded. Try again in %s seconds.", retryAfter)
+	}
+	return fmt.Errorf("github api returned status %d: %s", resp.StatusCode, string(respBody))
 }
 
 // ListIssues fetches issues from a GitHub repository filtered by state.
@@ -103,7 +123,7 @@ func ListIssues(ctx context.Context, owner, repo, token, state string) ([]Issue,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("github api returned status %d", resp.StatusCode)
+		return nil, apiError(resp)
 	}
 
 	var issues []Issue
@@ -139,7 +159,7 @@ func ListPullRequests(ctx context.Context, owner, repo, token string) ([]PullReq
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("github api returned status %d", resp.StatusCode)
+		return nil, apiError(resp)
 	}
 
 	var prs []PullRequest
@@ -169,7 +189,7 @@ func GetPullRequestDiff(ctx context.Context, owner, repo, token string, number i
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("github api returned status %d", resp.StatusCode)
+		return "", apiError(resp)
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -205,7 +225,7 @@ func CreateIssue(ctx context.Context, owner, repo, token string, reqBody CreateI
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("github api returned status %d", resp.StatusCode)
+		return nil, apiError(resp)
 	}
 
 	var issue Issue
@@ -241,7 +261,7 @@ func UpdateIssue(ctx context.Context, owner, repo, token string, number int, req
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("github api returned status %d", resp.StatusCode)
+		return nil, apiError(resp)
 	}
 
 	var issue Issue
@@ -314,7 +334,7 @@ func ListPRReviews(ctx context.Context, owner, repo, token string, prNumber int)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("github api returned status %d", resp.StatusCode)
+		return nil, apiError(resp)
 	}
 
 	var reviews []map[string]any
@@ -409,7 +429,7 @@ func ListPRComments(ctx context.Context, owner, repo, token string, prNumber int
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("github api returned status %d", resp.StatusCode)
+		return nil, apiError(resp)
 	}
 
 	var comments []map[string]any
@@ -445,7 +465,7 @@ func CreatePullRequest(ctx context.Context, owner, repo, token string, pr PRRequ
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("github api returned status %d", resp.StatusCode)
+		return nil, apiError(resp)
 	}
 
 	var prResp PRResponse
