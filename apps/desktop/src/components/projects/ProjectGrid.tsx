@@ -276,25 +276,30 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!projectToDelete} onOpenChange={(open) => !open && setProjectToDelete(null)}>
-        <DialogContent className="sm:max-w-md bg-popover border-border">
+        <DialogContent className="sm:max-w-lg bg-popover border-border p-8">
           <DialogHeader>
-            <DialogTitle className="text-lg font-black text-foreground flex items-center gap-2">
-              <Trash2 className="text-red-500" size={18} />
+            <div className="flex justify-center mb-4">
+              <div className="h-14 w-14 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                <Trash2 className="text-red-500" size={24} />
+              </div>
+            </div>
+            <DialogTitle className="text-xl font-black text-foreground text-center">
               Remove Project
             </DialogTitle>
-            <DialogDescription className="text-muted-foreground pt-2 text-left text-sm">
-              Remove <span className="text-foreground font-bold">{projectToDelete?.name}</span> from your workspace?
-              <div className="bg-muted/20 border border-border/30 p-2 rounded-lg mt-3 font-mono text-[10px] text-muted-foreground/60 truncate">
-                {projectToDelete?.root_path}
-              </div>
+            <DialogDescription className="text-muted-foreground pt-3 text-center text-sm leading-relaxed">
+              Are you sure you want to remove <span className="text-foreground font-bold">{projectToDelete?.name}</span> from your workspace?
+              <span className="block text-xs text-muted-foreground/50 mt-1">This will not delete any files on disk.</span>
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="mt-4">
-            <Button variant="ghost" onClick={() => setProjectToDelete(null)} className="text-muted-foreground hover:text-foreground text-xs">
+          <div className="bg-muted/20 border border-border/30 px-4 py-3 rounded-xl mt-4 font-mono text-xs text-muted-foreground/60 break-all">
+            {projectToDelete?.root_path}
+          </div>
+          <DialogFooter className="mt-6 flex gap-3 sm:gap-3">
+            <Button variant="ghost" onClick={() => setProjectToDelete(null)} className="flex-1 text-muted-foreground hover:text-foreground text-sm h-10">
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteConfirm} className="bg-red-600 hover:bg-red-500 text-white font-bold text-xs">
-              Remove
+            <Button variant="destructive" onClick={handleDeleteConfirm} className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold text-sm h-10">
+              Remove Project
             </Button>
           </DialogFooter>
         </DialogContent>
