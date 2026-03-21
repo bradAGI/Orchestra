@@ -5,3 +5,4 @@ Notes.md
 /SPEC.md
 apps/tui/tui
 apps/backend/orchestrad
+.worktrees/
