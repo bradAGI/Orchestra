@@ -28,6 +28,7 @@ type Server struct {
 	logger        zerolog.Logger
 	orchestrator  *orchestrator.Service
 	workspaceRoot string
+	worktreeRoot  string
 	authToken     string
 	pubsub        *observability.PubSub
 	db            *db.DB
@@ -63,6 +64,7 @@ func NewRouterWithPubSub(
 		logger:        logger,
 		orchestrator:  orchestratorService,
 		workspaceRoot: cfg.WorkspaceRoot,
+		worktreeRoot:  cfg.WorktreeRoot,
 		authToken:     cfg.APIToken,
 		pubsub:        pubsub,
 		db:            warehouseDB,
