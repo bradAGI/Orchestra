@@ -503,31 +503,29 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                     <Trash2 size={14} />
                                 </Button>
                             </AppTooltip>
-                            <DialogContent className="sm:max-w-md bg-popover border-border shadow-2xl">
+                            <DialogContent className="sm:max-w-lg bg-popover border-border p-8">
                                 <DialogHeader>
-                                    <DialogTitle className="text-xl font-bold text-foreground flex items-center gap-2">
-                                        <Trash2 className="text-red-500" size={20} />
+                                    <DialogTitle className="text-xl font-black text-foreground text-center">
                                         Remove Project
                                     </DialogTitle>
-                                    <DialogDescription className="text-muted-foreground pt-2">
+                                    <DialogDescription className="text-muted-foreground pt-3 text-center text-sm leading-relaxed">
                                         Are you sure you want to remove <span className="text-foreground font-bold">{project.name}</span> from your workspace?
-                                        <br /><br />
-                                        <span className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground/60">Project Path</span>
-                                        <div className="bg-muted/30 border border-border p-2 rounded mt-1 font-mono text-[10px] text-muted-foreground truncate">
-                                            {project.root_path}
-                                        </div>
+                                        <span className="block text-xs text-muted-foreground/50 mt-1">This will not delete any files on disk.</span>
                                     </DialogDescription>
                                 </DialogHeader>
+                                <div className="bg-muted/20 border border-border/30 px-4 py-3 rounded-xl mt-4 font-mono text-xs text-muted-foreground/60 break-all">
+                                    {project.root_path}
+                                </div>
                                 {deleteError ? (
-                                    <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                                    <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-300 mt-2">
                                         {deleteError}
                                     </div>
                                 ) : null}
-                                <DialogFooter className="mt-6">
+                                <DialogFooter className="mt-6 flex gap-3 sm:gap-3">
                                     <Button
                                         variant="ghost"
                                         onClick={() => setIsDeleteDialogOpen(false)}
-                                        className="text-muted-foreground hover:text-foreground"
+                                        className="flex-1 text-muted-foreground hover:text-foreground text-sm h-10"
                                         disabled={deletePending}
                                     >
                                         Cancel
@@ -535,7 +533,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                     <Button
                                         variant="destructive"
                                         onClick={handleDelete}
-                                        className="bg-red-600 hover:bg-red-500 text-white font-bold"
+                                        className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold text-sm h-10"
                                         disabled={deletePending}
                                     >
                                         {deletePending ? 'Removing...' : 'Remove Project'}
