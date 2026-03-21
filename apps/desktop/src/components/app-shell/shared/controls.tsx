@@ -121,15 +121,15 @@ export function AgentSelector({ value, agents, onChange, direction = 'up' }: { v
 
   return (
     <CustomDropdown
-      className="bg-transparent border-none hover:bg-muted/20 !h-7 !px-2 rounded-md transition-colors shadow-none"
+      className="bg-transparent border-none hover:bg-muted/20 !h-10 !px-3 rounded-lg transition-colors shadow-none"
       value={normalizedValue || 'Unassigned'}
       direction={direction}
       options={agents.map((a) => ({ label: a, value: a, icon: getAgentIcon(a) }))}
       onChange={(v) => onChange(`agent-${v}`)}
       triggerContent={
-        <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground/70 uppercase">
-          {normalizedValue && normalizedValue !== 'Unassigned' ? getAgentIcon(normalizedValue) : <User size={12} className="opacity-40" />}
-          <span className="truncate max-w-[80px]">{normalizedValue || 'Assignee'}</span>
+        <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground/70 uppercase">
+          {normalizedValue && normalizedValue !== 'Unassigned' ? getAgentIcon(normalizedValue) : <User size={14} className="opacity-40" />}
+          <span className="truncate max-w-[100px]">{normalizedValue || 'Assignee'}</span>
         </div>
       }
     />
@@ -169,18 +169,18 @@ export function ProjectSelector({
 
   return (
     <CustomDropdown
-      className="bg-transparent border-none hover:bg-muted/20 !h-7 !px-2 rounded-md transition-colors shadow-none"
+      className="bg-transparent border-none hover:bg-muted/20 !h-10 !px-3 rounded-lg transition-colors shadow-none"
       value={value}
       direction="up"
       options={[
-        { label: 'Select Project', value: '', icon: <FolderTree className="h-3 w-3 opacity-40" /> },
-        ...projects.map((p) => ({ label: p.name, value: p.id, icon: <Folder className="h-3 w-3 text-primary/60" /> })),
+        { label: 'Select Project', value: '', icon: <FolderTree className="h-3.5 w-3.5 opacity-40" /> },
+        ...projects.map((p) => ({ label: p.name, value: p.id, icon: <Folder className="h-3.5 w-3.5 text-primary/60" /> })),
       ]}
       onChange={onChange}
       triggerContent={
-        <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground/70 uppercase">
-          {project ? <Folder size={12} className="text-primary/60" /> : <FolderTree size={12} className="opacity-40" />}
-          <span className="truncate max-w-[80px]">{project ? project.name : 'Project'}</span>
+        <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground/70 uppercase">
+          {project ? <Folder size={14} className="text-primary/60" /> : <FolderTree size={14} className="opacity-40" />}
+          <span className="truncate max-w-[100px]">{project ? project.name : 'Project'}</span>
         </div>
       }
     />
