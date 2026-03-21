@@ -453,8 +453,16 @@ func (s *Server) PatchIssue(w http.ResponseWriter, r *http.Request) {
 		if issue.ProjectID != "" && s.db != nil {
 			project, projErr := s.db.GetProjectByID(r.Context(), issue.ProjectID)
 			if projErr == nil && project.RootPath != "" {
+				// Prefer worktree path if the issue has a branch and the worktree exists
+				commitDir := project.RootPath
+				if issue.BranchName != "" && s.worktreeRoot != "" {
+					wtPath := filepath.Join(s.worktreeRoot, project.ID, issue.BranchName)
+					if info, err := os.Stat(wtPath); err == nil && info.IsDir() {
+						commitDir = wtPath
+					}
+				}
 				commitMsg := fmt.Sprintf("feat(%s): %s\n\nVia Orchestra", issue.Identifier, issue.Title)
-				if commitErr := git.Commit(r.Context(), project.RootPath, commitMsg); commitErr != nil {
+				if commitErr := git.Commit(r.Context(), commitDir, commitMsg); commitErr != nil {
 					s.logger.Debug().Err(commitErr).Msg("auto-commit on state change (may have no changes)")
 				}
 			}

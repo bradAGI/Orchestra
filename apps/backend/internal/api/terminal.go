@@ -5,6 +5,8 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -32,6 +34,22 @@ func (s *Server) TerminalWebSocket(w http.ResponseWriter, r *http.Request) {
 		project, err := s.db.GetProjectByID(r.Context(), projectID)
 		if err == nil {
 			dir = project.RootPath
+
+			// For issue-scoped terminals, use the worktree path if available
+			if strings.HasPrefix(sessionID, "issue-") && s.worktreeRoot != "" {
+				issueIdent := strings.TrimPrefix(sessionID, "issue-")
+				if issues, listErr := s.orchestrator.ListIssues(r.Context(), tracker.IssueFilter{}); listErr == nil {
+					for _, iss := range issues {
+						if iss.Identifier == issueIdent && iss.BranchName != "" {
+							wtPath := filepath.Join(s.worktreeRoot, project.ID, iss.BranchName)
+							if info, statErr := os.Stat(wtPath); statErr == nil && info.IsDir() {
+								dir = wtPath
+							}
+							break
+						}
+					}
+				}
+			}
 		}
 	}
 

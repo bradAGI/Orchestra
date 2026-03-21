@@ -717,6 +717,10 @@ func processExecutionTick(
 
 		go func() {
 			project := resolvedProject
+			diffDir := workspacePath // use worktree path for diff stats
+			if diffDir == "" {
+				diffDir = project.RootPath
+			}
 			if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
 				return
 			}
@@ -731,8 +735,8 @@ func processExecutionTick(
 
 			// Get git diff stats for the comment
 			diffStats := ""
-			if project.RootPath != "" {
-				cmd := exec.Command("git", "-C", project.RootPath, "diff", "--stat", "HEAD")
+			if diffDir != "" {
+				cmd := exec.Command("git", "-C", diffDir, "diff", "--stat", "HEAD")
 				if out, err := cmd.Output(); err == nil && len(out) > 0 {
 					diffStats = string(out)
 				}
@@ -740,13 +744,13 @@ func processExecutionTick(
 
 			// Get list of changed files
 			changedFiles := ""
-			if project.RootPath != "" {
-				cmd := exec.Command("git", "-C", project.RootPath, "diff", "--name-only", "HEAD")
+			if diffDir != "" {
+				cmd := exec.Command("git", "-C", diffDir, "diff", "--name-only", "HEAD")
 				if out, err := cmd.Output(); err == nil && len(out) > 0 {
 					changedFiles = strings.TrimSpace(string(out))
 				}
 				// Also include untracked files
-				cmd2 := exec.Command("git", "-C", project.RootPath, "ls-files", "--others", "--exclude-standard")
+				cmd2 := exec.Command("git", "-C", diffDir, "ls-files", "--others", "--exclude-standard")
 				if out2, err := cmd2.Output(); err == nil && len(out2) > 0 {
 					if changedFiles != "" {
 						changedFiles += "\n"
