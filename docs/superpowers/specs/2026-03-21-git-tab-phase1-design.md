@@ -10,7 +10,7 @@ Two-panel layout within the Git tab:
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│ ⎇ branch-name  ↑2 ahead ↓0 behind  [Push] [Pull] [Fetch] │
+│ ⎇ branch-name  ↑2 ahead ↓0 behind  [Push ↑2] [Pull]      │
 ├─────────────────────────────────────────────────────┤
 │ [Changes]  History  GitHub                          │
 ├──────────────┬──┬───────────────────────────────────┤
@@ -32,7 +32,7 @@ Two-panel layout within the Git tab:
 - **Left panel (~300px, resizable):** Stacked vertically — Unstaged files (top), Staged files (bottom), Commit bar (pinned at bottom)
 - **Right panel (flex):** Diff viewer, full height
 - **Resizable split:** Vertical drag handle between left and right panels
-- **Branch bar:** Top of Git tab — branch name, ahead/behind counts, Push/Pull/Fetch buttons
+- **Branch bar:** Top of Git tab — branch name, ahead/behind counts, Push/Pull buttons (Fetch deferred to Phase 2)
 - **Sub-tabs:** Changes | History | GitHub — only Changes is implemented in Phase 1; History and GitHub remain as-is
 
 ## Components
@@ -43,8 +43,8 @@ Rewritten. Manages top-level state and orchestrates child components.
 
 **State:**
 - `currentBranch: string` — from `fetchProjectGitBranches()`
-- `aheadBehind: { ahead: number, behind: number }` — from git status
-- `status: { unstaged: GitStatusEntry[], staged: GitStatusEntry[] }` — from `fetchProjectGitStatus()`
+- `aheadBehind: { ahead: number, behind: number }` — parsed from `git status --branch --porcelain` output (the `## branch...origin/branch [ahead N, behind N]` line). Requires adding `--branch` flag to the backend's `git status` command, or running a separate `git rev-list --count --left-right HEAD...@{upstream}` command.
+- `status: { unstaged: GitStatusEntry[], staged: GitStatusEntry[] }` — from `fetchProjectGitStatus()`. The backend returns flat porcelain output; the **frontend** parses the two-character status code: first character = index (staged) status, second character = worktree (unstaged) status. A file can appear in both lists (e.g., partially staged). Parsing logic lives in a `parseGitStatus()` utility in `StagingArea.tsx`.
 - `selectedFile: string | null` — path of file selected for diff
 - `diffData: string | null` — raw diff for selected file
 - `activeSubTab: 'changes' | 'history' | 'github'`
@@ -52,7 +52,7 @@ Rewritten. Manages top-level state and orchestrates child components.
 **Behavior:**
 - Fetches branch, status, ahead/behind on mount
 - Refreshes status after any mutation (stage, unstage, commit, push, pull)
-- When `selectedFile` changes, calls `fetchProjectGitDiff({ file })` and updates `diffData`
+- When `selectedFile` changes, calls `fetchProjectGitDiff({ file, staged })` and updates `diffData`. The `staged` flag determines whether the backend runs `git diff <file>` (unstaged) or `git diff --cached <file>` (staged). For untracked files (`?` status), the backend runs `git diff --no-index /dev/null <file>` to show full file contents as additions.
 - Renders branch bar, sub-tabs, and `ResizableSplit` containing `StagingArea` + `DiffViewer`
 
 ### `StagingArea.tsx` — Left panel (new, replaces `ChangesList.tsx`)
@@ -63,7 +63,7 @@ Two stacked file lists with drag-and-drop between them.
 - `unstaged: GitStatusEntry[]`
 - `staged: GitStatusEntry[]`
 - `selectedFile: string | null`
-- `onFileSelect: (path: string) => void`
+- `onFileSelect: (path: string, staged: boolean) => void`
 - `onStage: (path: string) => void`
 - `onUnstage: (path: string) => void`
 - `onStageAll: () => void`
@@ -161,7 +161,7 @@ GitTab (state owner)
 ```
 
 1. `GitTab` mounts → fetches branches + status
-2. User clicks a file in `StagingArea` → `GitTab.onFileSelect(path)` → fetches diff → passes to `DiffViewer`
+2. User clicks a file in `StagingArea` → `GitTab.onFileSelect(path, staged)` → fetches diff (with `staged` flag to pick `git diff` vs `git diff --cached`) → passes to `DiffViewer`
 3. User drags file from unstaged to staged → `StagingArea.onStage(path)` → `GitTab` calls `gitStage(projectId, path)` → refreshes status
 4. User types commit message + clicks Commit → `CommitBar.onCommit(msg)` → `GitTab` calls `gitCommit(projectId, msg)` → refreshes status, clears message
 5. User clicks Push → `GitTab` calls `gitPush(projectId)` → refreshes status + ahead/behind
@@ -179,7 +179,11 @@ GitTab (state owner)
 | Push | POST | `/api/v1/projects/{id}/git/push` |
 | Pull | POST | `/api/v1/projects/{id}/git/pull` |
 
-No new backend endpoints needed for Phase 1.
+### Backend Changes Needed
+
+- **`git status` command:** Add `--branch` flag to include ahead/behind tracking info in the porcelain output. This is a one-line change in the backend's git status handler.
+- **`git diff` endpoint:** Add `?file=path` query parameter for single-file diffs, and `?staged=true` parameter to switch between `git diff <file>` (unstaged) and `git diff --cached <file>` (staged). For untracked files, use `git diff --no-index /dev/null <file>`.
+- **Fetch button:** Deferred to Phase 2 (branch management). No fetch endpoint exists yet — the branch bar will show Push and Pull only in Phase 1.
 
 ## New Dependency
 
