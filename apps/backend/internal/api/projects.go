@@ -670,14 +670,31 @@ func (s *Server) GetProjectGitHubIssues(w http.ResponseWriter, r *http.Request) 
 	if state == "" {
 		state = "open"
 	}
-	issues, err := ghutil.ListIssues(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, state)
+	page := 1
+	if p := r.URL.Query().Get("page"); p != "" {
+		if parsed, parseErr := strconv.Atoi(p); parseErr == nil && parsed > 0 {
+			page = parsed
+		}
+	}
+	issues, err := ghutil.ListIssues(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, state, page)
 	if err != nil {
 		s.logger.Warn().Err(err).Str("project_id", projectID).Msg("failed to fetch github issues")
-		writeJSONError(w, http.StatusBadGateway, "github_fetch_failed", "failed to fetch issues from GitHub")
+		writeJSONError(w, http.StatusBadGateway, "github_fetch_failed", err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, issues)
+	writeJSON(w, http.StatusOK, map[string]any{"issues": issues, "has_more": len(issues) == 50})
+}
+
+func (s *Server) GetDefaultBranch(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+	branch := git.DefaultBranch(r.Context(), project.RootPath)
+	writeJSON(w, http.StatusOK, map[string]string{"branch": branch})
 }
 
 func (s *Server) GetProjectGitBranches(w http.ResponseWriter, r *http.Request) {
@@ -807,14 +824,20 @@ func (s *Server) GetProjectGitHubPulls(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prs, err := ghutil.ListPullRequests(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken)
+	page := 1
+	if p := r.URL.Query().Get("page"); p != "" {
+		if parsed, parseErr := strconv.Atoi(p); parseErr == nil && parsed > 0 {
+			page = parsed
+		}
+	}
+	prs, err := ghutil.ListPullRequests(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, page)
 	if err != nil {
 		s.logger.Warn().Err(err).Str("project_id", projectID).Msg("failed to fetch github pull requests")
-		writeJSONError(w, http.StatusBadGateway, "github_fetch_failed", "failed to fetch pull requests from GitHub")
+		writeJSONError(w, http.StatusBadGateway, "github_fetch_failed", err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, prs)
+	writeJSON(w, http.StatusOK, map[string]any{"pulls": prs, "has_more": len(prs) == 30})
 }
 
 func (s *Server) GetProjectGitHubPullDiff(w http.ResponseWriter, r *http.Request) {

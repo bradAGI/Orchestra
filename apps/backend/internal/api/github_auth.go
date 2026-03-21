@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/go-github/v69/github"
 	"github.com/orchestra/orchestra/apps/backend/internal/db"
+	"github.com/orchestra/orchestra/apps/backend/internal/observability"
 	"golang.org/x/oauth2"
 	githuboauth "golang.org/x/oauth2/github"
 )
@@ -39,6 +40,9 @@ func (s *Server) HandleGitHubLogin(w http.ResponseWriter, r *http.Request) {
 		if token != "" {
 			s.logger.Info().Str("project_id", projectID).Msg("automatically discovered github cli token")
 			if err := s.updateProjectGitHubToken(r.Context(), projectID, token); err == nil {
+				if s.pubsub != nil {
+					s.pubsub.Publish(observability.Event{Type: "GITHUB_CONNECTED", Data: map[string]any{"project_id": projectID}})
+				}
 				// We found it! Send a success page immediately.
 				w.Header().Set("Content-Type", "text/html")
 				fmt.Fprintf(w, "<html><body style='font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#09090b;color:white;'>"+
@@ -99,6 +103,10 @@ func (s *Server) HandleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if s.pubsub != nil {
+		s.pubsub.Publish(observability.Event{Type: "GITHUB_CONNECTED", Data: map[string]any{"project_id": state}})
+	}
+
 	w.Header().Set("Content-Type", "text/html")
 	fmt.Fprintf(w, "<html><body style='font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#09090b;color:white;'>"+
 		"<div style='text-align:center;padding:2rem;background:#18181b;border-radius:1rem;border:1px solid #27272a;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5)'>"+
@@ -138,6 +146,10 @@ func (s *Server) HandleGitHubDisconnect(w http.ResponseWriter, r *http.Request) 
 	if rowsAffected == 0 {
 		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
 		return
+	}
+
+	if s.pubsub != nil {
+		s.pubsub.Publish(observability.Event{Type: "GITHUB_DISCONNECTED", Data: map[string]any{"project_id": projectID}})
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})

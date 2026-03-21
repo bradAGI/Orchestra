@@ -102,11 +102,14 @@ func apiError(resp *http.Response) error {
 }
 
 // ListIssues fetches issues from a GitHub repository filtered by state.
-func ListIssues(ctx context.Context, owner, repo, token, state string) ([]Issue, error) {
+func ListIssues(ctx context.Context, owner, repo, token, state string, page int) ([]Issue, error) {
 	if state == "" {
 		state = "open"
 	}
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues?state=%s&per_page=50", owner, repo, state)
+	if page < 1 {
+		page = 1
+	}
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues?state=%s&per_page=50&page=%d", owner, repo, state, page)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -141,8 +144,11 @@ func ListIssues(ctx context.Context, owner, repo, token, state string) ([]Issue,
 }
 
 // ListPullRequests fetches pull requests from a GitHub repository.
-func ListPullRequests(ctx context.Context, owner, repo, token string) ([]PullRequest, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls?state=all&per_page=30", owner, repo)
+func ListPullRequests(ctx context.Context, owner, repo, token string, page int) ([]PullRequest, error) {
+	if page < 1 {
+		page = 1
+	}
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls?state=all&per_page=30&page=%d", owner, repo, page)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {

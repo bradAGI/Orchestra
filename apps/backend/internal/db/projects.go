@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"path/filepath"
 )
 
@@ -237,8 +238,13 @@ func (db *DB) GetProjects(ctx context.Context) ([]Project, error) {
 		if err := rows.Scan(&p.ID, &p.Name, &p.RootPath, &p.RemoteURL, &p.GitHubOwner, &p.GitHubRepo, &p.GitHubToken); err != nil {
 			return nil, err
 		}
-		if dec, err := DecryptToken(p.GitHubToken); err == nil {
-			p.GitHubToken = dec
+		if p.GitHubToken != "" {
+			if dec, err := DecryptToken(p.GitHubToken); err == nil {
+				p.GitHubToken = dec
+			} else {
+				log.Printf("WARN: failed to decrypt github token for project %s: %v", p.ID, err)
+				p.GitHubToken = ""
+			}
 		}
 		projects = append(projects, p)
 	}
@@ -370,9 +376,12 @@ func (db *DB) GetProjectByID(ctx context.Context, id string) (Project, error) {
 	var p Project
 	err := db.QueryRowContext(ctx, "SELECT id, name, root_path, remote_url, COALESCE(github_owner, ''), COALESCE(github_repo, ''), COALESCE(github_token, '') FROM projects WHERE id = ?", id).
 		Scan(&p.ID, &p.Name, &p.RootPath, &p.RemoteURL, &p.GitHubOwner, &p.GitHubRepo, &p.GitHubToken)
-	if err == nil {
+	if err == nil && p.GitHubToken != "" {
 		if dec, decErr := DecryptToken(p.GitHubToken); decErr == nil {
 			p.GitHubToken = dec
+		} else {
+			log.Printf("WARN: failed to decrypt github token for project %s: %v", p.ID, decErr)
+			p.GitHubToken = ""
 		}
 	}
 	return p, err
