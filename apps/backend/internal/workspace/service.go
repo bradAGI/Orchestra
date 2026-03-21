@@ -3,6 +3,7 @@
 package workspace
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -10,6 +11,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"time"
+
+	"github.com/orchestra/orchestra/apps/backend/internal/utils/git"
 )
 
 // Service manages issue workspaces under a configurable root directory.
@@ -211,6 +214,72 @@ func (s Service) GetDiff(issueIdentifier string, provider string) (string, error
 	}
 
 	return string(out), nil
+}
+
+// WorktreePath returns the deterministic worktree path for a project and branch.
+func (s Service) WorktreePath(projectID, branchName string) string {
+	return filepath.Join(s.Root, projectID, branchName)
+}
+
+// EnsureWorktree creates or reuses a git worktree for the given project and branch.
+// Returns (worktreePath, baseSHA, created, error).
+// If the worktree already exists, returns (path, "", false, nil).
+// If new, captures base SHA from project repo HEAD before creating.
+func (s Service) EnsureWorktree(projectRoot, projectID, branchName string, hooks Hooks) (string, string, bool, error) {
+	wtPath := s.WorktreePath(projectID, branchName)
+
+	// If directory already exists, reuse it.
+	if info, err := os.Stat(wtPath); err == nil && info.IsDir() {
+		return wtPath, "", false, nil
+	}
+
+	ctx := context.Background()
+
+	// Capture base SHA before creating the worktree.
+	baseSHA, err := git.HeadSHA(ctx, projectRoot)
+	if err != nil {
+		return "", "", false, fmt.Errorf("capture base SHA: %w", err)
+	}
+
+	// Try creating with a new branch first.
+	if err := git.WorktreeAdd(ctx, projectRoot, wtPath, branchName, true); err != nil {
+		// Branch may already exist — try without -b.
+		if err2 := git.WorktreeAdd(ctx, projectRoot, wtPath, branchName, false); err2 != nil {
+			return "", "", false, fmt.Errorf("worktree add failed: new-branch: %v; existing-branch: %v", err, err2)
+		}
+	}
+
+	// Run after_create hook if set (log warning on failure, don't block).
+	if hooks.AfterCreate != "" {
+		if _, hookErr := RunHook("after_create", hooks.AfterCreate, wtPath, s.timeoutOrDefault()); hookErr != nil {
+			fmt.Fprintf(os.Stderr, "WARN: after_create hook failed for %s: %v\n", wtPath, hookErr)
+		}
+	}
+
+	return wtPath, baseSHA, true, nil
+}
+
+// RemoveWorktree removes a git worktree, running the before_remove hook first.
+func (s Service) RemoveWorktree(projectRoot, wtPath string, hooks Hooks) error {
+	if !exists(wtPath) {
+		return nil
+	}
+
+	// Run before_remove hook if set (log warning on failure, don't block).
+	if hooks.BeforeRemove != "" {
+		if _, hookErr := RunHook("before_remove", hooks.BeforeRemove, wtPath, s.timeoutOrDefault()); hookErr != nil {
+			fmt.Fprintf(os.Stderr, "WARN: before_remove hook failed for %s: %v\n", wtPath, hookErr)
+		}
+	}
+
+	ctx := context.Background()
+	return git.WorktreeRemove(ctx, projectRoot, wtPath)
+}
+
+// PruneWorktrees cleans up stale worktree references for the given project repo.
+func (s Service) PruneWorktrees(projectRoot string) error {
+	ctx := context.Background()
+	return git.WorktreePrune(ctx, projectRoot)
 }
 
 func (s Service) timeoutOrDefault() time.Duration {
