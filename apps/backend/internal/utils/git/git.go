@@ -198,6 +198,57 @@ func StashPop(ctx context.Context, dir string) error {
 	return nil
 }
 
+// StashList returns a list of stash entries with ref and message fields.
+func StashList(ctx context.Context, dir string) ([]map[string]string, error) {
+	cmd := exec.CommandContext(ctx, "git", "stash", "list", "--format=%gd|%s")
+	cmd.Dir = dir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("git stash list failed: %v - %s", err, stderr.String())
+	}
+	var result []map[string]string
+	for _, line := range strings.Split(strings.TrimSpace(stdout.String()), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 2)
+		entry := map[string]string{"ref": parts[0]}
+		if len(parts) > 1 {
+			entry["message"] = parts[1]
+		} else {
+			entry["message"] = ""
+		}
+		result = append(result, entry)
+	}
+	return result, nil
+}
+
+// StashApply applies the specified stash entry without removing it.
+func StashApply(ctx context.Context, dir, ref string) error {
+	cmd := exec.CommandContext(ctx, "git", "stash", "apply", ref)
+	cmd.Dir = dir
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("git stash apply failed: %v - %s", err, stderr.String())
+	}
+	return nil
+}
+
+// StashDrop removes the specified stash entry.
+func StashDrop(ctx context.Context, dir, ref string) error {
+	cmd := exec.CommandContext(ctx, "git", "stash", "drop", ref)
+	cmd.Dir = dir
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("git stash drop failed: %v - %s", err, stderr.String())
+	}
+	return nil
+}
+
 // DefaultBranch detects the default branch for the remote origin (e.g. "main" or "master").
 // Returns "main" if detection fails.
 func DefaultBranch(ctx context.Context, dir string) string {

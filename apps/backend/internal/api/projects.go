@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -1234,6 +1235,221 @@ func (s *Server) PostGitStashPop(w http.ResponseWriter, r *http.Request) {
 	if err := git.StashPop(r.Context(), project.RootPath); err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git stash pop failed")
 		writeJSONError(w, http.StatusInternalServerError, "git_stash_pop_failed", "git stash pop failed")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *Server) GetGitStashList(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if err := workspace.ValidateProjectPath(project.RootPath, s.config.ProjectRoots); err != nil {
+		s.logger.Warn().Err(err).Str("path", project.RootPath).Msg("unauthorized git stash list attempt")
+		writeJSONError(w, http.StatusForbidden, "unauthorized_project_path", "unauthorized project path")
+		return
+	}
+
+	stashes, err := git.StashList(r.Context(), project.RootPath)
+	if err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git stash list failed")
+		writeJSONError(w, http.StatusInternalServerError, "git_stash_list_failed", "git stash list failed")
+		return
+	}
+
+	if stashes == nil {
+		stashes = []map[string]string{}
+	}
+	writeJSON(w, http.StatusOK, stashes)
+}
+
+func (s *Server) PostGitStashApply(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if err := workspace.ValidateProjectPath(project.RootPath, s.config.ProjectRoots); err != nil {
+		s.logger.Warn().Err(err).Str("path", project.RootPath).Msg("unauthorized git stash apply attempt")
+		writeJSONError(w, http.StatusForbidden, "unauthorized_project_path", "unauthorized project path")
+		return
+	}
+
+	var req struct {
+		Ref string `json:"ref"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+		return
+	}
+	if req.Ref == "" {
+		writeJSONError(w, http.StatusBadRequest, "invalid_request", "ref is required")
+		return
+	}
+
+	if err := git.StashApply(r.Context(), project.RootPath, req.Ref); err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git stash apply failed")
+		writeJSONError(w, http.StatusInternalServerError, "git_stash_apply_failed", "git stash apply failed")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *Server) PostGitStashDrop(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if err := workspace.ValidateProjectPath(project.RootPath, s.config.ProjectRoots); err != nil {
+		s.logger.Warn().Err(err).Str("path", project.RootPath).Msg("unauthorized git stash drop attempt")
+		writeJSONError(w, http.StatusForbidden, "unauthorized_project_path", "unauthorized project path")
+		return
+	}
+
+	var req struct {
+		Ref string `json:"ref"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+		return
+	}
+	if req.Ref == "" {
+		writeJSONError(w, http.StatusBadRequest, "invalid_request", "ref is required")
+		return
+	}
+
+	if err := git.StashDrop(r.Context(), project.RootPath, req.Ref); err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git stash drop failed")
+		writeJSONError(w, http.StatusInternalServerError, "git_stash_drop_failed", "git stash drop failed")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *Server) GetGitConflicts(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if err := workspace.ValidateProjectPath(project.RootPath, s.config.ProjectRoots); err != nil {
+		s.logger.Warn().Err(err).Str("path", project.RootPath).Msg("unauthorized git conflicts attempt")
+		writeJSONError(w, http.StatusForbidden, "unauthorized_project_path", "unauthorized project path")
+		return
+	}
+
+	// Check for unmerged files via git status --porcelain
+	cmd := exec.CommandContext(r.Context(), "git", "status", "--porcelain")
+	cmd.Dir = project.RootPath
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git status failed")
+		writeJSONError(w, http.StatusInternalServerError, "git_status_failed", "git status failed")
+		return
+	}
+
+	var conflictFiles []string
+	for _, line := range strings.Split(string(out), "\n") {
+		if len(line) < 3 {
+			continue
+		}
+		xy := line[:2]
+		// Unmerged statuses: UU, AA, DD, AU, UA, DU, UD
+		if strings.Contains(xy, "U") || xy == "AA" || xy == "DD" {
+			filePath := strings.TrimSpace(line[3:])
+			conflictFiles = append(conflictFiles, filePath)
+		}
+	}
+
+	// Check if in merge state
+	mergeHeadPath := filepath.Join(project.RootPath, ".git", "MERGE_HEAD")
+	_, mergeErr := os.Stat(mergeHeadPath)
+	inMerge := mergeErr == nil
+
+	if conflictFiles == nil {
+		conflictFiles = []string{}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"in_merge": inMerge,
+		"files":    conflictFiles,
+	})
+}
+
+func (s *Server) PostGitMergeAbort(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if err := workspace.ValidateProjectPath(project.RootPath, s.config.ProjectRoots); err != nil {
+		s.logger.Warn().Err(err).Str("path", project.RootPath).Msg("unauthorized git merge abort attempt")
+		writeJSONError(w, http.StatusForbidden, "unauthorized_project_path", "unauthorized project path")
+		return
+	}
+
+	cmd := exec.CommandContext(r.Context(), "git", "merge", "--abort")
+	cmd.Dir = project.RootPath
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git merge abort failed")
+		writeJSONError(w, http.StatusInternalServerError, "git_merge_abort_failed", "git merge --abort failed")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *Server) PostGitConflictResolve(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if err := workspace.ValidateProjectPath(project.RootPath, s.config.ProjectRoots); err != nil {
+		s.logger.Warn().Err(err).Str("path", project.RootPath).Msg("unauthorized git resolve attempt")
+		writeJSONError(w, http.StatusForbidden, "unauthorized_project_path", "unauthorized project path")
+		return
+	}
+
+	var req struct {
+		File string `json:"file"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+		return
+	}
+	if req.File == "" {
+		writeJSONError(w, http.StatusBadRequest, "invalid_request", "file is required")
+		return
+	}
+
+	cmd := exec.CommandContext(r.Context(), "git", "add", req.File)
+	cmd.Dir = project.RootPath
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Str("file", req.File).Msg("git add (resolve) failed")
+		writeJSONError(w, http.StatusInternalServerError, "git_resolve_failed", "git add failed")
 		return
 	}
 
