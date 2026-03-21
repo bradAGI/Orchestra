@@ -4,7 +4,6 @@ package workspace
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -27,85 +26,6 @@ type Hooks struct {
 	BeforeRemove string
 	BeforeRun    string
 	AfterRun     string
-}
-
-// EnsureIssueWorkspace creates or verifies the workspace directory for the given issue,
-// returning the path, whether the workspace was newly created, and any hook result.
-func (s Service) EnsureIssueWorkspace(issueIdentifier string, provider string, hooks Hooks) (string, bool, HookResult, error) {
-	path, err := WorkspacePath(s.Root, issueIdentifier, provider)
-	if err != nil {
-		return "", false, HookResult{}, err
-	}
-
-	if err := os.MkdirAll(s.Root, 0o755); err != nil {
-		return "", false, HookResult{}, fmt.Errorf("create workspace root: %w", err)
-	}
-
-	created := false
-	info, statErr := os.Lstat(path)
-	switch {
-	case statErr == nil && info.IsDir():
-		if err := ValidateWorkspacePath(s.Root, path); err != nil {
-			return "", false, HookResult{}, err
-		}
-	case statErr == nil && !info.IsDir():
-		if err := os.Remove(path); err != nil {
-			return "", false, HookResult{}, fmt.Errorf("remove stale workspace path: %w", err)
-		}
-		if err := os.MkdirAll(path, 0o755); err != nil {
-			return "", false, HookResult{}, fmt.Errorf("create workspace directory: %w", err)
-		}
-		created = true
-	case statErr != nil:
-		if !isNotExist(statErr) {
-			return "", false, HookResult{}, fmt.Errorf("inspect workspace path: %w", statErr)
-		}
-		if err := os.MkdirAll(path, 0o755); err != nil {
-			return "", false, HookResult{}, fmt.Errorf("create workspace directory: %w", err)
-		}
-		created = true
-	}
-
-	if created && hooks.AfterCreate != "" {
-		res, err := RunHook("after_create", hooks.AfterCreate, path, s.timeoutOrDefault())
-		return path, created, res, err
-	}
-
-	return path, created, HookResult{}, nil
-}
-
-// RemoveIssueWorkspaces deletes the workspace directory for the given issue,
-// running the before_remove hook first if configured.
-func (s Service) RemoveIssueWorkspaces(issueIdentifier string, provider string, hooks Hooks) error {
-	if issueIdentifier == "" {
-		return nil
-	}
-
-	path, err := WorkspacePath(s.Root, issueIdentifier, provider)
-	if err != nil {
-		return err
-	}
-
-	if !exists(path) {
-		return nil
-	}
-
-	if hooks.BeforeRemove != "" {
-		if _, err := RunHook("before_remove", hooks.BeforeRemove, path, s.timeoutOrDefault()); err != nil {
-			// Log warning but continue with removal — hook failure should not block cleanup
-			fmt.Fprintf(os.Stderr, "WARN: before_remove hook failed for %s: %v\n", path, err)
-		}
-	}
-
-	if err := ValidateWorkspacePath(s.Root, path); err != nil {
-		return err
-	}
-
-	if err := os.RemoveAll(path); err != nil {
-		return fmt.Errorf("remove workspace: %w", err)
-	}
-
-	return nil
 }
 
 // RunBeforeRunHook executes the before_run hook script in the given workspace directory.
@@ -287,18 +207,6 @@ func (s Service) timeoutOrDefault() time.Duration {
 		return 60 * time.Second
 	}
 	return s.HookTimeout
-}
-
-func isNotExist(err error) bool {
-	return err != nil && (os.IsNotExist(err) || isPathErrorNotExist(err))
-}
-
-func isPathErrorNotExist(err error) bool {
-	var pathErr *fs.PathError
-	if errors.As(err, &pathErr) {
-		return os.IsNotExist(pathErr.Err)
-	}
-	return false
 }
 
 // MarkerPath returns the path to the .orchestra marker file within the given directory.
