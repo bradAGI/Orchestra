@@ -1379,3 +1379,86 @@ func (s *Server) GetPRComments(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, comments)
 }
+
+func (s *Server) PostCreateGitHubRepo(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if project.GitHubToken == "" {
+		writeJSONError(w, http.StatusPreconditionFailed, "github_not_connected", "GitHub is not connected for this project")
+		return
+	}
+
+	var req struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Private     bool   `json:"private"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+		return
+	}
+	if req.Name == "" {
+		writeJSONError(w, http.StatusBadRequest, "invalid_request", "name is required")
+		return
+	}
+
+	repo, err := ghutil.CreateRepository(r.Context(), project.GitHubToken, ghutil.CreateRepoRequest{
+		Name:        req.Name,
+		Description: req.Description,
+		Private:     req.Private,
+	})
+	if err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Msg("failed to create github repo")
+		writeJSONError(w, http.StatusBadGateway, "github_create_failed", err.Error())
+		return
+	}
+
+	// Set remote origin on the local git repo
+	addCmd := exec.CommandContext(r.Context(), "git", "remote", "add", "origin", repo.CloneURL)
+	addCmd.Dir = project.RootPath
+	if err := addCmd.Run(); err != nil {
+		// Remote may already exist, try set-url instead
+		setCmd := exec.CommandContext(r.Context(), "git", "remote", "set-url", "origin", repo.CloneURL)
+		setCmd.Dir = project.RootPath
+		if setErr := setCmd.Run(); setErr != nil {
+			s.logger.Error().Err(setErr).Str("project_id", projectID).Msg("failed to set git remote")
+			writeJSONError(w, http.StatusInternalServerError, "git_remote_failed", "failed to set git remote origin")
+			return
+		}
+	}
+
+	// Parse owner/repo from full_name (e.g. "owner/repo")
+	parts := strings.SplitN(repo.FullName, "/", 2)
+	if len(parts) != 2 {
+		s.logger.Error().Str("full_name", repo.FullName).Msg("unexpected full_name format")
+		writeJSONError(w, http.StatusInternalServerError, "parse_error", "unexpected repository full_name format")
+		return
+	}
+
+	// Update the project record with github_owner, github_repo, and remote_url
+	if err := s.db.UpdateProjectGitHubFull(r.Context(), projectID, parts[0], parts[1], repo.CloneURL); err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Msg("failed to update project github info")
+		writeJSONError(w, http.StatusInternalServerError, "db_update_failed", "failed to update project record")
+		return
+	}
+
+	// Initial push
+	pushCmd := exec.CommandContext(r.Context(), "git", "push", "-u", "origin", "HEAD")
+	pushCmd.Dir = project.RootPath
+	if pushOut, err := pushCmd.CombinedOutput(); err != nil {
+		s.logger.Warn().Err(err).Str("output", string(pushOut)).Str("project_id", projectID).Msg("initial git push failed (non-fatal)")
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"full_name": repo.FullName,
+		"clone_url": repo.CloneURL,
+		"ssh_url":   repo.SSHURL,
+		"html_url":  repo.HTMLURL,
+	})
+}

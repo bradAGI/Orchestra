@@ -393,6 +393,12 @@ func (db *DB) UpdateProjectGitHubInfo(ctx context.Context, id, owner, repo strin
 	return err
 }
 
+// UpdateProjectGitHubFull sets the GitHub owner, repo, and remote URL for an existing project.
+func (db *DB) UpdateProjectGitHubFull(ctx context.Context, id, owner, repo, remoteURL string) error {
+	_, err := db.ExecContext(ctx, "UPDATE projects SET github_owner = ?, github_repo = ?, remote_url = ? WHERE id = ?", owner, repo, remoteURL, id)
+	return err
+}
+
 // Session represents an agent execution session linked to a project and provider.
 type Session struct {
 	ID          string `json:"id"`
