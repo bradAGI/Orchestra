@@ -12,6 +12,9 @@ import {
   gitCommit,
   gitPush,
   gitPull,
+  gitFetch,
+  gitMerge,
+  gitDeleteBranch,
 } from '@/lib/orchestra-client'
 import { BranchBar } from './BranchBar'
 import { StagingArea } from './StagingArea'
@@ -60,6 +63,7 @@ export function GitTab({
 }) {
   const [currentBranch, setCurrentBranch] = useState('')
   const [branches, setBranches] = useState<string[]>([])
+  const [remoteBranches, setRemoteBranches] = useState<string[]>([])
   const [files, setFiles] = useState<GitStatusEntry[]>([])
   const [aheadBehind, setAheadBehind] = useState({ ahead: 0, behind: 0 })
   const [commits, setCommits] = useState<GitCommit[]>([])
@@ -83,6 +87,7 @@ export function GitTab({
       ])
       setCurrentBranch(branchData.current || '')
       setBranches(branchData.branches || [])
+      setRemoteBranches(branchData.remotes || [])
       setFiles(statusData.files)
       setAheadBehind(statusData.branch)
       setCommits(historyData)
@@ -194,6 +199,36 @@ export function GitTab({
     }
   }
 
+  const handleFetch = useCallback(async () => {
+    if (!config) return
+    try {
+      await gitFetch(config, project.id)
+      loadAll()
+    } catch (err) {
+      console.error('fetch failed', err)
+    }
+  }, [config, project.id, loadAll])
+
+  const handleMerge = useCallback(async (branch: string) => {
+    if (!config) return
+    try {
+      await gitMerge(config, project.id, branch)
+      loadAll()
+    } catch (err) {
+      console.error('merge failed', err)
+    }
+  }, [config, project.id, loadAll])
+
+  const handleDeleteBranch = useCallback(async (branch: string) => {
+    if (!config) return
+    try {
+      await gitDeleteBranch(config, project.id, branch)
+      loadAll()
+    } catch (err) {
+      console.error('delete branch failed', err)
+    }
+  }, [config, project.id, loadAll])
+
   if (!config) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
@@ -215,10 +250,14 @@ export function GitTab({
             config={config}
             currentBranch={currentBranch}
             branches={branches}
-            onBranchChange={loadAll}
+            remoteBranches={remoteBranches}
             aheadBehind={aheadBehind}
+            onBranchChange={loadAll}
             onPush={handlePush}
             onPull={handlePull}
+            onFetch={handleFetch}
+            onMerge={handleMerge}
+            onDeleteBranch={handleDeleteBranch}
           />
         </div>
         <button
