@@ -31,7 +31,6 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog"
 
 /** Props for the {@link ProjectDetailView} component. */
@@ -56,13 +55,8 @@ interface ProjectDetailViewProps {
 
 type ProjectTab = 'overview' | 'files' | 'git'
 
-/**
- * Full-page detail view for a single project, with tabs for overview,
- * file browser, git history, and issue kanban board scoped to the project.
- */
 export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     project,
-    stats: _stats,
     config,
     snapshot,
     boardIssues,
@@ -90,51 +84,52 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     const [contentLoading, setContentLoading] = useState(false)
     const [loadingTab, setLoadingTab] = useState(false)
     const [refreshing, setRefreshing] = useState(false)
-    const [githubDisconnectPending, setGitHubDisconnectPending] = useState(false)
-    const [githubActionError, setGitHubActionError] = useState('')
+    const [githubPending, setGithubPending] = useState(false)
+    const [githubError, setGithubError] = useState('')
     const [tabError, setTabError] = useState<string | null>(null)
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
     const [deletePending, setDeletePending] = useState(false)
     const [deleteError, setDeleteError] = useState('')
     const [githubIssues, setGithubIssues] = useState<GitHubIssue[]>([])
 
-    // Fetch GitHub issues on mount (for backlog in overview)
+    const pathExists = project.path_exists !== false
+    const isGitHub = !!project.github_owner && !!project.github_repo
+    const isConnected = !!project.github_token
+
+    // Fetch GitHub issues on mount
     useEffect(() => {
-        if (!config || !project.github_token) return
+        if (!config || !isConnected) return
         fetchProjectGitHubIssues(config, project.id, 'open')
             .then((data) => setGithubIssues(data?.issues ?? []))
             .catch(() => setGithubIssues([]))
-    }, [config, project.id, project.github_token])
+    }, [config, project.id, isConnected])
 
-    // Poll GitHub issues every 60s when viewing overview
+    // Poll GitHub issues every 60s on overview tab
     useEffect(() => {
-        if (!config || !project.github_token) return
-        if (activeTab !== 'overview') return
+        if (!config || !isConnected || activeTab !== 'overview') return
         const interval = setInterval(() => {
             fetchProjectGitHubIssues(config, project.id, 'open')
                 .then((data) => setGithubIssues(data?.issues ?? []))
                 .catch(() => {})
         }, 60000)
         return () => clearInterval(interval)
-    }, [config, project.id, project.github_token, activeTab])
+    }, [config, project.id, isConnected, activeTab])
 
+    // Reset state on project change
     useEffect(() => {
         setFileQuery('')
         setExpandedPaths({})
         setFocusedPath(null)
         setSelectedFile(null)
         setFileContent(null)
+        setGithubError('')
     }, [project.id])
 
+    // Load tab data
     useEffect(() => {
-        // Clear errors and stale data when switching tabs
         setTabError(null)
-
-        if (!config || !project.id) return
-        if (activeTab === 'overview') return
-        if (!pathExists) return
-
-        const loadTabData = async () => {
+        if (!config || !project.id || activeTab === 'overview' || !pathExists) return
+        const load = async () => {
             setLoadingTab(true)
             try {
                 if (activeTab === 'files') {
@@ -144,23 +139,20 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                     setFocusedPath(null)
                 }
             } catch (err) {
-                const msg = err instanceof Error ? err.message : String(err)
-                setTabError(msg)
-                console.error('[ProjectDetailView] Failed to load tab data:', err)
+                setTabError(err instanceof Error ? err.message : String(err))
             } finally {
                 setLoadingTab(false)
             }
         }
-
-        void loadTabData()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeTab, config, project.id])
+        void load()
+    }, [activeTab, config, project.id, pathExists])
 
     const handleRefresh = async () => {
         if (!config) return
         setRefreshing(true)
         try {
             await refreshProject(config, project.id)
+            await onRefreshProjects()
             if (activeTab === 'files') {
                 const tree = await fetchProjectTree(config, project.id)
                 setFileTree(tree)
@@ -172,76 +164,76 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         }
     }
 
-    const openExternalTarget = async (url: string) => {
-        const desktopBridge = window.orchestraDesktop
-        if (desktopBridge && typeof desktopBridge.openExternal === 'function') {
-            await desktopBridge.openExternal(url)
+    const openExternal = async (url: string) => {
+        const bridge = window.orchestraDesktop
+        if (bridge?.openExternal) {
+            await bridge.openExternal(url)
             return
         }
         window.open(url, '_blank', 'noopener,noreferrer')
     }
 
-
     const handleConnectGitHub = async () => {
         if (!config || !project.id) return
-        setGitHubActionError('')
-        const loginUrl = `${config.baseUrl}/api/v1/github/login?project_id=${project.id}`
+        setGithubError('')
+        setGithubPending(true)
         try {
-            await openExternalTarget(loginUrl)
-            // SSE GITHUB_CONNECTED event will trigger project list refresh automatically
+            const loginUrl = `${config.baseUrl}/api/v1/github/login?project_id=${project.id}`
+            await openExternal(loginUrl)
+            // SSE GITHUB_CONNECTED event will trigger project refresh automatically
         } catch (err) {
-            console.error('Failed to launch GitHub authentication:', err)
-            setGitHubActionError(err instanceof Error ? err.message : 'Failed to start GitHub authentication')
+            setGithubError(err instanceof Error ? err.message : 'Failed to start GitHub authentication')
+        } finally {
+            setGithubPending(false)
         }
     }
 
     const handleDisconnectGitHub = async () => {
         if (!config || !project.id) return
-        const confirmed = window.confirm('Disconnect GitHub from this project? You can reconnect later.')
-        if (!confirmed) return
-        setGitHubActionError('')
-        setGitHubDisconnectPending(true)
+        if (!window.confirm(`Disconnect GitHub from ${project.github_owner}/${project.github_repo}?`)) return
+        setGithubError('')
+        setGithubPending(true)
         try {
             await disconnectProjectGitHub(config, project.id)
-            // SSE GITHUB_DISCONNECTED event will trigger project list refresh automatically
+            // SSE GITHUB_DISCONNECTED event will trigger project refresh automatically
         } catch (err) {
-            const message = err instanceof Error ? err.message : 'Failed to disconnect GitHub'
-            setGitHubActionError(message)
+            setGithubError(err instanceof Error ? err.message : 'Failed to disconnect GitHub')
         } finally {
-            setGitHubDisconnectPending(false)
+            setGithubPending(false)
         }
     }
 
-    const handleOpenProjectFolder = async () => {
-        const desktopBridge = window.orchestraDesktop
-        const fileUrl = `file://${encodeURI(project.root_path)}`
-
+    const handleOpenFolder = async () => {
+        const bridge = window.orchestraDesktop
         try {
-            if (desktopBridge && typeof desktopBridge.openPath === 'function') {
-                await desktopBridge.openPath(project.root_path)
-                return
-            }
-            if (desktopBridge && typeof desktopBridge.openExternal === 'function') {
-                await desktopBridge.openExternal(fileUrl)
-                return
-            }
-            window.open(fileUrl, '_blank', 'noopener,noreferrer')
+            if (bridge?.openPath) { await bridge.openPath(project.root_path); return }
+            if (bridge?.openExternal) { await bridge.openExternal(`file://${encodeURI(project.root_path)}`); return }
+            window.open(`file://${encodeURI(project.root_path)}`, '_blank', 'noopener,noreferrer')
         } catch (err) {
             console.error('Failed to open project folder:', err)
         }
     }
 
+    const handleDelete = async () => {
+        setDeletePending(true)
+        setDeleteError('')
+        try {
+            await onDeleteProject(project.id)
+            setIsDeleteDialogOpen(false)
+        } catch (err) {
+            setDeleteError(err instanceof Error ? err.message : 'Failed to remove project')
+        } finally {
+            setDeletePending(false)
+        }
+    }
+
+    // File tree handlers
     const handleLoadFolderChildren = async (path: string): Promise<ProjectTreeNode[]> => {
         if (!config) return []
         setFolderLoadPending((prev) => ({ ...prev, [path]: true }))
-        try {
-            return await fetchProjectTree(config, project.id, path)
-        } catch (err) {
-            console.error('Failed to expand folder:', err)
-            return []
-        } finally {
-            setFolderLoadPending((prev) => ({ ...prev, [path]: false }))
-        }
+        try { return await fetchProjectTree(config, project.id, path) }
+        catch { return [] }
+        finally { setFolderLoadPending((prev) => ({ ...prev, [path]: false })) }
     }
 
     const handleFileClick = async (path: string) => {
@@ -251,10 +243,8 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         setContentLoading(true)
         setFileContent(null)
         try {
-            const content = await fetchProjectFileContent(config, project.id, path)
-            setFileContent(content)
-        } catch (err) {
-            console.error('Failed to load file content:', err)
+            setFileContent(await fetchProjectFileContent(config, project.id, path))
+        } catch {
             setFileContent('Error: Could not load file content.')
         } finally {
             setContentLoading(false)
@@ -262,296 +252,160 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     }
 
     const toggleFolder = async (node: ProjectTreeNode) => {
-        const path = node.path
-        const shouldOpen = !expandedPaths[path]
+        const shouldOpen = !expandedPaths[node.path]
         if (shouldOpen && (!node.children || node.children.length === 0)) {
-            const children = await handleLoadFolderChildren(path)
-            setFileTree((prev) => injectTreeChildren(prev, path, children))
+            const children = await handleLoadFolderChildren(node.path)
+            setFileTree((prev) => injectTreeChildren(prev, node.path, children))
         }
-        setExpandedPaths((prev) => ({ ...prev, [path]: shouldOpen }))
-        setFocusedPath(path)
+        setExpandedPaths((prev) => ({ ...prev, [node.path]: shouldOpen }))
+        setFocusedPath(node.path)
     }
 
-    const handleNodeAction = async (node: ProjectTreeNode) => {
-        if (node.is_dir) {
-            await toggleFolder(node)
-            return
-        }
-        await handleFileClick(node.path)
-    }
-
-    const filteredTree = useMemo(() => {
-        return filterTreeNodes(fileTree, fileQuery, showHiddenFiles)
-    }, [fileTree, fileQuery, showHiddenFiles])
-
-    const visibleTreeNodes = useMemo(() => {
-        return flattenVisibleTree(filteredTree, expandedPaths)
-    }, [filteredTree, expandedPaths])
+    const filteredTree = useMemo(() => filterTreeNodes(fileTree, fileQuery, showHiddenFiles), [fileTree, fileQuery, showHiddenFiles])
+    const visibleTreeNodes = useMemo(() => flattenVisibleTree(filteredTree, expandedPaths), [filteredTree, expandedPaths])
 
     const handleTreeKeyDown = async (event: React.KeyboardEvent<HTMLDivElement>) => {
         if (visibleTreeNodes.length === 0) return
-
         const currentPath = focusedPath || selectedFile || visibleTreeNodes[0]?.node.path || null
-        const currentIndex = currentPath
-            ? Math.max(visibleTreeNodes.findIndex((entry) => entry.node.path === currentPath), 0)
-            : 0
+        const currentIndex = currentPath ? Math.max(visibleTreeNodes.findIndex((entry) => entry.node.path === currentPath), 0) : 0
         const current = visibleTreeNodes[currentIndex]
         if (!current) return
 
-        if (event.key === 'ArrowDown') {
-            event.preventDefault()
-            const next = visibleTreeNodes[Math.min(currentIndex + 1, visibleTreeNodes.length - 1)]
-            if (next) setFocusedPath(next.node.path)
-            return
-        }
-
-        if (event.key === 'ArrowUp') {
-            event.preventDefault()
-            const prev = visibleTreeNodes[Math.max(currentIndex - 1, 0)]
-            if (prev) setFocusedPath(prev.node.path)
-            return
-        }
-
+        if (event.key === 'ArrowDown') { event.preventDefault(); const next = visibleTreeNodes[Math.min(currentIndex + 1, visibleTreeNodes.length - 1)]; if (next) setFocusedPath(next.node.path); return }
+        if (event.key === 'ArrowUp') { event.preventDefault(); const prev = visibleTreeNodes[Math.max(currentIndex - 1, 0)]; if (prev) setFocusedPath(prev.node.path); return }
         if (event.key === 'ArrowRight') {
             event.preventDefault()
             if (current.node.is_dir) {
-                if (!expandedPaths[current.node.path]) {
-                    await toggleFolder(current.node)
-                } else {
-                    const next = visibleTreeNodes[currentIndex + 1]
-                    if (next) setFocusedPath(next.node.path)
-                }
+                if (!expandedPaths[current.node.path]) { await toggleFolder(current.node) }
+                else { const next = visibleTreeNodes[currentIndex + 1]; if (next) setFocusedPath(next.node.path) }
             }
             return
         }
-
         if (event.key === 'ArrowLeft') {
             event.preventDefault()
-            if (current.node.is_dir && expandedPaths[current.node.path]) {
-                setExpandedPaths((prev) => ({ ...prev, [current.node.path]: false }))
-                return
-            }
-            if (current.parentPath) {
-                setFocusedPath(current.parentPath)
-            }
+            if (current.node.is_dir && expandedPaths[current.node.path]) { setExpandedPaths((prev) => ({ ...prev, [current.node.path]: false })); return }
+            if (current.parentPath) setFocusedPath(current.parentPath)
             return
         }
-
         if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault()
-            await handleNodeAction(current.node)
+            if (current.node.is_dir) await toggleFolder(current.node)
+            else await handleFileClick(current.node.path)
         }
     }
 
-    const pathExists = project.path_exists !== false
     const tabs = [
-        { id: 'overview', label: 'Project Tasks', icon: <Layers size={14} />, needsPath: false },
-        { id: 'files', label: 'Files', icon: <FileText size={14} />, needsPath: true },
-        { id: 'git', label: 'Git', icon: <GitBranch size={14} />, needsPath: true },
-    ] as const
-
-
-    const handleDelete = async () => {
-        setDeletePending(true)
-        setDeleteError('')
-        try {
-            await onDeleteProject(project.id)
-            setIsDeleteDialogOpen(false)
-        } catch (err) {
-            const message = err instanceof Error ? err.message : 'Failed to remove project'
-            setDeleteError(message)
-        } finally {
-            setDeletePending(false)
-        }
-    }
+        { id: 'overview' as const, label: 'Tasks', icon: <Layers size={14} />, needsPath: false },
+        { id: 'files' as const, label: 'Files', icon: <FileText size={14} />, needsPath: true },
+        { id: 'git' as const, label: 'Git', icon: <GitBranch size={14} />, needsPath: true },
+    ]
 
     return (
         <div className="flex flex-col h-full bg-background/20 overflow-hidden">
             {/* Header */}
-            <div className="flex flex-col px-8 pt-4 border-b border-border/40 bg-background/40 backdrop-blur-xl sticky top-0 z-20 shrink-0">
-                <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
-                    <div className="flex min-w-0 items-center gap-2.5">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={onBack}
-                            className="h-8 text-muted-foreground hover:text-foreground gap-1.5 -ml-2"
-                        >
-                            <ArrowLeft size={14} />
-                            Back
-                        </Button>
-                        <div className="h-4 w-px bg-border/50" />
-                        <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0">
-                            <Folder size={16} />
-                        </div>
-                        <div className="flex min-w-0 items-center gap-2 flex-wrap">
-                            <h1 className="text-xl font-bold tracking-tight truncate max-w-[220px] lg:max-w-none">{project.name}</h1>
-                            {project.remote_url && (
-                                <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 gap-1 h-5 px-1.5 cursor-default">
-                                    <GitBranch size={10} />
-                                    Git Remote
-                                </Badge>
-                            )}
-                            {project.github_token ? (
-                                <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1 h-5 px-1.5 cursor-default">
-                                    <Github size={10} />
-                                    {project.github_owner}/{project.github_repo}
-                                </Badge>
-                            ) : (
-                                project.github_owner && (
-                                    <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 gap-1 h-5 px-1.5 cursor-default">
-                                        <Github size={10} />
-                                        {project.github_owner}/{project.github_repo}
-                                    </Badge>
-                                )
-                            )}
-                            <div className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground/70 font-mono">
-                                <span className="truncate max-w-[240px] lg:max-w-[420px]">{project.root_path}</span>
-                                <AppTooltip content="Open project folder">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-6 w-6 p-0 text-muted-foreground hover:text-primary"
-                                        onClick={() => void handleOpenProjectFolder()}
-                                        aria-label="Open project folder"
-                                    >
-                                        <ExternalLink size={12} />
-                                    </Button>
-                                </AppTooltip>
-                            </div>
-                        </div>
+            <div className="shrink-0 border-b border-border/40 bg-background/40 backdrop-blur-xl sticky top-0 z-20">
+                {/* Row 1: Navigation + Identity */}
+                <div className="flex items-center gap-3 px-6 pt-4 pb-2">
+                    <Button variant="ghost" size="sm" onClick={onBack} className="h-7 text-muted-foreground hover:text-foreground gap-1 -ml-2 text-xs">
+                        <ArrowLeft size={14} /> Back
+                    </Button>
+                    <div className="h-4 w-px bg-border/40" />
+                    <div className="h-7 w-7 rounded-md bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0">
+                        <Folder size={14} />
+                    </div>
+                    <h1 className="text-lg font-bold tracking-tight truncate">{project.name}</h1>
+
+                    {/* Badges */}
+                    <div className="flex items-center gap-1.5">
+                        {isConnected ? (
+                            <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1 h-5 px-1.5 text-[10px]">
+                                <Github size={10} />
+                                {project.github_owner}/{project.github_repo}
+                            </Badge>
+                        ) : isGitHub ? (
+                            <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 gap-1 h-5 px-1.5 text-[10px]">
+                                <Github size={10} />
+                                {project.github_owner}/{project.github_repo}
+                            </Badge>
+                        ) : project.remote_url ? (
+                            <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 gap-1 h-5 px-1.5 text-[10px]">
+                                <GitBranch size={10} /> Git
+                            </Badge>
+                        ) : null}
+                    </div>
+                </div>
+
+                {/* Row 2: Path + Actions */}
+                <div className="flex items-center justify-between gap-3 px-6 pb-2">
+                    <div className="flex items-center gap-1.5 min-w-0 text-[11px] text-muted-foreground/60 font-mono">
+                        <span className="truncate max-w-[400px]">{project.root_path}</span>
+                        <AppTooltip content="Open folder">
+                            <button onClick={() => void handleOpenFolder()} className="p-0.5 hover:text-primary transition-colors">
+                                <ExternalLink size={11} />
+                            </button>
+                        </AppTooltip>
                     </div>
 
-                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                        <AppTooltip content="Force metadata and filesystem sync">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                onClick={handleRefresh}
-                                disabled={refreshing}
-                            >
-                                <RefreshCcw size={14} className={refreshing ? 'animate-refresh-spin' : ''} />
+                    <div className="flex items-center gap-1.5 shrink-0">
+                        <AppTooltip content="Refresh project">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleRefresh} disabled={refreshing}>
+                                <RefreshCcw size={13} className={refreshing ? 'animate-refresh-spin' : ''} />
                             </Button>
                         </AppTooltip>
 
-                        {project.github_token ? (
-                            <AppTooltip content="Disconnect GitHub for this project">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="gap-2 h-8 px-3 text-xs border-green-500/20 text-green-500 hover:bg-green-500/10"
-                                    onClick={() => void handleDisconnectGitHub()}
-                                    disabled={githubDisconnectPending}
-                                >
-                                    <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                                    <Github size={14} />
-                                    {githubDisconnectPending ? 'Disconnecting...' : 'Disconnect GitHub'}
-                                </Button>
-                            </AppTooltip>
-                        ) : (
-                            <AppTooltip content="Authenticate with GitHub to enable PR creation">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="gap-2 h-8 px-3 text-xs bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20"
-                                    onClick={() => void handleConnectGitHub()}
-                                >
-                                    <Github size={14} />
-                                    Connect GitHub
-                                </Button>
-                            </AppTooltip>
-                        )}
+                        {isConnected ? (
+                            <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] text-green-500 hover:text-green-400 hover:bg-green-500/10 gap-1.5"
+                                onClick={() => void handleDisconnectGitHub()} disabled={githubPending}>
+                                <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                                Disconnect
+                            </Button>
+                        ) : isGitHub ? (
+                            <Button variant="default" size="sm" className="h-7 px-3 text-[11px] gap-1.5 shadow-sm"
+                                onClick={() => void handleConnectGitHub()} disabled={githubPending}>
+                                <Github size={12} />
+                                {githubPending ? 'Connecting...' : 'Connect GitHub'}
+                            </Button>
+                        ) : null}
 
                         {project.remote_url && (
-                            <AppTooltip content="Open git repository in your default browser">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="gap-2 h-8 px-3 text-xs border-border/60"
-                                    onClick={() => void openExternalTarget(project.remote_url)}
-                                >
-                                    <Globe size={14} />
-                                    Git Repo
+                            <AppTooltip content="Open repository">
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => void openExternal(project.remote_url)}>
+                                    <Globe size={13} />
                                 </Button>
                             </AppTooltip>
                         )}
 
-                        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                            <AppTooltip content="Remove project from workspace">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 w-8 p-0 text-red-500 hover:text-red-400 hover:bg-red-500/10 border-red-500/20"
-                                    onClick={() => setIsDeleteDialogOpen(true)}
-                                >
-                                    <Trash2 size={14} />
-                                </Button>
-                            </AppTooltip>
-                            <DialogContent className="sm:max-w-lg bg-popover border-border p-8">
-                                <DialogHeader>
-                                    <DialogTitle className="text-xl font-black text-foreground text-center">
-                                        Remove Project
-                                    </DialogTitle>
-                                    <DialogDescription className="text-muted-foreground pt-3 text-center text-sm leading-relaxed">
-                                        Are you sure you want to remove <span className="text-foreground font-bold">{project.name}</span> from your workspace?
-                                        <span className="block text-xs text-muted-foreground/50 mt-1">This will not delete any files on disk.</span>
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <div className="bg-muted/20 border border-border/30 px-4 py-3 rounded-xl mt-4 font-mono text-xs text-muted-foreground/60 break-all">
-                                    {project.root_path}
-                                </div>
-                                {deleteError ? (
-                                    <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-300 mt-2">
-                                        {deleteError}
-                                    </div>
-                                ) : null}
-                                <DialogFooter className="mt-6 flex gap-3 sm:gap-3">
-                                    <Button
-                                        variant="ghost"
-                                        onClick={() => setIsDeleteDialogOpen(false)}
-                                        className="flex-1 text-muted-foreground hover:text-foreground text-sm h-10"
-                                        disabled={deletePending}
-                                    >
-                                        Cancel
-                                    </Button>
-                                    <Button
-                                        variant="destructive"
-                                        onClick={handleDelete}
-                                        className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold text-sm h-10"
-                                        disabled={deletePending}
-                                    >
-                                        {deletePending ? 'Removing...' : 'Remove Project'}
-                                    </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
+                        <AppTooltip content="Remove project">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-red-400"
+                                onClick={() => setIsDeleteDialogOpen(true)}>
+                                <Trash2 size={13} />
+                            </Button>
+                        </AppTooltip>
                     </div>
                 </div>
-                {githubActionError ? (
-                    <p className="pb-3 text-[10px] text-red-400">{githubActionError}</p>
-                ) : null}
+
+                {/* Error banner */}
+                {githubError && (
+                    <div className="mx-6 mb-2 px-3 py-1.5 rounded-md bg-red-500/10 border border-red-500/20 text-[11px] text-red-400 flex items-center justify-between">
+                        <span>{githubError}</span>
+                        <button onClick={() => setGithubError('')} className="ml-2 hover:text-red-300"><X size={12} /></button>
+                    </div>
+                )}
 
                 {/* Tabs */}
-                <div className="flex gap-1">
+                <div className="flex gap-0.5 px-6">
                     {tabs.map((tab) => {
                         const disabled = tab.needsPath && !pathExists
                         return (
-                            <AppTooltip key={tab.id} content={disabled ? `${tab.label} unavailable — project path not found on disk` : `View project ${tab.label}`}>
-                                <button
-                                    onClick={() => !disabled && setActiveTab(tab.id)}
-                                    className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-bold uppercase tracking-widest transition-all ${
-                                        disabled
-                                            ? 'border-transparent text-muted-foreground/30 cursor-not-allowed'
-                                            : activeTab === tab.id
-                                                ? 'border-primary text-primary'
-                                                : 'border-transparent text-muted-foreground hover:text-foreground'
-                                    }`}
-                                >
-                                    {tab.icon}
-                                    {tab.label}
-                                </button>
-                            </AppTooltip>
+                            <button key={tab.id}
+                                onClick={() => !disabled && setActiveTab(tab.id)}
+                                className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider transition-all ${
+                                    disabled ? 'border-transparent text-muted-foreground/25 cursor-not-allowed'
+                                    : activeTab === tab.id ? 'border-primary text-primary'
+                                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                                }`}>
+                                {tab.icon} {tab.label}
+                            </button>
                         )
                     })}
                 </div>
@@ -563,14 +417,12 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                     {activeTab === 'overview' && (
                         <div className="flex-1 flex flex-col">
                             {!pathExists && (
-                                <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl border border-amber-500/30 bg-amber-500/5 text-amber-400 text-xs">
+                                <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg border border-amber-500/30 bg-amber-500/5 text-amber-400 text-xs">
                                     <AlertCircle size={14} className="shrink-0" />
-                                    <span>Path not found: <span className="font-mono">{project.root_path}</span> — Files, Git, Terminal unavailable</span>
+                                    Path not found: <span className="font-mono">{project.root_path}</span>
                                 </div>
                             )}
-                            {/* Board */}
-                            <div className="group relative bg-gradient-to-b from-card via-card to-muted/20 rounded-xl border border-border/30 p-6 backdrop-blur-sm flex-1 flex flex-col overflow-hidden">
-                                <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                            <div className="flex-1 flex flex-col overflow-hidden rounded-lg border border-border/30 bg-card/50">
                                 <KanbanBoard
                                     loadingState={loadingState}
                                     snapshot={snapshot}
@@ -603,121 +455,57 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                     {activeTab === 'files' && (
                         <div className="flex-1 flex flex-col min-h-0">
                             {tabError ? (
-                                <div className="flex flex-col items-center justify-center py-20 text-red-400 bg-red-500/5 border border-red-500/20 rounded-xl">
-                                    <AlertCircle size={48} className="mb-4" />
-                                    <p className="text-sm font-bold uppercase tracking-widest">Loading Failed</p>
-                                    <p className="text-xs mt-2 font-mono">{tabError}</p>
+                                <div className="flex flex-col items-center justify-center py-20 text-red-400 bg-red-500/5 border border-red-500/20 rounded-lg">
+                                    <AlertCircle size={36} className="mb-3" />
+                                    <p className="text-sm font-semibold">Failed to load files</p>
+                                    <p className="text-xs mt-1 font-mono opacity-60">{tabError}</p>
                                 </div>
                             ) : loadingTab ? (
-                                <div className="space-y-2">
-                                    {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-10 w-full" />)}
-                                </div>
+                                <div className="space-y-2">{[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
                             ) : (
-                                <div className="flex-1 flex gap-4 min-h-0 text-left">
-                                    {/* File Tree */}
-                                    <div className="w-1/3 bg-card/50 border border-border/30 rounded-xl overflow-hidden shadow-inner flex flex-col min-w-[260px]">
-                                        <div className="p-2 border-b border-border/40 bg-muted/10 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 flex items-center justify-between gap-2">
-                                            <span>Files</span>
-                                            <div className="flex items-center gap-1 text-[9px] normal-case tracking-normal font-medium">
-                                                <span className="opacity-60">{visibleTreeNodes.length} items</span>
-                                                <div className="h-1.5 w-1.5 rounded-full bg-primary/40" />
-                                            </div>
-                                        </div>
-                                        <div className="p-2 border-b border-border/30 bg-background/40 space-y-2">
+                                <div className="flex-1 flex gap-3 min-h-0">
+                                    {/* File tree */}
+                                    <div className="w-1/3 min-w-[240px] bg-card/50 border border-border/30 rounded-lg overflow-hidden flex flex-col">
+                                        <div className="p-2 border-b border-border/30 space-y-1.5">
                                             <div className="relative">
-                                                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/60" />
-                                                <input
-                                                    type="text"
-                                                    value={fileQuery}
-                                                    onChange={(event) => setFileQuery(event.target.value)}
-                                                    placeholder="Search files or paths"
-                                                    className="h-8 w-full rounded-md border border-border/40 bg-background/70 pl-7 pr-7 text-xs outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-primary/50"
-                                                />
-                                                {fileQuery ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setFileQuery('')}
-                                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground/70 hover:bg-muted/50 hover:text-foreground"
-                                                        aria-label="Clear file search"
-                                                    >
-                                                        <X size={11} />
-                                                    </button>
-                                                ) : null}
+                                                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                                                <input type="text" value={fileQuery} onChange={(e) => setFileQuery(e.target.value)}
+                                                    placeholder="Search files..." className="h-7 w-full rounded border border-border/40 bg-background/60 pl-7 pr-7 text-xs outline-none focus:border-primary/50" />
+                                                {fileQuery && <button onClick={() => setFileQuery('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-muted-foreground/50 hover:text-foreground"><X size={11} /></button>}
                                             </div>
-                                            <div className="flex items-center justify-between gap-1">
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-7 px-2 text-[10px] uppercase tracking-wider font-bold"
-                                                    onClick={() => setExpandedPaths({})}
-                                                >
-                                                    Collapse All
-                                                </Button>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className={`h-7 px-2 text-[10px] uppercase tracking-wider font-bold ${showHiddenFiles ? 'text-primary' : 'text-muted-foreground'}`}
-                                                    onClick={() => setShowHiddenFiles((prev) => !prev)}
-                                                >
-                                                    Dotfiles: {showHiddenFiles ? 'On' : 'Off'}
-                                                </Button>
+                                            <div className="flex items-center justify-between">
+                                                <button onClick={() => setExpandedPaths({})} className="text-[10px] text-muted-foreground hover:text-foreground">Collapse all</button>
+                                                <button onClick={() => setShowHiddenFiles(p => !p)} className={`text-[10px] ${showHiddenFiles ? 'text-primary' : 'text-muted-foreground'} hover:text-foreground`}>
+                                                    Dotfiles {showHiddenFiles ? 'on' : 'off'}
+                                                </button>
                                             </div>
-                                            <p className="text-[9px] text-muted-foreground/60">Keyboard: arrows to navigate, enter to open.</p>
                                         </div>
-                                        <div
-                                            className="flex-1 overflow-auto custom-scrollbar text-left focus:outline-none"
-                                            tabIndex={0}
-                                            onKeyDown={(event) => { void handleTreeKeyDown(event) }}
-                                            onFocus={() => {
-                                                if (!focusedPath && visibleTreeNodes[0]) {
-                                                    setFocusedPath(visibleTreeNodes[0].node.path)
-                                                }
-                                            }}
-                                        >
+                                        <div className="flex-1 overflow-auto custom-scrollbar focus:outline-none" tabIndex={0}
+                                            onKeyDown={(e) => { void handleTreeKeyDown(e) }}
+                                            onFocus={() => { if (!focusedPath && visibleTreeNodes[0]) setFocusedPath(visibleTreeNodes[0].node.path) }}>
                                             {filteredTree.length > 0 ? (
-                                                <FileTree
-                                                    items={filteredTree}
-                                                    expandedPaths={expandedPaths}
-                                                    loadingPaths={folderLoadPending}
-                                                    onToggle={toggleFolder}
-                                                    onFileClick={(path) => { void handleFileClick(path) }}
-                                                    activeFile={selectedFile}
-                                                    focusedPath={focusedPath}
-                                                />
+                                                <FileTree items={filteredTree} expandedPaths={expandedPaths} loadingPaths={folderLoadPending}
+                                                    onToggle={toggleFolder} onFileClick={(p) => { void handleFileClick(p) }}
+                                                    activeFile={selectedFile} focusedPath={focusedPath} />
                                             ) : (
-                                                <div className="px-3 py-6 text-[11px] text-muted-foreground/70">
-                                                    No files match this filter.
-                                                </div>
+                                                <div className="px-3 py-6 text-[11px] text-muted-foreground/50">No files match.</div>
                                             )}
                                         </div>
                                     </div>
 
-                                     {/* Content Viewer */}
-                                     <div className="group relative flex-1 bg-gradient-to-b from-card via-card to-muted/20 border border-border/30 rounded-xl overflow-hidden shadow-2xl flex flex-col">
-                                         <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                                         <div className="p-2 border-b border-border/40 bg-muted/10 flex items-center justify-between">
-                                            <div className="flex items-center gap-2 overflow-hidden">
-                                                <File size={12} className="text-primary/60 shrink-0" />
-                                                 <span className="text-[10px] font-mono text-muted-foreground truncate">{selectedFile || 'No file selected'}</span>
-                                            </div>
-                                            {contentLoading && <RefreshCcw size={12} className="text-primary animate-refresh-spin" />}
+                                    {/* File content */}
+                                    <div className="flex-1 bg-card/50 border border-border/30 rounded-lg overflow-hidden flex flex-col">
+                                        <div className="px-3 py-2 border-b border-border/30 flex items-center gap-2 min-h-[36px]">
+                                            <File size={12} className="text-primary/50 shrink-0" />
+                                            <span className="text-[11px] font-mono text-muted-foreground truncate">{selectedFile || 'No file selected'}</span>
+                                            {contentLoading && <RefreshCcw size={11} className="text-primary animate-refresh-spin ml-auto" />}
                                         </div>
-                                        <div className="flex-1 overflow-auto custom-scrollbar text-left">
+                                        <div className="flex-1 overflow-auto custom-scrollbar">
                                             {selectedFile ? (
                                                 fileContent !== null ? (
-                                                    <pre className="m-0 min-h-full overflow-x-auto p-6 font-mono text-xs leading-6 text-foreground/90">
-                                                        {fileContent}
-                                                    </pre>
-                                                ) : (
-                                                    <div className="h-full flex items-center justify-center opacity-20 italic text-sm">Loading content...</div>
-                                                )
-                                            ) : (
-                                                <div className="h-full flex items-center justify-center text-muted-foreground/30 text-sm">
-                                                    Select a file to view
-                                                </div>
-                                            )}
+                                                    <pre className="m-0 p-4 font-mono text-xs leading-6 text-foreground/90 overflow-x-auto">{fileContent}</pre>
+                                                ) : <div className="flex items-center justify-center h-full text-sm opacity-20">Loading...</div>
+                                            ) : <div className="flex items-center justify-center h-full text-muted-foreground/25 text-sm">Select a file</div>}
                                         </div>
                                     </div>
                                 </div>
@@ -730,216 +518,111 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                             <GitTab project={project} config={config} />
                         </section>
                     )}
-
                 </div>
             </div>
+
+            {/* Delete dialog */}
+            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <DialogContent className="sm:max-w-md bg-popover border-border p-6">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-bold text-center">Remove Project</DialogTitle>
+                        <DialogDescription className="text-center text-sm pt-2">
+                            Remove <span className="font-semibold text-foreground">{project.name}</span> from your workspace?
+                            <span className="block text-xs text-muted-foreground/50 mt-1">Files on disk will not be deleted.</span>
+                        </DialogDescription>
+                    </DialogHeader>
+                    {deleteError && (
+                        <div className="rounded border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400 mt-2">{deleteError}</div>
+                    )}
+                    <DialogFooter className="mt-4 flex gap-2 sm:gap-2">
+                        <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)} className="flex-1 h-9" disabled={deletePending}>Cancel</Button>
+                        <Button variant="destructive" onClick={handleDelete} className="flex-1 h-9 font-semibold" disabled={deletePending}>
+                            {deletePending ? 'Removing...' : 'Remove'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }
 
 
-type VisibleTreeEntry = {
-    node: ProjectTreeNode
-    level: number
-    parentPath: string | null
-}
+// --- File tree helpers (kept in same file for co-location) ---
+
+type VisibleTreeEntry = { node: ProjectTreeNode; level: number; parentPath: string | null }
 
 function injectTreeChildren(nodes: ProjectTreeNode[], targetPath: string, children: ProjectTreeNode[]): ProjectTreeNode[] {
     return nodes.map((node) => {
-        if (node.path === targetPath) {
-            return { ...node, children }
-        }
-        if (node.children && node.children.length > 0) {
-            return { ...node, children: injectTreeChildren(node.children, targetPath, children) }
-        }
+        if (node.path === targetPath) return { ...node, children }
+        if (node.children?.length) return { ...node, children: injectTreeChildren(node.children, targetPath, children) }
         return node
     })
 }
 
 function filterTreeNodes(nodes: ProjectTreeNode[], query: string, showHidden: boolean): ProjectTreeNode[] {
-    const normalized = query.trim().toLowerCase()
-
+    const q = query.trim().toLowerCase()
     return nodes
-        .filter((node) => showHidden || !node.name.startsWith('.'))
-        .flatMap((node) => {
-            const filteredChildren = node.children ? filterTreeNodes(node.children, query, showHidden) : []
-            const matches = normalized.length === 0
-                || node.name.toLowerCase().includes(normalized)
-                || node.path.toLowerCase().includes(normalized)
-
-            if (node.is_dir) {
-                if (matches || filteredChildren.length > 0 || normalized.length === 0) {
-                    return [{ ...node, children: filteredChildren }]
-                }
-                return []
-            }
-
-            return matches ? [node] : []
+        .filter((n) => showHidden || !n.name.startsWith('.'))
+        .flatMap((n) => {
+            const kids = n.children ? filterTreeNodes(n.children, query, showHidden) : []
+            const match = !q || n.name.toLowerCase().includes(q) || n.path.toLowerCase().includes(q)
+            if (n.is_dir) return (match || kids.length || !q) ? [{ ...n, children: kids }] : []
+            return match ? [n] : []
         })
 }
 
-function flattenVisibleTree(nodes: ProjectTreeNode[], expandedPaths: Record<string, boolean>, level = 0, parentPath: string | null = null): VisibleTreeEntry[] {
-    const flattened: VisibleTreeEntry[] = []
-
+function flattenVisibleTree(nodes: ProjectTreeNode[], expanded: Record<string, boolean>, level = 0, parent: string | null = null): VisibleTreeEntry[] {
+    const out: VisibleTreeEntry[] = []
     for (const node of nodes) {
-        flattened.push({ node, level, parentPath })
-        const isOpen = !!expandedPaths[node.path]
-        if (node.is_dir && isOpen && node.children && node.children.length > 0) {
-            flattened.push(...flattenVisibleTree(node.children, expandedPaths, level + 1, node.path))
-        }
+        out.push({ node, level, parentPath: parent })
+        if (node.is_dir && expanded[node.path] && node.children?.length)
+            out.push(...flattenVisibleTree(node.children, expanded, level + 1, node.path))
     }
-
-    return flattened
+    return out
 }
 
-function getTreeNodeIcon(node: ProjectTreeNode, isOpen: boolean) {
-    if (node.is_dir) {
-        return isOpen
-            ? <FolderOpen size={16} className="text-primary" />
-            : <FolderIcon size={16} className="text-primary/60" />
-    }
-
+function getNodeIcon(node: ProjectTreeNode, isOpen: boolean) {
+    if (node.is_dir) return isOpen ? <FolderOpen size={15} className="text-primary" /> : <FolderIcon size={15} className="text-primary/50" />
     const ext = node.name.split('.').pop()?.toLowerCase() || ''
-    if (['ts', 'tsx', 'js', 'jsx', 'py', 'go', 'rs', 'java', 'cpp', 'c', 'rb', 'php'].includes(ext)) {
-        return <Code size={15} className="text-sky-400/80" />
-    }
-    if (['json', 'yaml', 'yml', 'toml', 'ini', 'env'].includes(ext)) {
-        return <Database size={15} className="text-emerald-400/80" />
-    }
-    if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico'].includes(ext)) {
-        return <Image size={15} className="text-purple-400/80" />
-    }
-    if (['md', 'txt', 'log'].includes(ext)) {
-        return <FileText size={15} className="text-amber-300/80" />
-    }
-    return <File size={15} className="text-muted-foreground/70" />
+    if (['ts', 'tsx', 'js', 'jsx', 'py', 'go', 'rs', 'java', 'cpp', 'c', 'rb', 'php'].includes(ext)) return <Code size={14} className="text-sky-400/70" />
+    if (['json', 'yaml', 'yml', 'toml', 'ini', 'env'].includes(ext)) return <Database size={14} className="text-emerald-400/70" />
+    if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico'].includes(ext)) return <Image size={14} className="text-purple-400/70" />
+    if (['md', 'txt', 'log'].includes(ext)) return <FileText size={14} className="text-amber-300/70" />
+    return <File size={14} className="text-muted-foreground/50" />
 }
 
-function FileTree({
-    items,
-    level = 0,
-    expandedPaths,
-    loadingPaths,
-    onToggle,
-    onFileClick,
-    activeFile,
-    focusedPath,
-}: {
-    items: ProjectTreeNode[]
-    level?: number
-    expandedPaths: Record<string, boolean>
-    loadingPaths: Record<string, boolean>
-    onToggle: (node: ProjectTreeNode) => void | Promise<void>
-    onFileClick?: (path: string) => void
-    activeFile?: string | null
-    focusedPath?: string | null
+function FileTree({ items, level = 0, expandedPaths, loadingPaths, onToggle, onFileClick, activeFile, focusedPath }: {
+    items: ProjectTreeNode[]; level?: number; expandedPaths: Record<string, boolean>; loadingPaths: Record<string, boolean>
+    onToggle: (n: ProjectTreeNode) => void | Promise<void>; onFileClick?: (p: string) => void; activeFile?: string | null; focusedPath?: string | null
 }) {
     return (
-        <div className="divide-y divide-border/10 pb-2">
-            {items.map((item, idx) => (
-                <FileTreeNode
-                    key={`${item.path}-${idx}`}
-                    item={item}
-                    level={level}
-                    expandedPaths={expandedPaths}
-                    loadingPaths={loadingPaths}
-                    onToggle={onToggle}
-                    onFileClick={onFileClick}
-                    activeFile={activeFile}
-                    focusedPath={focusedPath}
-                />
-            ))}
-        </div>
-    )
-}
-
-function FileTreeNode({
-    item,
-    level,
-    expandedPaths,
-    loadingPaths,
-    onToggle,
-    onFileClick,
-    activeFile,
-    focusedPath,
-}: {
-    item: ProjectTreeNode
-    level: number
-    expandedPaths: Record<string, boolean>
-    loadingPaths: Record<string, boolean>
-    onToggle: (node: ProjectTreeNode) => void | Promise<void>
-    onFileClick?: (path: string) => void
-    activeFile?: string | null
-    focusedPath?: string | null
-}) {
-    const hasChildren = item.is_dir
-    const isActive = activeFile === item.path
-    const isFocused = focusedPath === item.path
-    const isOpen = !!expandedPaths[item.path]
-    const loading = !!loadingPaths[item.path]
-    const children = item.children || []
-
-    const handleToggle = async () => {
-        if (item.is_dir) {
-            await onToggle(item)
-        } else if (onFileClick) {
-            onFileClick(item.path)
-        }
-    }
-
-    return (
-        <>
-            <div
-                style={{ paddingLeft: `${level * 14 + 10}px` }}
-                className={`py-1.5 pr-2 flex items-center gap-2 group cursor-pointer transition-colors border-l-2 ${
-                    isActive
-                        ? 'bg-primary/10 text-primary border-primary/60'
-                        : isFocused
-                            ? 'bg-muted/40 text-foreground border-border/60'
-                            : 'hover:bg-muted/20 border-transparent'
-                }`}
-                onClick={handleToggle}
-            >
-                {item.is_dir ? (
-                    <>
-                        {loading ? (
-                            <RefreshCcw size={13} className="text-primary/50 animate-refresh-spin" />
-                        ) : (
-                            <ChevronRight
-                                size={13}
-                                className={`text-muted-foreground/50 transition-all duration-200 ${isOpen ? 'rotate-90 text-primary/70' : ''}`}
-                            />
-                        )}
-                        {getTreeNodeIcon(item, isOpen)}
-                        <span className="text-xs font-medium truncate">{item.name}</span>
-                    </>
-                ) : (
-                    <>
-                        <div className="w-[13px]" />
-                        {getTreeNodeIcon(item, false)}
-                        <span className={`text-xs truncate transition-colors ${isActive ? 'font-semibold text-primary' : 'text-muted-foreground group-hover:text-foreground'}`}>{item.name}</span>
-                    </>
-                )}
-            </div>
-            {isOpen && hasChildren && children.length > 0 && (
-                <div className="animate-in fade-in slide-in-from-top-1 duration-200">
-                    <FileTree
-                        items={children}
-                        level={level + 1}
-                        expandedPaths={expandedPaths}
-                        loadingPaths={loadingPaths}
-                        onToggle={onToggle}
-                        onFileClick={onFileClick}
-                        activeFile={activeFile}
-                        focusedPath={focusedPath}
-                    />
-                </div>
-            )}
-            {isOpen && hasChildren && children.length === 0 && !loading && (
-                <div style={{ paddingLeft: `${(level + 1) * 14 + 10}px` }} className="py-2 opacity-50 italic text-[10px]">
-                    Empty directory
-                </div>
-            )}
-        </>
+        <div>{items.map((item, i) => {
+            const isOpen = !!expandedPaths[item.path]
+            const isActive = activeFile === item.path
+            const isFocused = focusedPath === item.path
+            const loading = !!loadingPaths[item.path]
+            return (
+                <React.Fragment key={`${item.path}-${i}`}>
+                    <div style={{ paddingLeft: `${level * 14 + 8}px` }}
+                        className={`py-1 pr-2 flex items-center gap-1.5 cursor-pointer transition-colors text-xs ${
+                            isActive ? 'bg-primary/10 text-primary' : isFocused ? 'bg-muted/30 text-foreground' : 'hover:bg-muted/15'}`}
+                        onClick={() => item.is_dir ? void onToggle(item) : onFileClick?.(item.path)}>
+                        {item.is_dir ? (
+                            loading ? <RefreshCcw size={12} className="text-primary/40 animate-refresh-spin" />
+                            : <ChevronRight size={12} className={`text-muted-foreground/40 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                        ) : <div className="w-3" />}
+                        {getNodeIcon(item, isOpen)}
+                        <span className="truncate">{item.name}</span>
+                    </div>
+                    {isOpen && item.children?.length ? (
+                        <FileTree items={item.children} level={level + 1} expandedPaths={expandedPaths} loadingPaths={loadingPaths}
+                            onToggle={onToggle} onFileClick={onFileClick} activeFile={activeFile} focusedPath={focusedPath} />
+                    ) : null}
+                    {isOpen && item.is_dir && !item.children?.length && !loading && (
+                        <div style={{ paddingLeft: `${(level + 1) * 14 + 8}px` }} className="py-1.5 text-[10px] text-muted-foreground/30 italic">Empty</div>
+                    )}
+                </React.Fragment>
+            )
+        })}</div>
     )
 }
