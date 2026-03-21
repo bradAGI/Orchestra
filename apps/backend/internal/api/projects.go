@@ -656,8 +656,18 @@ func (s *Server) GetProjectGitDiff(w http.ResponseWriter, r *http.Request) {
 		// Show diff for specific commit
 		cmd = exec.CommandContext(r.Context(), "git", "show", hash)
 	} else {
-		// Show uncommitted changes
-		cmd = exec.CommandContext(r.Context(), "git", "diff")
+		// Show uncommitted changes with optional file and staged filters
+		file := r.URL.Query().Get("file")
+		staged := r.URL.Query().Get("staged")
+
+		args := []string{"diff"}
+		if staged == "true" {
+			args = append(args, "--cached")
+		}
+		if file != "" {
+			args = append(args, "--", file)
+		}
+		cmd = exec.CommandContext(r.Context(), "git", args...)
 	}
 	cmd.Dir = project.RootPath
 	out, err := cmd.CombinedOutput()
@@ -666,6 +676,18 @@ func (s *Server) GetProjectGitDiff(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.Write([]byte(""))
 		return
+	}
+
+	// For untracked files: if diff produced empty output and a file was specified,
+	// fall back to git diff --no-index /dev/null <file>
+	file := r.URL.Query().Get("file")
+	if len(out) == 0 && file != "" && hash == "" {
+		fallback := exec.CommandContext(r.Context(), "git", "diff", "--no-index", "/dev/null", file)
+		fallback.Dir = project.RootPath
+		fallbackOut, _ := fallback.CombinedOutput()
+		if len(fallbackOut) > 0 {
+			out = fallbackOut
+		}
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
