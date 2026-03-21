@@ -101,6 +101,17 @@ func Pull(ctx context.Context, dir, remote, branch string) error {
 	return nil
 }
 
+// Fetch retrieves objects and refs from all remotes, pruning deleted remote branches.
+func Fetch(ctx context.Context, dir string) error {
+	cmd := exec.CommandContext(ctx, "git", "fetch", "--all", "--prune")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git fetch: %s: %w", string(out), err)
+	}
+	return nil
+}
+
 // CreateBranch creates and checks out a new branch with the given name.
 func CreateBranch(ctx context.Context, dir, name string) error {
 	cmd := exec.CommandContext(ctx, "git", "checkout", "-b", name)

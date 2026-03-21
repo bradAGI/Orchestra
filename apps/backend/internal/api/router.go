@@ -150,6 +150,7 @@ func NewRouterWithPubSub(
 	protected.Post("/api/v1/projects/{project_id}/git/commit", server.PostGitCommit)
 	protected.Post("/api/v1/projects/{project_id}/git/push", server.PostGitPush)
 	protected.Post("/api/v1/projects/{project_id}/git/pull", server.PostGitPull)
+	protected.Post("/api/v1/projects/{project_id}/git/fetch", server.PostGitFetch)
 	protected.Post("/api/v1/projects/{project_id}/git/branches", server.PostGitCreateBranch)
 	protected.Post("/api/v1/projects/{project_id}/git/checkout", server.PostGitCheckout)
 	protected.Delete("/api/v1/projects/{project_id}/git/branches/{branch}", server.DeleteGitBranch)

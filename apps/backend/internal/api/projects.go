@@ -152,6 +152,29 @@ func (s *Server) PostGitPull(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+func (s *Server) PostGitFetch(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if err := workspace.ValidateProjectPath(project.RootPath, s.config.ProjectRoots); err != nil {
+		s.logger.Warn().Err(err).Str("path", project.RootPath).Msg("unauthorized git fetch attempt")
+		writeJSONError(w, http.StatusForbidden, "unauthorized_project_path", "unauthorized project path")
+		return
+	}
+
+	if err := git.Fetch(r.Context(), project.RootPath); err != nil {
+		s.logger.Error().Err(err).Str("project_id", projectID).Msg("git fetch failed")
+		writeJSONError(w, http.StatusInternalServerError, "git_fetch_failed", "git fetch failed")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
 func (s *Server) GetProjects(w http.ResponseWriter, r *http.Request) {
 	if s.db == nil {
 		writeJSONError(w, http.StatusServiceUnavailable, "db_unavailable", "database not available")
