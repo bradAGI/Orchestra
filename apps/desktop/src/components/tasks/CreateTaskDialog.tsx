@@ -187,7 +187,7 @@ export function CreateTaskDialog({
             </div>
           )}
 
-          <div className="px-4 py-3 flex items-center justify-between bg-muted/10">
+          <div className="px-6 py-4 flex items-center justify-between bg-muted/10 border-t border-border/20">
             <div className="flex items-center gap-1">
               <ProjectSelector
                 value={projectID}
@@ -241,7 +241,7 @@ export function CreateTaskDialog({
                   }
                 }}
                 disabled={whisperStatus.state !== 'idle' && !recording}
-                className={`h-7 px-3 text-[10px] font-bold uppercase tracking-widest touch-none ${
+                className={`h-10 px-4 text-xs font-bold uppercase tracking-widest touch-none ${
                   recording
                     ? 'text-red-400'
                     : whisperStatus.state !== 'idle'
@@ -250,13 +250,13 @@ export function CreateTaskDialog({
                 }`}
               >
                 {recording ? (
-                  <><Square className="h-3 w-3 mr-1" /> Release to Stop</>
+                  <><Square className="h-4 w-4 mr-1.5" /> Release to Stop</>
                 ) : whisperStatus.state === 'loading' ? (
-                  <><Loader2 className="h-3 w-3 mr-1 animate-spin-smooth" /> Loading {whisperStatus.progress}%</>
+                  <><Loader2 className="h-4 w-4 mr-1.5 animate-spin-smooth" /> Loading {whisperStatus.progress}%</>
                 ) : whisperStatus.state === 'transcribing' ? (
-                  <><Loader2 className="h-3 w-3 mr-1 animate-spin-smooth" /> Transcribing...</>
+                  <><Loader2 className="h-4 w-4 mr-1.5 animate-spin-smooth" /> Transcribing...</>
                 ) : (
-                  <><Mic className="h-3 w-3 mr-1" /> Hold to Talk</>
+                  <><Mic className="h-4 w-4 mr-1.5" /> Hold to Talk</>
                 )}
               </Button>
               <Button
@@ -265,14 +265,14 @@ export function CreateTaskDialog({
                 size="sm"
                 onClick={() => onOpenChange(false)}
                 disabled={pending}
-                className="text-muted-foreground/40 hover:text-foreground h-10 px-5 text-xs font-bold uppercase tracking-widest"
+                className="text-muted-foreground/40 hover:text-foreground h-11 px-6 text-sm font-bold uppercase tracking-widest"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={pending || !title.trim() || !projectID}
-                className="h-10 px-6 bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 font-bold uppercase tracking-widest text-xs disabled:opacity-30"
+                className="h-11 px-8 bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 font-bold uppercase tracking-widest text-sm disabled:opacity-30"
               >
                 {pending ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : 'Create'}
               </Button>
