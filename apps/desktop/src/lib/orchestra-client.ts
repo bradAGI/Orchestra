@@ -767,26 +767,39 @@ export async function fetchProjectGitHistory(config: BackendConfig, projectId: s
   return data || []
 }
 
+export type GitStatusResponse = {
+  files: GitStatusEntry[]
+  branch: { ahead: number; behind: number }
+}
+
 /**
  * Fetches the current git status (modified/untracked files) for a project.
  * @param config - Backend connection configuration.
  * @param projectId - The project UUID.
- * @returns Array of git status entries.
+ * @returns Git status response with files and branch info.
  */
-export async function fetchProjectGitStatus(config: BackendConfig, projectId: string): Promise<GitStatusEntry[]> {
-  const data = await requestJSON<GitStatusEntry[]>(config, `/api/v1/projects/${projectId}/git/status`)
-  return data || []
+export async function fetchProjectGitStatus(config: BackendConfig, projectId: string): Promise<GitStatusResponse> {
+  const data = await requestJSON<GitStatusResponse>(config, `/api/v1/projects/${projectId}/git/status`)
+  return data || { files: [], branch: { ahead: 0, behind: 0 } }
 }
 
 /**
- * Fetches the git diff for a project, optionally at a specific commit hash.
+ * Fetches the git diff for a project, optionally filtered by commit hash, file, or staged status.
  * @param config - Backend connection configuration.
  * @param projectId - The project UUID.
- * @param hash - Optional commit hash to diff against.
+ * @param opts - Optional filters: hash, file, staged.
  * @returns Unified diff output as a string.
  */
-export async function fetchProjectGitDiff(config: BackendConfig, projectId: string, hash?: string): Promise<string> {
-  const query = hash ? `?hash=${encodeURIComponent(hash)}` : ''
+export async function fetchProjectGitDiff(
+  config: BackendConfig,
+  projectId: string,
+  opts?: { hash?: string; file?: string; staged?: boolean }
+): Promise<string> {
+  const params = new URLSearchParams()
+  if (opts?.hash) params.set('hash', opts.hash)
+  if (opts?.file) params.set('file', opts.file)
+  if (opts?.staged) params.set('staged', 'true')
+  const query = params.toString() ? `?${params.toString()}` : ''
   return requestText(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/diff${query}`)
 }
 

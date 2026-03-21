@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw } from 'lucide-react'
 import type { Project } from '@/lib/orchestra-types'
-import type { BackendConfig, GitCommit, GitStatusEntry, GitHubPR } from '@/lib/orchestra-client'
+import type { BackendConfig, GitCommit, GitStatusEntry, GitHubPR, GitStatusResponse } from '@/lib/orchestra-client'
 import {
   fetchProjectGitHistory,
   fetchProjectGitStatus,
@@ -45,7 +45,7 @@ export function GitTab({
       ])
       setCurrentBranch(branchData.current || '')
       setBranches(branchData.branches || [])
-      setStatus(statusData)
+      setStatus(statusData.files)
       setCommits(historyData)
     } catch (err) {
       console.error('git load failed', err)
@@ -60,11 +60,11 @@ export function GitTab({
   useEffect(() => {
     if (!config) return
     if (selectedCommit) {
-      fetchProjectGitDiff(config, project.id, selectedCommit)
+      fetchProjectGitDiff(config, project.id, { hash: selectedCommit })
         .then(setDiff)
         .catch(() => setDiff(''))
     } else if (selectedFile) {
-      fetchProjectGitDiff(config, project.id)
+      fetchProjectGitDiff(config, project.id, {})
         .then(setDiff)
         .catch(() => setDiff(''))
     }

@@ -35,8 +35,8 @@ export function createGitTools(config: BackendConfig) {
         project_id: z.string().describe('The project UUID'),
       }),
       execute: async (params) => {
-        const entries = await fetchProjectGitStatus(config, params.project_id)
-        return { files: entries }
+        const resp = await fetchProjectGitStatus(config, params.project_id)
+        return { files: resp.files }
       },
     }),
 
@@ -58,7 +58,7 @@ export function createGitTools(config: BackendConfig) {
         const limited = commits.slice(0, params.limit)
         const result: Record<string, unknown> = { commits: limited, total: commits.length }
         if (params.include_diff || params.diff_commit) {
-          const diff = await fetchProjectGitDiff(config, params.project_id, params.diff_commit)
+          const diff = await fetchProjectGitDiff(config, params.project_id, { hash: params.diff_commit })
           result.diff = diff || '(no changes)'
         }
         return result
