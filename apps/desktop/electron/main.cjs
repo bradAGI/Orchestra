@@ -365,17 +365,23 @@ function createWindow() {
   Menu.setApplicationMenu(null)
 
   // Enforce Content Security Policy on all responses
+  const isDev = !!process.env.VITE_DEV_SERVER_URL
   win.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    // In dev mode, Vite injects inline scripts for React fast refresh preamble
+    const scriptSrc = isDev ? "'self' 'unsafe-inline'" : "'self'"
+    const connectSrc = isDev
+      ? "'self' http://127.0.0.1:* ws://127.0.0.1:* ws://localhost:*"
+      : "'self' http://127.0.0.1:* ws://127.0.0.1:*"
     callback({
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           "default-src 'self'; " +
-          "script-src 'self'; " +
+          `script-src ${scriptSrc}; ` +
           "style-src 'self' 'unsafe-inline'; " +
           "img-src 'self' data: blob:; " +
           "font-src 'self'; " +
-          "connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*; " +
+          `connect-src ${connectSrc}; ` +
           "media-src 'self' blob:; " +
           "worker-src 'self' blob:"
         ],
