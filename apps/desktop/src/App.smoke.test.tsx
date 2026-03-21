@@ -759,7 +759,7 @@ describe('App smoke render', () => {
 
       // ProjectGrid delete confirmation dialog
       const dialog = await screen.findByRole('dialog')
-      fireEvent.click(within(dialog).getByRole('button', { name: /^Remove$/i }))
+      fireEvent.click(within(dialog).getByRole('button', { name: /Remove Project/i }))
 
       await waitFor(() => {
         expect(fetchMockRef.mock.calls.some(

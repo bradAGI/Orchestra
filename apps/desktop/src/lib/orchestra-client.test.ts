@@ -3,6 +3,7 @@ import {
   applyWorkspaceMigration,
   fetchState,
   fetchIssueDetail,
+  fetchIssueLogs,
   fetchWorkspaceMigrationPlan,
   isUnauthorizedError,
   normalizeEventEnvelope,
@@ -304,5 +305,45 @@ describe('isUnauthorizedError', () => {
     expect(isUnauthorizedError('request_failed: 500 Internal Server Error')).toBe(false)
     expect(isUnauthorizedError(new Error('boom'))).toBe(false)
     expect(isUnauthorizedError({})).toBe(false)
+  })
+})
+
+describe('requestText via fetchIssueLogs', () => {
+  it('requestText returns text content for successful responses', async () => {
+    const logContent = 'line 1: agent started\nline 2: task completed'
+    const fetchMock = vi.fn(async () => {
+      return new Response(logContent, { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await fetchIssueLogs(config, 'OPS-42')
+
+    expect(result).toBe(logContent)
+    expect(fetchMock).toHaveBeenCalledOnce()
+    const url = String(fetchMock.mock.calls[0]?.[0])
+    expect(url).toContain('/api/v1/issues/OPS-42/logs')
+  })
+
+  it('requestText throws APIError for error responses', async () => {
+    const fetchMock = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          error: {
+            code: 'internal_error',
+            message: 'log storage unavailable',
+          },
+        }),
+        { status: 500, statusText: 'Internal Server Error' },
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(fetchIssueLogs(config, 'OPS-42')).rejects.toThrowError('log storage unavailable')
+
+    try {
+      await fetchIssueLogs(config, 'OPS-42')
+    } catch (error) {
+      expect(toDisplayError(error)).toBe('internal_error: log storage unavailable')
+    }
   })
 })
