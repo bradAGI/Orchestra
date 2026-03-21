@@ -799,9 +799,29 @@ func (s *Server) GetProjectGitBranches(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Get remote branches
+	remoteCmd := exec.CommandContext(r.Context(), "git", "branch", "-r", "--list")
+	remoteCmd.Dir = project.RootPath
+	remoteOut, err := remoteCmd.Output()
+	if err != nil {
+		s.logger.Warn().Err(err).Str("project_id", projectID).Msg("failed to list remote branches")
+		// Non-fatal: return empty remotes
+		remoteOut = nil
+	}
+
+	var remoteBranches []string
+	for _, line := range strings.Split(string(remoteOut), "\n") {
+		name := strings.TrimSpace(line)
+		if name == "" || strings.Contains(name, "->") {
+			continue
+		}
+		remoteBranches = append(remoteBranches, name)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"current":  current,
 		"branches": branches,
+		"remotes":  remoteBranches,
 	})
 }
 
