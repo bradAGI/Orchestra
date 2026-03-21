@@ -71,13 +71,13 @@ export function GitHubPanel({
         fetchProjectGitHubPulls(config, projectId),
         fetchProjectGitBranches(config, projectId),
       ])
-      setIssues(issueData.issues)
-      setIssueHasMore(issueData.has_more)
+      setIssues(issueData?.issues || [])
+      setIssueHasMore(issueData?.has_more || false)
       setIssuePage(1)
-      setPRs(prData.pulls)
-      setPrHasMore(prData.has_more)
+      setPRs(prData?.pulls || [])
+      setPrHasMore(prData?.has_more || false)
       setPrPage(1)
-      setBranches(branchData.branches || [])
+      setBranches(branchData?.branches || [])
     } catch (err) {
       console.error('github load failed', err)
       setLoadError(friendlyErrorMessage(err))
@@ -111,8 +111,8 @@ export function GitHubPanel({
     try {
       const nextPage = issuePage + 1
       const data = await fetchProjectGitHubIssues(config, projectId, issueFilter === 'all' ? 'all' : issueFilter, nextPage)
-      setIssues((prev) => [...prev, ...data.issues])
-      setIssueHasMore(data.has_more)
+      setIssues((prev) => [...prev, ...(data?.issues || [])])
+      setIssueHasMore(data?.has_more || false)
       setIssuePage(nextPage)
     } catch (err) {
       console.error('load more issues failed', err)
@@ -127,8 +127,8 @@ export function GitHubPanel({
     try {
       const nextPage = prPage + 1
       const data = await fetchProjectGitHubPulls(config, projectId, nextPage)
-      setPRs((prev) => [...prev, ...data.pulls])
-      setPrHasMore(data.has_more)
+      setPRs((prev) => [...prev, ...(data?.pulls || [])])
+      setPrHasMore(data?.has_more || false)
       setPrPage(nextPage)
     } catch (err) {
       console.error('load more PRs failed', err)
