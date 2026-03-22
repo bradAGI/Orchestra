@@ -41,7 +41,7 @@ export const sidebarItems: SidebarItem[] = [
   },
   {
     id: 'CONSOLE',
-    label: 'Live Console',
+    label: 'Terminals',
     description: 'Multi-agent terminal dock',
     icon: Terminal,
   },
@@ -130,7 +130,7 @@ const sectionMeta: Record<SectionID, { label: string; title: string }> = {
   SANDBOX: { label: 'Compute', title: 'Sandbox' },
   SETTINGS: { label: 'System', title: 'Settings' },
   DOCS: { label: 'Knowledge', title: 'Documentation' },
-  CONSOLE: { label: 'Runtime', title: 'Live Console' },
+  CONSOLE: { label: 'Runtime', title: 'Terminals' },
 }
 
 /**
