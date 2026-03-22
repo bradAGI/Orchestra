@@ -64,15 +64,9 @@ export function KanbanBoard({
   onCreateIssue?: (state: string) => void
 }) {
   const handleCreateClick = (columnId: string) => {
+    if (columnId !== 'backlog') return
     if (!onCreateIssue) return
-    const stateMap: Record<string, string> = {
-      backlog: 'Backlog',
-      todo: 'Todo',
-      progress: 'In Progress',
-      review: 'Review',
-      done: 'Done',
-    }
-    onCreateIssue(stateMap[columnId] || 'Todo')
+    onCreateIssue('Backlog')
   }
 
   const [stateFilter, setStateFilter] = useState<string>('all')
@@ -150,6 +144,40 @@ export function KanbanBoard({
       progress: 'In Progress',
       review: 'Review',
       done: 'Done',
+    }
+
+    const columnIdFromState: Record<string, string> = {
+      'Backlog': 'backlog',
+      'Todo': 'todo',
+      'In Progress': 'progress',
+      'Review': 'review',
+      'Done': 'done',
+    }
+
+    const allowedDragTransitions: Record<string, string[]> = {
+      backlog: ['todo'],
+      todo: ['progress'],
+      progress: [],      // Auto-moves to review on completion
+      review: ['done'],
+      done: [],           // Terminal
+    }
+
+    // Find the issue being dragged to determine its current column
+    const issue = boardIssues.find(
+      (i) => (i.identifier || i.issue_identifier) === issueIdentifier
+    )
+    if (!issue) return
+
+    const currentColumnId = columnIdFromState[issue.state] || ''
+    if (currentColumnId === targetColumnId) return
+
+    // Check if the transition is allowed
+    const allowed = allowedDragTransitions[currentColumnId]
+    if (!allowed || !allowed.includes(targetColumnId)) return
+
+    // For Backlog -> Todo: require description, assignee, and project
+    if (currentColumnId === 'backlog' && targetColumnId === 'todo') {
+      if (!issue.description || !issue.assignee_id || issue.assignee_id === 'Unassigned' || !issue.project_id) return
     }
 
     const nextState = stateMap[targetColumnId]
@@ -339,7 +367,7 @@ export function KanbanBoard({
                   <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{column.title}</h3>
                   <span className="text-[11px] font-medium text-muted-foreground/50">{column.items.length}</span>
                 </div>
-                {column.id !== 'done' && column.id !== 'review' && (
+                {column.id === 'backlog' && (
                   <AppTooltip content={`Create Task in ${column.title}`}>
                     <button
                       className="grid h-6 w-6 place-items-center rounded-md border border-dashed border-muted-foreground/30 text-muted-foreground/50 hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all"
@@ -362,7 +390,7 @@ export function KanbanBoard({
                 {loadingState ? (
                   Array.from({ length: 3 }).map((_, idx) => <Skeleton key={idx} className="h-28 w-full rounded-lg" />)
                 ) : column.items.length === 0 ? (
-                  column.id !== 'done' && column.id !== 'review' ? (
+                  column.id === 'backlog' ? (
                     <button
                       type="button"
                       className="relative w-full h-full min-h-[200px] flex flex-col items-center justify-center cursor-pointer bg-gradient-to-b from-card via-card to-muted/20 border border-border/40 rounded-xl transition-all group/empty overflow-hidden hover:border-primary/30"
@@ -374,7 +402,7 @@ export function KanbanBoard({
                     </button>
                   ) : (
                     <div className="relative w-full h-full min-h-[200px] flex items-center justify-center bg-gradient-to-b from-card via-card to-muted/20 border border-border/40 rounded-xl overflow-hidden">
-                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground/15">No completed tasks</p>
+                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground/15">No tasks</p>
                     </div>
                   )
                 ) : (
