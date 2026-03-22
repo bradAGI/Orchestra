@@ -394,6 +394,22 @@ export async function stopIssueSession(config: BackendConfig, issueIdentifier: s
 }
 
 /**
+ * Stops an issue, transitioning it out of its current active state.
+ * @param config - Backend connection configuration.
+ * @param issueIdentifier - Human-readable issue identifier.
+ * @returns The updated issue record.
+ */
+export async function stopIssue(config: BackendConfig, issueIdentifier: string): Promise<IssueListItem> {
+  const normalized = issueIdentifier.trim()
+  if (normalized === '') {
+    throw new APIError('invalid_request', 'issue identifier is required')
+  }
+  return requestJSON<IssueListItem>(config, `/api/v1/issues/${encodeURIComponent(normalized)}/stop`, {
+    method: 'POST',
+  })
+}
+
+/**
  * Fetches the current runtime snapshot from the orchestrator.
  * @param config - Backend connection configuration.
  * @returns The normalized runtime snapshot.
