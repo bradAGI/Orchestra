@@ -703,12 +703,8 @@ export default function App() {
     if (!config) return
 
     try {
-      // Stop any running session before deleting
-      try {
-        await stopIssueSession(config, identifier)
-      } catch {
-        // Session may not be running — ignore
-      }
+      // Backend DeleteIssue handler stops sessions automatically — no need to call stopIssueSession here
+      // (calling it would reset state to Todo via DeleteIssueSession, breaking the delete)
 
       // Close the linked GitHub issue before deleting locally
       const issueToClose = allBoardIssuesRef.current.find(i =>
