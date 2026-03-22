@@ -1,6 +1,6 @@
 # 6.2 Container Build
 
-> **Source files:** `ops/docker/Dockerfile.backend`, `ops/docker/compose.yml`
+> **Source files:** `ops/docker/Dockerfile.backend`
 
 Orchestra's backend is containerized using a multi-stage Docker build that produces a minimal, distroless image published to GitHub Container Registry (GHCR).
 
@@ -77,52 +77,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 The container exposes a health check via the `orchestra healthz` CLI command, polled every 30 seconds with a 5-second startup grace period.
 
-## 6.2.3 Docker Compose
-
-The `compose.yml` provides a single-service local deployment:
-
-```yaml
-services:
-  orchestra-backend:
-    build:
-      context: ../../
-      dockerfile: ops/docker/Dockerfile.backend
-    image: orchestra-backend:latest
-    container_name: orchestra-backend
-    environment:
-      ORCHESTRA_SERVER_HOST: 0.0.0.0
-      ORCHESTRA_SERVER_PORT: 4010
-      ORCHESTRA_WORKSPACE_ROOT: /var/lib/orchestra/workspaces
-    ports:
-      - "4010:4010"
-    volumes:
-      - orchestra-workspaces:/var/lib/orchestra/workspaces
-    restart: unless-stopped
-```
-
-| Configuration | Value | Purpose |
-|---------------|-------|---------|
-| Build context | `../../` (repo root) | Dockerfile references `apps/backend/` relative to repo root |
-| Port mapping | `4010:4010` | Expose API on host |
-| Volume | `orchestra-workspaces` | Persist agent workspace data across restarts |
-| Workspace root | `/var/lib/orchestra/workspaces` | In-container workspace directory, mounted to named volume |
-| Restart policy | `unless-stopped` | Auto-restart on failure, honor manual stops |
-
-### Running with Compose
-
-```bash
-# Build and start
-cd ops/docker
-docker compose up -d --build
-
-# View logs
-docker compose logs -f orchestra-backend
-
-# Stop
-docker compose down
-```
-
-## 6.2.4 Registry Publishing
+## 6.2.3 Registry Publishing
 
 Container images are published to GHCR via the `orchestra-container-publish` workflow (see [Section 6.3](ci-cd.md)):
 

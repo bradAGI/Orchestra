@@ -132,9 +132,7 @@ Uses `gcr.io/distroless/static-debian12` with `nonroot:nonroot` user and proper 
 
 ### 5.2 Port Exposed to All Interfaces — MEDIUM
 
-**File:** `ops/docker/compose.yml:12-13`
-
-Port 4010 bound to `0.0.0.0`. Should bind to `127.0.0.1:4010:4010` by default.
+The `ORCHESTRA_SERVER_HOST` default of `0.0.0.0` binds to all interfaces. Should default to `127.0.0.1` for local development.
 
 ---
 

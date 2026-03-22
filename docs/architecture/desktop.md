@@ -179,18 +179,9 @@ flowchart TD
 
 ---
 
-### Frontend Enums
+### Enum Values
 
-The `src/lib/enums.ts` file defines the canonical enum values used throughout the frontend:
-
-| Enum | Values | Purpose |
-|------|--------|---------|
-| `Provider` | `CODEX`, `CLAUDE`, `OPENCODE`, `GEMINI`, `UNSANDBOX` | Agent provider identifiers |
-| `IssueStatus` | `RUNNING`, `RETRYING`, `TRACKED`, `IDLE` | Issue lifecycle states in the UI |
-| `ConfigScope` | `GLOBAL`, `PROJECT` | Configuration scope levels |
-| `AgentCategory` | `CORE`, `SKILL` | Agent classification |
-| `SSEEventType` | `RUN_EVENT`, `RUN_STARTED`, `RUN_FAILED`, `RUN_CONTINUES`, `RUN_SUCCEEDED`, `RETRY_SCHEDULED`, `HOOK_STARTED`, `HOOK_COMPLETED`, `HOOK_FAILED` | SSE lifecycle event types |
-| `SectionID` | `DASHBOARD`, `RUNNING`, `ISSUES`, `PROJECTS`, `AGENTS`, `WAREHOUSE`, `SANDBOX`, ... | Navigation section identifiers |
+Enum values used throughout the frontend (e.g., `Provider`, `IssueStatus`, `SSEEventType`, `SectionID`) are defined as string literal types inline where needed. See the [Enum Reference](../enums.md) for the full list of values and their backend Go counterparts.
 
 ---
 

@@ -175,12 +175,6 @@ flowchart TD
 
 Each workspace can contain an `.orchestra` marker file at its root. This file is excluded from artifact listings and serves as a workspace identification marker.
 
-```go
-func MarkerPath(path string) string {
-    return filepath.Join(path, ".orchestra")
-}
-```
-
 ---
 
 ## Cross-References
