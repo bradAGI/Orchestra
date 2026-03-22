@@ -613,7 +613,12 @@ func processExecutionTick(
 
 	service.RecordRunResult(entry.IssueID, activeProviderName, result.SessionID, result.Usage.InputTokens, result.Usage.OutputTokens, result.Usage.TotalTokens)
 
-	continueTurn, checkErr := service.ShouldContinueTurn(context.Background(), entry.IssueID, activeProviderName, attempt, service.GetMaxTurns())
+	// Planning mode (Todo) gets a hard turn limit of 3 to keep it fast
+	effectiveMaxTurns := service.GetMaxTurns()
+	if strings.EqualFold(entry.State, "Todo") {
+		effectiveMaxTurns = 3
+	}
+	continueTurn, checkErr := service.ShouldContinueTurn(context.Background(), entry.IssueID, activeProviderName, attempt, effectiveMaxTurns)
 	if checkErr != nil {
 		runAfterHook()
 		dueAt := service.NextRetryDue(entry.IssueID, attempt)
@@ -693,8 +698,11 @@ func processExecutionTick(
 
 	// Move issue to Review on successful completion (but not for Todo/planning runs)
 	if !strings.EqualFold(entry.State, "Todo") {
+		logger.Info().Str("issue_id", entry.IssueID).Str("state", entry.State).Msg("auto-transitioning issue to Review")
 		if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"state": "Review"}); err != nil {
-			logger.Warn().Err(err).Str("issue_id", entry.IssueID).Msg("failed to set issue to Review after success")
+			logger.Error().Err(err).Str("issue_id", entry.IssueID).Msg("FAILED to auto-transition issue to Review")
+		} else {
+			logger.Info().Str("issue_id", entry.IssueID).Msg("successfully auto-transitioned to Review")
 		}
 	} else {
 		logger.Info().Str("issue_id", entry.IssueID).Msg("planning-mode run completed; keeping issue in Todo state")

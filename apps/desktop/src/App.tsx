@@ -416,7 +416,7 @@ export default function App() {
           setErrorMessage('')
           // Fetch board issues to populate the Kanban board persistence (throttled)
           const now = Date.now()
-          if (now - lastIssueFetchRef.current > 30000) {
+          if (now - lastIssueFetchRef.current > 10000) {
             lastIssueFetchRef.current = now
             fetchIssues(config).then(setBoardIssues).catch(() => {})
           }
@@ -442,6 +442,9 @@ export default function App() {
                 ]
               })
               playNotification(issueIdentifier)
+              // Force immediate refresh to pick up the auto-Review transition
+              fetchIssues(config).then(setBoardIssues).catch(() => {})
+              lastIssueFetchRef.current = Date.now()
             }
           }
         },
