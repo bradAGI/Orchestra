@@ -514,7 +514,7 @@ export function KanbanBoard({
           ))}
         </div>
       ) : (
-        <div className="flex-1 rounded-xl border bg-card/50 shadow-lg overflow-hidden min-h-0 flex flex-col">
+        <div className="flex-1 rounded-xl border bg-card/50 shadow-lg overflow-hidden min-h-0 flex flex-col mx-4">
           {filteredList.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center p-12 text-center text-muted-foreground/40">
               <ClipboardList className="h-12 w-12 mb-4 opacity-20" />
