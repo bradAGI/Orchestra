@@ -11,6 +11,7 @@ import { AgentSelector, CustomDropdown, getAgentIcon } from '@/components/app-sh
 import type { IssueDetailResult } from './types'
 import { FeedbackDialog } from './FeedbackDialog'
 import { extractOperationalPlanItems, extractPlanFromText, parseDiff, type DiffFile, type PlanItem } from './IssueDetailUtils'
+import { getCachedPlan, setCachedPlan, clearCachedPlan } from './planCache'
 
 function DescriptionEditor({ value, onChange, onBlur, theme }: {
   value: string
@@ -203,8 +204,21 @@ export function IssueDetailView({
     if (fromTimeline.length > 0) return fromTimeline
 
     // Final fallback: parse description
-    return extractPlanFromText(description)
+    const descPlan = extractPlanFromText(description)
+    if (descPlan.length > 0) return descPlan
+
+    // If nothing found from any source, use cached plan
+    const cached = getCachedPlan(identifier)
+    if (cached.length > 0) return cached
+
+    return []
   }, [issueHistory, timeline, issueId, identifier, description, logs])
+  useEffect(() => {
+    if (identifier && planItems.length > 0) {
+      setCachedPlan(identifier, planItems)
+    }
+  }, [identifier, planItems])
+
   const completedCount = planItems.filter(i => i.done).length
   const isRunning = snapshot?.running?.some(r => r.issue_id === issueId || r.issue_identifier === identifier) ?? false
 
@@ -267,6 +281,9 @@ export function IssueDetailView({
       setLogs('')
       setDiffFiles([])
       setActiveDiffFile(null)
+    }
+    if (newState === 'Backlog') {
+      clearCachedPlan(identifier)
     }
     if (onUpdate) await onUpdate({ state: newState })
   }
@@ -578,7 +595,9 @@ export function IssueDetailView({
                       <div className={`mt-0.5 h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${item.done ? 'bg-primary border-primary text-primary-foreground' : 'border-border/50'}`}>
                         {item.done && <CheckCircle2 size={12} />}
                       </div>
-                      <span className={`text-sm leading-relaxed ${item.done ? 'text-muted-foreground/40 line-through' : 'text-foreground'}`}>{item.text}</span>
+                      <div className={`text-sm leading-relaxed prose prose-sm prose-invert max-w-none prose-p:my-0 prose-code:text-primary/70 ${item.done ? 'text-muted-foreground/40 line-through opacity-50' : 'text-foreground'}`}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{item.text}</ReactMarkdown>
+                      </div>
                     </div>
                   ))}
                 </div>
