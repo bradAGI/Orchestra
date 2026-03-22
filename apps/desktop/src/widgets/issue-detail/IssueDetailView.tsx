@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Brain, CheckCircle2, ChevronDown, ChevronRight, FileText, GitPullRequest, Github, Info, Loader2, Pencil, Terminal, Wrench, X, Zap } from 'lucide-react'
+import { CheckCircle2, ChevronDown, FileText, GitPullRequest, Github, Info, Loader2, Pencil, Terminal, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -7,10 +7,12 @@ import type { BackendConfig, IssueUpdatePayload, IssueHistoryEntry } from '@/lib
 import { fetchIssueHistory, fetchIssueDiff, fetchIssueLogs, gitCheckout, gitMerge, gitDeleteBranch, updateProjectGitHubIssue, stopIssue } from '@/lib/orchestra-client'
 import type { SnapshotPayload } from '@/lib/orchestra-types'
 import type { TimelineItem } from '@/components/app-shell/types'
-import { AgentSelector, CustomDropdown, getAgentIcon } from '@/components/app-shell/shared/controls'
+import { AgentSelector } from '@/components/app-shell/shared/controls'
 import type { IssueDetailResult } from './types'
 import { FeedbackDialog } from './FeedbackDialog'
 import { extractOperationalPlanItems, extractPlanFromText, parseDiff, type DiffFile, type PlanItem } from './IssueDetailUtils'
+import { getCachedPlan, setCachedPlan, clearCachedPlan } from './planCache'
+import { SessionTimeline } from './SessionTimeline'
 
 function DescriptionEditor({ value, onChange, onBlur, theme }: {
   value: string
@@ -144,7 +146,7 @@ export function IssueDetailView({
   const [diffFiles, setDiffFiles] = useState<DiffFile[]>([])
   const [diffLoading, setDiffLoading] = useState(false)
   const [activeDiffFile, setActiveDiffFile] = useState<string | null>(null)
-  const [expandedOutputEntries, setExpandedOutputEntries] = useState<Set<number>>(new Set())
+
 
   // Only sync state/assignee from result (these are set by dropdowns, not typed input)
   // Title and description are user-editable text - only set on initial load, not on re-fetches
@@ -203,8 +205,21 @@ export function IssueDetailView({
     if (fromTimeline.length > 0) return fromTimeline
 
     // Final fallback: parse description
-    return extractPlanFromText(description)
+    const descPlan = extractPlanFromText(description)
+    if (descPlan.length > 0) return descPlan
+
+    // If nothing found from any source, use cached plan
+    const cached = getCachedPlan(identifier)
+    if (cached.length > 0) return cached
+
+    return []
   }, [issueHistory, timeline, issueId, identifier, description, logs])
+  useEffect(() => {
+    if (identifier && planItems.length > 0) {
+      setCachedPlan(identifier, planItems)
+    }
+  }, [identifier, planItems])
+
   const completedCount = planItems.filter(i => i.done).length
   const isRunning = snapshot?.running?.some(r => r.issue_id === issueId || r.issue_identifier === identifier) ?? false
 
@@ -267,6 +282,9 @@ export function IssueDetailView({
       setLogs('')
       setDiffFiles([])
       setActiveDiffFile(null)
+    }
+    if (newState === 'Backlog') {
+      clearCachedPlan(identifier)
     }
     if (onUpdate) await onUpdate({ state: newState })
   }
@@ -578,7 +596,9 @@ export function IssueDetailView({
                       <div className={`mt-0.5 h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${item.done ? 'bg-primary border-primary text-primary-foreground' : 'border-border/50'}`}>
                         {item.done && <CheckCircle2 size={12} />}
                       </div>
-                      <span className={`text-sm leading-relaxed ${item.done ? 'text-muted-foreground/40 line-through' : 'text-foreground'}`}>{item.text}</span>
+                      <div className={`text-sm leading-relaxed prose prose-sm prose-invert max-w-none prose-p:my-0 prose-code:text-primary/70 ${item.done ? 'text-muted-foreground/40 line-through opacity-50' : 'text-foreground'}`}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{item.text}</ReactMarkdown>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -598,252 +618,7 @@ export function IssueDetailView({
         {/* Activity */}
         {/* Output */}
         {bottomTab === 'output' && (
-          <div className="h-full bg-gradient-to-b from-card via-card to-muted/10">
-            {logsLoading ? (
-              <div className="h-full flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin-smooth text-primary/30" /></div>
-            ) : logs && !logs.includes('# No logs available') ? (
-              <div className="flex flex-col h-full overflow-auto custom-scrollbar">
-                {(() => {
-                  // Universal log parser — supports Gemini, Codex, Claude, and OpenCode NDJSON + PTY
-                  const parsed: Array<{ idx: number; kind: string; ts: string; label: string; content: string; status?: string }> = []
-                  let seenFirstJSON = false
-
-                  logs.split('\n').forEach((line, idx) => {
-                    const trimmed = line.trim()
-                    if (!trimmed) return
-                    if (!trimmed.startsWith('{')) {
-                      if (!seenFirstJSON) return
-                      if (/error|fail|429|refused|SIGTERM|panic/i.test(trimmed)) {
-                        parsed.push({ idx, kind: 'error', ts: '', label: '', content: trimmed })
-                      }
-                      return
-                    }
-                    seenFirstJSON = true
-                    let obj: Record<string, unknown>
-                    try { obj = JSON.parse(trimmed) } catch { return }
-
-                    const type = (obj.type as string) || ''
-                    const ts = obj.timestamp ? new Date(obj.timestamp as string).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''
-
-                    // ── Gemini / Claude / OpenCode (NDJSON with type/role fields) ──
-                    if (type === 'init') {
-                      parsed.push({ idx, kind: 'session', ts, label: (obj.model as string) || 'agent', content: '' })
-                    } else if (type === 'message' && obj.role === 'user') {
-                      const c = typeof obj.content === 'string' ? obj.content : JSON.stringify(obj.content || '').slice(0, 300)
-                      parsed.push({ idx, kind: 'prompt', ts, label: '', content: c.length > 200 ? c.slice(0, 200) + '...' : c })
-                    } else if (type === 'message' && obj.role === 'assistant') {
-                      const c = typeof obj.content === 'string' ? obj.content : ''
-                      if (c.trim()) parsed.push({ idx, kind: 'agent', ts, label: '', content: c })
-                    } else if (type === 'tool_use') {
-                      const tool = (obj.tool_name as string) || 'tool'
-                      const p = obj.parameters as Record<string, unknown> | undefined
-                      parsed.push({ idx, kind: 'tool', ts, label: tool, content: String(p?.command || p?.dir_path || p?.file_path || p?.pattern || p?.description || '') })
-                    } else if (type === 'tool_result') {
-                      const o = (obj.output as string) || ''
-                      parsed.push({ idx, kind: 'result', ts, label: '', content: o.length > 200 ? o.slice(0, 200) + '...' : o, status: (obj.status as string) || 'success' })
-                    // ── Codex (item-based events) ──
-                    } else if (type === 'thread.started') {
-                      parsed.push({ idx, kind: 'session', ts, label: 'codex', content: '' })
-                    } else if (type === 'turn.started' || type === 'turn.completed') {
-                      parsed.push({ idx, kind: 'lifecycle', ts, label: type === 'turn.started' ? 'Turn Started' : 'Turn Completed', content: '' })
-                    } else if (type === 'item.completed') {
-                      const item = obj.item as Record<string, unknown> | undefined
-                      if (!item) return
-                      const iType = (item.type as string) || ''
-                      const text = (item.text as string) || (item.aggregated_output as string) || ''
-                      if (iType === 'agent_message') parsed.push({ idx, kind: 'agent', ts, label: '', content: text })
-                      else if (iType === 'reasoning') parsed.push({ idx, kind: 'thinking', ts, label: '', content: text })
-                      else if (iType === 'command_execution') parsed.push({ idx, kind: 'tool', ts, label: 'shell', content: (item.command as string) || text.slice(0, 150) })
-                      else if (iType === 'file_edit' || iType === 'file_create') parsed.push({ idx, kind: 'tool', ts, label: iType === 'file_edit' ? 'edit' : 'create', content: (item.file_path as string) || text.slice(0, 150) })
-                      else if (text.trim()) parsed.push({ idx, kind: 'agent', ts, label: '', content: text })
-                    // ── Claude Code stream-json events ──
-                    } else if (type === 'system' && (obj.subtype as string) === 'init') {
-                      parsed.push({ idx, kind: 'session', ts, label: (obj.model as string) || 'claude', content: '' })
-                    } else if (type === 'assistant') {
-                      const msg = obj.message as Record<string, unknown> | undefined
-                      const content = msg?.content as Array<Record<string, unknown>> | undefined
-                      if (content) {
-                        for (const block of content) {
-                          if (block.type === 'text' && block.text) {
-                            parsed.push({ idx, kind: 'agent', ts, label: '', content: block.text as string })
-                          } else if (block.type === 'tool_use') {
-                            parsed.push({ idx, kind: 'tool', ts, label: (block.name as string) || 'tool', content: JSON.stringify((block.input as Record<string, unknown>)?.command || (block.input as Record<string, unknown>)?.file_path || '').slice(0, 150) })
-                          } else if (block.type === 'thinking') {
-                            const thinking = (block.thinking as string) || ''
-                            if (thinking.trim()) parsed.push({ idx, kind: 'thinking', ts, label: '', content: thinking })
-                          }
-                        }
-                      }
-                    } else if (type === 'user') {
-                      const msg = obj.message as Record<string, unknown> | undefined
-                      const content = msg?.content as Array<Record<string, unknown>> | undefined
-                      if (content) {
-                        for (const block of content) {
-                          if (block.type === 'tool_result') {
-                            const raw = block.content
-                            const text = typeof raw === 'string' ? raw : Array.isArray(raw) ? (raw as Array<Record<string,unknown>>).map(b => typeof b.text === 'string' ? b.text : '').join('') : ''
-                            parsed.push({ idx, kind: 'result', ts, label: '', content: text.length > 200 ? text.slice(0, 200) + '...' : text, status: block.is_error ? 'error' : 'success' })
-                          }
-                        }
-                      }
-                    } else if (type === 'content_block_delta') {
-                      const delta = obj.delta as Record<string, unknown> | undefined
-                      const text = (delta?.text as string) || ''
-                      if (text.trim()) parsed.push({ idx, kind: 'agent', ts, label: '', content: text })
-                    } else if (type === 'result') {
-                      const resultText = (obj.result as string) || ''
-                      if (resultText.trim()) {
-                        parsed.push({ idx, kind: 'agent', ts, label: '', content: resultText })
-                      }
-                      parsed.push({ idx: idx + 0.5, kind: 'lifecycle', ts, label: 'Completed', content: (obj.stop_reason as string) || '' })
-                    }
-                  })
-
-                  // Deduplicate entries with same kind+ts+content
-                  const seen = new Set<string>()
-                  const deduplicated = parsed.filter((e) => {
-                    const key = `${e.kind}|${e.ts}|${e.label}|${e.content.slice(0, 100)}`
-                    if (seen.has(key)) return false
-                    seen.add(key)
-                    return true
-                  })
-
-                  if (deduplicated.length === 0) {
-                    return (
-                      <div className="h-full flex flex-col items-center justify-center text-muted-foreground/20 gap-3">
-                        <Terminal size={36} />
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Logs are empty</p>
-                      </div>
-                    )
-                  }
-
-                  return (
-                    <div className="p-4 space-y-3">
-                      {deduplicated.map((entry) => {
-                        const isExpanded = expandedOutputEntries.has(entry.idx)
-                        const toggleExpand = () => setExpandedOutputEntries(prev => {
-                          const next = new Set(prev)
-                          if (next.has(entry.idx)) next.delete(entry.idx)
-                          else next.add(entry.idx)
-                          return next
-                        })
-
-                        if (entry.kind === 'session') {
-                          return (
-                            <div key={entry.idx} className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-primary/5 border border-primary/10">
-                              <div className="h-6 w-6 rounded-lg bg-primary/15 grid place-items-center"><Zap size={12} className="text-primary" /></div>
-                              <span className="text-[10px] font-black uppercase tracking-widest text-primary">Session</span>
-                              {entry.label && <span className="text-[9px] font-mono text-primary/50 bg-primary/10 px-2 py-0.5 rounded-md border border-primary/10">{entry.label}</span>}
-                              <span className="text-[9px] font-mono text-muted-foreground/30 ml-auto">{entry.ts}</span>
-                            </div>
-                          )
-                        }
-                        if (entry.kind === 'lifecycle') return null
-                        if (entry.kind === 'prompt') {
-                          return (
-                            <button key={entry.idx} onClick={toggleExpand} className="w-full flex items-center gap-2 px-4 py-2 rounded-lg bg-muted/20 border border-border/20 text-left group hover:border-border/40 transition-all">
-                              <ChevronRight size={11} className={`text-muted-foreground/30 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                              <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40 group-hover:text-muted-foreground/60">System Prompt</span>
-                              <span className="text-[9px] font-mono text-muted-foreground/20 ml-auto">{entry.ts}</span>
-                              {isExpanded && (
-                                <p className="text-[11px] text-foreground/30 leading-relaxed mt-2 whitespace-pre-wrap max-h-40 overflow-auto custom-scrollbar w-full" onClick={e => e.stopPropagation()}>{entry.content}</p>
-                              )}
-                            </button>
-                          )
-                        }
-                        if (entry.kind === 'agent') {
-                          return (
-                            <div key={entry.idx} className="rounded-xl border border-border/20 bg-gradient-to-b from-card to-muted/10 overflow-hidden">
-                              <div className="flex items-start gap-3 px-4 py-3">
-                                <div className="h-7 w-7 rounded-lg bg-primary/10 border border-primary/15 grid place-items-center shrink-0 mt-0.5">{getAgentIcon(provider, 16)}</div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="prose prose-invert prose-sm max-w-none text-[12px] leading-relaxed prose-p:my-1 prose-p:text-foreground/90 prose-code:text-primary prose-code:bg-primary/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-[11px] prose-pre:bg-background prose-pre:border prose-pre:border-border/30 prose-pre:rounded-lg prose-li:text-foreground/80 prose-headings:text-foreground prose-headings:text-xs prose-strong:text-foreground">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.content}</ReactMarkdown>
-                                  </div>
-                                </div>
-                                <span className="text-[8px] font-mono text-muted-foreground/20 shrink-0 mt-1">{entry.ts}</span>
-                              </div>
-                            </div>
-                          )
-                        }
-                        if (entry.kind === 'thinking') {
-                          return (
-                            <div key={entry.idx} className="rounded-xl border border-violet-500/20 bg-gradient-to-r from-violet-500/5 to-transparent overflow-hidden transition-all hover:border-violet-500/30">
-                              <button onClick={toggleExpand} className="w-full flex items-center gap-3 px-4 py-2.5 text-left group">
-                                <div className="h-6 w-6 rounded-lg bg-violet-500/15 border border-violet-500/20 grid place-items-center shrink-0">
-                                  <Brain size={11} className="text-violet-400" />
-                                </div>
-                                <span className="text-[10px] font-bold text-violet-400/70 italic">Reasoning</span>
-                                <ChevronDown size={10} className={`text-violet-400/40 transition-transform ml-auto ${isExpanded ? 'rotate-180' : ''}`} />
-                                <span className="text-[8px] font-mono text-muted-foreground/40 shrink-0">{entry.ts}</span>
-                              </button>
-                              {isExpanded && (
-                                <div className="px-4 pb-3">
-                                  <p className="text-[11px] text-violet-300/60 leading-relaxed whitespace-pre-wrap max-h-48 overflow-auto custom-scrollbar rounded-lg bg-violet-500/5 border border-violet-500/10 p-3">{entry.content.replace(/\*\*/g, '')}</p>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        }
-                        if (entry.kind === 'tool') {
-                          return (
-                            <div key={entry.idx} className="group/tool rounded-xl border border-border/30 bg-gradient-to-r from-muted/20 to-transparent overflow-hidden transition-all hover:border-border/50">
-                              <div className="flex items-center gap-3 px-4 py-2.5">
-                                <div className="h-6 w-6 rounded-lg bg-amber-500/15 border border-amber-500/20 grid place-items-center shrink-0">
-                                  <Wrench size={11} className="text-amber-400" />
-                                </div>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 shrink-0">{entry.label}</span>
-                                <code className="text-[10px] font-mono text-foreground/60 truncate flex-1">{entry.content.replace(/"/g, '')}</code>
-                                <span className="text-[8px] font-mono text-muted-foreground/40 shrink-0">{entry.ts}</span>
-                              </div>
-                            </div>
-                          )
-                        }
-                        if (entry.kind === 'result') {
-                          const isError = entry.status === 'error'
-                          return (
-                            <div key={entry.idx} className={`rounded-xl border overflow-hidden transition-all ${isError ? 'border-red-500/20 bg-red-500/5' : 'border-border/20 bg-muted/10 hover:border-border/40'}`}>
-                              <button onClick={toggleExpand} className="w-full flex items-center gap-3 px-4 py-2 text-left">
-                                <div className={`h-5 w-5 rounded-md grid place-items-center shrink-0 ${isError ? 'bg-red-500/15' : 'bg-primary/15'}`}>
-                                  <CheckCircle2 size={10} className={isError ? 'text-red-400' : 'text-primary/70'} />
-                                </div>
-                                <span className={`text-[10px] font-mono truncate flex-1 ${isError ? 'text-red-400/70' : 'text-foreground/50'}`}>
-                                  {entry.content.slice(0, 120)}{entry.content.length > 120 ? '…' : ''}
-                                </span>
-                                {entry.content.length > 60 && <ChevronDown size={10} className={`text-muted-foreground/40 transition-transform shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />}
-                              </button>
-                              {isExpanded && (
-                                <div className="px-4 pb-3 pt-0">
-                                  <pre className="text-[10px] text-foreground/60 leading-relaxed whitespace-pre-wrap max-h-40 overflow-auto custom-scrollbar font-mono rounded-lg bg-background/50 border border-border/20 p-3">{entry.content}</pre>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        }
-                        if (entry.kind === 'error') {
-                          return (
-                            <div key={entry.idx} className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/15 bg-red-500/5">
-                              <Zap size={12} className="text-red-400/60 shrink-0" />
-                              <span className="text-[10px] font-mono text-red-400/70 flex-1">{entry.content}</span>
-                            </div>
-                          )
-                        }
-                        return null
-                      })}
-                    </div>
-                  )
-                })()}
-              </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-muted-foreground/20 gap-3">
-                <Terminal size={36} />
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em]">No output yet</p>
-                <p className="text-[10px] text-muted-foreground/15">
-                  {localState === 'Todo' ? 'Start the task to see agent output.' : 'Waiting for agent output...'}
-                </p>
-              </div>
-            )}
-          </div>
+          <SessionTimeline logs={logs} loading={logsLoading} />
         )}
 
         {/* Changes */}
