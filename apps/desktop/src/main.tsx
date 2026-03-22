@@ -3,10 +3,6 @@ import ReactDOM from 'react-dom/client'
 import 'overlayscrollbars/overlayscrollbars.css'
 import './index.css'
 
-if (import.meta.env.DEV) {
-  import('react-grab').catch(() => {})
-}
-
 const rootElement: HTMLElement = (() => {
   const element = document.getElementById('root')
   if (!element) {
