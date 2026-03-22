@@ -529,7 +529,7 @@ export function KanbanBoard({
                     <th className="px-4 py-3">Title</th>
                     <th className="px-4 py-3 w-32">Assignee</th>
                     <th className="px-4 py-3 w-28">Status</th>
-                    <th className="px-4 py-3 w-20 text-right"></th>
+                    <th className="px-4 py-3 w-20 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
