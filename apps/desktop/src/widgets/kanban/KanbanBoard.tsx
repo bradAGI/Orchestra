@@ -296,7 +296,7 @@ export function KanbanBoard({
             className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-all text-[11px] font-bold uppercase tracking-widest"
           >
             <Plus className="h-3.5 w-3.5" />
-            Create
+            Create Task
           </button>
           {viewMode === 'list' && (
             <div className="flex items-center gap-1.5 rounded-md border bg-muted/20 px-1.5 py-0.5">
