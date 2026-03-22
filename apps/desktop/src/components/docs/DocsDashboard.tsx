@@ -25,6 +25,25 @@ interface DocsDashboardProps {
     theme?: 'light' | 'dark'
 }
 
+function AuthImage({ docPath, alt, config, ...props }: { docPath: string; alt: string; config: BackendConfig | null; [key: string]: unknown }) {
+    const [blobUrl, setBlobUrl] = useState<string | null>(null)
+    useEffect(() => {
+        if (!config) return
+        let revoked = false
+        const url = new URL(`/api/v1/docs/${docPath}`, config.baseUrl).toString()
+        fetch(url, { headers: { Authorization: `Bearer ${config.apiToken}` } })
+            .then(r => r.blob())
+            .then(blob => {
+                if (revoked) return
+                setBlobUrl(URL.createObjectURL(blob))
+            })
+            .catch(() => {})
+        return () => { revoked = true; if (blobUrl) URL.revokeObjectURL(blobUrl) }
+    }, [config, docPath])
+    if (!blobUrl) return <div className="h-48 bg-muted/10 rounded-xl animate-pulse" />
+    return <img src={blobUrl} alt={alt} className="rounded-xl border border-border shadow-lg max-w-full" {...(props as React.ImgHTMLAttributes<HTMLImageElement>)} />
+}
+
 export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) => {
     const [docs, setDocs] = useState<DocItem[]>([])
     const [loading, setLoading] = useState(true)
@@ -109,9 +128,29 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
     handleSelectDocRef.current = handleSelectDoc
     const selectedPathRef = useRef(selectedPath)
     selectedPathRef.current = selectedPath
+    const configRef = useRef(config)
+    configRef.current = config
 
     /* eslint-disable @typescript-eslint/no-explicit-any -- react-markdown component override props use untyped AST nodes */
     const markdownComponents = useMemo(() => ({
+        img({src, alt, ...props}: any) {
+            if (src && !src.startsWith('http') && !src.startsWith('data:')) {
+                const currentDir = selectedPathRef.current?.split('/').slice(0, -1).join('/') || ''
+                let resolvedPath = src
+                if (!resolvedPath.startsWith('/') && currentDir) {
+                    resolvedPath = `${currentDir}/${resolvedPath}`
+                }
+                const parts = resolvedPath.split('/').filter(Boolean)
+                const normalized: string[] = []
+                for (const p of parts) {
+                    if (p === '..') normalized.pop()
+                    else if (p !== '.') normalized.push(p)
+                }
+                resolvedPath = normalized.join('/')
+                return <AuthImage docPath={resolvedPath} alt={alt || ''} config={configRef.current} {...props} />
+            }
+            return <img src={src} alt={alt || ''} className="rounded-xl max-w-full" {...props} />
+        },
         a({href, children, ...props}: any) {
             if (href && (href.endsWith('.md') || href.includes('.md#'))) {
                 const currentDir = selectedPathRef.current?.split('/').slice(0, -1).join('/') || ''
