@@ -411,7 +411,7 @@ export function IssueDetailView({
                   theme={theme}
                 />
               ) : (
-                <div className="px-4 py-3 text-[11px] text-foreground/80 whitespace-pre-wrap">
+                <div className="px-4 py-3 text-base text-foreground/80 whitespace-pre-wrap leading-relaxed">
                   {localDescription || 'No description'}
                 </div>
               )}
