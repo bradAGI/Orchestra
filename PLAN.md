@@ -83,9 +83,16 @@ Hooks extracted: `useBackendConfig`, `useIssueLookup`, `useNotifications`, `useW
 
 Moved into `useNotifications` hook.
 
-### ~~3.7 Remove Unused Dependency~~ — DONE
+### 3.7 Remove Unused Dependency
 
-Removed `react-grab` from devDependencies and its dev-only dynamic import from `main.tsx`.
+**Status:** `react-grab` (`^0.1.28`) is still in `package.json` dependencies.
+
+**Changes:**
+- Remove `"react-grab": "^0.1.25"` from devDependencies
+- Remove the dev-only import from `index.html` if present
+- Run `npm ci` to verify clean install
+
+**Files:** `apps/desktop/package.json`, `apps/desktop/index.html`
 
 ---
 
@@ -208,7 +215,7 @@ Race tests now run on both push and pull_request events (no PR exclusion conditi
 | 11 | ~~3.3 URL param sanitization~~ | Done |
 | 12 | ~~3.2 Input validation~~ | Done |
 | 13 | ~~3.4 Error boundaries~~ | Done |
-| 14 | ~~3.7 Remove react-grab~~ | Done |
+| 14 | 3.7 Remove react-grab | **TODO** |
 | 15 | ~~3.1 Extract custom hooks~~ | Done |
 | 16 | ~~3.6 AudioContext fix~~ | Done |
 | 17 | ~~2.4 Rate limiting~~ | Done |
@@ -221,4 +228,4 @@ Race tests now run on both push and pull_request events (no PR exclusion conditi
 | 24 | 6.1 Deployment runbook | **TODO** |
 | 25 | 6.2 Migration guide | **TODO** |
 
-**Progress: 16/25 done, 1 partial, 8 remaining.**
+**Progress: 15/25 done, 1 partial, 9 remaining.**
