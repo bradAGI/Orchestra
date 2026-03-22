@@ -725,8 +725,18 @@ export default function App() {
         }
       }
 
-      await deleteIssue(config, identifier)
-      setStatusMessage(`Task ${identifier} deleted.`)
+      // GH- prefixed issues are virtual (from GitHub sync) — not in local tracker
+      if (identifier.startsWith('GH-')) {
+        // Just remove from board and close on GitHub (already handled above)
+        setBoardIssues((prev) => prev.filter((issue) => {
+          const candidate = typeof issue.identifier === 'string' ? issue.identifier : issue.issue_identifier
+          return candidate !== identifier
+        }))
+        setStatusMessage(`GitHub issue ${identifier} dismissed from board.`)
+      } else {
+        await deleteIssue(config, identifier)
+        setStatusMessage(`Task ${identifier} deleted.`)
+      }
 
       // Remove from board immediately so UI reflects deletion even if follow-up refresh fails.
       setBoardIssues((prev) => prev.filter((issue) => {
