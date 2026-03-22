@@ -389,7 +389,7 @@ export function GitTab({
           </div>
           <div className="flex-1 overflow-hidden">
             <DiffViewer
-              filePath={null}
+              filePath={selectedCommit ? `commit ${selectedCommit.slice(0, 7)}` : null}
               diff={diff}
               mode={diffMode}
               onModeChange={setDiffMode}
