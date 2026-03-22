@@ -291,6 +291,13 @@ export function KanbanBoard({
     <div className="flex-1 flex flex-col min-h-0 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 px-4 pt-2 pb-2 shrink-0">
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => handleCreateClick('backlog')}
+            className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-all text-[11px] font-bold uppercase tracking-widest"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Create
+          </button>
           {viewMode === 'list' && (
             <div className="flex items-center gap-1.5 rounded-md border bg-muted/20 px-1.5 py-0.5">
               <span className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/60">State</span>
@@ -367,19 +374,6 @@ export function KanbanBoard({
                   <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{column.title}</h3>
                   <span className="text-[11px] font-medium text-muted-foreground/50">{column.items.length}</span>
                 </div>
-                {column.id === 'backlog' && (
-                  <AppTooltip content={`Create Task in ${column.title}`}>
-                    <button
-                      className="grid h-6 w-6 place-items-center rounded-md border border-dashed border-muted-foreground/30 text-muted-foreground/50 hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleCreateClick(column.id)
-                      }}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </button>
-                  </AppTooltip>
-                )}
               </div>
 
               <OverlayScrollbarsComponent
