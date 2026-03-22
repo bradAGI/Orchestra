@@ -194,7 +194,7 @@ export function IssueDetailView({
   // Skip fetching when in Backlog/Todo — no agent data to show
   useEffect(() => {
     if (!config || !identifier) return
-    if (localState === 'Backlog' || localState === 'Todo') {
+    if (localState === 'Backlog') {
       setIssueHistory([])
       return
     }
