@@ -4,185 +4,145 @@ Orchestra is a multi-agent development platform that combines task management, G
 
 ---
 
-## Dashboard & Tasks
+## Task Workflow
 
-When you launch Orchestra, you land on the **Tasks** board — a Kanban-style view for managing work across your projects.
+Orchestra enforces a strict task lifecycle. Every task flows through five states with gates at each transition.
+
+```
+BACKLOG → TODO → IN PROGRESS → REVIEW → DONE
+```
 
 ### Task Board
 
-![Task Board](screenshots/03-task-board.png)
+![Task Board](screenshots/01-task-board.png)
 
-The board has five columns: **Backlog**, **To Do**, **In Progress**, **Review**, and **Done**. Tasks flow left to right as work progresses.
+The Kanban board has five columns. Tasks can only be created in **Backlog** — all other columns show "NO TASKS" until work flows into them.
 
-- Click **"CLICK TO ADD TASK"** in any column to create a new task
-- Filter tasks by project using the **PROJECT** dropdown in the toolbar
-- Use **SYNC DATA** to refresh from the backend
-- The **LIVE** indicator shows real-time SSE connection status
+- **Backlog** — drafting area. The only column with a "+" create button.
+- **Todo** — agent creates a plan automatically
+- **In Progress** — agent executes the plan
+- **Review** — human reviews the work
+- **Done** — completed, branch preserved for PR
 
 ### Creating a Task
 
 ![Create Task](screenshots/02-create-task.png)
 
-The task creation dialog includes:
+Click **"CLICK TO ADD TASK"** in the Backlog column. All four fields are **required**:
 
-- **Title** — what needs to be done (required)
-- **Description** — detailed instructions for the agent, supports Markdown
-- **Project** — which project this task belongs to
-- **Agent** — assign to a specific agent or leave unassigned
-- **Voice input** — hold the microphone button to dictate
+- **Title** — what needs to be done
+- **Description** — detailed instructions for the agent
+- **Project** — which codebase the agent works in
+- **Agent** — which AI agent to assign (Claude, Codex, Gemini, OpenCode)
 
-Press **CREATE** to add the task to the board.
+The **CREATE** button stays disabled until all fields are filled.
 
-### Task Detail View
+### Backlog — The Staging Area
 
-![Task Detail](screenshots/04-task-detail.png)
+![Task in Backlog](screenshots/03-task-in-backlog.png)
 
-Click any task card to open the inspector with four tabs:
+Tasks in Backlog are fully editable drafts. You can change the title, description, agent, and project at any time.
 
-- **Details** — edit title, description (Markdown), status, and agent assignment
-- **Plan** — view the agent's execution plan for this task
-- **Session** — live terminal output from the agent working on this task
-- **Changes** — git diff of changes the agent has made
+![Backlog Detail](screenshots/04-backlog-detail.png)
 
-The right sidebar shows metadata: status, assigned agent, project, identifier, and creation date.
+The inspector shows:
+- Editable title and description (with markdown support)
+- Agent and project selectors
+- Status: **"Draft — drag to Todo when ready"**
+- Auto-created GitHub issue link
+
+**Moving to Todo:** Drag the task card from Backlog to the Todo column. This requires all fields to be filled — if anything is missing, the card snaps back.
+
+### Todo — Planning Phase
+
+When a task enters Todo:
+1. The agent is automatically dispatched in **planning mode**
+2. It reads the description, explores the codebase, and creates a structured plan
+3. The agent stops — it does **not** write code yet
+4. Review the plan in the **Plan** tab
+
+**Fields are locked** — title, description, agent, and project cannot be changed.
+
+Drag to **In Progress** when the plan looks good.
+
+### In Progress — Execution Phase
+
+![In Progress - Locked](screenshots/05-inprogress-locked.png)
+
+When a task enters In Progress:
+1. The agent is dispatched to **execute the plan**
+2. Watch progress in the **Session** tab (live terminal output)
+3. See code changes in the **Changes** tab
+4. The agent automatically moves the task to **Review** when done
+
+The inspector shows:
+- **Status: "Executing"** with amber pulse indicator
+- **"STOP & RESET"** button — kills the agent, clears plan and changes, returns to Backlog
+- All fields locked (read-only title, description, no selectors)
+
+### Review — Human QA
+
+When the agent completes, the task moves to Review automatically. You review:
+- **Plan** tab — what the agent intended to do
+- **Session** tab — what actually happened
+- **Changes** tab — the code diff
+
+Two actions:
+- **Approve** → moves to Done
+- **Reject** → opens a feedback dialog. Describe what needs to change. The task returns to Todo with your feedback, the agent re-plans incorporating it, and the branch is preserved.
+
+### Done — Completed
+
+The task is finished. All tabs remain viewable. The branch is preserved — go to the project's **Git** tab to create a PR when ready.
+
+### Stop & Reset
+
+Available from any active state (Todo, In Progress, Review). Pressing **STOP & RESET**:
+- Kills any running agent session
+- Clears the plan and changes
+- Returns the task to **Backlog** for editing
+- Requires confirmation: "This will clear the plan and all changes"
 
 ---
 
-## Projects
+## Drag Rules
 
-### Project List
+| Transition | Allowed? | Gate |
+|------------|----------|------|
+| Backlog → Todo | Drag | Title + description + agent + project required |
+| Todo → In Progress | Drag | Agent auto-executes plan |
+| In Progress → Review | Automatic | Agent completes |
+| Review → Done | Drag | Human approval |
+| Review → Todo | Button only | Requires feedback text |
+| Any → Backlog | Button only | Stop & Reset (clears everything) |
+| Backward drag | Blocked | Cannot drag cards left |
+| Skip states | Blocked | Must go through each state in order |
 
-![Projects](screenshots/05-projects.png)
+---
 
-The **Projects** view lists all registered workspaces. Each row shows:
+## Projects & Git
 
-- Project name and path
-- **GitHub Connected** badge (if linked)
-- Session count, token usage, and last activity
-
-Click **ADD PROJECT** to register a new local directory. Click any project row to open it.
-
-### Project Detail
-
-![Project Detail](screenshots/06-project-detail.png)
-
-Each project has three main tabs:
+Navigate to **Projects** in the sidebar to see all registered workspaces. Click a project to open it. Each project has three tabs:
 
 - **Tasks** — project-scoped Kanban board
 - **Files** — browse the project's file tree
-- **Git** — full Git client (staging, commits, branches, GitHub)
+- **Git** — full Git client with Changes, History, and GitHub sub-tabs
 
-The header shows the project name, GitHub owner/repo link, path, and action buttons (**Disconnect**, **Repo** link).
+### Git Tab — Changes
 
-### File Browser
+The Changes view has a two-panel layout:
+- **Left panel**: Stacked Unstaged/Staged file lists with drag-and-drop staging, commit bar at bottom
+- **Right panel**: Diff viewer for the selected file
 
-![Files Tab](screenshots/14-files-tab.png)
+### Git Tab — History
 
-The **Files** tab provides a tree view of the project directory. Click files to view their contents. This is useful for reviewing code without leaving Orchestra.
+Scrollable commit timeline with search. Click a commit to view its diff.
 
----
+### Git Tab — GitHub
 
-## Git Tab
+Issues and pull requests from the connected repository. Create issues, PRs, and review/merge PRs directly from Orchestra.
 
-The Git tab is a full-featured Git client integrated into each project. It has three sub-tabs: **Changes**, **History**, and **GitHub**.
-
-### Changes — Staging & Committing
-
-![Git Changes](screenshots/07-git-tab-changes.png)
-
-The Changes view uses a two-panel layout:
-
-**Left panel:**
-- **Unstaged** — files with uncommitted changes (red header, count badge)
-- **Staged** — files ready to commit (green header, count badge)
-- **Commit bar** — always visible at the bottom
-
-**Right panel:**
-- **Diff viewer** — shows the diff for the selected file
-
-**Staging files:**
-- Click a file to view its diff on the right
-- Drag files between Unstaged and Staged to stage/unstage
-- Use **Stage All** / **Unstage All** for bulk operations
-
-**Committing:**
-- Type a commit message in the subject line (character count shown, warns at 72+)
-- Click **+ body** to add an extended description
-- Press **Commit** or use **Ctrl+Enter**
-- The **Push** button appears with an arrow count (e.g., "Push ↑2") when you have unpushed commits
-
-### Branch Management
-
-![Branch Dropdown](screenshots/11-branch-dropdown.png)
-
-Click the **branch name** button to open the branch dropdown:
-
-- **Local branches** — click to checkout, current branch has a green dot
-- **Remote branches** — shown in a separate section with `origin/` prefix
-- **+ New branch** — create a new branch from current HEAD
-- **Delete / Merge** — hover over a branch for action buttons (with inline confirmation)
-
-Action buttons in the branch bar:
-- **Fetch** — fetch from all remotes
-- **Pull** — pull with behind count indicator (↓N)
-- **Push** — push with ahead count indicator (↑N)
-- **Stash** — open the stash panel to save, apply, or drop stashes
-
-### History — Commit Timeline
-
-![Git History](screenshots/08-git-tab-history.png)
-
-The History sub-tab shows a visual commit timeline:
-
-- Vertical timeline line with commit dots
-- Each commit shows: message, short hash, author, relative timestamp
-- Search bar to filter commits by message text
-- Click a commit to view its diff in the right panel
-
-### GitHub Integration
-
-![GitHub Tab](screenshots/10-git-github-tab.png)
-
-The GitHub sub-tab shows issues and pull requests from the connected repository:
-
-**Issues:**
-- Filter by state: Open, Closed, All
-- Create new issues with title and description
-- Toggle issue state (open/close)
-- Expand issues to view full description
-
-**Pull Requests:**
-- View open PRs with status badges (open, merged, closed)
-- Create new PRs with branch selection (head → base)
-- Click a PR to open the review view with diff and merge options
-
-**For projects without a GitHub connection:**
-The GitHub tab shows a "Create GitHub Repository" button (if a GitHub token is configured) to create a new repo and automatically set the remote + initial push.
-
----
-
-## Embedded Agent
-
-![Embedded Agent](screenshots/12-embedded-agent.png)
-
-Press **Ctrl+.** (or click the floating button) to open the **Orchestra Agent** panel. This is an AI assistant that can:
-
-- Create, update, and delete tasks
-- Search and list tasks across projects
-- Execute git operations (commit, push, branch management)
-- Answer questions about your projects
-
-The agent has access to tools and shows tool usage inline (e.g., "1 TOOL USED"). Conversations persist per project.
-
-You can also use **voice input** — click the microphone button to dictate messages.
-
----
-
-## Live Console
-
-![Live Console](screenshots/13-live-console.png)
-
-The **Live Console** provides a multi-agent terminal dock where you can monitor active agent sessions in real time. Each session shows terminal output from agents working on tasks.
+For projects without a GitHub connection, shows a "Create GitHub Repository" button.
 
 ---
 
@@ -194,13 +154,3 @@ The **Live Console** provides a multi-agent terminal dock where you can monitor 
 | **Ctrl+K** | Universal search |
 | **Ctrl+Enter** | Commit (in Git tab) |
 | **Escape** | Close dialogs and dropdowns |
-
----
-
-## Getting Started
-
-1. **Add a project** — go to Projects → ADD PROJECT and select a local directory
-2. **Connect GitHub** — click the GitHub button on a project to authenticate via OAuth or GitHub CLI
-3. **Create tasks** — use the task board or the embedded agent to create work items
-4. **Use the Git tab** — stage, commit, push, and manage branches without leaving Orchestra
-5. **Let agents work** — assign tasks to agents and monitor their progress in the Live Console
