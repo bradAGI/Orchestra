@@ -46,6 +46,7 @@ const subTabs: { key: SubTab; label: string }[] = [
 function classifyFiles(files: GitStatusEntry[]): { unstaged: GitStatusEntry[]; staged: GitStatusEntry[] } {
   const staged: GitStatusEntry[] = []
   const unstaged: GitStatusEntry[] = []
+  if (!files) return { staged, unstaged }
   for (const entry of files) {
     const s = entry.status
     if (s === '??' || s === '? ') {
@@ -101,9 +102,9 @@ export function GitTab({
       setCurrentBranch(branchData.current || '')
       setBranches(branchData.branches || [])
       setRemoteBranches(branchData.remotes || [])
-      setFiles(statusData.files)
-      setAheadBehind(statusData.branch)
-      setCommits(historyData)
+      setFiles(statusData?.files || [])
+      setAheadBehind(statusData?.branch || { ahead: 0, behind: 0 })
+      setCommits(historyData || [])
       const [stashData, conflictData] = await Promise.all([
         gitStashList(config, project.id),
         gitGetConflicts(config, project.id),
