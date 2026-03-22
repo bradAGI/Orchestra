@@ -1,6 +1,6 @@
 // Package agents provides runner implementations for dispatching work to
-// machine-learning coding agents (Claude, Codex, Gemini, OpenCode, Unsandbox)
-// and a registry that maps provider names to their concrete runners.
+// machine-learning coding agents (Claude, Gemini, OpenCode, Codex via app-server,
+// and Unsandbox) and a registry that maps provider names to their concrete runners.
 package agents
 
 import (

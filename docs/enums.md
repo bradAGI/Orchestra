@@ -4,10 +4,9 @@
 > - `apps/backend/internal/types/enums.go` -- IssueStatus, AgentCategory, SSEEventType (Go)
 > - `apps/backend/internal/agents/types.go` -- Provider (Go)
 > - `apps/backend/internal/tracker/types.go` -- Issue.State, Blocker.State (Go)
-> - `apps/desktop/src/lib/enums.ts` -- All enums (TypeScript mirrors)
 > - `packages/protocol/schemas/v1/` -- JSON schema enum constraints
 
-Orchestra uses a consistent set of enums across the backend (Go), frontend (TypeScript), and protocol schemas (JSON Schema). All enum values are UPPERCASE strings. The backend provides normalization functions (`NormalizeProvider`, `NormalizeSSEEventType`) that accept case-insensitive input for backward compatibility.
+Orchestra uses a consistent set of enums across the backend (Go) and protocol schemas (JSON Schema). All enum values are UPPERCASE strings. The backend provides a normalization function (`NormalizeProvider`) that accepts case-insensitive input for backward compatibility.
 
 ---
 
@@ -34,19 +33,6 @@ const (
     ProviderOpenCode Provider = "OPENCODE"
     ProviderGemini   Provider = "GEMINI"
 )
-```
-
-**Frontend definition** (`apps/desktop/src/lib/enums.ts`):
-
-```typescript
-export const Provider = {
-  CODEX: 'CODEX',
-  CLAUDE: 'CLAUDE',
-  OPENCODE: 'OPENCODE',
-  GEMINI: 'GEMINI',
-  UNSANDBOX: 'UNSANDBOX',
-} as const
-export type Provider = (typeof Provider)[keyof typeof Provider]
 ```
 
 **JSON Schema usage:** The `provider` field in `issue.create.request.schema.json`, `issue.update.request.schema.json`, `issue.response.schema.json`, `issues.list.response.schema.json`, and `state.response.schema.json` constrains values to `["CODEX", "CLAUDE", "OPENCODE", "GEMINI", "UNSANDBOX"]`.
@@ -79,18 +65,6 @@ const (
     IssueStatusTracked  IssueStatus = "TRACKED"
     IssueStatusIdle     IssueStatus = "IDLE"
 )
-```
-
-**Frontend definition** (`apps/desktop/src/lib/enums.ts`):
-
-```typescript
-export const IssueStatus = {
-  RUNNING: 'RUNNING',
-  RETRYING: 'RETRYING',
-  TRACKED: 'TRACKED',
-  IDLE: 'IDLE',
-} as const
-export type IssueStatus = (typeof IssueStatus)[keyof typeof IssueStatus]
 ```
 
 **JSON Schema usage:** The `status` field in `issue.response.schema.json` constrains values to `["RUNNING", "RETRYING", "TRACKED", "IDLE"]`.
@@ -131,16 +105,6 @@ const (
 )
 ```
 
-**Frontend definition** (`apps/desktop/src/lib/enums.ts`):
-
-```typescript
-export const AgentCategory = {
-  CORE: 'CORE',
-  SKILL: 'SKILL',
-} as const
-export type AgentCategory = (typeof AgentCategory)[keyof typeof AgentCategory]
-```
-
 **JSON Schema usage:** The `category` field in `agents.list.response.schema.json` and `agent.config.response.schema.json` constrains values to `["CORE", "SKILL"]`.
 
 **Config discovery paths by category:**
@@ -162,16 +126,6 @@ Indicates whether a configuration file applies globally or to a specific project
 |---|---|---|
 | `GLOBAL` | Applies to all projects (stored in `$HOME` or workspace root) | Backend, Frontend, Schema |
 | `PROJECT` | Applies only to a specific project (stored in the project directory) | Backend, Frontend, Schema |
-
-**Frontend definition** (`apps/desktop/src/lib/enums.ts`):
-
-```typescript
-export const ConfigScope = {
-  GLOBAL: 'GLOBAL',
-  PROJECT: 'PROJECT',
-} as const
-export type ConfigScope = (typeof ConfigScope)[keyof typeof ConfigScope]
-```
 
 **JSON Schema usage:** The `scope` field in `agents.list.response.schema.json` and `agent.config.response.schema.json` constrains values to `["GLOBAL", "PROJECT"]`.
 
@@ -212,25 +166,6 @@ const (
     SSEHookFailed     SSEEventType = "HOOK_FAILED"
 )
 ```
-
-**Frontend definition** (`apps/desktop/src/lib/enums.ts`):
-
-```typescript
-export const SSEEventType = {
-  RUN_EVENT: 'RUN_EVENT',
-  RUN_STARTED: 'RUN_STARTED',
-  RUN_FAILED: 'RUN_FAILED',
-  RUN_CONTINUES: 'RUN_CONTINUES',
-  RUN_SUCCEEDED: 'RUN_SUCCEEDED',
-  RETRY_SCHEDULED: 'RETRY_SCHEDULED',
-  HOOK_STARTED: 'HOOK_STARTED',
-  HOOK_COMPLETED: 'HOOK_COMPLETED',
-  HOOK_FAILED: 'HOOK_FAILED',
-} as const
-export type SSEEventType = (typeof SSEEventType)[keyof typeof SSEEventType]
-```
-
-**Normalization:** `NormalizeSSEEventType(s string)` converts any input to UPPERCASE for backward compatibility.
 
 In addition to these typed events, the SSE stream emits two system-level events that are not part of this enum:
 
@@ -279,23 +214,7 @@ Frontend navigation section identifiers. Used by the desktop app to track which 
 | `DOCS` | Documentation viewer | Frontend only |
 | `CONSOLE` | Terminal/console interface | Frontend only |
 
-**Frontend definition** (`apps/desktop/src/lib/enums.ts`):
-
-```typescript
-export const SectionID = {
-  DASHBOARD: 'DASHBOARD',
-  RUNNING: 'RUNNING',
-  ISSUES: 'ISSUES',
-  PROJECTS: 'PROJECTS',
-  AGENTS: 'AGENTS',
-  WAREHOUSE: 'WAREHOUSE',
-  SANDBOX: 'SANDBOX',
-  SETTINGS: 'SETTINGS',
-  DOCS: 'DOCS',
-  CONSOLE: 'CONSOLE',
-} as const
-export type SectionID = (typeof SectionID)[keyof typeof SectionID]
-```
+**Frontend definition** (`apps/desktop/src/app/routes/sections.tsx`): Section identifiers are defined inline as string literal union types in the navigation routes configuration.
 
 ---
 
@@ -303,14 +222,14 @@ export type SectionID = (typeof SectionID)[keyof typeof SectionID]
 
 Summary of where each enum is defined and used across the stack:
 
-| Enum | Backend (Go) | Frontend (TS) | JSON Schema |
-|---|---|---|---|
-| `Provider` | `internal/agents/types.go` | `enums.ts` | `issue.*.schema.json`, `state.response.schema.json` |
-| `IssueStatus` | `internal/types/enums.go` | `enums.ts` | `issue.response.schema.json` |
-| `AgentCategory` | `internal/types/enums.go` | `enums.ts` | `agents.list.response.schema.json`, `agent.config.response.schema.json` |
-| `ConfigScope` | `internal/agents/config.go` | `enums.ts` | `agents.list.response.schema.json`, `agent.config.response.schema.json` |
-| `SSEEventType` | `internal/types/enums.go` | `enums.ts` | -- |
-| `SectionID` | -- | `enums.ts` | -- |
+| Enum | Backend (Go) | JSON Schema |
+|---|---|---|
+| `Provider` | `internal/agents/types.go` | `issue.*.schema.json`, `state.response.schema.json` |
+| `IssueStatus` | `internal/types/enums.go` | `issue.response.schema.json` |
+| `AgentCategory` | `internal/types/enums.go` | `agents.list.response.schema.json`, `agent.config.response.schema.json` |
+| `ConfigScope` | `internal/agents/config.go` | `agents.list.response.schema.json`, `agent.config.response.schema.json` |
+| `SSEEventType` | `internal/types/enums.go` | -- |
+| `SectionID` | -- | -- |
 
 ---
 

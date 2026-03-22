@@ -3,8 +3,6 @@
 // server-sent event types.
 package types
 
-import "strings"
-
 // IssueStatus represents the computed runtime status of an issue.
 type IssueStatus string
 
@@ -54,8 +52,3 @@ const (
 	SSEHookFailed SSEEventType = "HOOK_FAILED"
 )
 
-// NormalizeSSEEventType normalizes an SSE event type string to UPPERCASE
-// for backward compatibility with clients sending lowercase values.
-func NormalizeSSEEventType(s string) SSEEventType {
-	return SSEEventType(strings.ToUpper(s))
-}
