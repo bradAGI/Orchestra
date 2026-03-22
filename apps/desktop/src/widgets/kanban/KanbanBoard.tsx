@@ -317,6 +317,10 @@ export function KanbanBoard({
             </div>
           )}
 
+
+        </div>
+
+        <div className="flex items-center gap-2">
           {projects.length > 1 && (
             <div className="flex items-center gap-1.5 rounded-md border bg-muted/20 px-1.5 py-0.5">
               <span className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/60">Project</span>
@@ -331,9 +335,6 @@ export function KanbanBoard({
               />
             </div>
           )}
-
-        </div>
-
         <div className="flex items-center gap-1 rounded-lg border bg-muted/20 p-1">
           <AppTooltip content="Board View">
             <button
@@ -351,6 +352,7 @@ export function KanbanBoard({
               <Rows className="h-3.5 w-3.5" />
             </button>
           </AppTooltip>
+        </div>
         </div>
       </div>
 

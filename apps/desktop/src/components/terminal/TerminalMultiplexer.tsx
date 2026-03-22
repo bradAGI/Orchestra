@@ -206,7 +206,7 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
                 {viewMode === 'tabs' ? (
                     // Single terminal tab view
                     activeTab && (
-                        <div className="w-full h-full" key={activeTab.id}>
+                        <div className="w-full h-full px-3" key={activeTab.id}>
                             <TerminalView
                                 sessionId={activeTab.id}
                                 projectId={activeTab.projectId}
