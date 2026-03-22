@@ -188,15 +188,36 @@ export function IssueDetailView({
       for (const line of [...logLines].reverse()) {
         try {
           const entry = JSON.parse(line)
-          const msg = entry.message || entry.content || entry.text || ''
-          if (msg) {
-            const items = extractPlanFromText(msg)
+          // Extract text from various agent log formats
+          let text = ''
+          if (typeof entry.message === 'string') {
+            text = entry.message
+          } else if (entry.message?.content) {
+            // Claude format: message.content is array of {type:"text", text:"..."}
+            if (Array.isArray(entry.message.content)) {
+              text = entry.message.content
+                .filter((b: any) => b.type === 'text' && b.text)
+                .map((b: any) => b.text)
+                .join('\n')
+            } else if (typeof entry.message.content === 'string') {
+              text = entry.message.content
+            }
+          } else if (typeof entry.content === 'string') {
+            text = entry.content
+          } else if (typeof entry.text === 'string') {
+            text = entry.text
+          } else if (typeof entry.result === 'string') {
+            text = entry.result
+          }
+          if (text) {
+            const items = extractPlanFromText(text)
             if (items.length > 0) return items
           }
         } catch { /* skip non-JSON lines */ }
       }
-      // Try raw text extraction from entire logs
-      const items = extractPlanFromText(logs)
+      // Try raw text extraction with unescaped newlines
+      const unescaped = logs.replace(/\\n/g, '\n')
+      const items = extractPlanFromText(unescaped)
       if (items.length > 0) return items
     }
 
