@@ -1,5 +1,7 @@
 # Orchestra
 
+⚠️ Early Development Notice: This project is in early development and is not yet ready for production use. Features may change, break, or be incomplete. Use at your own risk.
+
 Multi-agent orchestration platform that coordinates machine learning coding agents to autonomously resolve issues from project trackers. Orchestra dispatches work to agents (Claude, Codex, OpenCode, Gemini), monitors their execution via real-time event streaming, and manages retries, workspaces, and MCP tool integrations — all through an Electron desktop app or a terminal TUI.
 
 ```mermaid
