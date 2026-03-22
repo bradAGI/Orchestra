@@ -216,6 +216,7 @@ func NewRouterWithPubSub(
 	protected.Patch("/api/v1/issues/{issue_identifier}", server.PatchIssue)
 	protected.Delete("/api/v1/issues/{issue_identifier}", server.DeleteIssue)
 	protected.Delete("/api/v1/issues/{issue_identifier}/session", server.DeleteIssueSession)
+	protected.Post("/api/v1/issues/{issue_identifier}/stop", server.PostIssueStop)
 
 	return r
 }

@@ -893,6 +893,35 @@ func (s *Server) DeleteIssueSession(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// PostIssueStop handles POST /api/v1/issues/{issue_identifier}/stop by stopping
+// all active sessions and resetting the issue to Backlog with empty feedback.
+// This bypasses normal state transition validation as a special reset operation.
+func (s *Server) PostIssueStop(w http.ResponseWriter, r *http.Request) {
+	identifier := chi.URLParam(r, "issue_identifier")
+
+	// Stop all sessions if the issue has an active runtime
+	runtime, ok := s.orchestrator.LookupIssue(identifier)
+	if ok {
+		s.orchestrator.StopAllSessionsForIssue(runtime.IssueID)
+	}
+
+	// Reset state to Backlog and clear feedback (bypasses transition validation)
+	issue, err := s.orchestrator.UpdateIssue(r.Context(), identifier, map[string]any{
+		"state":    "Backlog",
+		"feedback": "",
+	})
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "update_failed", "failed to reset issue")
+		return
+	}
+	if issue == nil {
+		writeJSONError(w, http.StatusNotFound, "issue_not_found", "issue not found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, issue)
+}
+
 // DeleteIssue handles DELETE /api/v1/issues/{issue_identifier} by permanently
 // deleting the identified issue from the tracker.
 func (s *Server) DeleteIssue(w http.ResponseWriter, r *http.Request) {
