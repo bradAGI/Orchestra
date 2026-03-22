@@ -426,6 +426,91 @@ func (s *Server) GetIssue(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
+// validTransitions defines the allowed state changes for issues.
+var validTransitions = map[string][]string{
+	"Backlog":     {"Todo"},
+	"Todo":        {"In Progress", "Backlog"},
+	"In Progress": {"Review", "Backlog"},
+	"Review":      {"Done", "Todo", "Backlog"},
+	"Done":        {},
+}
+
+// lockedFields are fields that cannot be changed when an issue is not in Backlog.
+var lockedFields = map[string]bool{
+	"title":       true,
+	"description": true,
+	"project_id":  true,
+	"assignee_id": true,
+}
+
+// validateStateTransition checks whether a state change is allowed and whether
+// gating requirements are met. Returns an error string if invalid, or "" if ok.
+func validateStateTransition(current, next string, issue *tracker.Issue, updates map[string]any) string {
+	allowed, exists := validTransitions[current]
+	if !exists {
+		return fmt.Sprintf("unknown current state %q", current)
+	}
+	found := false
+	for _, s := range allowed {
+		if s == next {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Sprintf("transition from %q to %q is not allowed", current, next)
+	}
+
+	// Gate: Backlog → Todo requires title, description, assignee_id, project_id all non-empty
+	if current == "Backlog" && next == "Todo" {
+		title := issue.Title
+		if v, ok := updates["title"].(string); ok {
+			title = v
+		}
+		description := issue.Description
+		if v, ok := updates["description"].(string); ok {
+			description = v
+		}
+		assigneeID := issue.AssigneeID
+		if v, ok := updates["assignee_id"].(string); ok {
+			assigneeID = v
+		}
+		projectID := issue.ProjectID
+		if v, ok := updates["project_id"].(string); ok {
+			projectID = v
+		}
+		if title == "" || description == "" || assigneeID == "" || projectID == "" {
+			return "cannot move to Todo: title, description, assignee_id, and project_id must all be set"
+		}
+		if assigneeID == "unassigned" {
+			return "cannot move to Todo: assignee must not be \"unassigned\""
+		}
+	}
+
+	// Gate: Review → Todo requires feedback field in updates
+	if current == "Review" && next == "Todo" {
+		if _, ok := updates["feedback"]; !ok {
+			return "cannot move from Review to Todo without providing feedback"
+		}
+	}
+
+	return ""
+}
+
+// validateFieldLocking rejects updates to locked fields when the issue is not in Backlog.
+// Returns an error string if a locked field is being updated, or "" if ok.
+func validateFieldLocking(currentState string, updates map[string]any) string {
+	if currentState == "Backlog" {
+		return ""
+	}
+	for field := range updates {
+		if lockedFields[field] {
+			return fmt.Sprintf("field %q is locked when issue is in state %q (only editable in Backlog)", field, currentState)
+		}
+	}
+	return ""
+}
+
 // PatchIssue handles PATCH /api/v1/issues/{issue_identifier} by applying
 // partial updates to an issue. When the state is changed to "Review" or "Done",
 // an auto-commit is triggered on the associated project.
@@ -435,6 +520,31 @@ func (s *Server) PatchIssue(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
 		writeJSONError(w, http.StatusBadRequest, "invalid_json", "failed to decode request body")
 		return
+	}
+
+	// Fetch current issue for validation
+	currentIssue, err := s.orchestrator.FetchIssueByIdentifier(r.Context(), identifier)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "issue_lookup_failed", "failed to lookup issue")
+		return
+	}
+	if currentIssue == nil {
+		writeJSONError(w, http.StatusNotFound, "issue_not_found", "issue not found")
+		return
+	}
+
+	// Validate field locking
+	if errMsg := validateFieldLocking(currentIssue.State, updates); errMsg != "" {
+		writeJSONError(w, http.StatusBadRequest, "field_locked", errMsg)
+		return
+	}
+
+	// Validate state transition if state is being changed
+	if newState, ok := updates["state"].(string); ok && newState != currentIssue.State {
+		if errMsg := validateStateTransition(currentIssue.State, newState, currentIssue, updates); errMsg != "" {
+			writeJSONError(w, http.StatusBadRequest, "invalid_transition", errMsg)
+			return
+		}
 	}
 
 	issue, err := s.orchestrator.UpdateIssue(r.Context(), identifier, updates)
