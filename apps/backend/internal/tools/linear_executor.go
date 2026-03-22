@@ -218,11 +218,3 @@ func toStringSlice(value any) []string {
 	}
 	return out
 }
-
-func isObjectOrNil(value any) bool {
-	if value == nil {
-		return true
-	}
-	_, ok := value.(map[string]any)
-	return ok
-}

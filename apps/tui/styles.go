@@ -16,14 +16,6 @@ var (
 	// FgColor is the foreground text color for the dashboard theme.
 	FgColor = lipgloss.Color("#F8F8F2")
 
-	// TitleStyle is the lipgloss style for the main dashboard title.
-	TitleStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(FgColor).
-			Background(PrimaryColor).
-			Padding(0, 1).
-			MarginLeft(2)
-
 	// HeaderStyle is the lipgloss style for section headers.
 	HeaderStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -57,11 +49,6 @@ var (
 			Border(lipgloss.NormalBorder()).
 			BorderForeground(lipgloss.Color("#44475A")).
 			Padding(0, 1)
-
-	// CommandStyle is the lipgloss style for command text display.
-	CommandStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#F1FA8C")).
-			Italic(true)
 
 	// ActiveTabStyle is the lipgloss style for the currently selected tab.
 	ActiveTabStyle = lipgloss.NewStyle().

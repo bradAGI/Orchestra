@@ -208,8 +208,3 @@ func (s Service) timeoutOrDefault() time.Duration {
 	}
 	return s.HookTimeout
 }
-
-// MarkerPath returns the path to the .orchestra marker file within the given directory.
-func MarkerPath(path string) string {
-	return filepath.Join(path, ".orchestra")
-}

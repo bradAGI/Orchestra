@@ -66,7 +66,6 @@ type OutputTokenDetail struct {
 // --- Content Block Builders ---
 
 func TextBlock(t string) ContentBlock      { return ContentBlock{Type: "text", Text: t} }
-func ReasoningBlock(t string) ContentBlock { return ContentBlock{Type: "reasoning", Text: t} }
 
 func ToolCallBlock(toolName string, input any, toolCallID string) ContentBlock {
 	if toolCallID == "" {
@@ -79,13 +78,6 @@ func ToolResultBlock(toolCallID, toolName string, output any, isError bool) Cont
 	return ContentBlock{Type: "tool-result", ToolCallID: toolCallID, ToolName: toolName, Output: output, IsError: isError}
 }
 
-func ImageBlock(mediaType, data string) ContentBlock {
-	return ContentBlock{Type: "image", MediaType: mediaType, Data: data}
-}
-
-func FileBlock(mediaType, data string) ContentBlock {
-	return ContentBlock{Type: "file", MediaType: mediaType, Data: data}
-}
 
 // --- Logger ---
 
