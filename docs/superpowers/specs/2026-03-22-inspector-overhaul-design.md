@@ -72,36 +72,20 @@ Parse each line as JSON. Categorize by `type` field:
 ## 3. Per-Task Changes Isolation
 
 ### Problem
-The Changes tab shows `git diff` from the working directory. All tasks on the same project share the same diff. Changes from one task bleed into another.
+The Changes tab sometimes shows changes from other tasks on the same project.
+
+### Current State
+The backend `GetIssueDiff` handler in `state.go` already reads `base_sha` and `branch_name` from the issue's database record and runs `git diff <base_sha>...<branch>`. This should scope changes per task.
 
 ### Solution
+Verify the existing backend scoping works correctly. The likely issue is that `base_sha` or `branch_name` is not populated for certain issue creation paths (e.g., tasks created through the UI vs imported from GitHub).
 
-**Backend:** Update the `GetIssueDiff` handler in `apps/backend/internal/api/state.go` to accept `base_sha` and `branch` query params:
+**Investigation needed:**
+- Check if `base_sha` is set when a task moves to Todo (when the agent first dispatches and creates a worktree/branch)
+- Check if `branch_name` is set on the issue record
+- If either is missing, ensure the orchestrator populates them during dispatch
 
-```
-GET /api/v1/issues/{id}/diff?base_sha=abc123&branch=fetch-1
-```
-
-When both params are present, run:
-```
-git diff <base_sha>...<branch>
-```
-
-This shows only what changed between the task's starting point and its current branch. Fall back to existing `git diff` behavior when params are missing.
-
-**Frontend:** Update `fetchIssueDiff` in `orchestra-client.ts` to pass `base_sha` and `branch_name` from the issue record:
-
-```typescript
-export async function fetchIssueDiff(config, identifier, provider?, baseSha?, branch?): Promise<string> {
-  const params = new URLSearchParams()
-  if (provider) params.set('provider', provider)
-  if (baseSha) params.set('base_sha', baseSha)
-  if (branch) params.set('branch', branch)
-  // ...
-}
-```
-
-In IssueDetailView, pass `typed.base_sha` and `typed.branch_name` to the diff fetch.
+**Frontend:** Ensure `fetchIssueDiff` passes the issue `provider` param so the backend can locate the correct session/worktree for the diff. No new params needed — the backend reads from the DB.
 
 ## 4. File Structure
 
@@ -111,8 +95,8 @@ In IssueDetailView, pass `typed.base_sha` and `typed.branch_name` to the diff fe
 | `apps/desktop/src/widgets/issue-detail/SessionTimeline.test.tsx` | Create | Tests |
 | `apps/desktop/src/widgets/issue-detail/planCache.ts` | Create | Plan persistence cache |
 | `apps/desktop/src/widgets/issue-detail/IssueDetailView.tsx` | Modify | Use SessionTimeline, plan cache, markdown plan items, scoped diff |
-| `apps/desktop/src/lib/orchestra-client.ts` | Modify | Add base_sha/branch params to fetchIssueDiff |
-| `apps/backend/internal/api/state.go` | Modify | Scoped diff in GetIssueDiff handler |
+| `apps/desktop/src/lib/orchestra-client.ts` | Verify | Ensure provider param passed to fetchIssueDiff |
+| `apps/backend/internal/api/state.go` | Verify | Confirm base_sha/branch_name populated during dispatch |
 
 ## Out of Scope
 
