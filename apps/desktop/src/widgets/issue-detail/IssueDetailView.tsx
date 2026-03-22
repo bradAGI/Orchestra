@@ -180,13 +180,31 @@ export function IssueDetailView({
       if (items.length > 0) return items
     }
 
+    // Fallback: parse session logs (JSONL) for plan checkboxes
+    if (logs) {
+      const logLines = logs.split('\n').filter(l => l.trim())
+      for (const line of [...logLines].reverse()) {
+        try {
+          const entry = JSON.parse(line)
+          const msg = entry.message || entry.content || entry.text || ''
+          if (msg) {
+            const items = extractPlanFromText(msg)
+            if (items.length > 0) return items
+          }
+        } catch { /* skip non-JSON lines */ }
+      }
+      // Try raw text extraction from entire logs
+      const items = extractPlanFromText(logs)
+      if (items.length > 0) return items
+    }
+
     // Fallback to timeline events
     const fromTimeline = extractOperationalPlanItems(timeline, issueId, identifier, description)
     if (fromTimeline.length > 0) return fromTimeline
 
     // Final fallback: parse description
     return extractPlanFromText(description)
-  }, [issueHistory, timeline, issueId, identifier, description])
+  }, [issueHistory, timeline, issueId, identifier, description, logs])
   const completedCount = planItems.filter(i => i.done).length
   const isRunning = snapshot?.running?.some(r => r.issue_id === issueId || r.issue_identifier === identifier) ?? false
 
@@ -217,7 +235,7 @@ export function IssueDetailView({
   // Fetch tab-specific data
   useEffect(() => {
     if (!config || !identifier) return
-    if (bottomTab === 'output' && (isRunning || localState === 'In Progress' || localState === 'Review' || localState === 'Done')) {
+    if (localState !== 'Backlog') {
       setLogsLoading(true)
       fetchIssueLogs(config, identifier, provider)
         .then(setLogs)
