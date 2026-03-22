@@ -69,6 +69,7 @@ func runMigrations(db *sql.DB) error {
 		{"runs", "issue_identifier", "TEXT"},
 		{"sessions", "issue_id", "TEXT"},
 		{"sessions", "model", "TEXT"},
+		{"issues", "feedback", "TEXT"},
 	}
 
 	for _, m := range migrations {
