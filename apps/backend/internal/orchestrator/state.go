@@ -925,7 +925,7 @@ func (s *Service) enqueueCandidates(candidates []tracker.Issue) {
 
 		desc := issue.Description
 		if strings.EqualFold(issue.State, "Todo") {
-			desc = desc + "\n\n---\nMODE: PLAN ONLY. Create a detailed execution plan with checkboxes for each step. Do NOT write code, create files, or make any changes. Only analyze the codebase and create the plan."
+			desc = desc + "\n\n---\nMODE: PLAN ONLY — BE FAST.\n\nYour ONLY job is to output a plan. Do NOT write code, create files, or make changes.\n\n1. Spend at most 2-3 tool calls understanding the project structure (ls, read key files)\n2. Then IMMEDIATELY output your plan as markdown checkboxes:\n   - [ ] Step 1: ...\n   - [ ] Step 2: ...\n3. Stop after outputting the plan. Do NOT explore further.\n\nKeep the plan concise — 5-10 steps maximum. The human will review it before you execute."
 		} else if strings.EqualFold(issue.State, "In Progress") {
 			// For execution mode, tell the agent to skip exploration and execute directly
 			desc = desc + "\n\n---\nMODE: EXECUTE. You have already explored this codebase and created a plan. Skip codebase exploration — go straight to implementation. Follow your plan step by step. Write code, run tests, commit changes."
