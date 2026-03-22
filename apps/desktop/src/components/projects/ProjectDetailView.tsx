@@ -314,7 +314,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
             {/* Header */}
             <div className="shrink-0 border-b border-border/40 bg-background/40 backdrop-blur-xl sticky top-0 z-20">
                 {/* Row 1: Navigation + Identity */}
-                <div className="flex items-center gap-3 px-6 pt-2 pb-1">
+                <div className="flex items-center gap-2 px-4 py-0.5">
                     <Button variant="ghost" size="sm" onClick={onBack} className="h-7 text-muted-foreground hover:text-foreground gap-1 -ml-2 text-xs">
                         <ArrowLeft size={14} /> Back
                     </Button>
@@ -345,7 +345,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                 </div>
 
                 {/* Row 2: Path + Actions */}
-                <div className="flex items-center justify-between gap-3 px-6 pb-1">
+                <div className="flex items-center justify-between gap-2 px-4 pb-0">
                     <div className="flex items-center gap-1.5 min-w-0 text-[11px] text-muted-foreground/60 font-mono">
                         <span className="truncate max-w-[400px]">{project.root_path}</span>
                         <AppTooltip content="Open folder">
@@ -404,7 +404,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                 )}
 
                 {/* Tabs */}
-                <div className="flex gap-0.5 px-6">
+                <div className="flex gap-0.5 px-4">
                     {tabs.map((tab) => {
                         const disabled = tab.needsPath && !pathExists
                         return (
