@@ -289,7 +289,7 @@ export function KanbanBoard({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2 shrink-0">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 px-4 pt-2 pb-2 shrink-0">
         <div className="flex flex-wrap items-center gap-2">
           {viewMode === 'list' && (
             <div className="flex items-center gap-1.5 rounded-md border bg-muted/20 px-1.5 py-0.5">
