@@ -4,11 +4,12 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 import type { BackendConfig, IssueUpdatePayload, IssueHistoryEntry } from '@/lib/orchestra-client'
-import { fetchIssueHistory, fetchIssueDiff, fetchIssueLogs, gitCheckout, gitMerge, gitDeleteBranch, updateProjectGitHubIssue } from '@/lib/orchestra-client'
+import { fetchIssueHistory, fetchIssueDiff, fetchIssueLogs, gitCheckout, gitMerge, gitDeleteBranch, updateProjectGitHubIssue, stopIssue } from '@/lib/orchestra-client'
 import type { SnapshotPayload } from '@/lib/orchestra-types'
 import type { TimelineItem } from '@/components/app-shell/types'
 import { AgentSelector, CustomDropdown, getAgentIcon } from '@/components/app-shell/shared/controls'
 import type { IssueDetailResult } from './types'
+import { FeedbackDialog } from './FeedbackDialog'
 import { extractOperationalPlanItems, extractPlanFromText, parseDiff, type DiffFile, type PlanItem } from './IssueDetailUtils'
 
 function DescriptionEditor({ value, onChange, onBlur, theme }: {
@@ -131,6 +132,10 @@ export function IssueDetailView({
   const [localTitle, setLocalTitle] = useState(title)
   const [localDescription, setLocalDescription] = useState(description)
   const [bottomTab, setBottomTab] = useState<'details' | 'plan' | 'output' | 'changes'>('details')
+  const [showStopConfirm, setShowStopConfirm] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(false)
+
+  const isEditable = localState === 'Backlog'
 
   const [issueHistory, setIssueHistory] = useState<IssueHistoryEntry[]>([])
   const [_historyLoading, setHistoryLoading] = useState(false)
@@ -254,6 +259,24 @@ export function IssueDetailView({
     if (onUpdate) await onUpdate({ assignee_id: newAssignee, provider: agentName })
   }
 
+  const confirmStop = async () => {
+    if (!config) return
+    try {
+      await stopIssue(config, identifier)
+      setShowStopConfirm(false)
+      setLocalState('Backlog')
+      onUpdate?.({ state: 'Backlog' })
+    } catch (err) {
+      console.error('stop failed', err)
+    }
+  }
+
+  const handleReject = async (feedback: string) => {
+    setShowFeedback(false)
+    setLocalState('Todo')
+    onUpdate?.({ state: 'Todo', feedback })
+  }
+
   if (!result) {
     return <div className="h-full flex items-center justify-center text-muted-foreground/30 text-sm italic">No issue data.</div>
   }
@@ -276,18 +299,6 @@ export function IssueDetailView({
           <span className="shrink-0 font-mono text-[11px] font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/15">{identifier}</span>
           <h2 className="text-base font-bold truncate flex-1 min-w-0">{localTitle}</h2>
           <div className="flex items-center gap-2 shrink-0">
-          {isRunning && onStopSession && (
-            <button
-              className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-colors"
-              onClick={async () => {
-                await onStopSession(provider)
-                setLocalState('Todo')
-                if (onUpdate) await onUpdate({ state: 'Todo' })
-              }}
-            >
-              Stop
-            </button>
-          )}
           {localState === 'Review' && config && projectId && onUpdate && (
             <>
               <button
@@ -380,46 +391,105 @@ export function IssueDetailView({
           <div className="h-full flex">
             {/* Main content - editable */}
             <div className="flex-1 p-8 flex flex-col">
-              <input
-                className="w-full bg-transparent text-xl font-bold text-foreground outline-none focus:outline-none placeholder:text-muted-foreground/20 mb-1"
-                value={localTitle}
-                onChange={e => setLocalTitle(e.target.value)}
-                onBlur={() => { if (localTitle !== title && onUpdate) void onUpdate({ title: localTitle }) }}
-                placeholder="Task title..."
-              />
+              {isEditable ? (
+                <input
+                  className="w-full bg-transparent text-xl font-bold text-foreground outline-none focus:outline-none placeholder:text-muted-foreground/20 mb-1"
+                  value={localTitle}
+                  onChange={e => setLocalTitle(e.target.value)}
+                  onBlur={() => { if (localTitle !== title && onUpdate) void onUpdate({ title: localTitle }) }}
+                  placeholder="Task title..."
+                />
+              ) : (
+                <span className="text-sm font-medium text-foreground">{localTitle}</span>
+              )}
               <div className="w-12 h-0.5 bg-primary/30 rounded-full mb-4" />
-              <DescriptionEditor
-                value={localDescription}
-                onChange={setLocalDescription}
-                onBlur={() => { if (localDescription !== description && onUpdate) void onUpdate({ description: localDescription }) }}
-                theme={theme}
-              />
+              {isEditable ? (
+                <DescriptionEditor
+                  value={localDescription}
+                  onChange={setLocalDescription}
+                  onBlur={() => { if (localDescription !== description && onUpdate) void onUpdate({ description: localDescription }) }}
+                  theme={theme}
+                />
+              ) : (
+                <div className="px-4 py-3 text-[11px] text-foreground/80 whitespace-pre-wrap">
+                  {localDescription || 'No description'}
+                </div>
+              )}
             </div>
 
             {/* Sidebar properties */}
             <div className="w-72 border-l border-border/40 shrink-0 overflow-y-auto bg-muted/5">
               <div className="px-4 py-3 border-b border-border/20">
-                <label className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground/30 mb-1.5 block">Status</label>
-                <CustomDropdown
-                  className="w-full"
-                  value={localState}
-                  options={[
-                    { label: 'Backlog', value: 'Backlog', icon: <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/20" /> },
-                    { label: 'Todo', value: 'Todo', icon: <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" /> },
-                    { label: 'In Progress', value: 'In Progress', icon: <div className="h-1.5 w-1.5 rounded-full bg-amber-500" /> },
-                    { label: 'Review', value: 'Review', icon: <div className="h-1.5 w-1.5 rounded-full bg-blue-500" /> },
-                    { label: 'Done', value: 'Done', icon: <div className="h-1.5 w-1.5 rounded-full bg-primary" /> },
-                  ]}
-                  onChange={handleStateChange}
-                />
+                <div className="space-y-2">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Status</span>
+
+                  {localState === 'Backlog' && (
+                    <div className="text-[10px] text-muted-foreground/60">
+                      Draft — drag to Todo when ready
+                    </div>
+                  )}
+
+                  {localState === 'Todo' && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-blue-500" />
+                        <span className="text-[11px] text-blue-400">Planning</span>
+                      </div>
+                      <button onClick={() => setShowStopConfirm(true)} className="w-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all">
+                        Stop &amp; Reset
+                      </button>
+                    </div>
+                  )}
+
+                  {localState === 'In Progress' && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                        <span className="text-[11px] text-amber-400">Executing</span>
+                      </div>
+                      <button onClick={() => setShowStopConfirm(true)} className="w-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all">
+                        Stop &amp; Reset
+                      </button>
+                    </div>
+                  )}
+
+                  {localState === 'Review' && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-purple-500" />
+                        <span className="text-[11px] text-purple-400">Awaiting Review</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => { setLocalState('Done'); onUpdate?.({ state: 'Done' }) }} className="flex-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all">
+                          Approve
+                        </button>
+                        <button onClick={() => setShowFeedback(true)} className="flex-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all">
+                          Reject
+                        </button>
+                      </div>
+                      <button onClick={() => setShowStopConfirm(true)} className="w-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-muted/10 text-muted-foreground hover:bg-muted/20 transition-all">
+                        Stop &amp; Reset
+                      </button>
+                    </div>
+                  )}
+
+                  {localState === 'Done' && (
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span className="text-[11px] text-emerald-400">Completed</span>
+                    </div>
+                  )}
+                </div>
               </div>
               {[
-                { label: 'Agent', content: (
-                  <AgentSelector value={localAssignee} agents={availableAgents} onChange={handleAssigneeChange} direction="down" />
-                )},
-                { label: 'Project', content: (
-                  <span className="text-[11px] font-bold text-foreground/80">{projectName || 'Unlinked'}</span>
-                )},
+                ...(isEditable ? [
+                  { label: 'Agent', content: (
+                    <AgentSelector value={localAssignee} agents={availableAgents} onChange={handleAssigneeChange} direction="down" />
+                  )},
+                  { label: 'Project', content: (
+                    <span className="text-[11px] font-bold text-foreground/80">{projectName || 'Unlinked'}</span>
+                  )},
+                ] : []),
                 { label: 'Identifier', content: (
                   <span className="font-mono text-[11px] font-black text-primary/70">{identifier}</span>
                 )},
@@ -803,6 +873,32 @@ export function IssueDetailView({
           </div>
         )}
       </div>
+
+      {showStopConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-card border border-border/40 rounded-xl shadow-lg p-6 max-w-sm">
+            <h3 className="text-sm font-bold text-foreground mb-2">Stop &amp; Reset Task?</h3>
+            <p className="text-[11px] text-muted-foreground mb-4">
+              This will clear the plan and all changes. The task will return to Backlog for editing.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowStopConfirm(false)} className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg text-muted-foreground hover:text-foreground transition-all">
+                Cancel
+              </button>
+              <button onClick={confirmStop} className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all">
+                Stop &amp; Reset
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showFeedback && (
+        <FeedbackDialog
+          onSubmit={handleReject}
+          onCancel={() => setShowFeedback(false)}
+        />
+      )}
     </div>
   )
 }

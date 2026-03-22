@@ -507,7 +507,7 @@ describe('App smoke render', () => {
           identifier: 'OPS-60',
           title: 'State change task',
           description: '',
-          state: 'Todo',
+          state: 'Review',
           assignee_id: 'agent-codex',
           priority: 1,
           project_id: '',
@@ -545,24 +545,10 @@ describe('App smoke render', () => {
         expect(screen.getByText(/Issue Inspector/i)).toBeTruthy()
       })
 
-      // Find the state dropdown in the inspector and change it
-      // The CustomDropdown renders a button with the current value "Todo"
-      // We need to find the one inside the dialog
+      // The issue is in Review state — click the Approve workflow button
       const dialog = screen.getByRole('dialog')
-
-      // Find the dropdown trigger showing "Todo" in the dialog header area
-      const todoButtons = within(dialog).getAllByText('Todo')
-      // Click the dropdown trigger (should be a button)
-      const dropdownTrigger = todoButtons.find(el => el.closest('button'))
-      expect(dropdownTrigger).toBeTruthy()
-      fireEvent.click(dropdownTrigger!)
-
-      // Select "Done" from the dropdown options
-      await waitFor(() => {
-        const doneOptions = screen.getAllByText('Done')
-        const doneOption = doneOptions[doneOptions.length - 1]
-        fireEvent.click(doneOption)
-      })
+      const approveBtn = within(dialog).getByText('Approve')
+      fireEvent.click(approveBtn)
 
       await waitFor(() => {
         expect(fetchMock.mock.calls.some(
