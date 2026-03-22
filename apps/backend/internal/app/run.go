@@ -613,12 +613,7 @@ func processExecutionTick(
 
 	service.RecordRunResult(entry.IssueID, activeProviderName, result.SessionID, result.Usage.InputTokens, result.Usage.OutputTokens, result.Usage.TotalTokens)
 
-	// Planning mode (Todo) gets a lower turn limit to keep it focused
-	effectiveMaxTurns := service.GetMaxTurns()
-	if strings.EqualFold(entry.State, "Todo") && effectiveMaxTurns > 5 {
-		effectiveMaxTurns = 5
-	}
-	continueTurn, checkErr := service.ShouldContinueTurn(context.Background(), entry.IssueID, activeProviderName, attempt, effectiveMaxTurns)
+	continueTurn, checkErr := service.ShouldContinueTurn(context.Background(), entry.IssueID, activeProviderName, attempt, service.GetMaxTurns())
 	if checkErr != nil {
 		runAfterHook()
 		dueAt := service.NextRetryDue(entry.IssueID, attempt)
