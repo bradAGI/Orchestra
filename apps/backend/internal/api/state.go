@@ -926,6 +926,8 @@ func (s *Server) PostIssueStop(w http.ResponseWriter, r *http.Request) {
 // deleting the identified issue from the tracker.
 func (s *Server) DeleteIssue(w http.ResponseWriter, r *http.Request) {
 	identifier := chi.URLParam(r, "issue_identifier")
+	// Stop any running sessions before deleting
+	s.orchestrator.StopAllSessionsForIssue(identifier)
 	if err := s.orchestrator.DeleteIssue(r.Context(), identifier); err != nil {
 		s.logger.Error().Err(err).Str("issue_identifier", identifier).Msg("failed to delete issue")
 		if err == sql.ErrNoRows {

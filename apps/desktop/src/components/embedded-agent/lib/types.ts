@@ -79,6 +79,7 @@ export type EmbeddedAgentContextValue = {
   watchMode: WatchModeState
   scheduler: SchedulerState
   contextSuggestions: SuggestionsState
+  onNavigate?: (section: string, id?: string) => void
 }
 
 export const CHAT_PROVIDERS = [

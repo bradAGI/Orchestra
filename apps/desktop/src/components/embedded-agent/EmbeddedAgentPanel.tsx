@@ -21,13 +21,21 @@ export function EmbeddedAgentPanel({ onOpenSettings }: { onOpenSettings?: () => 
     scheduler,
   } = useEmbeddedAgent()
 
+  const { onNavigate } = useEmbeddedAgent()
+
   const handleAction = useCallback(
     (action: string, params: Record<string, unknown>) => {
       if (action === 'send_chat' && typeof params.message === 'string') {
         void sendMessage(params.message)
+      } else if (action === 'view_issue' && typeof params.identifier === 'string') {
+        onNavigate?.('TASKS', params.identifier)
+      } else if (action === 'review_diff' && typeof params.identifier === 'string') {
+        onNavigate?.('TASKS', params.identifier)
+      } else if (action === 'stop_session' && typeof params.identifier === 'string') {
+        void sendMessage(`Stop the session for ${params.identifier}`)
       }
     },
-    [sendMessage],
+    [sendMessage, onNavigate],
   )
 
   return (

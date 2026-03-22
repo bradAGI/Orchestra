@@ -703,6 +703,13 @@ export default function App() {
     if (!config) return
 
     try {
+      // Stop any running session before deleting
+      try {
+        await stopIssueSession(config, identifier)
+      } catch {
+        // Session may not be running — ignore
+      }
+
       // Close the linked GitHub issue before deleting locally
       const issueToClose = allBoardIssuesRef.current.find(i =>
         i.identifier === identifier || i.issue_identifier === identifier

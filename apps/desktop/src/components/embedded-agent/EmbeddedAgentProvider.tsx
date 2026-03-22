@@ -129,6 +129,7 @@ export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selec
         toggle: ctxToggle,
         dismiss: ctxDismiss,
       },
+      onNavigate,
     }),
     [
       messages, isStreaming, sendMessage, stop, clearChat,
@@ -137,6 +138,7 @@ export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selec
       watchEnabled, watchToggle, watchNotifications, watchUnread, watchDismiss, watchDismissAll,
       schedActiveItems, schedCancel,
       ctxSuggestions, ctxEnabled, ctxToggle, ctxDismiss,
+      onNavigate,
     ],
   )
 
