@@ -393,7 +393,7 @@ export function KanbanBoard({
                   column.id === 'backlog' ? (
                     <button
                       type="button"
-                      className="relative w-full flex-1 flex flex-col items-center justify-center cursor-pointer bg-gradient-to-b from-card via-card to-muted/20 border border-border/40 rounded-xl transition-all group/empty overflow-hidden hover:border-primary/30"
+                      className="relative w-full min-h-full flex flex-col items-center justify-center cursor-pointer bg-gradient-to-b from-card via-card to-muted/20 border border-border/40 rounded-xl transition-all group/empty overflow-hidden hover:border-primary/30"
                       onClick={() => handleCreateClick(column.id)}
                     >
                       <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover/empty:opacity-100 transition-opacity duration-500" />
@@ -401,7 +401,7 @@ export function KanbanBoard({
                       <p className="text-[10px] uppercase tracking-widest text-muted-foreground/20 group-hover/empty:text-muted-foreground/40 transition-colors">Click to add task</p>
                     </button>
                   ) : (
-                    <div className="relative w-full flex-1 flex items-center justify-center bg-gradient-to-b from-card via-card to-muted/20 border border-border/40 rounded-xl overflow-hidden">
+                    <div className="relative w-full min-h-full flex items-center justify-center bg-gradient-to-b from-card via-card to-muted/20 border border-border/40 rounded-xl overflow-hidden">
                       <p className="text-[10px] uppercase tracking-widest text-muted-foreground/15">No tasks</p>
                     </div>
                   )
