@@ -55,7 +55,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
         const fitAddon = new FitAddon()
         term.loadAddon(fitAddon)
         term.open(terminalRef.current)
-        fitAddon.fit()
+        try { fitAddon.fit() } catch { /* container may have zero dimensions */ }
 
         xtermRef.current = term
 
