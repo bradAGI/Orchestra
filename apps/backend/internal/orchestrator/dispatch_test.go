@@ -920,7 +920,8 @@ func TestPerformRefreshCarriesDescriptionIntoRunningEntry(t *testing.T) {
 	if len(snapshot.Running) != 1 {
 		t.Fatalf("expected 1 running, got %d", len(snapshot.Running))
 	}
-	if snapshot.Running[0].Description != "Detailed description of the bug" {
-		t.Fatalf("expected description carried through, got %q", snapshot.Running[0].Description)
+	expectedDesc := "Detailed description of the bug\n\n---\nMODE: PLAN ONLY. Create a detailed execution plan with checkboxes for each step. Do NOT write code, create files, or make any changes. Only analyze the codebase and create the plan."
+	if snapshot.Running[0].Description != expectedDesc {
+		t.Fatalf("expected description with planning mode suffix, got %q", snapshot.Running[0].Description)
 	}
 }

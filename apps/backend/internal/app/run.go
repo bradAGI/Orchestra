@@ -691,9 +691,13 @@ func processExecutionTick(
 		logger.Info().Str("terminal_id", terminalID).Msg("closed agent terminal session")
 	}
 
-	// Move issue to Review on successful completion
-	if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"state": "Review"}); err != nil {
-		logger.Warn().Err(err).Str("issue_id", entry.IssueID).Msg("failed to set issue to Review after success")
+	// Move issue to Review on successful completion (but not for Todo/planning runs)
+	if !strings.EqualFold(entry.State, "Todo") {
+		if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"state": "Review"}); err != nil {
+			logger.Warn().Err(err).Str("issue_id", entry.IssueID).Msg("failed to set issue to Review after success")
+		}
+	} else {
+		logger.Info().Str("issue_id", entry.IssueID).Msg("planning-mode run completed; keeping issue in Todo state")
 	}
 
 	publishLifecycleEvent(pubsub, "RUN_SUCCEEDED", map[string]any{

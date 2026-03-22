@@ -148,7 +148,7 @@ func NewService() *Service {
 	return &Service{
 		running:          make([]RunningEntry, 0),
 		retrying:         make([]RetryEntry, 0),
-		activeStates:     []string{"in progress"},
+		activeStates:     []string{"todo", "in progress"},
 		terminalStates:   []string{"done", "cancelled", "canceled", "closed", "duplicate"},
 		maxConcurrent:    4,
 		maxByState:       map[string]int{},
@@ -923,11 +923,16 @@ func (s *Service) enqueueCandidates(candidates []tracker.Issue) {
 			continue
 		}
 
+		desc := issue.Description
+		if strings.EqualFold(issue.State, "Todo") {
+			desc = desc + "\n\n---\nMODE: PLAN ONLY. Create a detailed execution plan with checkboxes for each step. Do NOT write code, create files, or make any changes. Only analyze the codebase and create the plan."
+		}
+
 		entry := RunningEntry{
 			IssueID:         issue.ID,
 			IssueIdentifier: issue.Identifier,
 			Title:           issue.Title,
-			Description:     issue.Description,
+			Description:     desc,
 			State:           issue.State,
 			AssigneeID:      issue.AssigneeID,
 			ProjectID:       issue.ProjectID,
@@ -1846,4 +1851,18 @@ func (s *Service) GetHistory(ctx context.Context, issueID string) ([]map[string]
 		return []map[string]any{}, nil
 	}
 	return s.db.GetUnifiedHistory(ctx, issueID)
+}
+
+// ClearIssuePlan removes the given issue from the running entries list by identifier.
+// This is used by the Stop endpoint to clean up planning-mode runs.
+func (s *Service) ClearIssuePlan(ctx context.Context, identifier string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	newRunning := make([]RunningEntry, 0, len(s.running))
+	for _, entry := range s.running {
+		if entry.IssueIdentifier != identifier {
+			newRunning = append(newRunning, entry)
+		}
+	}
+	s.running = newRunning
 }
