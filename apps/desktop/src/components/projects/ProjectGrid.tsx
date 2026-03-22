@@ -162,25 +162,25 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
       {/* Header bar */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-border/40 sticky top-0 bg-background/80 backdrop-blur-xl z-20">
         <div className="flex items-center gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
-            <input
-              type="text"
-              placeholder="Search projects..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-64 pl-9 pr-4 h-9 bg-muted/30 border border-border/40 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all placeholder:text-muted-foreground/30"
-            />
-          </div>
+          <Button variant="default" size="sm" onClick={onAddProject} className="h-8 gap-1.5 bg-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 shadow-lg shadow-primary/20 px-3">
+            <Plus size={14} />
+            Add Project
+          </Button>
           <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/30">
             {sorted.length} project{sorted.length !== 1 ? 's' : ''}
           </span>
         </div>
 
-        <Button variant="default" size="sm" onClick={onAddProject} className="h-8 gap-1.5 bg-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 shadow-lg shadow-primary/20 px-3">
-          <Plus size={14} />
-          Add Project
-        </Button>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
+          <input
+            type="text"
+            placeholder="Search projects..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-64 pl-9 pr-4 h-9 bg-muted/30 border border-border/40 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all placeholder:text-muted-foreground/30"
+          />
+        </div>
       </div>
 
       {/* Content */}
