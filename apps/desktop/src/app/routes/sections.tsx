@@ -42,7 +42,7 @@ export const sidebarItems: SidebarItem[] = [
   {
     id: 'CONSOLE',
     label: 'Terminals',
-    description: 'Multi-agent terminal dock',
+    description: 'Live agent sessions and shells',
     icon: Terminal,
   },
   {
