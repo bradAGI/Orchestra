@@ -119,11 +119,12 @@ When state is not Backlog, the PATCH handler rejects updates to:
 Only these fields are mutable after Backlog:
 - `state` (with transition validation)
 - `feedback` (for Review → Todo rejection)
-- `assignee_id` (only in Backlog for reassignment)
+
+`assignee_id` is only editable in Backlog — it is locked in all other states.
 
 ### Stop Endpoint
 
-Extend `DELETE /api/v1/issues/{id}/session` or add `POST /api/v1/issues/{id}/stop`:
+Add `POST /api/v1/issues/{id}/stop` (separate from session delete — Stop does more: resets state, clears plan, removes worktree):
 - Kill active agent session
 - Clear plan data (delete agent messages / plan content)
 - Reset branch / remove worktree
@@ -205,7 +206,7 @@ Add column:
 ALTER TABLE issues ADD COLUMN feedback TEXT;
 ```
 
-The `feedback` field stores the most recent rejection feedback. Cleared on Stop (reset to Backlog).
+The `feedback` field stores the most recent rejection feedback. Cleared on Stop (reset to Backlog). Preserved when task reaches Done (historical record of iterations).
 
 ### Transition History
 
