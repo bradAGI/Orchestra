@@ -506,6 +506,15 @@ export function IssueDetailView({
                         <span className="w-2 h-2 rounded-full bg-blue-500" />
                         <span className="text-[11px] text-blue-400">Planning</span>
                       </div>
+                      <button
+                        onClick={async () => {
+                          setLocalState('In Progress')
+                          if (onUpdate) await onUpdate({ state: 'In Progress' })
+                        }}
+                        className="w-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-all"
+                      >
+                        Start Execution
+                      </button>
                       <button onClick={() => setShowStopConfirm(true)} className="w-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all">
                         Stop &amp; Reset
                       </button>
