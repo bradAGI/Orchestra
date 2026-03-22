@@ -237,13 +237,13 @@ export function IssueDetailView({
       .catch(() => setIssueHistory([]))
       .finally(() => setHistoryLoading(false))
 
-    // Poll history every 5s while agent is running so plan updates live
+    // Poll history every 15s while agent is running so plan updates live
     if (!isRunning) return
     const interval = setInterval(() => {
       fetchIssueHistory(config, identifier)
         .then(setIssueHistory)
         .catch(() => {})
-    }, 5000)
+    }, 15000)
     return () => clearInterval(interval)
   }, [config, identifier, isRunning, localState])
 

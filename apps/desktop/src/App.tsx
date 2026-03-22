@@ -416,7 +416,7 @@ export default function App() {
           setErrorMessage('')
           // Fetch board issues to populate the Kanban board persistence (throttled)
           const now = Date.now()
-          if (now - lastIssueFetchRef.current > 5000) {
+          if (now - lastIssueFetchRef.current > 30000) {
             lastIssueFetchRef.current = now
             fetchIssues(config).then(setBoardIssues).catch(() => {})
           }

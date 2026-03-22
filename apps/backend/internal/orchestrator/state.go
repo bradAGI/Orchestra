@@ -926,6 +926,13 @@ func (s *Service) enqueueCandidates(candidates []tracker.Issue) {
 		desc := issue.Description
 		if strings.EqualFold(issue.State, "Todo") {
 			desc = desc + "\n\n---\nMODE: PLAN ONLY. Create a detailed execution plan with checkboxes for each step. Do NOT write code, create files, or make any changes. Only analyze the codebase and create the plan."
+		} else if strings.EqualFold(issue.State, "In Progress") {
+			// For execution mode, tell the agent to skip exploration and execute directly
+			desc = desc + "\n\n---\nMODE: EXECUTE. You have already explored this codebase and created a plan. Skip codebase exploration — go straight to implementation. Follow your plan step by step. Write code, run tests, commit changes."
+			// If there's feedback from a Review rejection, include it
+			if issue.Feedback != "" {
+				desc = desc + "\n\nFEEDBACK FROM REVIEW: " + issue.Feedback + "\n\nIncorporate this feedback into your implementation."
+			}
 		}
 
 		entry := RunningEntry{
