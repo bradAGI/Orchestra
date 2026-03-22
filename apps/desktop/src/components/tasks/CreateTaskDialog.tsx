@@ -39,7 +39,7 @@ export function CreateTaskDialog({
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const state = 'Backlog'
-  const [assignee, setAssignee] = useState('Unassigned')
+  const [assignee, setAssignee] = useState(availableAgents.length > 0 ? `agent-${availableAgents[0]}` : 'Unassigned')
   const [provider, setProvider] = useState('')
   const [disabledTools, setDisabledTools] = useState<string[]>([])
   const [projectID, setProjectID] = useState(initialProjectID || (projects.length > 0 ? projects[0].id : ''))
@@ -57,7 +57,7 @@ export function CreateTaskDialog({
       setProjectID(initialProjectID || (projects.length > 0 ? projects[0].id : ''))
       setTitle('')
       setDescription('')
-      setAssignee('Unassigned')
+      setAssignee(availableAgents.length > 0 ? `agent-${availableAgents[0]}` : 'Unassigned')
       setProvider(availableAgents.length > 0 ? availableAgents[0] : '')
       setDisabledTools([])
       setSubmitError('')

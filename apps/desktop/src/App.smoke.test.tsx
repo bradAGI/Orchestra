@@ -343,7 +343,12 @@ describe('App smoke render', () => {
         target: { value: 'Build the feature' },
       })
 
-      // Submit (project auto-selected since only one exists)
+      // Fill in description (required)
+      fireEvent.change(screen.getByPlaceholderText(/Describe the task for the agent/i), {
+        target: { value: 'Implement the new feature end to end' },
+      })
+
+      // Agent auto-selected from availableAgents, project auto-selected since only one exists
       const submitButton = screen.getAllByRole('button').find(
         (btn) => btn.textContent === 'Create' && (btn as HTMLButtonElement).type === 'submit',
       )
