@@ -38,7 +38,7 @@ export function CreateTaskDialog({
 }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [state, setState] = useState(initialState)
+  const state = 'Backlog'
   const [assignee, setAssignee] = useState('Unassigned')
   const [provider, setProvider] = useState('')
   const [disabledTools, setDisabledTools] = useState<string[]>([])
@@ -54,7 +54,6 @@ export function CreateTaskDialog({
 
   useEffect(() => {
     if (open) {
-      setState(initialState)
       setProjectID(initialProjectID || (projects.length > 0 ? projects[0].id : ''))
       setTitle('')
       setDescription('')
@@ -63,7 +62,7 @@ export function CreateTaskDialog({
       setDisabledTools([])
       setSubmitError('')
     }
-  }, [open, initialState, initialProjectID, availableAgents, projects])
+  }, [open, initialProjectID, availableAgents, projects])
 
   useEffect(() => {
     if (!open) {
@@ -87,6 +86,14 @@ export function CreateTaskDialog({
     setTitleError(tErr)
     setDescError(dErr)
     if (tErr || dErr) return
+    if (!description.trim()) {
+      setDescError('Description is required')
+      return
+    }
+    if (!assignee || assignee === 'Unassigned') {
+      setSubmitError('An agent must be assigned')
+      return
+    }
     setPending(true)
     setSubmitError('')
     try {
@@ -271,7 +278,7 @@ export function CreateTaskDialog({
               </Button>
               <Button
                 type="submit"
-                disabled={pending || !title.trim() || !projectID}
+                disabled={pending || !title.trim() || !description.trim() || !projectID || !assignee || assignee === 'Unassigned'}
                 className="h-11 px-8 bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 font-bold uppercase tracking-widest text-sm disabled:opacity-30"
               >
                 {pending ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : 'Create'}
