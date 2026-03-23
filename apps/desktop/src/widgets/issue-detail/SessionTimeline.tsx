@@ -164,11 +164,28 @@ function parseLogs(raw: string): ParsedEntry[] {
   return parsed
 }
 
-function deduplicateEntries(entries: ParsedEntry[]): ParsedEntry[] {
+function deduplicateAndMergeEntries(entries: ParsedEntry[]): ParsedEntry[] {
   const result: ParsedEntry[] = []
   for (const entry of entries) {
+    // Skip empty content
+    if (!entry.content.trim()) continue
+    // Skip PTY noise — shell prompts, ANSI artifacts, short garbage
+    if (entry.kind === 'agent' && entry.content.length < 5 && !/[a-zA-Z]/.test(entry.content)) continue
+
     const prev = result[result.length - 1]
+
+    // Exact duplicate — skip
     if (prev && prev.kind === entry.kind && prev.content === entry.content) continue
+
+    // Merge consecutive agent messages (streaming deltas) into one
+    if (prev && prev.kind === 'agent' && entry.kind === 'agent' && !prev.label && !entry.label) {
+      // Only merge if both are short (streaming fragments) or same timestamp
+      if (prev.content.length < 100 || entry.content.length < 100 || prev.ts === entry.ts) {
+        prev.content = prev.content + entry.content
+        continue
+      }
+    }
+
     result.push(entry)
   }
   return result
@@ -186,7 +203,7 @@ export function SessionTimeline({ logs, loading }: SessionTimelineProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const [expandedEntries, setExpandedEntries] = useState<Set<number>>(new Set())
 
-  const entries = deduplicateEntries(parseLogs(logs || ''))
+  const entries = deduplicateAndMergeEntries(parseLogs(logs || ''))
 
   // Auto-scroll to bottom when new entries appear
   useEffect(() => {
