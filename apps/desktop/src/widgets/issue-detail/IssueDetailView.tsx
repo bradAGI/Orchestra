@@ -183,9 +183,11 @@ export function IssueDetailView({
     }
 
     // Fallback: parse session logs (JSONL) for plan checkboxes
+    // Find the message with the MOST checkboxes (the real plan, not a partial mention)
     if (logs) {
+      let bestPlan: PlanItem[] = []
       const logLines = logs.split('\n').filter(l => l.trim())
-      for (const line of [...logLines].reverse()) {
+      for (const line of logLines) {
         try {
           const entry = JSON.parse(line)
           // Extract text from various agent log formats
@@ -193,7 +195,6 @@ export function IssueDetailView({
           if (typeof entry.message === 'string') {
             text = entry.message
           } else if (entry.message?.content) {
-            // Claude format: message.content is array of {type:"text", text:"..."}
             if (Array.isArray(entry.message.content)) {
               text = entry.message.content
                 .filter((b: any) => b.type === 'text' && b.text)
@@ -211,10 +212,15 @@ export function IssueDetailView({
           }
           if (text) {
             const items = extractPlanFromText(text)
-            if (items.length > 0) return items
+            // Keep the plan with the most items, preferring ones with checked items
+            if (items.length > bestPlan.length ||
+                (items.length === bestPlan.length && items.filter(i => i.done).length > bestPlan.filter(i => i.done).length)) {
+              bestPlan = items
+            }
           }
         } catch { /* skip non-JSON lines */ }
       }
+      if (bestPlan.length > 0) return bestPlan
       // Try raw text extraction with unescaped newlines
       const unescaped = logs.replace(/\\n/g, '\n')
       const items = extractPlanFromText(unescaped)
