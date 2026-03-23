@@ -424,28 +424,13 @@ export default function App() {
         onTimelineEvent: (eventType, envelope) => {
           setTimeline((previous) => appendTimelineEvent(previous, { type: envelope.type, at: envelope.timestamp, data: envelope.data }))
           if (eventType === 'RUN_SUCCEEDED') {
-            const issueId = (envelope.data.issue_id as string) || ''
             const issueIdentifier = (envelope.data.issue_identifier as string) || ''
-            if (issueId && issueIdentifier) {
-              setBoardIssues((prev) => {
-                const existing = prev.find((i) => i.issue_id === issueId)
-                if (existing) {
-                  return prev.map((i) => i.issue_id === issueId ? { ...i, state: 'Review' } : i)
-                }
-                return [
-                  ...prev,
-                  {
-                    issue_id: issueId,
-                    issue_identifier: issueIdentifier,
-                    state: 'Review',
-                  },
-                ]
-              })
+            // Don't optimistically set state — the backend auto-advances (Todo→InProgress or InProgress→Review)
+            // Just force a refresh to pick up whatever state the backend set
+            fetchIssues(config).then(setBoardIssues).catch(() => {})
+            lastIssueFetchRef.current = Date.now()
+            if (issueIdentifier) {
               playNotification(issueIdentifier)
-              // Force immediate refresh to pick up the auto-Review transition
-              fetchIssues(config).then(setBoardIssues).catch(() => {})
-              lastIssueFetchRef.current = Date.now()
-            }
           }
         },
         onStatus: (message) => {
