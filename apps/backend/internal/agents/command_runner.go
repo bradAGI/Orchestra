@@ -404,6 +404,12 @@ func (r *CommandRunner) runInPTY(
 	// If this is a non-persistent session, close it when we're done
 	// Actually, let's keep it open for HITL until explicitly closed by UI.
 
+	// Ensure the PTY is in the correct workspace directory before sending commands
+	if request.Workspace != "" {
+		session.Write([]byte(fmt.Sprintf("cd %s\n", shellQuote(request.Workspace))))
+		time.Sleep(100 * time.Millisecond) // Brief pause for cd to complete
+	}
+
 	// Send the command/prompt to the PTY
 	if !commandContainsPrompt {
 		session.Write([]byte(finalPrompt + "\n"))
