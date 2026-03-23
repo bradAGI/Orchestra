@@ -691,16 +691,19 @@ func processExecutionTick(
 		logger.Info().Str("terminal_id", terminalID).Msg("closed agent terminal session")
 	}
 
-	// Move issue to Review on successful completion (but not for Todo/planning runs)
-	if !strings.EqualFold(entry.State, "Todo") {
-		logger.Info().Str("issue_id", entry.IssueID).Str("state", entry.State).Msg("auto-transitioning issue to Review")
-		if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"state": "Review"}); err != nil {
-			logger.Error().Err(err).Str("issue_id", entry.IssueID).Msg("FAILED to auto-transition issue to Review")
-		} else {
-			logger.Info().Str("issue_id", entry.IssueID).Msg("successfully auto-transitioned to Review")
+	// Auto-advance on successful completion
+	if strings.EqualFold(entry.State, "Todo") {
+		// Planning complete → auto-advance to In Progress for execution
+		logger.Info().Str("issue_id", entry.IssueID).Msg("planning complete; auto-advancing to In Progress")
+		if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"state": "In Progress"}); err != nil {
+			logger.Error().Err(err).Str("issue_id", entry.IssueID).Msg("FAILED to auto-advance to In Progress")
 		}
 	} else {
-		logger.Info().Str("issue_id", entry.IssueID).Msg("planning-mode run completed; keeping issue in Todo state")
+		// Execution complete → auto-advance to Review for human QA
+		logger.Info().Str("issue_id", entry.IssueID).Str("state", entry.State).Msg("execution complete; auto-advancing to Review")
+		if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"state": "Review"}); err != nil {
+			logger.Error().Err(err).Str("issue_id", entry.IssueID).Msg("FAILED to auto-advance to Review")
+		}
 	}
 
 	publishLifecycleEvent(pubsub, "RUN_SUCCEEDED", map[string]any{
