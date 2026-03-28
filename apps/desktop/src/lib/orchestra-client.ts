@@ -1702,3 +1702,82 @@ export async function saveAgentProviderKey(
     body: JSON.stringify({ provider: providerId, api_key: apiKey }),
   })
 }
+
+// ---------------------------------------------------------------------------
+// Analytics API
+// ---------------------------------------------------------------------------
+
+function analyticsParams(since?: string, extra?: Record<string, string>): string {
+  const params = new URLSearchParams()
+  if (since) params.set('since', since)
+  if (extra) {
+    for (const [k, v] of Object.entries(extra)) {
+      if (v) params.set(k, v)
+    }
+  }
+  const qs = params.toString()
+  return qs ? `?${qs}` : ''
+}
+
+/**
+ * Fetches daily aggregated analytics (sessions, tokens, cost per day).
+ */
+export async function fetchAnalyticsDaily(config: BackendConfig, since?: string): Promise<unknown[]> {
+  return requestJSON<unknown[]>(config, `/api/v1/analytics/daily${analyticsParams(since)}`)
+}
+
+/**
+ * Fetches cost breakdown, optionally grouped by model or project.
+ */
+export async function fetchAnalyticsCost(config: BackendConfig, since?: string, groupBy?: string): Promise<unknown[]> {
+  return requestJSON<unknown[]>(config, `/api/v1/analytics/cost${analyticsParams(since, groupBy ? { group_by: groupBy } : undefined)}`)
+}
+
+/**
+ * Fetches cost optimization data (cache hit rate, thinking ratio, anomalies, downgrades).
+ */
+export async function fetchAnalyticsCostOptimization(config: BackendConfig): Promise<unknown> {
+  return requestJSON<unknown>(config, '/api/v1/analytics/cost/optimization')
+}
+
+/**
+ * Fetches provider performance metrics (latency percentiles, success/error rates).
+ */
+export async function fetchAnalyticsPerformance(config: BackendConfig, since?: string, provider?: string): Promise<unknown[]> {
+  return requestJSON<unknown[]>(config, `/api/v1/analytics/performance${analyticsParams(since, provider ? { provider } : undefined)}`)
+}
+
+/**
+ * Fetches current rate limit status across providers.
+ */
+export async function fetchAnalyticsRateLimits(config: BackendConfig): Promise<unknown> {
+  return requestJSON<unknown>(config, '/api/v1/analytics/rate-limits')
+}
+
+/**
+ * Fetches productivity metrics per provider (avg cost, lines changed, tokens, success rate).
+ */
+export async function fetchAnalyticsProductivity(config: BackendConfig, since?: string, provider?: string): Promise<unknown[]> {
+  return requestJSON<unknown[]>(config, `/api/v1/analytics/productivity${analyticsParams(since, provider ? { provider } : undefined)}`)
+}
+
+/**
+ * Fetches configured budget records.
+ */
+export async function fetchAnalyticsBudgets(config: BackendConfig): Promise<unknown[]> {
+  return requestJSON<unknown[]>(config, '/api/v1/analytics/budgets')
+}
+
+/**
+ * Fetches external cost reconciliation data.
+ */
+export async function fetchExternalReconcile(config: BackendConfig, since?: string): Promise<unknown> {
+  return requestJSON<unknown>(config, `/api/v1/external/reconcile${analyticsParams(since)}`)
+}
+
+/**
+ * Fetches external cost sync status (enabled, provider, last sync time).
+ */
+export async function fetchExternalStatus(config: BackendConfig): Promise<unknown> {
+  return requestJSON<unknown>(config, '/api/v1/external/status')
+}
