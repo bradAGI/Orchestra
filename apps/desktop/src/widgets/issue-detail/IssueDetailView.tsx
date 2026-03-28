@@ -4,12 +4,13 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 import type { BackendConfig, IssueUpdatePayload, IssueHistoryEntry } from '@/lib/orchestra-client'
-import { fetchIssueHistory, fetchIssueDiff, fetchIssueLogs, gitCheckout, gitMerge, gitDeleteBranch, updateProjectGitHubIssue, stopIssue } from '@/lib/orchestra-client'
+import { fetchIssueHistory, fetchIssueDiff, fetchIssueLogs, gitCheckout, gitMerge, gitDeleteBranch, updateProjectGitHubIssue, stopIssue, createGitHubPR } from '@/lib/orchestra-client'
 import type { SnapshotPayload } from '@/lib/orchestra-types'
 import type { TimelineItem } from '@/components/app-shell/types'
 import { AgentSelector } from '@/components/app-shell/shared/controls'
 import type { IssueDetailResult } from './types'
 import { FeedbackDialog } from './FeedbackDialog'
+import { PRCreateDialog } from './PRCreateDialog'
 import { extractOperationalPlanItems, extractPlanFromText, parseDiff, type DiffFile, type PlanItem } from './IssueDetailUtils'
 import { getCachedPlan, setCachedPlan, clearCachedPlan } from './planCache'
 import { SessionTimeline } from './SessionTimeline'
@@ -137,6 +138,8 @@ export function IssueDetailView({
   const [bottomTab, setBottomTab] = useState<'details' | 'plan' | 'output' | 'changes'>('details')
   const [showStopConfirm, setShowStopConfirm] = useState(false)
   const [showFeedback, setShowFeedback] = useState(false)
+  const [prDialogOpen, setPRDialogOpen] = useState(false)
+  const [prUrl, setPrUrl] = useState<string | null>((typed.pr_url as string) || null)
 
   const isEditable = localState === 'Backlog'
 
@@ -362,39 +365,59 @@ export function IssueDetailView({
           <div className="flex items-center gap-2 shrink-0">
           {localState === 'Review' && config && projectId && onUpdate && (
             <>
-              <button
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
-                onClick={async () => {
-                  try {
-                    const branchName = (typed.branch_name as string) || ''
-                    if (branchName && branchName !== 'main') {
-                      await gitCheckout(config, projectId, 'main')
-                      await gitMerge(config, projectId, branchName)
-                      try { await gitDeleteBranch(config, projectId, branchName) } catch { /* branch cleanup optional */ }
-                    }
-                    // Close GitHub issue (non-blocking — don't let failure prevent Done state)
-                    if (typed.url && typeof typed.url === 'string') {
-                      const match = (typed.url as string).match(/\/issues\/(\d+)/)
-                      if (match) {
-                        try {
-                          await updateProjectGitHubIssue(config, projectId, parseInt(match[1]), { state: 'closed' })
-                        } catch (ghErr) {
-                          console.warn('GitHub issue close failed (continuing):', ghErr)
-                        }
+              {prUrl && (
+                <a
+                  href={prUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                >
+                  <Github size={12} />
+                  PR Open
+                </a>
+              )}
+              {/* Primary: Create PR (GitHub) or Merge & Close (local) */}
+              {typed.url && typeof typed.url === 'string' && (typed.url as string).includes('github.com') ? (
+                <button
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
+                  onClick={() => setPRDialogOpen(true)}
+                >
+                  <GitPullRequest size={14} />
+                  Create PR
+                </button>
+              ) : (
+                <button
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
+                  onClick={async () => {
+                    try {
+                      const branchName = (typed.branch_name as string) || ''
+                      if (branchName && branchName !== 'main') {
+                        await gitCheckout(config, projectId, 'main')
+                        await gitMerge(config, projectId, branchName)
+                        try { await gitDeleteBranch(config, projectId, branchName) } catch { /* branch cleanup optional */ }
                       }
+                      await onUpdate({ state: 'Done' })
+                      setLocalState('Done')
+                    } catch (err) {
+                      console.error('Merge & Close failed:', err)
                     }
-                    await onUpdate({ state: 'Done' })
-                    setLocalState('Done')
-                  } catch (err) {
-                    console.error('Merge & Close failed:', err)
-                  }
-                }}
-              >
-                <GitPullRequest size={14} />
-                Merge &amp; Close
-              </button>
+                  }}
+                >
+                  <GitPullRequest size={14} />
+                  Merge &amp; Close
+                </button>
+              )}
+              {/* Secondary: Request Changes */}
               <button
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-muted/20 text-muted-foreground border border-border/30 hover:bg-muted/40 transition-colors"
+                onClick={() => setShowFeedback(true)}
+              >
+                <Pencil size={12} />
+                Request Changes
+              </button>
+              {/* Destructive: Close/Abandon */}
+              <button
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-red-500 border border-red-500/30 hover:bg-red-500/10 transition-colors"
                 onClick={async () => {
                   await onUpdate({ state: 'Done' })
                   setLocalState('Done')
@@ -757,6 +780,26 @@ export function IssueDetailView({
         <FeedbackDialog
           onSubmit={handleReject}
           onCancel={() => setShowFeedback(false)}
+        />
+      )}
+
+      {config && projectId && (
+        <PRCreateDialog
+          open={prDialogOpen}
+          onClose={() => setPRDialogOpen(false)}
+          onSubmit={async ({ title: prTitle, body, base, head, draft }) => {
+            const result = await createGitHubPR(config, identifier, { title: prTitle, body, base, head })
+            // Note: draft flag is informational — the backend API may not support it yet
+            void draft
+            setPrUrl(result.url)
+            setPRDialogOpen(false)
+            if (onUpdate) await onUpdate({ pr_url: result.url })
+          }}
+          issueTitle={localTitle}
+          issueDescription={description}
+          branchName={(typed.branch_name as string) || ''}
+          config={config}
+          projectId={projectId}
         />
       )}
     </div>
