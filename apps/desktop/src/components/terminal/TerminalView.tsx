@@ -3,6 +3,14 @@ import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
 
+// Track which sessions have already had their initial command sent,
+// so tab switches (unmount+remount) don't re-inject the command.
+const sentInitialCommands = new Set<string>()
+
+export function clearInitialCommandTracking(sessionId: string) {
+    sentInitialCommands.delete(sessionId)
+}
+
 interface TerminalViewProps {
     sessionId: string
     projectId?: string
@@ -75,7 +83,9 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
             const { rows, cols } = term
             ws.send(JSON.stringify({ type: 'resize', rows, cols }))
             // Run initial command if provided (e.g. launching an agent)
-            if (initialCommand) {
+            // Only send once per session — prevents re-injection on tab switch remount.
+            if (initialCommand && !sentInitialCommands.has(sessionId)) {
+                sentInitialCommands.add(sessionId)
                 setTimeout(() => {
                     if (ws.readyState === WebSocket.OPEN) {
                         ws.send(initialCommand + '\n')

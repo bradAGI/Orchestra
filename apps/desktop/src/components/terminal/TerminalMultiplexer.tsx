@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Mosaic, MosaicWindow, MosaicNode } from 'react-mosaic-component'
-import { TerminalView } from './TerminalView'
+import { TerminalView, clearInitialCommandTracking } from './TerminalView'
 import { Plus, X, Terminal as TerminalIcon, Columns2, Square, Zap } from 'lucide-react'
 
 import 'react-mosaic-component/react-mosaic-component.css'
@@ -89,8 +89,6 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTerminals])
 
-    const activeTab = activeTerminals.find(t => t.id === activeTabId)
-
     if (activeTerminals.length === 0) {
         return (
             <div className="w-full h-full bg-background overflow-hidden terminal-multiplexer flex flex-col">
@@ -145,6 +143,7 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation()
+                                        clearInitialCommandTracking(term.id)
                                         onCloseTerminal(term.id)
                                     }}
                                     className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-destructive/20 hover:text-destructive rounded transition-all"
@@ -204,19 +203,23 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
             {/* Content area */}
             <div className="flex-1 min-h-0">
                 {viewMode === 'tabs' ? (
-                    // Single terminal tab view
-                    activeTab && (
-                        <div className="w-full h-full px-3" key={activeTab.id}>
+                    // Render ALL terminals, hide inactive with CSS to prevent unmount/remount
+                    activeTerminals.map((term) => (
+                        <div
+                            key={term.id}
+                            className="w-full h-full px-3"
+                            style={{ display: activeTabId === term.id ? 'block' : 'none' }}
+                        >
                             <TerminalView
-                                sessionId={activeTab.id}
-                                projectId={activeTab.projectId}
+                                sessionId={term.id}
+                                projectId={term.projectId}
                                 baseUrl={baseUrl}
                                 apiToken={apiToken}
-                                initialCommand={activeTab.initialCommand}
+                                initialCommand={term.initialCommand}
                                 theme={theme}
                             />
                         </div>
-                    )
+                    ))
                 ) : (
                     // Split mosaic view
                     <Mosaic<string>
@@ -229,7 +232,10 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
                                     toolbarControls={
                                         <div className="flex items-center gap-1">
                                             <button
-                                                onClick={() => onCloseTerminal(id)}
+                                                onClick={() => {
+                                                    clearInitialCommandTracking(id)
+                                                    onCloseTerminal(id)
+                                                }}
                                                 className="p-1 hover:bg-destructive/20 text-muted-foreground/60 hover:text-destructive transition-colors rounded"
                                             >
                                                 <X size={12} />
