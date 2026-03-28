@@ -72,7 +72,9 @@ async function fetchOpenAIModels(baseUrl: string, apiKey: string): Promise<Model
   const res = await fetch(baseUrl, {
     headers: { Authorization: `Bearer ${apiKey}` },
   })
-  if (!res.ok) throw new Error(`${res.status}`)
+  if (res.status === 401) throw new Error('Invalid API key — check your key and try again')
+  if (res.status === 403) throw new Error('API key does not have permission to list models')
+  if (!res.ok) throw new Error(`Provider returned ${res.status}`)
   const data = await res.json() as { data: { id: string; owned_by?: string }[] }
   return data.data
     .filter((m) => m.id.startsWith('gpt-') || m.id.startsWith('o'))
@@ -83,7 +85,9 @@ async function fetchOpenAIModels(baseUrl: string, apiKey: string): Promise<Model
 
 async function fetchOpenRouterModels(): Promise<ModelInfo[]> {
   const res = await fetch('https://openrouter.ai/api/v1/models')
-  if (!res.ok) throw new Error(`${res.status}`)
+  if (res.status === 401) throw new Error('Invalid API key — check your key and try again')
+  if (res.status === 403) throw new Error('API key does not have permission to list models')
+  if (!res.ok) throw new Error(`Provider returned ${res.status}`)
   const data = await res.json() as { data: { id: string; name: string; supported_parameters?: string[] }[] }
   return data.data
     .filter((m) => m.supported_parameters?.includes('tools'))
@@ -93,7 +97,9 @@ async function fetchOpenRouterModels(): Promise<ModelInfo[]> {
 
 async function fetchGeminiModels(apiKey: string): Promise<ModelInfo[]> {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`)
-  if (!res.ok) throw new Error(`${res.status}`)
+  if (res.status === 401) throw new Error('Invalid API key — check your key and try again')
+  if (res.status === 403) throw new Error('API key does not have permission to list models')
+  if (!res.ok) throw new Error(`Provider returned ${res.status}`)
   const data = await res.json() as { models: { name: string; displayName: string; supportedGenerationMethods?: string[] }[] }
   return data.models
     .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))

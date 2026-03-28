@@ -687,6 +687,7 @@ function ModelSearchDropdown({
       <div className="space-y-1">
         <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Model</label>
         <p className="text-[11px] text-red-500">{error}</p>
+        <p className="text-[10px] text-muted-foreground/60">Check your API key and try saving again, or switch providers.</p>
       </div>
     )
   }
@@ -796,10 +797,12 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
   const [message, setMessage] = useState('')
   const [hasKey, setHasKey] = useState(false)
   const [storedKey, setStoredKey] = useState('')
+  const [initialLoading, setInitialLoading] = useState(true)
 
   // Load existing config on mount — respect saved provider preference
   useEffect(() => {
-    if (!config) return
+    if (!config) { setInitialLoading(false); return }
+    setInitialLoading(true)
     fetchAgentProviderKeys(config)
       .then((result) => {
         const prefs = (() => { try { return JSON.parse(localStorage.getItem('orchestra-agent-provider-prefs') ?? '{}') } catch { return {} } })()
@@ -816,6 +819,7 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
         }
       })
       .catch(() => {})
+      .finally(() => setInitialLoading(false))
   }, [config])
 
   // Fetch models from provider API when provider or key changes
@@ -836,11 +840,13 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
       .then((fetched) => {
         if (cancelled) return
         setModels(fetched)
-        if (fetched.length > 0 && !modelId) {
-          // Use saved model if it exists in list, otherwise first
-          const prefs = (() => { try { return JSON.parse(localStorage.getItem('orchestra-agent-provider-prefs') ?? '{}') } catch { return {} } })()
-          const match = prefs.modelId && fetched.find((m: { id: string }) => m.id === prefs.modelId)
-          setModelId(match ? prefs.modelId : fetched[0].id)
+        if (fetched.length > 0) {
+          setModelId((prev) => {
+            if (prev && fetched.some((m: { id: string }) => m.id === prev)) return prev
+            const prefs = (() => { try { return JSON.parse(localStorage.getItem('orchestra-agent-provider-prefs') ?? '{}') } catch { return {} } })()
+            const match = prefs.modelId && fetched.find((m: { id: string }) => m.id === prefs.modelId)
+            return match ? prefs.modelId : fetched[0]?.id ?? ''
+          })
         }
       })
       .catch((err) => {
@@ -853,7 +859,7 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
       })
 
     return () => { cancelled = true }
-  }, [providerId, storedKey, apiKey, modelId])
+  }, [providerId, storedKey, apiKey])
 
   const handleSave = async () => {
     if (!config || !apiKey.trim()) return
@@ -893,6 +899,19 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
     }
   }
 
+  if (initialLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-xl border border-border/20 bg-muted/10 p-4 space-y-4 animate-pulse">
+          <div className="h-4 w-32 bg-muted/30 rounded" />
+          <div className="h-8 w-full bg-muted/20 rounded-lg" />
+          <div className="h-8 w-full bg-muted/20 rounded-lg" />
+          <div className="h-8 w-48 bg-muted/20 rounded-lg" />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-border/20 bg-muted/10 p-4 space-y-4">
@@ -909,8 +928,31 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
             value={providerId}
             options={CHAT_PROVIDERS.map(p => ({ label: p.label, value: p.id }))}
             onChange={(v) => {
-              setProviderId(v as string); setModelId(''); setModels([]); setStoredKey(''); setHasKey(false)
-              try { localStorage.setItem('orchestra-agent-provider-prefs', JSON.stringify({ providerId: v, modelId: '' })) } catch { /* */ }
+              const newProvider = v as string
+              setProviderId(newProvider)
+              setModelId('')
+              setModels([])
+              setModelsError('')
+              try { localStorage.setItem('orchestra-agent-provider-prefs', JSON.stringify({ providerId: newProvider, modelId: '' })) } catch { /* */ }
+              // Re-check if this provider has a stored key
+              if (config) {
+                fetchAgentProviderKeys(config).then((result) => {
+                  const info = result.providers[newProvider]
+                  if (info?.configured) {
+                    setHasKey(true)
+                    setStoredKey(info.api_key ?? '')
+                  } else {
+                    setHasKey(false)
+                    setStoredKey('')
+                  }
+                }).catch(() => {
+                  setHasKey(false)
+                  setStoredKey('')
+                })
+              } else {
+                setHasKey(false)
+                setStoredKey('')
+              }
             }}
           />
         </div>
