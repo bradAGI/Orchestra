@@ -80,6 +80,8 @@ func runMigrations(db *sql.DB) error {
 		{"sessions", "duration_seconds", "REAL NOT NULL DEFAULT 0"},
 		{"sessions", "cost_cents", "INTEGER DEFAULT 0"},
 		{"sessions", "turn_count", "INTEGER DEFAULT 0"},
+		// PR URL tracking on issues
+		{"issues", "pr_url", "TEXT DEFAULT ''"},
 	}
 
 	for _, m := range migrations {

@@ -197,6 +197,26 @@ func (s Service) RemoveWorktree(projectRoot, wtPath string, hooks Hooks) error {
 	return git.WorktreeRemove(ctx, projectRoot, wtPath)
 }
 
+// CleanupWorktree removes a worktree directory, prunes stale references, and
+// deletes the associated branch (best-effort). Use this when an issue moves to Done.
+func (s Service) CleanupWorktree(projectRoot, projectID, branchName string) error {
+	wtPath := s.WorktreePath(projectID, branchName)
+	ctx := context.Background()
+
+	// Remove the worktree via git (handles lock files, etc.)
+	if err := git.WorktreeRemove(ctx, projectRoot, wtPath); err != nil {
+		return fmt.Errorf("remove worktree: %w", err)
+	}
+
+	// Prune stale worktree references (best-effort)
+	_ = git.WorktreePrune(ctx, projectRoot)
+
+	// Delete the branch (best-effort, may fail if not merged)
+	_ = git.DeleteBranch(ctx, projectRoot, branchName)
+
+	return nil
+}
+
 // PruneWorktrees cleans up stale worktree references for the given project repo.
 func (s Service) PruneWorktrees(projectRoot string) error {
 	ctx := context.Background()

@@ -613,6 +613,22 @@ func (s *Server) PatchIssue(w http.ResponseWriter, r *http.Request) {
 				if commitErr := git.Commit(r.Context(), commitDir, commitMsg); commitErr != nil {
 					s.logger.Debug().Err(commitErr).Msg("auto-commit on state change (may have no changes)")
 				}
+
+				// Clean up worktree when issue moves to Done
+				if newState == "Done" && issue.BranchName != "" && s.worktreeRoot != "" {
+					wsSvc := workspace.Service{Root: s.worktreeRoot}
+					if cleanupErr := wsSvc.CleanupWorktree(project.RootPath, project.ID, issue.BranchName); cleanupErr != nil {
+						s.logger.Warn().Err(cleanupErr).
+							Str("issue", issue.Identifier).
+							Str("branch", issue.BranchName).
+							Msg("worktree cleanup failed on Done transition")
+					} else {
+						s.logger.Info().
+							Str("issue", issue.Identifier).
+							Str("branch", issue.BranchName).
+							Msg("worktree cleaned up on Done transition")
+					}
+				}
 			}
 		}
 	}

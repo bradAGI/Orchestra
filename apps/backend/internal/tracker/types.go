@@ -25,6 +25,7 @@ type Issue struct {
 	DisabledTools    []string  `json:"disabled_tools,omitempty"`
 	BaseSHA          string    `json:"base_sha,omitempty"`
 	Feedback         string    `json:"feedback,omitempty"`
+	PRURL            string    `json:"pr_url,omitempty"`
 }
 
 // Blocker represents an issue that blocks another issue from progressing.
