@@ -3,6 +3,8 @@ package api
 import (
 	"net/http"
 	"time"
+
+	"github.com/orchestra/orchestra/apps/backend/internal/pricing"
 )
 
 // GetAnalyticsDaily handles GET /api/v1/analytics/daily and returns daily
@@ -44,12 +46,13 @@ func (s *Server) GetAnalyticsDaily(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	type DailyRow struct {
-		Date         string `json:"date"`
-		Sessions     int64  `json:"sessions"`
-		Tokens       int64  `json:"tokens"`
-		InputTokens  int64  `json:"input_tokens"`
-		OutputTokens int64  `json:"output_tokens"`
-		CostCents    int64  `json:"cost_cents"`
+		Date         string  `json:"date"`
+		Sessions     int64   `json:"sessions"`
+		Tokens       int64   `json:"tokens"`
+		InputTokens  int64   `json:"input_tokens"`
+		OutputTokens int64   `json:"output_tokens"`
+		CostCents    int64   `json:"cost_cents"`
+		Cost         float64 `json:"cost"`
 	}
 
 	var result []DailyRow
@@ -58,6 +61,14 @@ func (s *Server) GetAnalyticsDaily(w http.ResponseWriter, r *http.Request) {
 		if err := rows.Scan(&d.Date, &d.Sessions, &d.Tokens, &d.InputTokens, &d.OutputTokens, &d.CostCents); err != nil {
 			s.logger.Error().Err(err).Msg("scan analytics daily row")
 			continue
+		}
+		if d.CostCents > 0 {
+			d.Cost = float64(d.CostCents) / 100.0
+		} else if d.InputTokens > 0 || d.OutputTokens > 0 {
+			// CostCents is 0 but we have tokens — estimate using default pricing.
+			p := pricing.GetModelPricing("")
+			d.Cost = float64(d.InputTokens)*p.InputPerMTok/1_000_000.0 +
+				float64(d.OutputTokens)*p.OutputPerMTok/1_000_000.0
 		}
 		result = append(result, d)
 	}

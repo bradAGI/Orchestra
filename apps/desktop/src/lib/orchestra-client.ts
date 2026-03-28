@@ -1739,18 +1739,51 @@ export async function fetchAnalyticsCost(config: BackendConfig, since?: string, 
 
 /**
  * Fetches cost optimization data (cache hit rate, thinking ratio, anomalies, downgrades).
+ * Backend returns maps keyed by provider/model — we average them into single numbers.
  */
 export async function fetchAnalyticsCostOptimization(config: BackendConfig): Promise<CostOptimization> {
-  return requestJSON<CostOptimization>(config, '/api/v1/analytics/cost/optimization')
+  type BackendOpt = {
+    cache_hit_rate?: Record<string, number>
+    thinking_ratio?: Record<string, number>
+    total_spend_cents?: number
+    projected_monthly_cents?: number
+  }
+  const res = await requestJSON<BackendOpt>(config, '/api/v1/analytics/cost/optimization')
+
+  const avgMap = (m?: Record<string, number>): number => {
+    if (!m) return 0
+    const vals = Object.values(m)
+    return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
+  }
+
+  return {
+    cache_hit_rate: avgMap(res?.cache_hit_rate),
+    thinking_token_ratio: avgMap(res?.thinking_ratio),
+    model_downgrades: [],
+    anomalies: [],
+  }
 }
 
 /**
  * Fetches provider performance metrics (latency percentiles, success/error rates).
- * Backend returns `{ provider_health, ... }` — we unwrap to the provider_health array.
+ * Backend returns `{ provider_health, ... }` — we unwrap and remap field names.
  */
 export async function fetchAnalyticsPerformance(config: BackendConfig, since?: string, provider?: string): Promise<PerformanceRecord[]> {
-  const res = await requestJSON<{ provider_health?: PerformanceRecord[] } & Record<string, unknown>>(config, `/api/v1/analytics/performance${analyticsParams(since, provider ? { provider } : undefined)}`)
-  return res?.provider_health ?? []
+  type BackendHealth = {
+    provider: string; avg_latency_ms: number; p50_latency_ms: number; p95_latency_ms: number; p99_latency_ms: number
+    error_rate: number; success_rate: number; request_count: number; session_count: number; error_breakdown?: Record<string, number>
+  }
+  const res = await requestJSON<{ provider_health?: BackendHealth[]; error_breakdown?: Record<string, number> }>(config, `/api/v1/analytics/performance${analyticsParams(since, provider ? { provider } : undefined)}`)
+  return (res?.provider_health ?? []).map((h) => ({
+    provider: h.provider,
+    p50_latency: h.p50_latency_ms,
+    p95_latency: h.p95_latency_ms,
+    p99_latency: h.p99_latency_ms,
+    success_rate: h.success_rate,
+    error_rate: h.error_rate,
+    error_breakdown: h.error_breakdown ?? res?.error_breakdown ?? {},
+    total_requests: h.request_count,
+  }))
 }
 
 /**

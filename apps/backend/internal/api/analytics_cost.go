@@ -69,14 +69,20 @@ func (s *Server) GetAnalyticsCost(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	type CostGroup struct {
-		Key          string `json:"key"`
-		InputTokens  int64  `json:"input_tokens"`
-		OutputTokens int64  `json:"output_tokens"`
-		CacheRead    int64  `json:"cache_read"`
-		CacheWrite   int64  `json:"cache_write"`
-		Thinking     int64  `json:"thinking"`
-		CostCents    int64  `json:"cost_cents"`
-		SessionCount int64  `json:"session_count"`
+		Key            string  `json:"group"`
+		InputTokens    int64   `json:"input_tokens"`
+		OutputTokens   int64   `json:"output_tokens"`
+		CacheRead      int64   `json:"cache_read"`
+		CacheWrite     int64   `json:"cache_write"`
+		Thinking       int64   `json:"thinking"`
+		CostCents      int64   `json:"cost_cents"`
+		SessionCount   int64   `json:"session_count"`
+		InputCost      float64 `json:"input_cost"`
+		OutputCost     float64 `json:"output_cost"`
+		CacheReadCost  float64 `json:"cache_read_cost"`
+		CacheWriteCost float64 `json:"cache_write_cost"`
+		ThinkingCost   float64 `json:"thinking_cost"`
+		TotalCost      float64 `json:"total_cost"`
 	}
 
 	var groups []CostGroup
@@ -87,6 +93,22 @@ func (s *Server) GetAnalyticsCost(w http.ResponseWriter, r *http.Request) {
 			s.logger.Error().Err(err).Msg("scan analytics cost row")
 			continue
 		}
+
+		// Calculate dollar costs from tokens using pricing module.
+		// When grouping by model, use the model name for pricing lookup;
+		// otherwise use default pricing.
+		var modelKey string
+		if groupBy == "model" {
+			modelKey = g.Key
+		}
+		p := pricing.GetModelPricing(modelKey)
+		g.InputCost = float64(g.InputTokens) * p.InputPerMTok / 1_000_000.0
+		g.OutputCost = float64(g.OutputTokens) * p.OutputPerMTok / 1_000_000.0
+		g.CacheReadCost = float64(g.CacheRead) * p.CacheReadPerMTok / 1_000_000.0
+		g.CacheWriteCost = float64(g.CacheWrite) * p.CacheWritePerMTok / 1_000_000.0
+		g.ThinkingCost = float64(g.Thinking) * p.ThinkingPerMTok / 1_000_000.0
+		g.TotalCost = g.InputCost + g.OutputCost + g.CacheReadCost + g.CacheWriteCost + g.ThinkingCost
+
 		totalCents += g.CostCents
 		groups = append(groups, g)
 	}

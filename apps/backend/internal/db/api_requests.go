@@ -42,6 +42,10 @@ type PerformanceMetrics struct {
 type ProviderHealth struct {
 	Provider     string  `json:"provider"`
 	AvgLatencyMs int64   `json:"avg_latency_ms"`
+	P50LatencyMs int64   `json:"p50_latency_ms"`
+	P95LatencyMs int64   `json:"p95_latency_ms"`
+	P99LatencyMs int64   `json:"p99_latency_ms"`
+	SuccessRate  float64 `json:"success_rate"`
 	ErrorRate    float64 `json:"error_rate"`
 	RequestCount int64   `json:"request_count"`
 	SessionCount int64   `json:"session_count"`
@@ -186,12 +190,32 @@ func (db *DB) GetPerformanceMetrics(ctx context.Context, since int64, provider s
 		}
 		if ph.RequestCount > 0 {
 			ph.ErrorRate = float64(errCount) / float64(ph.RequestCount)
+			ph.SuccessRate = 1.0 - ph.ErrorRate
 		}
 		ph.Status = classifyProviderStatus(ph.ErrorRate, lastSeen, now)
 		m.ProviderHealth = append(m.ProviderHealth, ph)
 	}
 	if err := hrows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate provider health: %w", err)
+	}
+
+	// Compute per-provider latency percentiles.
+	for i := range m.ProviderHealth {
+		ph := &m.ProviderHealth[i]
+		for _, pct := range []struct {
+			n   int
+			dst *int64
+		}{
+			{50, &ph.P50LatencyMs},
+			{95, &ph.P95LatencyMs},
+			{99, &ph.P99LatencyMs},
+		} {
+			val, err := db.queryPercentile(ctx, since, ph.Provider, pct.n)
+			if err != nil {
+				return nil, fmt.Errorf("provider %s p%d: %w", ph.Provider, pct.n, err)
+			}
+			*pct.dst = val
+		}
 	}
 
 	// --- reliability funnel ---

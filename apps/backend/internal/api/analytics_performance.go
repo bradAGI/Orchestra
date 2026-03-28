@@ -64,6 +64,11 @@ func parseSinceParam(raw string) int64 {
 		return t.Unix()
 	}
 
+	// Try RFC3339 with milliseconds (e.g. "2026-03-20T00:00:00.000Z").
+	if t, err := time.Parse("2006-01-02T15:04:05.000Z", raw); err == nil {
+		return t.Unix()
+	}
+
 	// Try relative duration: number + unit suffix (d=days, h=hours, m=minutes).
 	if len(raw) >= 2 {
 		suffix := raw[len(raw)-1]
