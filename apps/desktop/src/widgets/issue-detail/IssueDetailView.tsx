@@ -142,7 +142,7 @@ export function IssueDetailView({
   const [issueHistory, setIssueHistory] = useState<IssueHistoryEntry[]>([])
   const [_historyLoading, setHistoryLoading] = useState(false)
   const [logs, setLogs] = useState('')
-  const [logsLoading, setLogsLoading] = useState(false)
+  const [logsLoading, setLogsLoading] = useState(localState !== 'Backlog')
   const [diffFiles, setDiffFiles] = useState<DiffFile[]>([])
   const [diffLoading, setDiffLoading] = useState(false)
   const [activeDiffFile, setActiveDiffFile] = useState<string | null>(null)
@@ -167,30 +167,25 @@ export function IssueDetailView({
       PLAN_EVENT_KINDS.has(e.kind) && e.message && e.kind !== 'pty'
     )
 
+    // Strategy: find the newest plan from each source, then pick the one with
+    // the most items. History may be truncated by the DB; logs are complete.
+    let historyPlan: PlanItem[] = []
+    let logsPlan: PlanItem[] = []
+
+    // Source 1: issue history (structured events from DB, newest-first)
     if (messageEvents.length > 0) {
-      // Scan individual messages newest-first for one that has checkboxes
       for (const entry of [...messageEvents].reverse()) {
         const items = extractPlanFromText(entry.message!)
-        if (items.length > 0) return items
+        if (items.length >= 3) { historyPlan = items; break }
       }
-
-      // If no single message has checkboxes, try concatenating the last few
-      // (agent may have split one plan restatement across 2-3 chunked messages)
-      const last5 = messageEvents.slice(-5)
-      const combined = last5.map(e => e.message).join('\n')
-      const items = extractPlanFromText(combined)
-      if (items.length > 0) return items
     }
 
-    // Fallback: parse session logs (JSONL) for plan checkboxes
-    // Find the message with the MOST checkboxes (the real plan, not a partial mention)
+    // Source 2: raw session logs (JSONL) — untruncated, scan newest-first
     if (logs) {
-      let bestPlan: PlanItem[] = []
       const logLines = logs.split('\n').filter(l => l.trim())
-      for (const line of logLines) {
+      for (let i = logLines.length - 1; i >= 0; i--) {
         try {
-          const entry = JSON.parse(line)
-          // Extract text from various agent log formats
+          const entry = JSON.parse(logLines[i])
           let text = ''
           if (typeof entry.message === 'string') {
             text = entry.message
@@ -212,20 +207,20 @@ export function IssueDetailView({
           }
           if (text) {
             const items = extractPlanFromText(text)
-            // Keep the plan with the most items, preferring ones with checked items
-            if (items.length > bestPlan.length ||
-                (items.length === bestPlan.length && items.filter(i => i.done).length > bestPlan.filter(i => i.done).length)) {
-              bestPlan = items
-            }
+            if (items.length >= 3) { logsPlan = items; break }
           }
         } catch { /* skip non-JSON lines */ }
       }
-      if (bestPlan.length > 0) return bestPlan
-      // Try raw text extraction with unescaped newlines
-      const unescaped = logs.replace(/\\n/g, '\n')
-      const items = extractPlanFromText(unescaped)
-      if (items.length > 0) return items
+      // Fallback: try raw text extraction with unescaped newlines
+      if (logsPlan.length === 0) {
+        const unescaped = logs.replace(/\\n/g, '\n')
+        logsPlan = extractPlanFromText(unescaped)
+      }
     }
+
+    // Pick the source with more items (logs are untruncated, so usually better)
+    const bestPlan = logsPlan.length >= historyPlan.length ? logsPlan : historyPlan
+    if (bestPlan.length > 0) return bestPlan
 
     // Fallback to timeline events
     const fromTimeline = extractOperationalPlanItems(timeline, issueId, identifier, description)
@@ -235,17 +230,19 @@ export function IssueDetailView({
     const descPlan = extractPlanFromText(description)
     if (descPlan.length > 0) return descPlan
 
-    // If nothing found from any source, use cached plan
-    const cached = getCachedPlan(identifier)
+    // If nothing found from any source, use cached plan (keyed by issueId UUID to avoid stale data)
+    const cacheKey = issueId || identifier
+    const cached = getCachedPlan(cacheKey)
     if (cached.length > 0) return cached
 
     return []
   }, [issueHistory, timeline, issueId, identifier, description, logs])
   useEffect(() => {
-    if (identifier && planItems.length > 0) {
-      setCachedPlan(identifier, planItems)
+    const cacheKey = issueId || identifier
+    if (cacheKey && planItems.length > 0) {
+      setCachedPlan(cacheKey, planItems)
     }
-  }, [identifier, planItems])
+  }, [issueId, identifier, planItems])
 
   const completedCount = planItems.filter(i => i.done).length
   const isRunning = snapshot?.running?.some(r => r.issue_id === issueId || r.issue_identifier === identifier) ?? false

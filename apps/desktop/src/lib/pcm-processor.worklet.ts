@@ -30,12 +30,16 @@ class PCMProcessor extends AudioWorkletProcessor {
     const channelData = input[0]
     if (!channelData || channelData.length === 0) return true
 
-    // Downsample from sampleRate to 16000 Hz
+    // Downsample from sampleRate to 16000 Hz using linear interpolation
     const ratio = sampleRate / 16000
     const outputLength = Math.floor(channelData.length / ratio)
     const downsampled = new Float32Array(outputLength)
     for (let i = 0; i < outputLength; i++) {
-      downsampled[i] = channelData[Math.round(i * ratio)]
+      const srcIdx = i * ratio
+      const lo = Math.floor(srcIdx)
+      const hi = Math.min(lo + 1, channelData.length - 1)
+      const frac = srcIdx - lo
+      downsampled[i] = channelData[lo] * (1 - frac) + channelData[hi] * frac
     }
 
     this.buffer.push(downsampled)

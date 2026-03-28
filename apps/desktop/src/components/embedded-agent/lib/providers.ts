@@ -72,9 +72,7 @@ async function fetchOpenAIModels(baseUrl: string, apiKey: string): Promise<Model
   const res = await fetch(baseUrl, {
     headers: { Authorization: `Bearer ${apiKey}` },
   })
-  if (res.status === 401) throw new Error('Invalid API key — check your key and try again')
-  if (res.status === 403) throw new Error('API key does not have permission to list models')
-  if (!res.ok) throw new Error(`Provider returned ${res.status}`)
+  if (!res.ok) throw new Error(httpErrorMessage(res.status))
   const data = await res.json() as { data: { id: string; owned_by?: string }[] }
   return data.data
     .filter((m) => m.id.startsWith('gpt-') || m.id.startsWith('o'))
@@ -85,9 +83,7 @@ async function fetchOpenAIModels(baseUrl: string, apiKey: string): Promise<Model
 
 async function fetchOpenRouterModels(): Promise<ModelInfo[]> {
   const res = await fetch('https://openrouter.ai/api/v1/models')
-  if (res.status === 401) throw new Error('Invalid API key — check your key and try again')
-  if (res.status === 403) throw new Error('API key does not have permission to list models')
-  if (!res.ok) throw new Error(`Provider returned ${res.status}`)
+  if (!res.ok) throw new Error(httpErrorMessage(res.status))
   const data = await res.json() as { data: { id: string; name: string; supported_parameters?: string[] }[] }
   return data.data
     .filter((m) => m.supported_parameters?.includes('tools'))
@@ -97,9 +93,7 @@ async function fetchOpenRouterModels(): Promise<ModelInfo[]> {
 
 async function fetchGeminiModels(apiKey: string): Promise<ModelInfo[]> {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`)
-  if (res.status === 401) throw new Error('Invalid API key — check your key and try again')
-  if (res.status === 403) throw new Error('API key does not have permission to list models')
-  if (!res.ok) throw new Error(`Provider returned ${res.status}`)
+  if (!res.ok) throw new Error(httpErrorMessage(res.status))
   const data = await res.json() as { models: { name: string; displayName: string; supportedGenerationMethods?: string[] }[] }
   return data.models
     .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
@@ -108,5 +102,14 @@ async function fetchGeminiModels(apiKey: string): Promise<ModelInfo[]> {
       name: m.displayName || m.name.replace('models/', ''),
     }))
     .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+function httpErrorMessage(status: number): string {
+  switch (status) {
+    case 401: return 'Invalid API key — check that the key is correct and active'
+    case 403: return 'Access denied — your API key does not have permission for this resource'
+    case 429: return 'Rate limited — too many requests, try again in a moment'
+    default: return `Request failed (HTTP ${status})`
+  }
 }
 

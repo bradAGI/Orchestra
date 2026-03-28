@@ -4,7 +4,11 @@ import { type ReactNode } from 'react'
 /** Root tooltip provider that wraps the app and configures the global delay duration. */
 export function AppTooltipProvider({ children }: { children: ReactNode }) {
   return (
-    <Tooltip.Provider delayDuration={400} skipDelayDuration={0} disableHoverableContent>
+    <Tooltip.Provider
+      delayDuration={400}
+      skipDelayDuration={0}
+      disableHoverableContent
+    >
       {children}
     </Tooltip.Provider>
   )

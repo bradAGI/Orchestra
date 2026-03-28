@@ -1,4 +1,4 @@
-import { useMemo, useRef, type KeyboardEvent } from 'react'
+import { memo, useMemo, useRef, type KeyboardEvent } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react'
 import type { SidebarItem } from '@/components/app-shell/types'
@@ -84,15 +84,10 @@ export function SidebarNav({
               const ItemIcon = item.icon
               const active = activeSection === item.id
               return (
-                <AppTooltip 
+                <AppTooltip
                   key={item.id}
                   side="right"
-                  content={
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-foreground">{item.label}</span>
-                      <span className="text-[8px] font-bold text-muted-foreground/70 normal-case tracking-normal">{item.description}</span>
-                    </div>
-                  }
+                  content={<NavTooltipContent label={item.label} description={item.description} />}
                 >
                   <button
                     type="button"
@@ -131,6 +126,15 @@ export function SidebarNav({
     </aside>
   )
 }
+
+const NavTooltipContent = memo(function NavTooltipContent({ label, description }: { label: string; description: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-foreground">{label}</span>
+      <span className="text-[8px] font-bold text-muted-foreground/70 normal-case tracking-normal">{description}</span>
+    </div>
+  )
+})
 
 function AppMonogramIcon({ className }: { className?: string }) {
   return (

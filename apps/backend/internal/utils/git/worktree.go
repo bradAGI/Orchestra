@@ -118,6 +118,19 @@ func WorktreeDiff(ctx context.Context, wtDir string) (string, error) {
 	return stdout.String(), nil
 }
 
+// MergeBase returns the merge-base (common ancestor) of two refs.
+func MergeBase(ctx context.Context, dir, ref1, ref2 string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", "merge-base", ref1, ref2)
+	cmd.Dir = dir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("git merge-base failed: %v - %s", err, stderr.String())
+	}
+	return strings.TrimSpace(stdout.String()), nil
+}
+
 // IsGitRepo checks whether dir contains a .git directory or file (worktree).
 func IsGitRepo(dir string) bool {
 	_, err := os.Stat(dir + "/.git")

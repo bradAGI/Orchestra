@@ -148,9 +148,10 @@ func (s Service) WorktreePath(projectID, branchName string) string {
 func (s Service) EnsureWorktree(projectRoot, projectID, branchName string, hooks Hooks) (string, string, bool, error) {
 	wtPath := s.WorktreePath(projectID, branchName)
 
-	// If directory already exists, reuse it.
+	// If directory already exists, reuse it but still return the merge-base SHA.
 	if info, err := os.Stat(wtPath); err == nil && info.IsDir() {
-		return wtPath, "", false, nil
+		baseSHA, _ := git.MergeBase(context.Background(), projectRoot, "HEAD", branchName)
+		return wtPath, baseSHA, false, nil
 	}
 
 	ctx := context.Background()

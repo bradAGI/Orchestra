@@ -431,6 +431,7 @@ export default function App() {
             lastIssueFetchRef.current = Date.now()
             if (issueIdentifier) {
               playNotification(issueIdentifier)
+            }
           }
         },
         onStatus: (message) => {
