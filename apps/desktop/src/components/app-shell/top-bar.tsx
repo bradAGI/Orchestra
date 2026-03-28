@@ -158,7 +158,7 @@ export function TopBar({
                 ref={searchInputRef}
                 type="text"
                 className="w-full bg-transparent text-[11px] font-medium text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
-                placeholder="Universal Search..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => searchQuery.trim().length >= 2 && setShowResults(true)}

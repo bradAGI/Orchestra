@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, Database, FolderTree, ListTodo, Settings2 } from 'lucide-react'
+import { Activity, Cpu, Database, FileText, FolderTree, ListTodo, Settings2, Terminal } from 'lucide-react'
 import {
   IssueDetailView,
   CreateTaskDialog,
@@ -1306,10 +1306,34 @@ export default function App() {
               <FolderTree className="h-4 w-4" /> Go to Projects
             </Command.Item>
             <Command.Item
+              onSelect={() => { setActiveSection('CONSOLE'); setPaletteOpen(false) }}
+              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
+            >
+              <Terminal className="h-4 w-4" /> Go to Terminals
+            </Command.Item>
+            <Command.Item
+              onSelect={() => { setActiveSection('AGENTS'); setPaletteOpen(false) }}
+              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
+            >
+              <Cpu className="h-4 w-4" /> Go to Agents
+            </Command.Item>
+            <Command.Item
               onSelect={() => { setActiveSection('WAREHOUSE'); setPaletteOpen(false) }}
               className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
             >
               <Database className="h-4 w-4" /> Go to Analytics
+            </Command.Item>
+            <Command.Item
+              onSelect={() => { setActiveSection('SETTINGS'); setPaletteOpen(false) }}
+              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
+            >
+              <Settings2 className="h-4 w-4" /> Go to Settings
+            </Command.Item>
+            <Command.Item
+              onSelect={() => { setActiveSection('DOCS'); setPaletteOpen(false) }}
+              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
+            >
+              <FileText className="h-4 w-4" /> Go to Documentation
             </Command.Item>
           </Command.Group>
 
