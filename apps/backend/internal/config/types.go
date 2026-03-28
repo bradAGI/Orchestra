@@ -4,6 +4,7 @@ package config
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/orchestra/orchestra/apps/backend/internal/workspace"
 )
@@ -70,6 +71,14 @@ type Config struct {
 	STTWhisperThreads int
 	// STTWhisperLanguage is the language code for Whisper transcription (default "en").
 	STTWhisperLanguage string
+	// AnthropicAdminKey is the Anthropic Admin API key for organization-level usage/cost sync.
+	AnthropicAdminKey string
+	// OpenAIAdminKey is the OpenAI Organization Admin API key for usage/cost sync.
+	OpenAIAdminKey string
+	// AnalyticsSyncInterval is the interval between external analytics sync runs.
+	AnalyticsSyncInterval time.Duration
+	// AnalyticsExternalEnabled controls whether external analytics sync is active.
+	AnalyticsExternalEnabled bool
 }
 
 // PortString returns the server port as a string.

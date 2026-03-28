@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/orchestra/orchestra/apps/backend/internal/workflow"
 	"github.com/orchestra/orchestra/apps/backend/internal/workspace"
@@ -66,6 +67,11 @@ func Load() (Config, error) {
 	sttWhisperModelPath := getenvOrEmpty("ORCHESTRA_STT_WHISPER_MODEL")
 	sttWhisperThreadsRaw := getenvOrEmpty("ORCHESTRA_STT_WHISPER_THREADS")
 	sttWhisperLanguage := getenvOrDefault("ORCHESTRA_STT_WHISPER_LANGUAGE", "en")
+
+	anthropicAdminKey := getenvOrEmpty("ORCHESTRA_ANTHROPIC_ADMIN_KEY")
+	openaiAdminKey := getenvOrEmpty("ORCHESTRA_OPENAI_ADMIN_KEY")
+	analyticsSyncIntervalRaw := getenvOrDefault("ORCHESTRA_ANALYTICS_SYNC_INTERVAL", "1h")
+	analyticsExternalEnabledRaw := getenvOrDefault("ORCHESTRA_ANALYTICS_EXTERNAL_ENABLED", "false")
 
 	workflowOverrides := loadWorkflowOverrides(strings.TrimSpace(workflowPath))
 	if host == "" {
@@ -241,6 +247,12 @@ func Load() (Config, error) {
 		worktreeRoot = filepath.Join(os.Getenv("HOME"), ".orchestra", "worktrees")
 	}
 
+	analyticsSyncInterval, err := time.ParseDuration(strings.TrimSpace(analyticsSyncIntervalRaw))
+	if err != nil || analyticsSyncInterval < 0 {
+		analyticsSyncInterval = time.Hour
+	}
+	analyticsExternalEnabled := parseBoolWithDefault(analyticsExternalEnabledRaw, false)
+
 	return Config{
 		Host:                     strings.TrimSpace(host),
 		Port:                     port,
@@ -276,6 +288,10 @@ func Load() (Config, error) {
 		STTWhisperModelPath:      strings.TrimSpace(sttWhisperModelPath),
 		STTWhisperThreads:        sttWhisperThreads,
 		STTWhisperLanguage:       strings.TrimSpace(sttWhisperLanguage),
+		AnthropicAdminKey:        strings.TrimSpace(anthropicAdminKey),
+		OpenAIAdminKey:           strings.TrimSpace(openaiAdminKey),
+		AnalyticsSyncInterval:    analyticsSyncInterval,
+		AnalyticsExternalEnabled: analyticsExternalEnabled,
 	}, nil
 }
 
