@@ -13,6 +13,7 @@ import { FeedbackDialog } from './FeedbackDialog'
 import { extractOperationalPlanItems, extractPlanFromText, parseDiff, type DiffFile, type PlanItem } from './IssueDetailUtils'
 import { getCachedPlan, setCachedPlan, clearCachedPlan } from './planCache'
 import { SessionTimeline } from './SessionTimeline'
+import { TerminalView } from '@/components/terminal/TerminalView'
 
 function DescriptionEditor({ value, onChange, onBlur, theme }: {
   value: string
@@ -648,10 +649,23 @@ export function IssueDetailView({
           </div>
         )}
 
-        {/* Activity */}
-        {/* Output */}
+        {/* Session — embedded terminal view for the issue's agent PTY */}
         {bottomTab === 'output' && (
-          <SessionTimeline logs={logs} loading={logsLoading} />
+          <div className="h-full">
+            {config && (isRunning || localState === 'In Progress' || localState === 'Review' || localState === 'Done') ? (
+              <div className="w-full h-full px-2 py-1">
+                <TerminalView
+                  sessionId={`issue-${identifier}`}
+                  projectId={projectId}
+                  baseUrl={config.baseUrl}
+                  apiToken={config.token}
+                  theme={theme}
+                />
+              </div>
+            ) : (
+              <SessionTimeline logs={logs} loading={logsLoading} />
+            )}
+          </div>
         )}
 
         {/* Changes */}
