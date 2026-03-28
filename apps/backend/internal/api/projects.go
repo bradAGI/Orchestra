@@ -777,7 +777,13 @@ func (s *Server) GetProjectGitHubIssues(w http.ResponseWriter, r *http.Request) 
 			page = parsed
 		}
 	}
-	issues, err := ghutil.ListIssues(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, state, page)
+	ghToken, err := s.resolveGitHubToken(r.Context(), project)
+	if err != nil {
+		s.logger.Warn().Err(err).Str("project_id", projectID).Msg("github token refresh failed")
+		writeJSONError(w, http.StatusUnauthorized, "token_expired", err.Error())
+		return
+	}
+	issues, err := ghutil.ListIssues(r.Context(), project.GitHubOwner, project.GitHubRepo, ghToken, state, page)
 	if err != nil {
 		s.logger.Warn().Err(err).Str("project_id", projectID).Msg("failed to fetch github issues")
 		writeJSONError(w, http.StatusBadGateway, "github_fetch_failed", err.Error())
@@ -885,7 +891,12 @@ func (s *Server) CreateProjectGitHubIssue(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	issue, err := ghutil.CreateIssue(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, req)
+	ghToken, err := s.resolveGitHubToken(r.Context(), project)
+	if err != nil {
+		writeJSONError(w, http.StatusUnauthorized, "token_expired", err.Error())
+		return
+	}
+	issue, err := ghutil.CreateIssue(r.Context(), project.GitHubOwner, project.GitHubRepo, ghToken, req)
 	if err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Msg("failed to create github issue")
 		writeJSONError(w, http.StatusBadGateway, "github_create_failed", fmt.Sprintf("failed to create issue: %v", err))
@@ -922,7 +933,12 @@ func (s *Server) UpdateProjectGitHubIssue(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	issue, err := ghutil.UpdateIssue(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, number, req)
+	ghToken, err := s.resolveGitHubToken(r.Context(), project)
+	if err != nil {
+		writeJSONError(w, http.StatusUnauthorized, "token_expired", err.Error())
+		return
+	}
+	issue, err := ghutil.UpdateIssue(r.Context(), project.GitHubOwner, project.GitHubRepo, ghToken, number, req)
 	if err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Int("number", number).Msg("failed to update github issue")
 		writeJSONError(w, http.StatusBadGateway, "github_update_failed", fmt.Sprintf("failed to update issue: %v", err))
@@ -951,7 +967,13 @@ func (s *Server) GetProjectGitHubPulls(w http.ResponseWriter, r *http.Request) {
 			page = parsed
 		}
 	}
-	prs, err := ghutil.ListPullRequests(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, page)
+	ghToken, err := s.resolveGitHubToken(r.Context(), project)
+	if err != nil {
+		s.logger.Warn().Err(err).Str("project_id", projectID).Msg("github token refresh failed")
+		writeJSONError(w, http.StatusUnauthorized, "token_expired", err.Error())
+		return
+	}
+	prs, err := ghutil.ListPullRequests(r.Context(), project.GitHubOwner, project.GitHubRepo, ghToken, page)
 	if err != nil {
 		s.logger.Warn().Err(err).Str("project_id", projectID).Msg("failed to fetch github pull requests")
 		writeJSONError(w, http.StatusBadGateway, "github_fetch_failed", err.Error())
@@ -982,7 +1004,12 @@ func (s *Server) GetProjectGitHubPullDiff(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	diff, err := ghutil.GetPullRequestDiff(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, number)
+	ghToken, err := s.resolveGitHubToken(r.Context(), project)
+	if err != nil {
+		writeJSONError(w, http.StatusUnauthorized, "token_expired", err.Error())
+		return
+	}
+	diff, err := ghutil.GetPullRequestDiff(r.Context(), project.GitHubOwner, project.GitHubRepo, ghToken, number)
 	if err != nil {
 		s.logger.Warn().Err(err).Str("project_id", projectID).Int("number", number).Msg("failed to fetch PR diff")
 		writeJSONError(w, http.StatusBadGateway, "github_fetch_failed", fmt.Sprintf("failed to fetch PR diff: %v", err))
@@ -1017,7 +1044,12 @@ func (s *Server) CreateProjectGitHubPull(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	pr, err := ghutil.CreatePullRequest(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, req)
+	ghToken, err := s.resolveGitHubToken(r.Context(), project)
+	if err != nil {
+		writeJSONError(w, http.StatusUnauthorized, "token_expired", err.Error())
+		return
+	}
+	pr, err := ghutil.CreatePullRequest(r.Context(), project.GitHubOwner, project.GitHubRepo, ghToken, req)
 	if err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Msg("failed to create github pull request")
 		writeJSONError(w, http.StatusBadGateway, "github_create_failed", fmt.Sprintf("failed to create pull request: %v", err))
@@ -1512,7 +1544,12 @@ func (s *Server) GetPRReviews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reviews, err := ghutil.ListPRReviews(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, number)
+	ghToken, err := s.resolveGitHubToken(r.Context(), project)
+	if err != nil {
+		writeJSONError(w, http.StatusUnauthorized, "token_expired", err.Error())
+		return
+	}
+	reviews, err := ghutil.ListPRReviews(r.Context(), project.GitHubOwner, project.GitHubRepo, ghToken, number)
 	if err != nil {
 		s.logger.Warn().Err(err).Str("project_id", projectID).Int("number", number).Msg("failed to fetch PR reviews")
 		writeJSONError(w, http.StatusBadGateway, "github_fetch_failed", fmt.Sprintf("failed to fetch PR reviews: %v", err))
@@ -1549,7 +1586,12 @@ func (s *Server) PostPRReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := ghutil.SubmitPRReview(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, number, req); err != nil {
+	ghToken, err := s.resolveGitHubToken(r.Context(), project)
+	if err != nil {
+		writeJSONError(w, http.StatusUnauthorized, "token_expired", err.Error())
+		return
+	}
+	if err := ghutil.SubmitPRReview(r.Context(), project.GitHubOwner, project.GitHubRepo, ghToken, number, req); err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Int("number", number).Msg("failed to submit PR review")
 		writeJSONError(w, http.StatusBadGateway, "github_review_failed", fmt.Sprintf("failed to submit PR review: %v", err))
 		return
@@ -1591,7 +1633,12 @@ func (s *Server) PostPRMerge(w http.ResponseWriter, r *http.Request) {
 		req.Method = "merge"
 	}
 
-	if err := ghutil.MergePR(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, number, req.Method); err != nil {
+	ghToken, err := s.resolveGitHubToken(r.Context(), project)
+	if err != nil {
+		writeJSONError(w, http.StatusUnauthorized, "token_expired", err.Error())
+		return
+	}
+	if err := ghutil.MergePR(r.Context(), project.GitHubOwner, project.GitHubRepo, ghToken, number, req.Method); err != nil {
 		s.logger.Error().Err(err).Str("project_id", projectID).Int("number", number).Msg("failed to merge PR")
 		writeJSONError(w, http.StatusBadGateway, "github_merge_failed", fmt.Sprintf("failed to merge PR: %v", err))
 		return
@@ -1621,7 +1668,12 @@ func (s *Server) GetPRComments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	comments, err := ghutil.ListPRComments(r.Context(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, number)
+	ghToken, err := s.resolveGitHubToken(r.Context(), project)
+	if err != nil {
+		writeJSONError(w, http.StatusUnauthorized, "token_expired", err.Error())
+		return
+	}
+	comments, err := ghutil.ListPRComments(r.Context(), project.GitHubOwner, project.GitHubRepo, ghToken, number)
 	if err != nil {
 		s.logger.Warn().Err(err).Str("project_id", projectID).Int("number", number).Msg("failed to fetch PR comments")
 		writeJSONError(w, http.StatusBadGateway, "github_fetch_failed", fmt.Sprintf("failed to fetch PR comments: %v", err))
@@ -1659,7 +1711,12 @@ func (s *Server) PostCreateGitHubRepo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	repo, err := ghutil.CreateRepository(r.Context(), project.GitHubToken, ghutil.CreateRepoRequest{
+	ghToken, err := s.resolveGitHubToken(r.Context(), project)
+	if err != nil {
+		writeJSONError(w, http.StatusUnauthorized, "token_expired", err.Error())
+		return
+	}
+	repo, err := ghutil.CreateRepository(r.Context(), ghToken, ghutil.CreateRepoRequest{
 		Name:        req.Name,
 		Description: req.Description,
 		Private:     req.Private,

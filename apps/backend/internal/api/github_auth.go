@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os/exec"
@@ -11,6 +12,7 @@ import (
 	"github.com/google/go-github/v69/github"
 	"github.com/orchestra/orchestra/apps/backend/internal/db"
 	"github.com/orchestra/orchestra/apps/backend/internal/observability"
+	ghutil "github.com/orchestra/orchestra/apps/backend/internal/utils/github"
 	"golang.org/x/oauth2"
 	githuboauth "golang.org/x/oauth2/github"
 )
@@ -95,8 +97,14 @@ func (s *Server) HandleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 
 	s.logger.Info().Str("github_user", user.GetLogin()).Str("project_id", state).Msg("github authentication successful")
 
-	// Store token in DB
-	err = s.updateProjectGitHubToken(ctx, state, tok.AccessToken)
+	// Store full token (access + refresh + expiry) as JSON for auto-refresh support
+	tokenJSON, err := json.Marshal(tok)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("failed to serialize github token")
+		writeJSONError(w, http.StatusInternalServerError, "token_serialize_failed", "failed to serialize token")
+		return
+	}
+	err = s.updateProjectGitHubToken(ctx, state, string(tokenJSON))
 	if err != nil {
 		s.logger.Error().Err(err).Msg("failed to update project with github token")
 		writeJSONError(w, http.StatusInternalServerError, "db_update_failed", "failed to save authentication state")
@@ -122,6 +130,34 @@ func (s *Server) updateProjectGitHubToken(ctx context.Context, projectID, token 
 	}
 	_, err = s.db.ExecContext(ctx, "UPDATE projects SET github_token = ? WHERE id = ?", encrypted, projectID)
 	return err
+}
+
+// resolveGitHubToken returns a valid access token for the project, refreshing
+// the OAuth token if it has expired. If a refresh occurs, the updated token is
+// persisted back to the database. For legacy plain-text tokens (e.g. from gh CLI),
+// the token is returned as-is with no refresh attempt.
+func (s *Server) resolveGitHubToken(ctx context.Context, project db.Project) (string, error) {
+	accessToken, updatedJSON, err := ghutil.RefreshableToken(
+		ctx,
+		project.GitHubToken,
+		s.config.GitHubClientID,
+		s.config.GitHubClientSecret,
+	)
+	if err != nil {
+		return "", err
+	}
+
+	// If the token was refreshed, persist the new token
+	if updatedJSON != "" {
+		if dbErr := s.updateProjectGitHubToken(ctx, project.ID, updatedJSON); dbErr != nil {
+			s.logger.Warn().Err(dbErr).Str("project_id", project.ID).Msg("failed to persist refreshed github token")
+			// Still return the valid access token even if persistence fails
+		} else {
+			s.logger.Info().Str("project_id", project.ID).Msg("refreshed and persisted github token")
+		}
+	}
+
+	return accessToken, nil
 }
 
 func (s *Server) HandleGitHubDisconnect(w http.ResponseWriter, r *http.Request) {
