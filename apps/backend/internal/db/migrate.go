@@ -70,6 +70,16 @@ func runMigrations(db *sql.DB) error {
 		{"sessions", "issue_id", "TEXT"},
 		{"sessions", "model", "TEXT"},
 		{"issues", "feedback", "TEXT"},
+		// Analytics: extended token tracking on events
+		{"events", "cache_read_tokens", "INTEGER DEFAULT 0"},
+		{"events", "cache_write_tokens", "INTEGER DEFAULT 0"},
+		{"events", "thinking_tokens", "INTEGER DEFAULT 0"},
+		{"events", "tool_tokens", "INTEGER DEFAULT 0"},
+		// Analytics: session status and duration tracking
+		{"sessions", "status", "TEXT NOT NULL DEFAULT 'unknown'"},
+		{"sessions", "duration_seconds", "REAL NOT NULL DEFAULT 0"},
+		{"sessions", "cost_cents", "INTEGER DEFAULT 0"},
+		{"sessions", "turn_count", "INTEGER DEFAULT 0"},
 	}
 
 	for _, m := range migrations {

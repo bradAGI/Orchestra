@@ -105,4 +105,78 @@ CREATE TABLE IF NOT EXISTS issue_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_issue_history_issue_id ON issue_history(issue_id);
+
+CREATE TABLE IF NOT EXISTS daily_metrics (
+	date         TEXT NOT NULL,
+	project_id   TEXT NOT NULL DEFAULT '',
+	provider     TEXT NOT NULL DEFAULT '',
+	model        TEXT NOT NULL DEFAULT '',
+	input_tokens   INTEGER DEFAULT 0,
+	output_tokens  INTEGER DEFAULT 0,
+	cache_read     INTEGER DEFAULT 0,
+	cache_write    INTEGER DEFAULT 0,
+	thinking       INTEGER DEFAULT 0,
+	cost_cents     INTEGER DEFAULT 0,
+	request_count  INTEGER DEFAULT 0,
+	session_count  INTEGER DEFAULT 0,
+	completed      INTEGER DEFAULT 0,
+	failed         INTEGER DEFAULT 0,
+	avg_duration   REAL DEFAULT 0,
+	PRIMARY KEY (date, project_id, provider, model)
+) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS api_requests (
+	id             TEXT PRIMARY KEY,
+	session_id     TEXT NOT NULL,
+	provider       TEXT NOT NULL,
+	model          TEXT NOT NULL,
+	input_tokens   INTEGER DEFAULT 0,
+	output_tokens  INTEGER DEFAULT 0,
+	latency_ms     INTEGER DEFAULT 0,
+	status_code    INTEGER DEFAULT 200,
+	error_type     TEXT,
+	rate_limit_remaining_requests INTEGER,
+	rate_limit_remaining_tokens   INTEGER,
+	created_at     INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_api_requests_session ON api_requests(session_id);
+CREATE INDEX IF NOT EXISTS idx_api_requests_time ON api_requests(created_at);
+
+CREATE TABLE IF NOT EXISTS session_git_metrics (
+	session_id      TEXT PRIMARY KEY,
+	lines_added     INTEGER DEFAULT 0,
+	lines_removed   INTEGER DEFAULT 0,
+	files_changed   INTEGER DEFAULT 0,
+	test_files      INTEGER DEFAULT 0,
+	commits         INTEGER DEFAULT 0,
+	hunks           INTEGER DEFAULT 0,
+	pr_url          TEXT,
+	pr_merged       INTEGER DEFAULT 0,
+	ci_passed       INTEGER DEFAULT -1,
+	created_at      TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS external_usage (
+	id          TEXT PRIMARY KEY,
+	provider    TEXT NOT NULL,
+	source      TEXT NOT NULL,
+	date        TEXT NOT NULL,
+	model       TEXT,
+	input_tokens  INTEGER,
+	output_tokens INTEGER,
+	cost_cents    INTEGER,
+	raw_data      TEXT,
+	synced_at     TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_external_usage_date ON external_usage(date, provider);
+
+CREATE TABLE IF NOT EXISTS budgets (
+	id          TEXT PRIMARY KEY,
+	project_id  TEXT,
+	provider    TEXT,
+	period      TEXT NOT NULL,
+	limit_cents INTEGER NOT NULL,
+	alert_pct   INTEGER DEFAULT 80,
+	created_at  TEXT DEFAULT CURRENT_TIMESTAMP
+);
 `

@@ -119,6 +119,7 @@ func Run(logger zerolog.Logger) error {
 
 	go startGarbageCollector(orchestratorService, warehouseDB, workspaceService, cfg.TelemetryRetentionDays, logger)
 	go startRefreshWorker(orchestratorService, pubsub, logger)
+	go startDailyMetricsRollup(warehouseDB, logger)
 	go telemetry.StartWatcher(context.Background(), warehouseDB, cfg.ProjectRoots, telemetry.Options{
 		Providers:       cfg.TelemetryProviders,
 		StoreRawPayload: cfg.TelemetryStoreRawPayload,
@@ -342,7 +343,7 @@ func processExecutionTick(
 		service.SetWorktreePath(entry.IssueID, wtPath)
 		logger.Info().Str("issue_id", entry.IssueID).Str("worktree", wtPath).Bool("created", created).Msg("worktree ready")
 
-		if created && baseSHA != "" {
+		if baseSHA != "" {
 			if _, updateErr := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"base_sha": baseSHA, "branch_name": branchName}); updateErr != nil {
 				logger.Warn().Err(updateErr).Msg("failed to store base_sha/branch_name on issue")
 			}
@@ -613,7 +614,14 @@ func processExecutionTick(
 
 	service.RecordRunResult(entry.IssueID, activeProviderName, result.SessionID, result.Usage.InputTokens, result.Usage.OutputTokens, result.Usage.TotalTokens)
 
-	continueTurn, checkErr := service.ShouldContinueTurn(context.Background(), entry.IssueID, activeProviderName, attempt, service.GetMaxTurns())
+	// Planning mode (Todo) should complete in 1 turn — the agent outputs its plan and we advance.
+	// Execution mode (In Progress) gets the full max-turns budget.
+	// Check the live DB state (not the dispatch entry which may be stale).
+	effectiveMaxTurns := service.GetMaxTurns()
+	if liveIssue, liveErr := service.FetchIssueByID(context.Background(), entry.IssueID); liveErr == nil && strings.EqualFold(liveIssue.State, "Todo") {
+		effectiveMaxTurns = 1
+	}
+	continueTurn, checkErr := service.ShouldContinueTurn(context.Background(), entry.IssueID, activeProviderName, attempt, effectiveMaxTurns)
 	if checkErr != nil {
 		runAfterHook()
 		dueAt := service.NextRetryDue(entry.IssueID, attempt)
@@ -691,19 +699,23 @@ func processExecutionTick(
 		logger.Info().Str("terminal_id", terminalID).Msg("closed agent terminal session")
 	}
 
-	// Auto-advance on successful completion
-	if strings.EqualFold(entry.State, "Todo") {
-		// Planning complete → auto-advance to In Progress for execution
+	// Auto-advance on successful completion — use live DB state to avoid stale dispatch entry
+	currentState := entry.State
+	if liveIssue, liveErr := service.FetchIssueByID(context.Background(), entry.IssueID); liveErr == nil {
+		currentState = liveIssue.State
+	}
+	if strings.EqualFold(currentState, "Todo") {
 		logger.Info().Str("issue_id", entry.IssueID).Msg("planning complete; auto-advancing to In Progress")
 		if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"state": "In Progress"}); err != nil {
 			logger.Error().Err(err).Str("issue_id", entry.IssueID).Msg("FAILED to auto-advance to In Progress")
 		}
-	} else {
-		// Execution complete → auto-advance to Review for human QA
-		logger.Info().Str("issue_id", entry.IssueID).Str("state", entry.State).Msg("execution complete; auto-advancing to Review")
+	} else if strings.EqualFold(currentState, "In Progress") {
+		logger.Info().Str("issue_id", entry.IssueID).Msg("execution complete; auto-advancing to Review")
 		if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"state": "Review"}); err != nil {
 			logger.Error().Err(err).Str("issue_id", entry.IssueID).Msg("FAILED to auto-advance to Review")
 		}
+	} else {
+		logger.Info().Str("issue_id", entry.IssueID).Str("state", currentState).Msg("run succeeded but state is not auto-advanceable; skipping")
 	}
 
 	publishLifecycleEvent(pubsub, "RUN_SUCCEEDED", map[string]any{
@@ -1280,4 +1292,56 @@ func classifyRefreshRetryCause(message string) string {
 		return "stalled_timeout"
 	}
 	return "refresh_retry"
+}
+
+// startDailyMetricsRollup runs every 5 minutes to aggregate event-level token
+// data into the daily_metrics table for fast dashboard queries.
+func startDailyMetricsRollup(warehouseDB *db.DB, logger zerolog.Logger) {
+	// Run once immediately on startup, then every 5 minutes.
+	rollupDailyMetrics(context.Background(), warehouseDB, logger)
+
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		rollupDailyMetrics(context.Background(), warehouseDB, logger)
+	}
+}
+
+// rollupDailyMetrics aggregates event-level token usage into daily_metrics,
+// grouped by date, project, provider, and model.
+func rollupDailyMetrics(ctx context.Context, warehouseDB *db.DB, logger zerolog.Logger) {
+	if warehouseDB == nil {
+		return
+	}
+
+	query := `
+		INSERT OR REPLACE INTO daily_metrics (date, project_id, provider, model,
+			input_tokens, output_tokens, cache_read, cache_write, thinking,
+			cost_cents, request_count, session_count, completed, failed, avg_duration)
+		SELECT
+			date(e.timestamp) as dt,
+			COALESCE(s.project_id, '') as pid,
+			COALESCE(s.provider, '') as prov,
+			COALESCE(s.model, '') as mdl,
+			COALESCE(SUM(e.input_tokens), 0),
+			COALESCE(SUM(e.output_tokens), 0),
+			COALESCE(SUM(e.cache_read_tokens), 0),
+			COALESCE(SUM(e.cache_write_tokens), 0),
+			COALESCE(SUM(e.thinking_tokens), 0),
+			0,
+			COUNT(e.id),
+			COUNT(DISTINCT s.id),
+			SUM(CASE WHEN s.status = 'completed' THEN 1 ELSE 0 END),
+			SUM(CASE WHEN s.status = 'failed' THEN 1 ELSE 0 END),
+			AVG(s.duration_seconds)
+		FROM events e
+		JOIN sessions s ON e.session_id = s.id
+		WHERE e.timestamp IS NOT NULL AND date(e.timestamp) IS NOT NULL
+		GROUP BY dt, pid, prov, mdl
+	`
+
+	if _, err := warehouseDB.ExecContext(ctx, query); err != nil {
+		logger.Warn().Err(err).Msg("daily_metrics rollup failed")
+	}
 }

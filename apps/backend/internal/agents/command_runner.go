@@ -600,6 +600,19 @@ func mergeTokenUsage(current TokenUsage, update TokenUsage) TokenUsage {
 	if partialDerivedTotal {
 		current.TotalTokens = current.InputTokens + current.OutputTokens
 	}
+	// Merge extended token fields
+	if update.CacheReadTokens > 0 {
+		current.CacheReadTokens = update.CacheReadTokens
+	}
+	if update.CacheWriteTokens > 0 {
+		current.CacheWriteTokens = update.CacheWriteTokens
+	}
+	if update.ThinkingTokens > 0 {
+		current.ThinkingTokens = update.ThinkingTokens
+	}
+	if update.ToolTokens > 0 {
+		current.ToolTokens = update.ToolTokens
+	}
 	return current
 }
 
@@ -697,7 +710,7 @@ func extractMessage(payload map[string]any) string {
 func extractUsage(payload map[string]any) TokenUsage {
 	usage := TokenUsage{}
 
-	for _, node := range []map[string]any{
+	nodes := []map[string]any{
 		payload,
 		nestedMap(payload, "usage"),
 		nestedMap(payload, "tokens"),
@@ -711,7 +724,9 @@ func extractUsage(payload map[string]any) TokenUsage {
 		nestedMap(nestedMap(payload, "message"), "usage"),
 		nestedMap(payload, "meta"),
 		nestedMap(nestedMap(payload, "meta"), "usage"),
-	} {
+	}
+
+	for _, node := range nodes {
 		if node == nil {
 			continue
 		}
@@ -722,7 +737,37 @@ func extractUsage(payload map[string]any) TokenUsage {
 			usage.TotalTokens = usage.InputTokens + usage.OutputTokens
 		}
 		if usage.InputTokens > 0 || usage.OutputTokens > 0 || usage.TotalTokens > 0 {
-			return usage
+			break
+		}
+	}
+
+	// Extract cache, thinking, and tool tokens from all candidate nodes.
+	// Different providers use different field names, so we check all of them.
+	for _, node := range nodes {
+		if node == nil {
+			continue
+		}
+		// Cache read tokens: Anthropic (cache_read_input_tokens), OpenAI (cached_input_tokens, cached_tokens), Gemini (cached)
+		if usage.CacheReadTokens == 0 {
+			usage.CacheReadTokens = firstInt64(node, "cache_read_input_tokens", "cached_input_tokens", "cached_tokens", "cached")
+		}
+		// Cache write tokens: Anthropic (cache_creation_input_tokens)
+		if usage.CacheWriteTokens == 0 {
+			usage.CacheWriteTokens = firstInt64(node, "cache_creation_input_tokens")
+		}
+		// Thinking/reasoning tokens: OpenAI (reasoning_tokens), Gemini (thoughts, thoughtsTokenCount)
+		if usage.ThinkingTokens == 0 {
+			usage.ThinkingTokens = firstInt64(node, "reasoning_tokens", "thoughts", "thoughtsTokenCount")
+			// OpenAI nests reasoning_tokens under completion_tokens_details
+			if usage.ThinkingTokens == 0 {
+				if details := nestedMap(node, "completion_tokens_details"); details != nil {
+					usage.ThinkingTokens = firstInt64(details, "reasoning_tokens")
+				}
+			}
+		}
+		// Tool tokens: Gemini (tool, toolUsePromptTokenCount)
+		if usage.ToolTokens == 0 {
+			usage.ToolTokens = firstInt64(node, "tool", "toolUsePromptTokenCount")
 		}
 	}
 

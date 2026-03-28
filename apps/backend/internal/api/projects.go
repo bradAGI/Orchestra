@@ -13,8 +13,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/orchestra/orchestra/apps/backend/internal/db"
 	"github.com/orchestra/orchestra/apps/backend/internal/utils/git"
 	ghutil "github.com/orchestra/orchestra/apps/backend/internal/utils/github"
 	"github.com/orchestra/orchestra/apps/backend/internal/workspace"
@@ -227,13 +229,46 @@ func (s *Server) GetWarehouseStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stats, err := s.db.GetGlobalStats(r.Context())
+	// Parse optional query parameters for filtering
+	query := r.URL.Query()
+	var opts []db.StatsOption
+	cacheKey := "global"
+
+	if since := query.Get("since"); since != "" {
+		if t, err := time.Parse(time.RFC3339, since); err == nil {
+			opts = append(opts, db.WithSince(t))
+			cacheKey += ":since=" + since
+		}
+	}
+	if until := query.Get("until"); until != "" {
+		if t, err := time.Parse(time.RFC3339, until); err == nil {
+			opts = append(opts, db.WithUntil(t))
+			cacheKey += ":until=" + until
+		}
+	}
+	if provider := query.Get("provider"); provider != "" {
+		opts = append(opts, db.WithProvider(provider))
+		cacheKey += ":provider=" + provider
+	}
+	if projectID := query.Get("project_id"); projectID != "" {
+		opts = append(opts, db.WithProjectID(projectID))
+		cacheKey += ":project_id=" + projectID
+	}
+
+	// Check cache first
+	if cached, ok := globalStatsCache.get(cacheKey); ok {
+		writeJSON(w, http.StatusOK, cached)
+		return
+	}
+
+	stats, err := s.db.GetGlobalStats(r.Context(), opts...)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("failed to get global stats")
 		writeJSONError(w, http.StatusInternalServerError, "db_failed", "failed to get global stats")
 		return
 	}
 
+	globalStatsCache.set(cacheKey, &stats)
 	writeJSON(w, http.StatusOK, stats)
 }
 

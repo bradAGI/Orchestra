@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
+	"time"
 )
 
 // UpsertProject takes the local workspace context and creates or updates a Project record
@@ -162,7 +163,7 @@ func (db *DB) GetUnifiedHistory(ctx context.Context, issueID string) ([]map[stri
 			e.id,
 			s.provider,
 			e.kind,
-			SUBSTR(e.message, 1, 500) as message,
+			SUBSTR(e.message, 1, 4000) as message,
 			e.input_tokens,
 			e.output_tokens,
 			e.timestamp
@@ -541,65 +542,166 @@ func (db *DB) GetSessionDetail(ctx context.Context, sessionID string) (*SessionD
 
 // ProviderTokens holds per-provider input/output token breakdowns.
 type ProviderTokens struct {
-	Total  int64 `json:"total"`
-	Input  int64 `json:"input"`
-	Output int64 `json:"output"`
+	Total      int64 `json:"total"`
+	Input      int64 `json:"input"`
+	Output     int64 `json:"output"`
+	CacheRead  int64 `json:"cache_read"`
+	CacheWrite int64 `json:"cache_write"`
+	Thinking   int64 `json:"thinking"`
+}
+
+// ProviderSessionStats holds per-provider session counts and success rates.
+type ProviderSessionStats struct {
+	Total       int64   `json:"total"`
+	Completed   int64   `json:"completed"`
+	Failed      int64   `json:"failed"`
+	AvgDuration float64 `json:"avg_duration"`
 }
 
 // GlobalStats holds platform-wide aggregate metrics including total tokens,
 // per-provider and per-model breakdowns, and recent sessions.
 type GlobalStats struct {
-	TotalTokens    int64                     `json:"total_tokens"`
-	TotalInput     int64                     `json:"total_input"`
-	TotalOutput    int64                     `json:"total_output"`
-	ProviderUsage  map[string]int64          `json:"provider_usage"`
-	ProviderTokens map[string]ProviderTokens `json:"provider_tokens"`
-	ModelUsage     map[string]int64          `json:"model_usage"`
-	RecentSessions []Session                 `json:"recent_sessions"`
+	TotalTokens      int64                              `json:"total_tokens"`
+	TotalInput       int64                              `json:"total_input"`
+	TotalOutput      int64                              `json:"total_output"`
+	TotalCacheRead   int64                              `json:"total_cache_read"`
+	TotalCacheWrite  int64                              `json:"total_cache_write"`
+	TotalThinking    int64                              `json:"total_thinking"`
+	ProviderUsage    map[string]int64                   `json:"provider_usage"`
+	ProviderTokens   map[string]ProviderTokens          `json:"provider_tokens"`
+	ModelUsage       map[string]int64                   `json:"model_usage"`
+	ProviderSessions map[string]ProviderSessionStats    `json:"provider_sessions"`
+	RecentSessions   []Session                          `json:"recent_sessions"`
+}
+
+// StatsOption configures optional filters for GetGlobalStats.
+type StatsOption func(*statsOpts)
+
+type statsOpts struct {
+	since     *time.Time
+	until     *time.Time
+	provider  string
+	projectID string
+}
+
+// WithSince filters stats to only include data after the given time.
+func WithSince(t time.Time) StatsOption {
+	return func(o *statsOpts) { o.since = &t }
+}
+
+// WithUntil filters stats to only include data before the given time.
+func WithUntil(t time.Time) StatsOption {
+	return func(o *statsOpts) { o.until = &t }
+}
+
+// WithProvider filters stats to only include data for the given provider.
+func WithProvider(p string) StatsOption {
+	return func(o *statsOpts) { o.provider = p }
+}
+
+// WithProjectID filters stats to only include data for the given project.
+func WithProjectID(id string) StatsOption {
+	return func(o *statsOpts) { o.projectID = id }
 }
 
 // GetGlobalStats computes platform-wide token usage, per-provider and per-model
-// breakdowns, and includes the most recent 50 sessions.
-func (db *DB) GetGlobalStats(ctx context.Context) (GlobalStats, error) {
+// breakdowns, and includes the most recent 50 sessions. Accepts optional
+// StatsOption filters for time-range, provider, and project scoping.
+func (db *DB) GetGlobalStats(ctx context.Context, opts ...StatsOption) (GlobalStats, error) {
+	var o statsOpts
+	for _, fn := range opts {
+		fn(&o)
+	}
+
+	// Build dynamic WHERE clauses based on options
+	var whereParts []string
+	var whereArgs []interface{}
+	if o.since != nil {
+		whereParts = append(whereParts, "s.created_at >= ?")
+		whereArgs = append(whereArgs, o.since.Format(time.RFC3339))
+	}
+	if o.until != nil {
+		whereParts = append(whereParts, "s.created_at <= ?")
+		whereArgs = append(whereArgs, o.until.Format(time.RFC3339))
+	}
+	if o.provider != "" {
+		whereParts = append(whereParts, "s.provider = ?")
+		whereArgs = append(whereArgs, o.provider)
+	}
+	if o.projectID != "" {
+		whereParts = append(whereParts, "s.project_id = ?")
+		whereArgs = append(whereArgs, o.projectID)
+	}
+
+	// sessionFilter is used for queries that start with "FROM sessions s" with no prior WHERE
+	sessionFilter := ""
+	if len(whereParts) > 0 {
+		sessionFilter = " WHERE " + joinStrings(whereParts, " AND ")
+	}
+
+	// whereFilter is used for queries that already have a WHERE clause or need WHERE 1=1 prefix
+	whereFilter := ""
+	if len(whereParts) > 0 {
+		whereFilter = " WHERE " + joinStrings(whereParts, " AND ")
+	}
+
 	var stats GlobalStats
 	stats.ProviderUsage = make(map[string]int64)
 	stats.ProviderTokens = make(map[string]ProviderTokens)
 	stats.ModelUsage = make(map[string]int64)
+	stats.ProviderSessions = make(map[string]ProviderSessionStats)
 
-	query := `SELECT SUM(input_tokens), SUM(output_tokens) FROM events`
-	_ = db.QueryRowContext(ctx, query).Scan(&stats.TotalInput, &stats.TotalOutput)
+	// Total tokens including extended fields
+	totalQuery := `SELECT COALESCE(SUM(e.input_tokens),0), COALESCE(SUM(e.output_tokens),0),
+		COALESCE(SUM(e.cache_read_tokens),0), COALESCE(SUM(e.cache_write_tokens),0), COALESCE(SUM(e.thinking_tokens),0)
+		FROM events e JOIN sessions s ON e.session_id = s.id` + whereFilter
+	_ = db.QueryRowContext(ctx, totalQuery, whereArgs...).Scan(
+		&stats.TotalInput, &stats.TotalOutput,
+		&stats.TotalCacheRead, &stats.TotalCacheWrite, &stats.TotalThinking,
+	)
 	stats.TotalTokens = stats.TotalInput + stats.TotalOutput
 
-	// Per-provider input/output breakdown
-	rows, err := db.QueryContext(ctx, `
-		SELECT s.provider, SUM(e.input_tokens), SUM(e.output_tokens)
+	// Per-provider input/output/cache/thinking breakdown
+	providerQuery := `
+		SELECT s.provider, SUM(e.input_tokens), SUM(e.output_tokens),
+			COALESCE(SUM(e.cache_read_tokens),0), COALESCE(SUM(e.cache_write_tokens),0), COALESCE(SUM(e.thinking_tokens),0)
 		FROM sessions s
-		JOIN events e ON s.id = e.session_id
+		JOIN events e ON s.id = e.session_id` + whereFilter + `
 		GROUP BY s.provider
-	`)
+	`
+	rows, err := db.QueryContext(ctx, providerQuery, whereArgs...)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
 			var provider string
-			var input, output int64
-			if err := rows.Scan(&provider, &input, &output); err == nil {
+			var input, output, cacheRead, cacheWrite, thinking int64
+			if err := rows.Scan(&provider, &input, &output, &cacheRead, &cacheWrite, &thinking); err == nil {
 				stats.ProviderUsage[provider] = input + output
 				stats.ProviderTokens[provider] = ProviderTokens{
-					Total:  input + output,
-					Input:  input,
-					Output: output,
+					Total:      input + output,
+					Input:      input,
+					Output:     output,
+					CacheRead:  cacheRead,
+					CacheWrite: cacheWrite,
+					Thinking:   thinking,
 				}
 			}
 		}
 	}
 
-	modelRows, err := db.QueryContext(ctx, `
+	// Per-model breakdown — always needs "model != ''" so we use AND for extra filters
+	modelBaseWhere := "s.model != '' AND s.model IS NOT NULL"
+	if len(whereParts) > 0 {
+		modelBaseWhere += " AND " + joinStrings(whereParts, " AND ")
+	}
+	modelQuery := `
 		SELECT s.model, SUM(e.input_tokens + e.output_tokens)
 		FROM sessions s
 		JOIN events e ON s.id = e.session_id
-		WHERE s.model != '' AND s.model IS NOT NULL
+		WHERE ` + modelBaseWhere + `
 		GROUP BY s.model
-	`)
+	`
+	modelRows, err := db.QueryContext(ctx, modelQuery, whereArgs...)
 	if err == nil {
 		defer modelRows.Close()
 		for modelRows.Next() {
@@ -611,8 +713,35 @@ func (db *DB) GetGlobalStats(ctx context.Context) (GlobalStats, error) {
 		}
 	}
 
+	// Per-provider session counts and success rates — always needs "provider != ''"
+	sessionBaseWhere := "provider != ''"
+	if len(whereParts) > 0 {
+		sessionBaseWhere += " AND " + joinStrings(whereParts, " AND ")
+	}
+	sessionStatsQuery := `
+		SELECT provider,
+			COUNT(*) as total,
+			SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+			SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+			AVG(duration_seconds) as avg_duration
+		FROM sessions s
+		WHERE ` + sessionBaseWhere + `
+		GROUP BY provider
+	`
+	psRows, err := db.QueryContext(ctx, sessionStatsQuery, whereArgs...)
+	if err == nil {
+		defer psRows.Close()
+		for psRows.Next() {
+			var provider string
+			var ps ProviderSessionStats
+			if err := psRows.Scan(&provider, &ps.Total, &ps.Completed, &ps.Failed, &ps.AvgDuration); err == nil {
+				stats.ProviderSessions[provider] = ps
+			}
+		}
+	}
+
 	// Fetch recent sessions (limited to 50 in SQL for performance)
-	sessionRows, err := db.QueryContext(ctx, `
+	recentQuery := `
 		SELECT
 			s.id, s.project_id, p.name, s.session_uuid, s.provider, COALESCE(s.model, ''), s.branch, s.created_at,
 			COALESCE(MAX(e.timestamp), s.created_at) as updated_at,
@@ -620,11 +749,12 @@ func (db *DB) GetGlobalStats(ctx context.Context) (GlobalStats, error) {
 			COALESCE(SUM(e.output_tokens), 0)
 		FROM sessions s
 		LEFT JOIN projects p ON s.project_id = p.id
-		LEFT JOIN events e ON s.id = e.session_id
+		LEFT JOIN events e ON s.id = e.session_id` + sessionFilter + `
 		GROUP BY s.id
 		ORDER BY updated_at DESC
 		LIMIT 50
-	`)
+	`
+	sessionRows, err := db.QueryContext(ctx, recentQuery, whereArgs...)
 	if err == nil {
 		defer sessionRows.Close()
 		for sessionRows.Next() {
@@ -647,4 +777,24 @@ func (db *DB) GetGlobalStats(ctx context.Context) (GlobalStats, error) {
 	}
 
 	return stats, nil
+}
+
+// joinStrings joins strings with a separator. Avoids importing strings package
+// just for this one use in a file that doesn't otherwise need it.
+func joinStrings(parts []string, sep string) string {
+	if len(parts) == 0 {
+		return ""
+	}
+	result := parts[0]
+	for _, p := range parts[1:] {
+		result += sep + p
+	}
+	return result
+}
+
+// UpdateSessionStatus sets the status and duration for a session.
+func (db *DB) UpdateSessionStatus(ctx context.Context, sessionID string, status string, durationSeconds float64) error {
+	_, err := db.ExecContext(ctx, `UPDATE sessions SET status = ?, duration_seconds = ? WHERE id = ?`,
+		status, durationSeconds, sessionID)
+	return err
 }

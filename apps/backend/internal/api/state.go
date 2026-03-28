@@ -10,9 +10,11 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/orchestra/orchestra/apps/backend/internal/db"
 	"github.com/orchestra/orchestra/apps/backend/internal/mcp"
 	"github.com/orchestra/orchestra/apps/backend/internal/presenter"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
@@ -20,6 +22,37 @@ import (
 	githubutils "github.com/orchestra/orchestra/apps/backend/internal/utils/github"
 	"github.com/orchestra/orchestra/apps/backend/internal/workspace"
 )
+
+// statsCache provides a simple in-memory cache for warehouse stats with a TTL.
+type statsCache struct {
+	mu   sync.RWMutex
+	data map[string]*cachedStats
+}
+
+type cachedStats struct {
+	stats     *db.GlobalStats
+	fetchedAt time.Time
+}
+
+const statsCacheTTL = 30 * time.Second
+
+var globalStatsCache = &statsCache{data: make(map[string]*cachedStats)}
+
+func (c *statsCache) get(key string) (*db.GlobalStats, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	entry, ok := c.data[key]
+	if !ok || time.Since(entry.fetchedAt) > statsCacheTTL {
+		return nil, false
+	}
+	return entry.stats, true
+}
+
+func (c *statsCache) set(key string, stats *db.GlobalStats) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.data[key] = &cachedStats{stats: stats, fetchedAt: time.Now()}
+}
 
 // CreateGitHubPR handles POST /api/v1/issues/{issue_identifier}/pr by creating
 // a GitHub pull request. It attempts to infer owner, repo, and token from the
@@ -620,6 +653,34 @@ func (s *Server) GetIssueLogs(w http.ResponseWriter, r *http.Request) {
 	if ok && runtime.Running != nil && runtime.Running.SessionLogPath != "" {
 		logPath = runtime.Running.SessionLogPath
 	} else {
+		// Verify the issue actually has sessions before serving file-based logs.
+		// Without this check, a newly created issue that reuses an identifier
+		// (e.g. FETCH-1 deleted then recreated) would serve stale logs.
+		var issueID string
+		if ok {
+			issueID = runtime.IssueID
+		} else if issues, err := s.orchestrator.SearchIssues(r.Context(), identifier); err == nil && len(issues) > 0 {
+			issueID = issues[0].ID
+		}
+		hasSessions := false
+		if issueID != "" && s.db != nil {
+			if history, err := s.db.GetUnifiedHistory(r.Context(), issueID); err == nil && len(history) > 0 {
+				// Check for at least one agent-sourced entry (not just metadata)
+				for _, h := range history {
+					if src, _ := h["source"].(string); src == "agent" {
+						hasSessions = true
+						break
+					}
+				}
+			}
+		}
+
+		if !hasSessions {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		// Try latest.log symlink first
 		candidate := filepath.Join(s.workspaceRoot, "_logs", identifier, "latest.log")
 		if _, err := os.Stat(candidate); err == nil {

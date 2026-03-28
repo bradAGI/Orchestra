@@ -187,15 +187,30 @@ export type ProviderTokens = {
   total: number
   input: number
   output: number
+  cache_read: number
+  cache_write: number
+  thinking: number
+}
+
+/** Per-provider session counts and success rates. */
+export type ProviderSessionStats = {
+  total: number
+  completed: number
+  failed: number
+  avg_duration: number
 }
 
 export type GlobalStats = {
   total_tokens: number
   total_input: number
   total_output: number
+  total_cache_read: number
+  total_cache_write: number
+  total_thinking: number
   provider_usage: Record<string, number>
   provider_tokens?: Record<string, ProviderTokens>
   model_usage: Record<string, number>
+  provider_sessions?: Record<string, ProviderSessionStats>
   recent_sessions: SessionSummary[]
 }
 
