@@ -908,9 +908,9 @@ func (s *Service) enqueueCandidates(candidates []tracker.Issue) {
 
 		targetProvider := s.agentProvider
 		if issue.Provider != "" {
-			targetProvider = issue.Provider
+			targetProvider = strings.ToUpper(strings.TrimSpace(issue.Provider))
 		} else if issue.AssigneeID != "" && strings.HasPrefix(issue.AssigneeID, "agent-") {
-			targetProvider = strings.TrimPrefix(issue.AssigneeID, "agent-")
+			targetProvider = strings.ToUpper(strings.TrimPrefix(issue.AssigneeID, "agent-"))
 		}
 
 		if s.isRunningLocked(issue.ID) || s.isRetryingLocked(issue.ID) {

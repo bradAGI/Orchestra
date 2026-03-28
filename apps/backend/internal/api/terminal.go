@@ -72,7 +72,7 @@ func (s *Server) TerminalWebSocket(w http.ResponseWriter, r *http.Request) {
 		if issues, err := s.orchestrator.ListIssues(r.Context(), tracker.IssueFilter{}); err == nil {
 			for _, issue := range issues {
 				if issue.Identifier == issueIdentifier {
-					provider := issue.Provider
+					provider := strings.ToUpper(strings.TrimSpace(issue.Provider))
 					if provider == "" {
 						provider = s.config.AgentProvider
 					}
