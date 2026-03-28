@@ -1724,14 +1724,17 @@ function analyticsParams(since?: string, extra?: Record<string, string>): string
  * Fetches daily aggregated analytics (sessions, tokens, cost per day).
  */
 export async function fetchAnalyticsDaily(config: BackendConfig, since?: string): Promise<DailyStats[]> {
-  return requestJSON<DailyStats[]>(config, `/api/v1/analytics/daily${analyticsParams(since)}`)
+  const res = await requestJSON<DailyStats[] | null>(config, `/api/v1/analytics/daily${analyticsParams(since)}`)
+  return res ?? []
 }
 
 /**
  * Fetches cost breakdown, optionally grouped by model or project.
+ * Backend returns `{ groups, daily, group_by, ... }` — we unwrap to the groups array.
  */
 export async function fetchAnalyticsCost(config: BackendConfig, since?: string, groupBy?: string): Promise<CostRecord[]> {
-  return requestJSON<CostRecord[]>(config, `/api/v1/analytics/cost${analyticsParams(since, groupBy ? { group_by: groupBy } : undefined)}`)
+  const res = await requestJSON<{ groups?: CostRecord[] }>(config, `/api/v1/analytics/cost${analyticsParams(since, groupBy ? { group_by: groupBy } : undefined)}`)
+  return res?.groups ?? []
 }
 
 /**
@@ -1743,41 +1746,51 @@ export async function fetchAnalyticsCostOptimization(config: BackendConfig): Pro
 
 /**
  * Fetches provider performance metrics (latency percentiles, success/error rates).
+ * Backend returns `{ provider_health, ... }` — we unwrap to the provider_health array.
  */
 export async function fetchAnalyticsPerformance(config: BackendConfig, since?: string, provider?: string): Promise<PerformanceRecord[]> {
-  return requestJSON<PerformanceRecord[]>(config, `/api/v1/analytics/performance${analyticsParams(since, provider ? { provider } : undefined)}`)
+  const res = await requestJSON<{ provider_health?: PerformanceRecord[] } & Record<string, unknown>>(config, `/api/v1/analytics/performance${analyticsParams(since, provider ? { provider } : undefined)}`)
+  return res?.provider_health ?? []
 }
 
 /**
  * Fetches current rate limit status across providers.
  */
 export async function fetchAnalyticsRateLimits(config: BackendConfig): Promise<unknown> {
-  return requestJSON<unknown>(config, '/api/v1/analytics/rate-limits')
+  const res = await requestJSON<{ rate_limits?: unknown }>(config, '/api/v1/analytics/rate-limits')
+  return res?.rate_limits ?? []
 }
 
 /**
  * Fetches productivity metrics per provider (avg cost, lines changed, tokens, success rate).
+ * Backend returns `{ agent_comparison, ... }` — we unwrap.
  */
 export async function fetchAnalyticsProductivity(config: BackendConfig, since?: string, provider?: string): Promise<ProductivityRecord[]> {
-  return requestJSON<ProductivityRecord[]>(config, `/api/v1/analytics/productivity${analyticsParams(since, provider ? { provider } : undefined)}`)
+  const res = await requestJSON<{ agent_comparison?: ProductivityRecord[] } & Record<string, unknown>>(config, `/api/v1/analytics/productivity${analyticsParams(since, provider ? { provider } : undefined)}`)
+  return res?.agent_comparison ?? []
 }
 
 /**
  * Fetches configured budget records.
+ * Backend returns `{ budgets }` — we unwrap.
  */
 export async function fetchAnalyticsBudgets(config: BackendConfig): Promise<BudgetRecord[]> {
-  return requestJSON<BudgetRecord[]>(config, '/api/v1/analytics/budgets')
+  const res = await requestJSON<{ budgets?: BudgetRecord[] }>(config, '/api/v1/analytics/budgets')
+  return res?.budgets ?? []
 }
 
 /**
  * Fetches external cost reconciliation data.
+ * Backend returns `{ reconciliation, since }` — we unwrap.
  */
 export async function fetchExternalReconcile(config: BackendConfig, since?: string): Promise<ExternalReconciliation> {
-  return requestJSON<ExternalReconciliation>(config, `/api/v1/external/reconcile${analyticsParams(since)}`)
+  const res = await requestJSON<{ reconciliation?: ExternalReconciliation['discrepancies']; since?: string }>(config, `/api/v1/external/reconcile${analyticsParams(since)}`)
+  return { discrepancies: res?.reconciliation ?? [] } as ExternalReconciliation
 }
 
 /**
  * Fetches external cost sync status (enabled, provider, last sync time).
+ * Backend returns `{ enabled, providers }` — we pass through as-is.
  */
 export async function fetchExternalStatus(config: BackendConfig): Promise<ExternalStatus> {
   return requestJSON<ExternalStatus>(config, '/api/v1/external/status')
