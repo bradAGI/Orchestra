@@ -9,7 +9,7 @@ import (
 )
 
 // testDB creates a temporary SQLite database with schema and budget/daily_metrics tables.
-func testDB(t *testing.T) *DB {
+func testBudgetDB(t *testing.T) *DB {
 	t.Helper()
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "test.db")
@@ -65,7 +65,7 @@ func testDB(t *testing.T) *DB {
 }
 
 func TestCreateBudget(t *testing.T) {
-	d := testDB(t)
+	d := testBudgetDB(t)
 	ctx := context.Background()
 
 	b, err := d.CreateBudget(ctx, Budget{
@@ -84,7 +84,7 @@ func TestCreateBudget(t *testing.T) {
 }
 
 func TestCreateBudget_Validation(t *testing.T) {
-	d := testDB(t)
+	d := testBudgetDB(t)
 	ctx := context.Background()
 
 	_, err := d.CreateBudget(ctx, Budget{LimitCents: 5000})
@@ -99,7 +99,7 @@ func TestCreateBudget_Validation(t *testing.T) {
 }
 
 func TestListBudgets(t *testing.T) {
-	d := testDB(t)
+	d := testBudgetDB(t)
 	ctx := context.Background()
 
 	_, _ = d.CreateBudget(ctx, Budget{Period: "daily", LimitCents: 100})
@@ -115,7 +115,7 @@ func TestListBudgets(t *testing.T) {
 }
 
 func TestDeleteBudget(t *testing.T) {
-	d := testDB(t)
+	d := testBudgetDB(t)
 	ctx := context.Background()
 
 	b, _ := d.CreateBudget(ctx, Budget{Period: "daily", LimitCents: 100})
@@ -133,7 +133,7 @@ func TestDeleteBudget(t *testing.T) {
 }
 
 func TestDeleteBudget_EmptyID(t *testing.T) {
-	d := testDB(t)
+	d := testBudgetDB(t)
 	err := d.DeleteBudget(context.Background(), "")
 	if err == nil {
 		t.Error("expected error for empty ID")
@@ -141,7 +141,7 @@ func TestDeleteBudget_EmptyID(t *testing.T) {
 }
 
 func TestGetBudgetUtilization(t *testing.T) {
-	d := testDB(t)
+	d := testBudgetDB(t)
 	ctx := context.Background()
 
 	b, _ := d.CreateBudget(ctx, Budget{
@@ -180,7 +180,7 @@ func TestGetBudgetUtilization(t *testing.T) {
 }
 
 func TestGetBudgetUtilization_NotFound(t *testing.T) {
-	d := testDB(t)
+	d := testBudgetDB(t)
 	_, _, err := d.GetBudgetUtilization(context.Background(), "nonexistent")
 	if err == nil {
 		t.Error("expected error for nonexistent budget")

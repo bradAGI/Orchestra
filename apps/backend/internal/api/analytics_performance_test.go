@@ -19,10 +19,10 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// newAnalyticsTestServer creates a Server with an in-memory warehouse DB and
+// newPerfTestServer creates a Server with an in-memory warehouse DB and
 // a chi router that only registers the analytics routes. This avoids modifying
 // router.go (owned by another agent).
-func newAnalyticsTestServer(t *testing.T) (*chi.Mux, *db.DB) {
+func newPerfTestServer(t *testing.T) (*chi.Mux, *db.DB) {
 	t.Helper()
 
 	raw, err := sql.Open("sqlite", ":memory:?_pragma=foreign_keys(0)")
@@ -76,8 +76,8 @@ func newAnalyticsTestServer(t *testing.T) (*chi.Mux, *db.DB) {
 	return r, warehouseDB
 }
 
-// newAnalyticsTestServerNoDB creates a Server without a warehouse DB.
-func newAnalyticsTestServerNoDB(t *testing.T) *chi.Mux {
+// newPerfTestServerNoDB creates a Server without a warehouse DB.
+func newPerfTestServerNoDB(t *testing.T) *chi.Mux {
 	t.Helper()
 
 	s := &Server{
@@ -98,7 +98,7 @@ func newAnalyticsTestServerNoDB(t *testing.T) *chi.Mux {
 }
 
 func TestGetAnalyticsPerformance_NoDatabase(t *testing.T) {
-	router := newAnalyticsTestServerNoDB(t)
+	router := newPerfTestServerNoDB(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/analytics/performance", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -109,7 +109,7 @@ func TestGetAnalyticsPerformance_NoDatabase(t *testing.T) {
 }
 
 func TestGetAnalyticsPerformance_Empty(t *testing.T) {
-	router, _ := newAnalyticsTestServer(t)
+	router, _ := newPerfTestServer(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/analytics/performance", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -128,7 +128,7 @@ func TestGetAnalyticsPerformance_Empty(t *testing.T) {
 }
 
 func TestGetAnalyticsPerformance_WithData(t *testing.T) {
-	router, warehouseDB := newAnalyticsTestServer(t)
+	router, warehouseDB := newPerfTestServer(t)
 	ctx := context.Background()
 	now := time.Now().Unix()
 
@@ -176,7 +176,7 @@ func TestGetAnalyticsPerformance_WithData(t *testing.T) {
 }
 
 func TestGetAnalyticsPerformance_ProviderFilter(t *testing.T) {
-	router, warehouseDB := newAnalyticsTestServer(t)
+	router, warehouseDB := newPerfTestServer(t)
 	ctx := context.Background()
 	now := time.Now().Unix()
 
@@ -216,7 +216,7 @@ func TestGetAnalyticsPerformance_ProviderFilter(t *testing.T) {
 }
 
 func TestGetRateLimits_NoDatabase(t *testing.T) {
-	router := newAnalyticsTestServerNoDB(t)
+	router := newPerfTestServerNoDB(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/analytics/rate-limits", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -227,7 +227,7 @@ func TestGetRateLimits_NoDatabase(t *testing.T) {
 }
 
 func TestGetRateLimits_WithData(t *testing.T) {
-	router, warehouseDB := newAnalyticsTestServer(t)
+	router, warehouseDB := newPerfTestServer(t)
 	ctx := context.Background()
 	now := time.Now().Unix()
 
