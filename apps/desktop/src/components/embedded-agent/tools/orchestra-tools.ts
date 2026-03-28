@@ -64,25 +64,26 @@ export function createOrchestraTools(config: BackendConfig) {
 
     create_issue: tool({
       description:
-        'Create a new issue with title, description, state, project, and optional provider assignment. ' +
+        'Create a new issue with title, description, project, agent provider, and state. ' +
         'Use when the user asks to create, add, or file a new issue, task, or ticket. ' +
-        'IMPORTANT: You MUST always provide both a title AND a description. Never create an issue with an empty description. ' +
-        'If the user only gives a title, write a clear description yourself based on context. ' +
-        'Always ask the user which project to assign or call list_projects/find_projects first to resolve the project_id. ' +
-        'Defaults to state="Backlog". Valid states: Backlog, Todo, In Progress, Review, Done. Returns the created issue with its identifier.',
+        'ALL fields are REQUIRED. You MUST: ' +
+        '1) Always provide a title AND description. If the user only gives a title, write a description yourself. ' +
+        '2) Always assign a project_id. Call list_projects or find_projects FIRST to resolve it. If only one project exists, use that. ' +
+        '3) Always assign a provider (agent). Default to "claude" if the user does not specify. Valid: "claude", "codex", "gemini", "opencode". ' +
+        'Defaults to state="Backlog". Valid states: Backlog, Todo, In Progress, Review, Done.',
       inputSchema: z.object({
         title: z.string().min(1).describe('Title of the issue — concise and descriptive'),
         description: z.string().min(1).describe('Description of what needs to be done — REQUIRED, never leave empty'),
         state: z.string().optional().default('Backlog').describe('Initial state: Backlog, Todo, In Progress, Review, Done'),
-        project_id: z.string().describe('Project ID to assign the issue to. Call list_projects or find_projects first to get available IDs.'),
-        provider: z.string().optional().describe('Agent provider to assign (e.g. "claude", "openai")'),
+        project_id: z.string().min(1).describe('Project ID — REQUIRED. Call list_projects or find_projects first to get available IDs.'),
+        provider: z.string().min(1).default('claude').describe('Agent provider — REQUIRED. One of: "claude", "codex", "gemini", "opencode". Defaults to "claude".'),
       }),
       execute: async (params) => {
         const issue = await createIssue(config, {
           title: params.title,
           description: params.description,
           state: normalizeState(params.state),
-          assignee_id: params.provider ? 'agent-' + params.provider : '',
+          assignee_id: 'agent-' + params.provider,
           project_id: params.project_id,
         })
         notifyDataChanged()
