@@ -87,6 +87,18 @@ export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selec
     })
   }, [refetchKeys])
 
+  // Eagerly preload Whisper STT model when panel opens
+  useEffect(() => {
+    if (isPanelOpen && config) {
+      import('@/lib/whisper-client').then(({ setWhisperBackendConfig, getWhisperClient }) => {
+        setWhisperBackendConfig(config)
+        getWhisperClient() // triggers preload on first call
+      }).catch(() => {
+        // Whisper preload is best-effort — ignore failures
+      })
+    }
+  }, [isPanelOpen, config])
+
   // Destructure stable references to avoid busting useMemo on every render
   const {
     enabled: watchEnabled, toggle: watchToggle, notifications: watchNotifications,

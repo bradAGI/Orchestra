@@ -46,18 +46,32 @@ async function ensurePipeline(): Promise<AutomaticSpeechRecognitionPipeline> {
 }
 
 self.onmessage = async (event: MessageEvent<WhisperWorkerRequest>) => {
-  const { type, audio } = event.data
-  if (type !== 'transcribe') return
+  const msg = event.data
+
+  if (msg.type === 'preload') {
+    try {
+      await ensurePipeline()
+      post({ type: 'status', status: 'loading', progress: 100 })
+    } catch (err) {
+      post({ type: 'error', message: err instanceof Error ? err.message : 'Whisper preload failed' })
+    }
+    return
+  }
+
+  if (msg.type !== 'transcribe') return
+
+  const { audio } = msg
 
   try {
     const pipe = await ensurePipeline()
     post({ type: 'status', status: 'transcribing' })
 
+    const durationSeconds = audio.length / 16000
     const result = await pipe(audio, {
       language: 'en',
       task: 'transcribe',
-      chunk_length_s: 30,
-      stride_length_s: 5,
+      chunk_length_s: durationSeconds < 25 ? 0 : 30,
+      stride_length_s: durationSeconds < 25 ? 0 : 5,
     })
 
     const text = Array.isArray(result) ? result.map((r) => r.text).join(' ') : result.text

@@ -1,8 +1,7 @@
 /** Messages sent from the main thread to the Whisper Web Worker. */
-export type WhisperWorkerRequest = {
-  type: 'transcribe'
-  audio: Float32Array
-}
+export type WhisperWorkerRequest =
+  | { type: 'transcribe'; audio: Float32Array }
+  | { type: 'preload' }
 
 /** Messages sent from the Whisper Web Worker back to the main thread. */
 export type WhisperWorkerResponse =

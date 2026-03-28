@@ -1,21 +1,29 @@
 import { useState, useRef, useCallback } from 'react'
-import { Mic, MicOff, Loader2 } from 'lucide-react'
+import { Mic, MicOff, Loader2, Download } from 'lucide-react'
 
 interface VoiceInputProps {
   onTranscription: (text: string) => void
   disabled?: boolean
 }
 
-type VoiceState = 'idle' | 'recording' | 'processing'
+type VoiceState = 'idle' | 'loading' | 'recording' | 'processing'
 
 export function VoiceInput({ onTranscription, disabled }: VoiceInputProps) {
   const [state, setState] = useState<VoiceState>('idle')
+  const [loadingProgress, setLoadingProgress] = useState(0)
   const clientRef = useRef<import('@/lib/whisper-client').WhisperClient | null>(null)
 
   const getClient = useCallback(async (): Promise<import('@/lib/whisper-client').WhisperClient> => {
     if (!clientRef.current) {
-      const { createWhisperClient } = await import('@/lib/whisper-client')
-      clientRef.current = createWhisperClient()
+      const { getWhisperClient } = await import('@/lib/whisper-client')
+      clientRef.current = getWhisperClient((status) => {
+        if (status.state === 'loading') {
+          setState('loading')
+          setLoadingProgress(status.progress)
+        } else if (status.state === 'transcribing') {
+          setState('processing')
+        }
+      })
     }
     return clientRef.current
   }, [])
@@ -26,7 +34,7 @@ export function VoiceInput({ onTranscription, disabled }: VoiceInputProps) {
 
     if (disabled) return
 
-    if (state === 'idle') {
+    if (state === 'idle' || state === 'loading') {
       // Start recording
       try {
         const client = await getClient()
@@ -42,11 +50,10 @@ export function VoiceInput({ onTranscription, disabled }: VoiceInputProps) {
       try {
         const client = await getClient()
         const audio = await client.stopRecording()
-        if (audio.length > 0) {
-          const text = await client.transcribe(audio)
-          if (text.trim()) {
-            onTranscription(text.trim())
-          }
+        // audio may be empty for backend path (uses blob side channel)
+        const text = await client.transcribe(audio)
+        if (text.trim()) {
+          onTranscription(text.trim())
         }
       } catch (err) {
         console.error('[VoiceInput] Transcription failed:', err)
@@ -64,7 +71,7 @@ export function VoiceInput({ onTranscription, disabled }: VoiceInputProps) {
       className={`flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors ${
         state === 'recording'
           ? 'bg-red-500/20 text-red-500'
-          : state === 'processing'
+          : state === 'processing' || state === 'loading'
             ? 'bg-muted/30 text-muted-foreground'
             : 'text-muted-foreground/50 hover:text-foreground hover:bg-muted/20'
       } disabled:opacity-30`}
@@ -73,18 +80,24 @@ export function VoiceInput({ onTranscription, disabled }: VoiceInputProps) {
           ? 'Click to stop recording'
           : state === 'processing'
             ? 'Transcribing...'
-            : 'Click to record'
+            : state === 'loading'
+              ? `Loading model (${loadingProgress}%)`
+              : 'Click to record'
       }
       title={
         state === 'recording'
           ? 'Click to stop'
           : state === 'processing'
             ? 'Transcribing...'
-            : 'Voice input'
+            : state === 'loading'
+              ? `Loading Whisper model... ${loadingProgress}%`
+              : 'Voice input'
       }
     >
       {state === 'processing' ? (
         <Loader2 className="size-3.5 animate-spin" />
+      ) : state === 'loading' ? (
+        <Download className="size-3.5 animate-pulse" />
       ) : state === 'recording' ? (
         <MicOff className="size-3.5 animate-pulse" />
       ) : (
