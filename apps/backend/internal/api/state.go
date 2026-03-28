@@ -807,7 +807,46 @@ func (s *Server) GetIssueDiff(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-				// Legacy fallback: no base_sha/branch_name on this issue
+				// Fallback: no base_sha/branch_name — try to find the worktree by
+				// scanning the worktree root for a directory belonging to this project.
+				// This avoids diffing the shared project root which leaks other issues' changes.
+				if s.worktreeRoot != "" {
+					projectWTDir := filepath.Join(s.worktreeRoot, project.ID)
+					if entries, err := os.ReadDir(projectWTDir); err == nil {
+						for _, entry := range entries {
+							if !entry.IsDir() {
+								continue
+							}
+							wtPath := filepath.Join(projectWTDir, entry.Name())
+							// Check if this worktree belongs to the current issue by looking
+							// for the issue identifier in the branch name or directory name
+							if !strings.Contains(strings.ToLower(entry.Name()), strings.ToLower(identifier)) {
+								continue
+							}
+							// Compute diff inside the worktree: committed + uncommitted
+							var allDiff []byte
+							baseSHA, baseErr := git.MergeBase(r.Context(), wtPath, "HEAD", "main")
+							if baseErr == nil && baseSHA != "" {
+								committed, err := git.BranchDiff(r.Context(), wtPath, baseSHA, "HEAD")
+								if err == nil && len(committed) > 0 {
+									allDiff = append(allDiff, []byte(committed)...)
+								}
+							}
+							uncommitted, err := git.WorktreeDiff(r.Context(), wtPath)
+							if err == nil && len(uncommitted) > 0 {
+								allDiff = append(allDiff, []byte(uncommitted)...)
+							}
+							if len(allDiff) > 0 {
+								w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+								w.WriteHeader(http.StatusOK)
+								_, _ = w.Write(allDiff)
+								return
+							}
+						}
+					}
+				}
+
+				// Last resort: diff the project root (may include other issues' changes)
 				if diff := s.legacyDiff(r, project.RootPath); len(diff) > 0 {
 					w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 					w.WriteHeader(http.StatusOK)
