@@ -93,17 +93,9 @@ func (s *Server) TerminalWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Send data to client — filter JSON noise for agent sessions
-	isAgentSession := strings.HasPrefix(sessionID, "issue-")
+	// Send all data to client — agents run in interactive mode (full TUI),
+	// no JSON filtering needed.
 	handlerID := session.AddHandler(func(data []byte) {
-		if isAgentSession {
-			// Filter agent stream-json output to show only human-readable content
-			filtered := filterAgentOutput(data)
-			if len(filtered) == 0 {
-				return
-			}
-			data = filtered
-		}
 		err := conn.WriteMessage(websocket.BinaryMessage, data)
 		if err != nil {
 			// Don't log as error, it just means client disconnected

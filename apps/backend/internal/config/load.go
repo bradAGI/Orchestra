@@ -22,11 +22,14 @@ func Load() (Config, error) {
 	}
 	agentProviderDefault := "CODEX"
 	agentMaxTurnsDefault := 10
+	// Agent commands run in interactive yolo mode (full TUI, auto-approve).
+	// The orchestrator delivers the prompt via PTY stdin after the agent boots.
+	// Token tracking comes from the telemetry watcher reading session files on disk.
 	agentCommandsDefault := map[string]string{
-		"CODEX":    "codex exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox --json {{prompt}}",
-		"CLAUDE":   "claude -p {{prompt}} --output-format stream-json --verbose --dangerously-skip-permissions",
-		"OPENCODE": "opencode run {{prompt}} --format json",
-		"GEMINI":   "gemini -p {{prompt}} --output-format stream-json --approval-mode yolo",
+		"CLAUDE":   "claude --dangerously-skip-permissions",
+		"CODEX":    "codex --full-auto",
+		"GEMINI":   "gemini --yolo",
+		"OPENCODE": "opencode -p {{prompt}}",
 	}
 
 	host := getenvOrEmpty("ORCHESTRA_SERVER_HOST")

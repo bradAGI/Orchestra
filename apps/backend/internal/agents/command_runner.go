@@ -410,14 +410,19 @@ func (r *CommandRunner) runInPTY(
 		time.Sleep(100 * time.Millisecond) // Brief pause for cd to complete
 	}
 
-	// Send the command/prompt to the PTY
-	if !commandContainsPrompt {
-		session.Write([]byte(finalPrompt + "\n"))
-	} else {
-		// If the command itself was resolved with the prompt, we might need a different approach.
-		// For now, assume resolvedCommand is what we want to run if it's a new session.
-		// But in a persistent PTY, we usually just want to send the prompt to an existing shell.
+	// Send the agent command and prompt to the PTY.
+	// For interactive agents (no {{prompt}} in command), launch the agent CLI first,
+	// wait for it to boot, then send the prompt as the first user message.
+	// For headless agents ({{prompt}} baked in), send the resolved command directly.
+	if commandContainsPrompt {
 		session.Write([]byte(resolvedCommand + "\n"))
+	} else {
+		// Launch the interactive agent CLI
+		session.Write([]byte(resolvedCommand + "\n"))
+		// Give the agent time to boot its TUI before sending the prompt
+		time.Sleep(2 * time.Second)
+		// Send the prompt as the first user message
+		session.Write([]byte(finalPrompt + "\n"))
 	}
 
 	// Wait for completion or timeout
