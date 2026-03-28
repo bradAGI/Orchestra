@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/websocket"
+	"github.com/orchestra/orchestra/apps/backend/internal/terminal"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
 )
 
@@ -61,33 +62,24 @@ func (s *Server) TerminalWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	// Default to bash
-	command := "/bin/bash"
-	args := []string{}
+	// For issue-scoped sessions, try to attach to an existing PTY first.
+	// The orchestrator (command_runner.go runInPTY) is responsible for launching
+	// the agent — the WebSocket handler just provides a window into it.
+	// Only create a new bash session if no existing session is found.
+	var session *terminal.Session
 
-	// If this is an issue session, we launch the specific agent command
 	if strings.HasPrefix(sessionID, "issue-") {
-		issueIdentifier := strings.TrimPrefix(sessionID, "issue-")
-		// Find the issue to get its provider
-		if issues, err := s.orchestrator.ListIssues(r.Context(), tracker.IssueFilter{}); err == nil {
-			for _, issue := range issues {
-				if issue.Identifier == issueIdentifier {
-					provider := strings.ToUpper(strings.TrimSpace(issue.Provider))
-					if provider == "" {
-						provider = s.config.AgentProvider
-					}
-
-					if cmd, ok := s.config.AgentCommands[provider]; ok && cmd != "" {
-						// Use shell to run the agent command so we can see its TUI if it has one
-						args = []string{"-c", cmd}
-					}
-					break
-				}
-			}
+		existing := s.termManager.GetSession(sessionID)
+		if existing != nil && !existing.Closed {
+			session = existing
+		} else {
+			// No agent session yet — create a plain bash shell in the worktree.
+			// The orchestrator will launch the agent when it dispatches.
+			session, err = s.termManager.CreateSession(sessionID, dir, "/bin/bash")
 		}
+	} else {
+		session, err = s.termManager.CreateSession(sessionID, dir, "/bin/bash")
 	}
-
-	session, err := s.termManager.CreateSession(sessionID, dir, command, args...)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("failed to create terminal session")
 		return
