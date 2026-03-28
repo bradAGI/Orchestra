@@ -348,7 +348,7 @@ export function IssueDetailView({
   const tabItems = [
     { id: 'details' as const, label: 'Details', icon: Info, count: undefined },
     { id: 'plan' as const, label: 'Plan', icon: CheckCircle2, count: planItems.length > 0 ? planItems.length : undefined },
-    { id: 'output' as const, label: 'Session', icon: Terminal, count: undefined },
+    { id: 'output' as const, label: 'Terminal', icon: Terminal, count: undefined },
     { id: 'changes' as const, label: 'Changes', icon: FileText, count: diffFiles.length > 0 ? diffFiles.length : undefined },
   ]
 
@@ -649,10 +649,10 @@ export function IssueDetailView({
           </div>
         )}
 
-        {/* Session — embedded terminal view for the issue's agent PTY */}
+        {/* Terminal — embedded terminal view for the issue's agent PTY */}
         {bottomTab === 'output' && (
           <div className="h-full">
-            {config && (isRunning || localState === 'In Progress' || localState === 'Review' || localState === 'Done') ? (
+            {config && isRunning ? (
               <div className="w-full h-full px-2 py-1">
                 <TerminalView
                   sessionId={`issue-${identifier}`}
@@ -661,6 +661,12 @@ export function IssueDetailView({
                   apiToken={config.token}
                   theme={theme}
                 />
+              </div>
+            ) : config && (localState === 'Review' || localState === 'Done') ? (
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground/20 gap-3">
+                <Terminal size={36} />
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Session completed</p>
+                <p className="text-[10px] text-muted-foreground/40">Agent finished execution. Review changes in the Changes tab.</p>
               </div>
             ) : (
               <SessionTimeline logs={logs} loading={logsLoading} />
