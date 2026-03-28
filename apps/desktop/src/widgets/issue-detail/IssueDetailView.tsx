@@ -332,10 +332,10 @@ export function IssueDetailView({
     }
   }
 
-  const handleReject = async (feedback: string) => {
+  const handleReject = async (feedback: string, targetState: 'Todo' | 'In Progress') => {
     setShowFeedback(false)
-    setLocalState('Todo')
-    onUpdate?.({ state: 'Todo', feedback })
+    setLocalState(targetState)
+    onUpdate?.({ state: targetState, feedback })
   }
 
   if (!result) {
