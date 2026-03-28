@@ -84,7 +84,7 @@ export function SettingsCard({
   initialTab?: 'backend' | 'agents' | 'integrations' | 'shortcuts' | 'notifications'
 }) {
   const { isMac } = usePlatform()
-  const [activeTab, setActiveTab] = useState<'backend' | 'agents' | 'integrations' | 'shortcuts' | 'notifications'>(initialTab ?? 'backend')
+  const [activeTab, setActiveTab] = useState<'backend' | 'integrations' | 'shortcuts' | 'notifications'>(initialTab === 'agents' ? 'backend' : (initialTab ?? 'backend'))
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -93,10 +93,9 @@ export function SettingsCard({
 
   const tabs = [
     { id: 'backend', label: 'Backend', tooltip: 'Configure backend profiles and API connection', icon: <Database className="h-3.5 w-3.5" /> },
-    { id: 'agents', label: 'Agents', tooltip: 'Agent configuration (moved to Agents dashboard)', icon: <Cpu className="h-3.5 w-3.5" /> },
     { id: 'integrations', label: 'Integrations', tooltip: 'Configure external service connections', icon: <Globe className="h-3.5 w-3.5" /> },
     { id: 'notifications', label: 'Notifications', tooltip: 'Sound and notification preferences', icon: <Bell className="h-3.5 w-3.5" /> },
-{ id: 'shortcuts', label: 'Shortcuts', tooltip: 'View global keyboard shortcuts', icon: <Keyboard className="h-3.5 w-3.5" /> },
+    { id: 'shortcuts', label: 'Shortcuts', tooltip: 'View global keyboard shortcuts', icon: <Keyboard className="h-3.5 w-3.5" /> },
   ] as const
 
   return (
@@ -178,19 +177,7 @@ export function SettingsCard({
             </div>
           )}
 
-          {activeTab === 'agents' && (
-            <div className="space-y-6 flex-1 flex flex-col items-center justify-center text-center py-12">
-              <Cpu className="h-10 w-10 text-muted-foreground/20" />
-              <div className="space-y-2">
-                <p className="text-sm font-bold text-foreground">Agent configuration has moved</p>
-                <p className="text-[11px] text-muted-foreground max-w-sm">
-                  Configure commands, models, permissions, hooks, and MCP servers per-provider in the Agents dashboard.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'integrations' && (
+{activeTab === 'integrations' && (
             <div className="space-y-6">
               <EmbeddedAgentConfigForm config={config} disabled={savingConfig || loadingConfig} />
               <UnsandboxConfigForm config={config} disabled={savingConfig || loadingConfig} />
