@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Activity, Bell, Check, CheckCircle2, CircleDashed, Database, ExternalLink, Eye, EyeOff, Github, Globe, Info, Keyboard, Loader2, Play, Plus, RefreshCcw, Settings2, ShieldCheck, SignalHigh, Terminal, Trash2, Users, Zap } from 'lucide-react'
+import { Activity, Bell, Check, CheckCircle2, CircleDashed, Cpu, Database, ExternalLink, Eye, EyeOff, Github, Globe, Info, Keyboard, Loader2, Play, Plus, RefreshCcw, Settings2, ShieldCheck, SignalHigh, Terminal, Trash2, Users, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AppTooltip } from '@/components/ui/tooltip-wrapper'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -37,7 +37,7 @@ export function SettingsCard({
   migrationFrom: _migrationFrom,
   migrationTo: _migrationTo,
   migrationPlan: _migrationPlan,
-  agentConfig,
+  agentConfig: _agentConfig,
   onMigrationFromChange: _onMigrationFromChange,
   onMigrationToChange: _onMigrationToChange,
   onMigrationPlan: _onMigrationPlan,
@@ -46,7 +46,7 @@ export function SettingsCard({
   onSetActiveProfile,
   onCreateProfile,
   onDeleteProfile,
-  onSaveAgentConfig,
+  onSaveAgentConfig: _onSaveAgentConfig,
   notifSound,
   notifMuted,
   notifVolume,
@@ -93,7 +93,7 @@ export function SettingsCard({
 
   const tabs = [
     { id: 'backend', label: 'Backend', tooltip: 'Configure backend profiles and API connection', icon: <Database className="h-3.5 w-3.5" /> },
-    { id: 'agents', label: 'Agents', tooltip: 'Set provider commands and default runner', icon: <Zap className="h-3.5 w-3.5" /> },
+    { id: 'agents', label: 'Agents', tooltip: 'Agent configuration (moved to Agents dashboard)', icon: <Cpu className="h-3.5 w-3.5" /> },
     { id: 'integrations', label: 'Integrations', tooltip: 'Configure external service connections', icon: <Globe className="h-3.5 w-3.5" /> },
     { id: 'notifications', label: 'Notifications', tooltip: 'Sound and notification preferences', icon: <Bell className="h-3.5 w-3.5" /> },
 { id: 'shortcuts', label: 'Shortcuts', tooltip: 'View global keyboard shortcuts', icon: <Keyboard className="h-3.5 w-3.5" /> },
@@ -179,22 +179,14 @@ export function SettingsCard({
           )}
 
           {activeTab === 'agents' && (
-            <div className="space-y-6 flex-1 flex flex-col">
-              {agentConfig ? (
-                <div className="group relative rounded-2xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 p-6 shadow-sm transition-all hover:shadow-md overflow-hidden">
-                  <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                  <AgentConfigForm
-                    agentConfig={agentConfig}
-                    onSave={onSaveAgentConfig}
-                    disabled={savingConfig || loadingConfig}
-                  />
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/60 bg-muted/5 py-16 text-center text-muted-foreground">
-                  <Activity className="h-8 w-8 opacity-20 mb-3" />
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em]">No agent configuration loaded</p>
-                </div>
-              )}
+            <div className="space-y-6 flex-1 flex flex-col items-center justify-center text-center py-12">
+              <Cpu className="h-10 w-10 text-muted-foreground/20" />
+              <div className="space-y-2">
+                <p className="text-sm font-bold text-foreground">Agent configuration has moved</p>
+                <p className="text-[11px] text-muted-foreground max-w-sm">
+                  Configure commands, models, permissions, hooks, and MCP servers per-provider in the Agents dashboard.
+                </p>
+              </div>
             </div>
           )}
 
@@ -376,82 +368,8 @@ export function SettingsCard({
   )
 }
 
-function AgentConfigForm({
-  agentConfig,
-  onSave,
-  disabled,
-}: {
-  agentConfig: { commands: Record<string, string>; agent_provider: string; max_turns: number }
-  onSave: (config: { commands: Record<string, string>; agent_provider: string; max_turns: number }) => Promise<void>
-  disabled: boolean
-}) {
-  const [provider, _setProvider] = useState(agentConfig.agent_provider || '')
-  const [commands, setCommands] = useState(agentConfig.commands || {})
-  const [maxTurns, setMaxTurns] = useState(agentConfig.max_turns || 10)
-
-  const handleCommandChange = (key: string, value: string) => {
-    setCommands((prev) => ({ ...prev, [key]: value }))
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Terminal className="h-3.5 w-3.5 text-primary" />
-          <h4 className="text-[10px] font-black uppercase tracking-widest text-foreground/80">Runner Executables</h4>
-        </div>
-        <div className="grid gap-2">
-          {Object.keys(commands).length === 0 ? (
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 p-4 border border-dashed rounded-xl">No runners configured.</p>
-          ) : Object.keys(commands).map((p) => (
-            <div key={p} className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 border border-border/40 transition-all hover:bg-muted/30">
-              <span className="min-w-[100px] text-[10px] font-black uppercase tracking-widest text-primary/70">{p}</span>
-              <input
-                className="h-9 flex-1 rounded-lg border border-border/60 bg-background px-3 text-xs font-mono focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                value={commands[p]}
-                onChange={(e) => handleCommandChange(p, e.target.value)}
-                placeholder="Executable path or command..."
-                disabled={disabled}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Activity className="h-3.5 w-3.5 text-primary" />
-          <h4 className="text-[10px] font-black uppercase tracking-widest text-foreground/80">Max Agent Turns</h4>
-        </div>
-        <p className="text-[10px] text-muted-foreground">Maximum number of turns before the agent stops. Range: 1-50.</p>
-        <div className="flex items-center gap-4 p-3 rounded-xl bg-muted/20 border border-border/40">
-          <input
-            type="range"
-            min={1}
-            max={50}
-            step={1}
-            value={maxTurns}
-            onChange={(e) => setMaxTurns(Number(e.target.value))}
-            disabled={disabled}
-            className="flex-1 accent-primary"
-          />
-          <span className="min-w-[40px] text-center text-sm font-black tabular-nums text-primary">{maxTurns}</span>
-        </div>
-      </div>
-
-      <div className="flex justify-end pt-4 border-t border-border/40">
-        <Button
-          size="sm"
-          onClick={() => void onSave({ agent_provider: provider, commands, max_turns: maxTurns })}
-          disabled={disabled || !provider}
-          className="px-6 font-black uppercase tracking-widest text-[9px] h-9 rounded-lg"
-        >
-          {disabled ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : 'Update Agent Configuration'}
-        </Button>
-      </div>
-    </div>
-  )
-}
+// AgentConfigForm removed — agent configuration (commands, models, permissions,
+// hooks, MCP servers) is now managed per-provider in the Agents dashboard.
 
 function BackendConfigForm({
   loadingConfig: _loadingConfig,
