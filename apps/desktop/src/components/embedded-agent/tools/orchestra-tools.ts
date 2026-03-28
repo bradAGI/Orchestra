@@ -66,11 +66,13 @@ export function createOrchestraTools(config: BackendConfig) {
       description:
         'Create a new issue with title, description, state, project, and optional provider assignment. ' +
         'Use when the user asks to create, add, or file a new issue, task, or ticket. ' +
-        'IMPORTANT: Always ask the user which project to assign or call list_projects/find_projects first to resolve the project_id. ' +
+        'IMPORTANT: You MUST always provide both a title AND a description. Never create an issue with an empty description. ' +
+        'If the user only gives a title, write a clear description yourself based on context. ' +
+        'Always ask the user which project to assign or call list_projects/find_projects first to resolve the project_id. ' +
         'Defaults to state="Backlog". Valid states: Backlog, Todo, In Progress, Review, Done. Returns the created issue with its identifier.',
       inputSchema: z.object({
-        title: z.string().describe('Title of the issue'),
-        description: z.string().optional().default('').describe('Description of the issue'),
+        title: z.string().min(1).describe('Title of the issue — concise and descriptive'),
+        description: z.string().min(1).describe('Description of what needs to be done — REQUIRED, never leave empty'),
         state: z.string().optional().default('Backlog').describe('Initial state: Backlog, Todo, In Progress, Review, Done'),
         project_id: z.string().describe('Project ID to assign the issue to. Call list_projects or find_projects first to get available IDs.'),
         provider: z.string().optional().describe('Agent provider to assign (e.g. "claude", "openai")'),
