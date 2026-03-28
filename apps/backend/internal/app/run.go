@@ -134,7 +134,7 @@ func Run(logger zerolog.Logger) error {
 	}
 
 	toolExecutor := tools.NewLinearToolExecutor(trackerClient)
-	go startExecutionWorker(orchestratorService, agentRegistry, provider, cfg.AgentProvider, cfg.WorkspaceRoot, cfg.WorkflowFile, cfg.AgentMaxTurns, toolExecutor.Execute, tools.TrackerToolSpecs(), cfg.WorkspaceHooks, pubsub, warehouseDB, ufLogger, termManager, logger)
+	go startExecutionWorker(orchestratorService, agentRegistry, provider, cfg.AgentProvider, cfg.WorkspaceRoot, cfg.WorkflowFile, cfg.AgentMaxTurns, toolExecutor.Execute, tools.TrackerToolSpecs(), cfg.WorkspaceHooks, pubsub, warehouseDB, ufLogger, termManager, &cfg, logger)
 
 	logger.Info().Str("addr", addr).Str("service_id", runtime.ServiceOrchestrator).Msg("starting orchestrad")
 
@@ -197,6 +197,7 @@ func startExecutionWorker(
 	warehouseDB *db.DB,
 	ufLogger *unfirehose.Logger,
 	termManager *terminal.Manager,
+	cfg *config.Config,
 	logger zerolog.Logger,
 ) {
 	workspaceService := workspace.Service{Root: workspaceRoot}
@@ -204,7 +205,7 @@ func startExecutionWorker(
 	defer ticker.Stop()
 
 	for range ticker.C {
-		processExecutionTick(service, workspaceService, registry, provider, providerName, workspaceRoot, workflowFile, agentMaxTurns, toolExecutor, toolSpecs, workspaceHooks, pubsub, warehouseDB, ufLogger, termManager, logger)
+		processExecutionTick(service, workspaceService, registry, provider, providerName, workspaceRoot, workflowFile, agentMaxTurns, toolExecutor, toolSpecs, workspaceHooks, pubsub, warehouseDB, ufLogger, termManager, cfg, logger)
 	}
 }
 
@@ -227,6 +228,7 @@ func processExecutionTick(
 	warehouseDB *db.DB,
 	ufLogger *unfirehose.Logger,
 	termManager *terminal.Manager,
+	cfg *config.Config,
 	logger zerolog.Logger,
 ) {
 	entry, ok := service.ClaimNextRunnable()
@@ -797,7 +799,21 @@ func processExecutionTick(
 
 			comment += "---\n*Automatically posted by [Orchestra](https://github.com/Traves-Theberge/Orchestra)*"
 
-			if err := ghutil.PostIssueComment(context.Background(), project.GitHubOwner, project.GitHubRepo, project.GitHubToken, issueNumber, comment); err != nil {
+			// Resolve a valid token, refreshing if expired
+			token, updatedJSON, tokenErr := ghutil.RefreshableToken(context.Background(), project.GitHubToken, cfg.GitHubClientID, cfg.GitHubClientSecret)
+			if tokenErr != nil {
+				logger.Warn().Err(tokenErr).Str("issue_id", entry.IssueID).Msg("failed to resolve github token for comment")
+				return
+			}
+			if updatedJSON != "" {
+				if enc, encErr := db.EncryptToken(updatedJSON); encErr == nil {
+					if _, dbErr := warehouseDB.ExecContext(context.Background(), "UPDATE projects SET github_token = ? WHERE id = ?", enc, project.ID); dbErr == nil {
+						logger.Info().Str("project_id", project.ID).Msg("refreshed and persisted github token in execution worker")
+					}
+				}
+			}
+
+			if err := ghutil.PostIssueComment(context.Background(), project.GitHubOwner, project.GitHubRepo, token, issueNumber, comment); err != nil {
 				logger.Warn().Err(err).Str("issue_id", entry.IssueID).Msg("failed to post GitHub comment")
 			} else {
 				logger.Info().Str("issue_id", entry.IssueID).Int("github_issue", issueNumber).Msg("posted completion comment to GitHub")

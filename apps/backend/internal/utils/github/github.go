@@ -9,6 +9,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"golang.org/x/oauth2"
+	githuboauth "golang.org/x/oauth2/github"
 )
 
 // PRRequest represents the payload for creating a GitHub pull request.
@@ -531,4 +534,66 @@ func CreatePullRequest(ctx context.Context, owner, repo, token string, pr PRRequ
 	}
 
 	return &prResp, nil
+}
+
+// TokenFromStored deserializes a stored token string.
+// It handles both legacy plain access tokens and the newer JSON format
+// that includes refresh token and expiry.
+func TokenFromStored(stored string) (*oauth2.Token, error) {
+	var tok oauth2.Token
+	if err := json.Unmarshal([]byte(stored), &tok); err != nil {
+		// Legacy format: plain access token string
+		return &oauth2.Token{AccessToken: stored}, nil
+	}
+	// Sanity check: JSON parsed but no access token means it's not a valid token
+	if tok.AccessToken == "" {
+		return &oauth2.Token{AccessToken: stored}, nil
+	}
+	return &tok, nil
+}
+
+// RefreshableToken returns a valid access token, refreshing if needed.
+// If the token was refreshed, updatedTokenJSON contains the new serialized
+// token that should be persisted. If no refresh was needed, updatedTokenJSON
+// is empty. For legacy plain-text tokens with no expiry, the token is returned
+// as-is.
+func RefreshableToken(ctx context.Context, stored, clientID, clientSecret string) (accessToken string, updatedTokenJSON string, err error) {
+	tok, err := TokenFromStored(stored)
+	if err != nil {
+		return "", "", err
+	}
+
+	// If no expiry set (legacy token) or token is still valid, use as-is
+	if tok.Expiry.IsZero() || tok.Valid() {
+		return tok.AccessToken, "", nil
+	}
+
+	// Token expired — try refresh
+	if tok.RefreshToken == "" {
+		return "", "", fmt.Errorf("token expired and no refresh token available — re-authenticate required")
+	}
+
+	if clientID == "" || clientSecret == "" {
+		return "", "", fmt.Errorf("token expired and OAuth client credentials not configured — re-authenticate required")
+	}
+
+	conf := &oauth2.Config{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		Endpoint:     githuboauth.Endpoint,
+	}
+
+	src := conf.TokenSource(ctx, tok)
+	newTok, err := src.Token()
+	if err != nil {
+		return "", "", fmt.Errorf("token refresh failed — re-authenticate required: %w", err)
+	}
+
+	// Serialize refreshed token for persistence
+	tokenJSON, err := json.Marshal(newTok)
+	if err != nil {
+		return newTok.AccessToken, "", nil // use token even if we can't serialize
+	}
+
+	return newTok.AccessToken, string(tokenJSON), nil
 }

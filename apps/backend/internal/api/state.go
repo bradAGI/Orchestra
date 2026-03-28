@@ -56,8 +56,13 @@ func (s *Server) CreateGitHubPR(w http.ResponseWriter, r *http.Request) {
 				if body.Repo == "" {
 					body.Repo = project.GitHubRepo
 				}
-				if body.Token == "" {
-					body.Token = project.GitHubToken
+				if body.Token == "" && project.GitHubToken != "" {
+					if resolved, err := s.resolveGitHubToken(r.Context(), project); err == nil {
+						body.Token = resolved
+					} else {
+						s.logger.Warn().Err(err).Str("project_id", projectID).Msg("failed to resolve github token for PR creation")
+						body.Token = project.GitHubToken // fall back to raw token
+					}
 				}
 
 				// If still missing owner/repo, try to parse from remote URL

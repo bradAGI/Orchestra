@@ -142,6 +142,7 @@ func TestProcessExecutionTickPublishesSuccessLifecycleEvents(t *testing.T) {
 		warehouseDB,
 		nil,
 		nil,
+		&config.Config{},
 		zerolog.Nop(),
 	)
 
@@ -205,6 +206,7 @@ func TestProcessExecutionTickPublishesFailureAndRetryLifecycleEvents(t *testing.
 		warehouseDB,
 		nil,
 		nil,
+		&config.Config{},
 		zerolog.Nop(),
 	)
 
@@ -285,6 +287,7 @@ func TestProcessExecutionTickDoesNotPublishRetryWhenAttemptExceedsMax(t *testing
 		warehouseDB,
 		nil,
 		nil,
+		&config.Config{},
 		zerolog.Nop(),
 	)
 
@@ -428,6 +431,7 @@ func TestProcessExecutionTickPreservesRateLimitsFromMixedNestedEnvelope(t *testi
 		warehouseDB,
 		nil,
 		nil,
+		&config.Config{},
 		zerolog.Nop(),
 	)
 
@@ -475,6 +479,7 @@ func TestProcessExecutionTickSkipsBeforeRunHookAfterFirstTurn(t *testing.T) {
 		warehouseDB,
 		nil,
 		nil,
+		&config.Config{},
 		zerolog.Nop(),
 	)
 
@@ -523,6 +528,7 @@ func TestProcessExecutionTickPublishesBeforeRunHookFailureCause(t *testing.T) {
 		warehouseDB,
 		nil,
 		nil,
+		&config.Config{},
 		zerolog.Nop(),
 	)
 
