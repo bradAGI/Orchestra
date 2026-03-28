@@ -369,9 +369,17 @@ function createWindow() {
   win.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     // In dev mode, Vite injects inline scripts for React fast refresh preamble
     const scriptSrc = isDev ? "'self' 'unsafe-inline'" : "'self'"
+    // Allow connections to backend (loopback) and LLM provider APIs for
+    // the embedded agent model listing and inference.
+    const providerAPIs = [
+      'https://openrouter.ai',
+      'https://api.openai.com',
+      'https://api.anthropic.com',
+      'https://generativelanguage.googleapis.com',
+    ].join(' ')
     const connectSrc = isDev
-      ? "'self' http://127.0.0.1:* ws://127.0.0.1:* ws://localhost:*"
-      : "'self' http://127.0.0.1:* ws://127.0.0.1:*"
+      ? `'self' http://127.0.0.1:* ws://127.0.0.1:* ws://localhost:* ${providerAPIs}`
+      : `'self' http://127.0.0.1:* ws://127.0.0.1:* ${providerAPIs}`
     callback({
       responseHeaders: {
         ...details.responseHeaders,
