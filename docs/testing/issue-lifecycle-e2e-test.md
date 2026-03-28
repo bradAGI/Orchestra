@@ -1,14 +1,15 @@
 # Issue Lifecycle — End-to-End Test Plan
 
-> Run this test to verify the full issue pipeline: creation, planning, execution, review, feedback, and merge.
+> Run this test to verify the full issue pipeline: creation, planning, execution, review, PR creation, feedback loop, and cleanup.
 
 ## Prerequisites
 
 - Backend running (`orchestrad` built and started)
 - Desktop app running (Electron or `npm run dev:linux`)
-- At least one project registered with a valid `root_path`
-- Chrome DevTools available for inspection
+- At least one project registered with a valid `root_path` and GitHub remote
+- `expect-cli` installed (`npm install -g expect-cli`)
 - Agent CLI installed (e.g. `claude` on PATH)
+- `EXPECT_BASE_URL` set to the app URL (e.g. `http://localhost:5173`)
 
 ---
 
@@ -25,54 +26,71 @@
 - [ ] Issue appears on the Kanban board in the Backlog column
 - [ ] Issue identifier is generated (e.g. `PROJ-1`)
 
+**expect-cli:**
+```bash
+expect-cli -m "Navigate to task board. Click Create Task. Fill in title 'Test Task', description 'Test the full lifecycle', select a project, select Claude as provider. Submit. Verify task appears in Backlog column with identifier." -y
+```
+
 ---
 
 ## Step 2: Move to Todo
 
-**Action:** Drag the issue from Backlog to the **Todo** column (or change state via dropdown).
+**Action:** Click the issue to open inspector, click "Move to Todo".
 
 **Verify:**
 - [ ] State changes to **Todo**
-- [ ] Orchestrator claims the issue (check terminal logs or SSE events)
+- [ ] Orchestrator claims the issue (SSE event or terminal activity)
 - [ ] Git worktree is created at `{worktree_root}/{project_id}/{branch_name}`
-- [ ] `base_sha` is recorded on the issue (merge-base with main)
+- [ ] `base_sha` is recorded on the issue
 - [ ] `branch_name` is recorded on the issue
+
+**expect-cli:**
+```bash
+expect-cli -m "Find the test task in Backlog. Click it to open inspector. Click 'Move to Todo'. Verify state changes. Wait 30s and check if orchestrator picks it up (task may auto-advance to InProgress)." -y
+```
 
 ---
 
 ## Step 3: Verify Planning Phase (Todo)
 
-**Action:** Open the Issue Inspector by clicking the issue.
+**Action:** Open the Issue Inspector while in Todo state.
 
 ### Plan Tab
 - [ ] Agent is running in **PLAN ONLY** mode (max 1 turn)
-- [ ] Agent explores codebase briefly (2-3 tool calls)
 - [ ] Agent outputs a plan as markdown checkboxes (`- [ ] Step 1: ...`)
 - [ ] Plan tab displays the extracted checkboxes
-- [ ] Plan has 5-10 actionable steps
 
-### Session Tab
-- [ ] Shows the agent's session output (planning activity)
-- [ ] Events stream in real-time via SSE
+### Terminal Tab
+- [ ] Shows live agent TUI output (interactive mode)
+- [ ] Agent is in the worktree directory
 
 ### Changes Tab
 - [ ] **Empty** — no code changes during planning phase
-- [ ] Shows "No changes detected" or similar empty state
 
 ### Title & Description
-- [ ] Title and description are still **editable** (Backlog → Todo allows editing)
+- [ ] Title and description are still **editable** in Todo state
+
+**expect-cli:**
+```bash
+expect-cli -m "Open the test task inspector. Check Plan tab for checkboxes. Check Terminal tab for live agent output. Check Changes tab is empty. Verify title/description are editable." -y
+```
 
 ---
 
-## Step 4: Verify Terminal
+## Step 4: Verify Terminal Session
 
-**Action:** Switch to the Terminal tab in the main UI.
+**Action:** Switch to the Terminals section in sidebar.
 
-- [ ] A terminal session exists for this issue (named with issue identifier)
-- [ ] Terminal shows the **correct agent** running (matches the assigned provider)
-- [ ] Agent is running in the issue's **worktree directory** (not the project root)
+- [ ] A terminal session exists for this issue
+- [ ] Terminal shows the **correct agent** running (matches assigned provider)
+- [ ] Agent is in the issue's **worktree directory** (not project root)
 - [ ] Terminal shows interactive TUI output (not JSON noise)
 - [ ] No text injection from other sessions
+
+**expect-cli:**
+```bash
+expect-cli -m "Click Terminals in the sidebar. Look for a terminal tab for the test issue. Verify agent is running with interactive TUI output. Take screenshot." -y
+```
 
 ---
 
@@ -83,8 +101,8 @@
 **Verify:**
 - [ ] State automatically advances from **Todo** to **InProgress**
 - [ ] No manual intervention required
-- [ ] Title and description are now **read-only** (not editable in InProgress)
-- [ ] The plan from the Todo phase is preserved in the Plan tab
+- [ ] Title and description become **read-only**
+- [ ] Plan from Todo phase is preserved in Plan tab
 
 ---
 
@@ -94,30 +112,24 @@
 
 ### Plan Tab
 - [ ] Shows the plan from the Todo phase
-- [ ] Checkboxes may update as the agent completes steps
-- [ ] Plan items are not lost or reset
+- [ ] Checkboxes may update as agent completes steps
 
-### Session Tab
-- [ ] Shows the execution session output
-- [ ] Events stream in real-time
-- [ ] Session content mirrors the Terminal tab output
-- [ ] Agent is in **EXECUTE** mode (writing code, running tests, committing)
+### Terminal Tab
+- [ ] Shows live execution — agent writing code, running tests
+- [ ] Same content as the Terminals section for this issue
 
 ### Changes Tab
 - [ ] Changes appear as the agent writes code
-- [ ] Shows the **worktree diff** (only this issue's changes, not other issues)
-- [ ] File list shows files changed by this agent
-- [ ] Diff content is correct (additions in green, deletions in red)
-- [ ] No files from other issues leak into this diff
+- [ ] Shows **worktree diff only** (not other issues' changes)
+- [ ] File list accurate, diff content correct
 
-### Terminal Tab
-- [ ] Agent is still running in the same terminal session
-- [ ] Terminal shows interactive execution (not JSON)
-- [ ] User can observe the agent working in real-time
+### Title & Description
+- [ ] **Read-only** — not editable in InProgress
 
-### Token Tracking
-- [ ] Analytics dashboard shows token usage for this session
-- [ ] Provider is correctly attributed (matches assigned agent)
+**expect-cli:**
+```bash
+expect-cli -m "Open the test task inspector. Verify state is InProgress. Check Plan tab still has checkboxes. Check Terminal tab shows live agent execution. Check Changes tab shows files being modified. Verify title is not editable." -y
+```
 
 ---
 
@@ -136,107 +148,178 @@
 
 **Action:** Open the Issue Inspector in Review state.
 
-### Plan Tab
-- [ ] Plan checkboxes are checked off (completed steps marked `[x]`)
-- [ ] Plan is complete or shows which steps were done
+### Header Buttons
+- [ ] **Create PR** button is visible (primary/green)
+- [ ] **Request Changes** button is visible (secondary/outline)
+- [ ] **Close** button is visible (red/destructive)
+- [ ] Old "Merge & Close" button is gone (unless no GitHub remote)
 
-### Session Tab
-- [ ] Session is complete (no longer streaming)
-- [ ] Full session history is viewable
-- [ ] Session log shows both planning and execution phases
+### Plan Tab
+- [ ] Plan checkboxes are checked off (completed steps)
+
+### Terminal Tab
+- [ ] Shows "Session completed" message (agent not running)
 
 ### Changes Tab
-- [ ] All changes from the execution phase are visible
-- [ ] Diff is computed from the **worktree** (isolated from other issues)
-- [ ] File count and line counts are accurate
-- [ ] Changes are the final state (committed + uncommitted)
+- [ ] All changes from execution are visible
+- [ ] Diff computed from **worktree** (isolated, no cross-issue leaking)
+- [ ] File count and diff content accurate
 
-### Title & Description
-- [ ] Still **read-only** in Review state
-
----
-
-## Step 9: Feedback / Rejection Flow
-
-**Action:** Enter feedback in the Review dialog and reject the task.
-
-### With Feedback
-- [ ] Feedback dialog appears with a text input
-- [ ] User can type feedback about what needs to change
-- [ ] On submit, issue moves back to **InProgress** (not Todo — re-execute, don't re-plan)
-- [ ] Feedback text is stored on the issue (`feedback` field)
-- [ ] When agent re-runs, the prompt includes: "FEEDBACK FROM REVIEW: {feedback text}"
-- [ ] Agent addresses the feedback in its next execution pass
-- [ ] After re-execution, state advances back to **Review**
-
-### Without Feedback (Approve)
-- [ ] If no feedback needed, user can approve the task
-- [ ] Issue remains in **Review** or advances to **Done**
-- [ ] PR creation option becomes available (see Step 10)
+**expect-cli:**
+```bash
+expect-cli -m "Open the test task inspector in Review state. Verify three buttons: Create PR, Request Changes, Close. Check Plan tab shows completed checkboxes. Check Terminal tab shows session completed. Check Changes tab shows all file changes." -y
+```
 
 ---
 
-## Step 10: Pull Request Creation
+## Step 9: Request Changes (Feedback Flow)
 
-**Action:** Click "Create Pull Request" in the Review/Done state.
+**Action:** Click "Request Changes" to test the feedback loop.
+
+### Feedback Dialog
+- [ ] Feedback dialog opens with textarea
+- [ ] Two action choices: **Re-execute** (default) and **Re-plan**
+- [ ] Feedback text is required (can't submit empty)
+- [ ] Submit button text changes based on choice
+
+### Re-execute path
+- [ ] Select "Re-execute", enter feedback, submit
+- [ ] Issue moves back to **InProgress**
+- [ ] Agent re-runs with feedback appended to prompt
+- [ ] After agent finishes, issue returns to **Review**
+
+### Re-plan path
+- [ ] Select "Re-plan", enter feedback, submit
+- [ ] Issue moves back to **Todo**
+- [ ] Agent re-plans from scratch with feedback context
+- [ ] After planning, auto-advances to InProgress, then Review
+
+**expect-cli:**
+```bash
+expect-cli -m "Open the test task in Review. Click Request Changes. Verify feedback dialog opens with Re-execute and Re-plan options. Enter feedback text 'Add error handling for edge cases'. Select Re-execute. Submit. Verify issue moves to InProgress." -y
+```
+
+---
+
+## Step 10: Create Pull Request
+
+**Action:** After the feedback loop returns to Review, click "Create PR".
+
+### PR Creation Dialog
+- [ ] Dialog opens with pre-filled fields
+- [ ] Title pre-filled from issue title
+- [ ] Description pre-filled from issue description
+- [ ] Base branch auto-detected (not hardcoded to main)
+- [ ] Head branch shows the issue's worktree branch (read-only)
+- [ ] Draft PR checkbox available
+- [ ] Submit creates the PR on GitHub
+
+### After PR Creation
+- [ ] PR URL stored on the issue
+- [ ] "PR Open" badge/link appears in inspector header
+- [ ] Link opens GitHub PR in new tab
+- [ ] Issue stays in **Review** (not auto-advanced to Done)
+
+### Non-GitHub Projects
+- [ ] If no GitHub remote, "Create PR" falls back to "Merge & Close"
+- [ ] Direct merge: checkout main → merge branch → delete branch → Done
+
+**expect-cli:**
+```bash
+expect-cli -m "Open the test task in Review. Click Create PR. Verify dialog opens with pre-filled title, description, and branches. Submit. Verify PR Open badge appears with GitHub link. Verify issue stays in Review state." -y
+```
+
+---
+
+## Step 11: Close / Done
+
+**Action:** After PR is created (or merged on GitHub), close the issue.
 
 **Verify:**
-- [ ] PR creation dialog appears with pre-filled title and description
-- [ ] Base branch is detected dynamically (not hardcoded to `main`)
-- [ ] Head branch is the issue's worktree branch
-- [ ] PR is created on the correct GitHub repository
-- [ ] PR URL is displayed and clickable
-- [ ] If no GitHub remote is configured, a helpful error message is shown
-
----
-
-## Step 11: Merge / Complete
-
-**Action:** Click "Complete & Merge" (or equivalent) after PR is approved.
-
-**Verify:**
-- [ ] Main branch is checked out
-- [ ] Issue branch is merged into main
-- [ ] Worktree branch is cleaned up (deleted)
+- [ ] Click "Close" to move to Done
 - [ ] Worktree directory is removed
-- [ ] Issue state moves to **Done**
-- [ ] Issue appears in the Done column on the Kanban board
-- [ ] Git history shows the merged commits
+- [ ] Local branch is deleted
+- [ ] `git worktree prune` runs
+- [ ] Linked GitHub issue is closed (if applicable)
+- [ ] Issue appears in Done column on Kanban board
+- [ ] Final metrics recorded (tokens, cost, duration)
+
+**expect-cli:**
+```bash
+expect-cli -m "Open the test task in Review (with PR created). Click Close. Verify issue moves to Done column on kanban board." -y
+```
 
 ---
 
-## Failure Scenarios to Test
+## Failure Scenarios
 
 ### Agent Fails During Planning
 - [ ] If agent errors out during Todo, issue should NOT auto-advance
-- [ ] Error is visible in Session tab
-- [ ] User can retry by moving issue back to Todo
+- [ ] Error visible in Terminal tab
+- [ ] User can retry by moving back to Todo
 
 ### Agent Fails During Execution
-- [ ] If agent errors out during InProgress, issue should NOT auto-advance to Review
-- [ ] Error is visible in Session tab
+- [ ] If agent errors out during InProgress, should NOT advance to Review
+- [ ] Error visible in Terminal tab
 - [ ] Changes tab shows partial changes (if any)
 
 ### Wrong Agent Provider
-- [ ] If provider is set to "claude", the terminal must show `claude` running (not `codex`)
-- [ ] Provider case normalization works (lowercase "claude" → uppercase "CLAUDE" for command lookup)
+- [ ] Provider set to "claude" → terminal shows `claude` running (not `codex`)
+- [ ] Case normalization works (lowercase → uppercase for command lookup)
 
 ### Worktree Isolation
-- [ ] Two issues on the same project show **different** diffs in their Changes tabs
-- [ ] Issue A's changes do not leak into Issue B's Changes tab
-- [ ] Each issue operates in its own worktree directory
+- [ ] Two issues on same project show **different** diffs in Changes tab
+- [ ] No cross-issue diff leaking
+- [ ] Each issue in its own worktree directory
 
 ### Terminal Tab Switching
-- [ ] Switching between terminal tabs does NOT re-inject agent commands
+- [ ] Switching terminal tabs does NOT re-inject agent commands
 - [ ] WebSocket connections persist across tab switches
-- [ ] Each terminal shows its own session output
+
+### PR Creation Failures
+- [ ] Invalid branch → helpful error in dialog
+- [ ] No GitHub remote → falls back to direct merge option
+- [ ] Network error → error message shown, dialog stays open for retry
+
+### Feedback Loop
+- [ ] Empty feedback text → validation prevents submit
+- [ ] Re-plan sends to Todo, Re-execute sends to InProgress
+- [ ] Feedback text included in agent prompt on re-dispatch
 
 ---
 
+## Full Flow Diagram
+
+```
+GitHub Issues / Manual Create / Embedded Agent
+        │
+        ▼
+   BACKLOG (editable)
+        │ User moves to Todo
+        ▼
+   TODO — agent plans (MODE=PLAN ONLY)
+        │ Auto-advance
+        ▼
+   IN PROGRESS — agent executes (MODE=EXECUTE)
+        │ Auto-advance
+        ▼
+   REVIEW — human reviews
+        │
+        ├── Create PR → PR on GitHub → CI/CD reviews
+        │   └── PR merged → Done (cleanup)
+        │
+        ├── Request Changes → feedback dialog
+        │   ├── Re-execute → InProgress (with feedback)
+        │   └── Re-plan → Todo (with feedback)
+        │
+        └── Close → Done (abandon + cleanup)
+```
+
 ## Notes
 
-- **Interactive yolo mode**: Agents run as full interactive TUIs (`claude --dangerously-skip-permissions`, `codex --full-auto`, `gemini --yolo`)
-- **Token tracking**: Telemetry watcher reads session files from disk, not from PTY JSON
-- **Plan extraction**: Reads markdown checkboxes from agent message events
-- **State machine**: Backlog → Todo (plan) → InProgress (execute) → Review → Done
-- **Feedback loop**: Review → reject with feedback → InProgress → Review (repeat until approved)
+- **Interactive yolo mode**: Agents run as full TUIs (`claude --dangerously-skip-permissions`, `codex --full-auto`, `gemini --yolo`)
+- **Token tracking**: Telemetry watcher reads session files from disk
+- **Plan extraction**: Reads markdown checkboxes from agent messages
+- **Terminal tab in inspector**: Shows live PTY when running, "Session completed" when done
+- **PR creation**: Orchestra's job ends at the PR — CI/CD handles code review from there
+- **The circle**: CI/CD finds issues → new issues created → Backlog → agents fix them
