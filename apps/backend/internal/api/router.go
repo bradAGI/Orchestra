@@ -184,6 +184,25 @@ func NewRouterWithPubSub(
 	protected.Post("/api/v1/issues/{issue_identifier}/pr", server.CreateGitHubPR)
 	protected.Get("/api/v1/warehouse/stats", server.GetWarehouseStats)
 	protected.Get("/api/v1/telemetry/health", server.GetTelemetryHealth)
+
+	// Analytics endpoints
+	protected.Get("/api/v1/analytics/daily", server.GetAnalyticsDaily)
+	protected.Get("/api/v1/analytics/cost", server.GetAnalyticsCost)
+	protected.Get("/api/v1/analytics/cost/optimization", server.GetCostOptimization)
+	protected.Get("/api/v1/analytics/performance", server.GetAnalyticsPerformance)
+	protected.Get("/api/v1/analytics/rate-limits", server.GetRateLimits)
+	protected.Get("/api/v1/analytics/productivity", server.GetAnalyticsProductivity)
+	protected.Get("/api/v1/analytics/productivity/sessions", server.GetProductivitySessions)
+	protected.Get("/api/v1/analytics/budgets", server.GetBudgets)
+	protected.Post("/api/v1/analytics/budgets", server.PostBudget)
+	protected.Delete("/api/v1/analytics/budgets/{id}", server.DeleteBudget)
+	protected.Post("/api/v1/analytics/external/sync", server.PostExternalSync)
+	protected.Get("/api/v1/analytics/external/status", server.GetExternalStatus)
+	protected.Get("/api/v1/analytics/external/reconcile", server.GetExternalReconcile)
+
+	// External analytics — frontend uses shorter paths
+	protected.Get("/api/v1/external/status", server.GetExternalStatus)
+	protected.Get("/api/v1/external/reconcile", server.GetExternalReconcile)
 	oauthRateLimited := r.With(RateLimit(5, 10))
 	oauthRateLimited.Get("/api/v1/github/login", server.HandleGitHubLogin)
 	oauthRateLimited.Get("/api/v1/github/callback", server.HandleGitHubCallback)

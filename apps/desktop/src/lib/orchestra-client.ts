@@ -1,4 +1,5 @@
 import type { APIErrorEnvelope, EventEnvelope, GlobalStats, Project, ProjectStats, SnapshotPayload, AgentConfig, DocItem, Issue, SessionDetail, SessionSummary } from '@/lib/orchestra-types'
+import type { DailyStats, CostRecord, CostOptimization, PerformanceRecord, ProductivityRecord, BudgetRecord, ExternalReconciliation, ExternalStatus } from '@/components/analytics/useAnalyticsData'
 
 /** Runtime connection configuration for the orchestrator backend. */
 export type BackendConfig = {
@@ -1722,29 +1723,29 @@ function analyticsParams(since?: string, extra?: Record<string, string>): string
 /**
  * Fetches daily aggregated analytics (sessions, tokens, cost per day).
  */
-export async function fetchAnalyticsDaily(config: BackendConfig, since?: string): Promise<unknown[]> {
-  return requestJSON<unknown[]>(config, `/api/v1/analytics/daily${analyticsParams(since)}`)
+export async function fetchAnalyticsDaily(config: BackendConfig, since?: string): Promise<DailyStats[]> {
+  return requestJSON<DailyStats[]>(config, `/api/v1/analytics/daily${analyticsParams(since)}`)
 }
 
 /**
  * Fetches cost breakdown, optionally grouped by model or project.
  */
-export async function fetchAnalyticsCost(config: BackendConfig, since?: string, groupBy?: string): Promise<unknown[]> {
-  return requestJSON<unknown[]>(config, `/api/v1/analytics/cost${analyticsParams(since, groupBy ? { group_by: groupBy } : undefined)}`)
+export async function fetchAnalyticsCost(config: BackendConfig, since?: string, groupBy?: string): Promise<CostRecord[]> {
+  return requestJSON<CostRecord[]>(config, `/api/v1/analytics/cost${analyticsParams(since, groupBy ? { group_by: groupBy } : undefined)}`)
 }
 
 /**
  * Fetches cost optimization data (cache hit rate, thinking ratio, anomalies, downgrades).
  */
-export async function fetchAnalyticsCostOptimization(config: BackendConfig): Promise<unknown> {
-  return requestJSON<unknown>(config, '/api/v1/analytics/cost/optimization')
+export async function fetchAnalyticsCostOptimization(config: BackendConfig): Promise<CostOptimization> {
+  return requestJSON<CostOptimization>(config, '/api/v1/analytics/cost/optimization')
 }
 
 /**
  * Fetches provider performance metrics (latency percentiles, success/error rates).
  */
-export async function fetchAnalyticsPerformance(config: BackendConfig, since?: string, provider?: string): Promise<unknown[]> {
-  return requestJSON<unknown[]>(config, `/api/v1/analytics/performance${analyticsParams(since, provider ? { provider } : undefined)}`)
+export async function fetchAnalyticsPerformance(config: BackendConfig, since?: string, provider?: string): Promise<PerformanceRecord[]> {
+  return requestJSON<PerformanceRecord[]>(config, `/api/v1/analytics/performance${analyticsParams(since, provider ? { provider } : undefined)}`)
 }
 
 /**
@@ -1757,27 +1758,27 @@ export async function fetchAnalyticsRateLimits(config: BackendConfig): Promise<u
 /**
  * Fetches productivity metrics per provider (avg cost, lines changed, tokens, success rate).
  */
-export async function fetchAnalyticsProductivity(config: BackendConfig, since?: string, provider?: string): Promise<unknown[]> {
-  return requestJSON<unknown[]>(config, `/api/v1/analytics/productivity${analyticsParams(since, provider ? { provider } : undefined)}`)
+export async function fetchAnalyticsProductivity(config: BackendConfig, since?: string, provider?: string): Promise<ProductivityRecord[]> {
+  return requestJSON<ProductivityRecord[]>(config, `/api/v1/analytics/productivity${analyticsParams(since, provider ? { provider } : undefined)}`)
 }
 
 /**
  * Fetches configured budget records.
  */
-export async function fetchAnalyticsBudgets(config: BackendConfig): Promise<unknown[]> {
-  return requestJSON<unknown[]>(config, '/api/v1/analytics/budgets')
+export async function fetchAnalyticsBudgets(config: BackendConfig): Promise<BudgetRecord[]> {
+  return requestJSON<BudgetRecord[]>(config, '/api/v1/analytics/budgets')
 }
 
 /**
  * Fetches external cost reconciliation data.
  */
-export async function fetchExternalReconcile(config: BackendConfig, since?: string): Promise<unknown> {
-  return requestJSON<unknown>(config, `/api/v1/external/reconcile${analyticsParams(since)}`)
+export async function fetchExternalReconcile(config: BackendConfig, since?: string): Promise<ExternalReconciliation> {
+  return requestJSON<ExternalReconciliation>(config, `/api/v1/external/reconcile${analyticsParams(since)}`)
 }
 
 /**
  * Fetches external cost sync status (enabled, provider, last sync time).
  */
-export async function fetchExternalStatus(config: BackendConfig): Promise<unknown> {
-  return requestJSON<unknown>(config, '/api/v1/external/status')
+export async function fetchExternalStatus(config: BackendConfig): Promise<ExternalStatus> {
+  return requestJSON<ExternalStatus>(config, '/api/v1/external/status')
 }
