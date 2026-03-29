@@ -1,5 +1,5 @@
 import React from 'react'
-import { DollarSign, Zap, Cpu, TrendingUp, type LucideIcon } from 'lucide-react'
+import { DollarSign, Zap, Cpu, type LucideIcon } from 'lucide-react'
 
 interface StatCard {
   icon: LucideIcon
@@ -13,14 +13,12 @@ interface StatsCardsProps {
   totalSpend: number
   totalTokens: number
   totalSessions: number
-  roiEstimate?: number
 }
 
 export const StatsCards: React.FC<StatsCardsProps> = ({
   totalSpend,
   totalTokens,
   totalSessions,
-  roiEstimate,
 }) => {
   const cards: StatCard[] = [
     {
@@ -43,16 +41,10 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
       value: totalSessions.toLocaleString(),
       color: 'text-blue-500',
     },
-    {
-      icon: TrendingUp,
-      label: 'ROI Estimate',
-      value: roiEstimate != null ? `${roiEstimate.toFixed(1)}x` : '--',
-      color: 'text-amber-500',
-    },
   ]
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {cards.map((card) => {
         const Icon = card.icon
         return (
