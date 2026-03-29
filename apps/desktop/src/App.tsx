@@ -427,11 +427,14 @@ export default function App() {
             const issueIdentifier = (envelope.data.issue_identifier as string) || ''
             // Don't optimistically set state — the backend auto-advances (Todo→InProgress or InProgress→Review)
             // Just force a refresh to pick up whatever state the backend set
-            fetchIssues(config).then(setBoardIssues).catch(() => {})
+            fetchIssues(config).then((issues) => {
+              setBoardIssues(issues)
+              // Only play notification if the issue still exists on the board
+              if (issueIdentifier && issues.some(i => (i.identifier || i.issue_identifier) === issueIdentifier)) {
+                playNotification(issueIdentifier)
+              }
+            }).catch(() => {})
             lastIssueFetchRef.current = Date.now()
-            if (issueIdentifier) {
-              playNotification(issueIdentifier)
-            }
           }
         },
         onStatus: (message) => {

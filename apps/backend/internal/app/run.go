@@ -701,11 +701,14 @@ func processExecutionTick(
 		logger.Info().Str("terminal_id", terminalID).Msg("closed agent terminal session")
 	}
 
-	// Auto-advance on successful completion — use live DB state to avoid stale dispatch entry
-	currentState := entry.State
-	if liveIssue, liveErr := service.FetchIssueByID(context.Background(), entry.IssueID); liveErr == nil {
-		currentState = liveIssue.State
+	// Auto-advance on successful completion — use live DB state to avoid stale dispatch entry.
+	// If the issue was deleted while the agent was running, bail out silently.
+	liveIssue, liveErr := service.FetchIssueByID(context.Background(), entry.IssueID)
+	if liveErr != nil {
+		logger.Warn().Str("issue_id", entry.IssueID).Str("identifier", entry.IssueIdentifier).Msg("issue no longer exists after run — skipping post-run actions")
+		return
 	}
+	currentState := liveIssue.State
 	if strings.EqualFold(currentState, "Todo") {
 		logger.Info().Str("issue_id", entry.IssueID).Msg("planning complete; auto-advancing to In Progress")
 		if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"state": "In Progress"}); err != nil {
