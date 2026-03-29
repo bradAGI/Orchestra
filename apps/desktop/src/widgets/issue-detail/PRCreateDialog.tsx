@@ -26,7 +26,17 @@ export function PRCreateDialog({
   projectId,
 }: PRCreateDialogProps) {
   const [title, setTitle] = useState(issueTitle)
-  const [body, setBody] = useState(issueDescription)
+  // Format PR body: use original description (before appended plan) + plan as checklist
+  const [body, setBody] = useState(() => {
+    const planSplit = issueDescription.split('\n\n## Agent Plan\n\n')
+    const originalDesc = planSplit[0] || issueDescription
+    const plan = planSplit[1] || ''
+    let prBody = `## Summary\n\n${originalDesc}`
+    if (plan) {
+      prBody += `\n\n## Implementation Plan\n\n${plan}`
+    }
+    return prBody
+  })
   const [base, setBase] = useState('main')
   const [draft, setDraft] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -36,7 +46,14 @@ export function PRCreateDialog({
   useEffect(() => {
     if (!open) return
     setTitle(issueTitle)
-    setBody(issueDescription)
+    const planSplit = issueDescription.split('\n\n## Agent Plan\n\n')
+    const originalDesc = planSplit[0] || issueDescription
+    const plan = planSplit[1] || ''
+    let prBody = `## Summary\n\n${originalDesc}`
+    if (plan) {
+      prBody += `\n\n## Implementation Plan\n\n${plan}`
+    }
+    setBody(prBody)
     setError(null)
     setSubmitting(false)
     fetchDefaultBranch(config, projectId)
