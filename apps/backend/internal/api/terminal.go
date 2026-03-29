@@ -8,11 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/websocket"
-	"github.com/orchestra/orchestra/apps/backend/internal/terminal"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
 )
 
@@ -63,43 +61,21 @@ func (s *Server) TerminalWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	// For issue-scoped sessions, ONLY attach to an existing PTY created by the
-	// orchestrator's command_runner.runInPTY(). Never create a competing session.
-	// For non-issue sessions (quick-launch, manual), create a bash shell.
-	var session *terminal.Session
-
-	if strings.HasPrefix(sessionID, "issue-") {
-		// Poll for the orchestrator's PTY session — it may not exist yet if
-		// the inspector opened before the orchestrator dispatched.
-		for attempt := 0; attempt < 10; attempt++ {
-			existing := s.termManager.GetSession(sessionID)
-			if existing != nil && !existing.Closed {
-				s.logger.Info().Str("session_id", sessionID).Msg("terminal: attached to orchestrator PTY session")
-				session = existing
-				break
-			}
-			if attempt < 9 {
-				time.Sleep(2 * time.Second)
-			}
-		}
-		if session == nil {
-			s.logger.Warn().Str("session_id", sessionID).Msg("terminal: no orchestrator PTY session found after polling")
-			// Send a message to the client and close — don't create a competing bash session
-			conn.WriteMessage(websocket.TextMessage, []byte("\r\n\x1b[33mWaiting for agent to start...\x1b[0m\r\n"))
-			conn.Close()
-			return
-		}
-	} else {
-		session, err = s.termManager.CreateSession(sessionID, dir, "/bin/bash")
-		if err != nil {
-			s.logger.Error().Err(err).Msg("failed to create terminal session")
-			return
-		}
+	session, err := s.termManager.CreateSession(sessionID, dir, "/bin/bash")
+	if err != nil {
+		s.logger.Error().Err(err).Msg("failed to create terminal session")
+		return
 	}
 
-	// Send all data to client — agents run in interactive mode (full TUI),
-	// no JSON filtering needed.
+	isAgentSession := strings.HasPrefix(sessionID, "issue-")
 	handlerID := session.AddHandler(func(data []byte) {
+		if isAgentSession {
+			filtered := filterAgentOutput(data)
+			if len(filtered) == 0 {
+				return
+			}
+			data = filtered
+		}
 		err := conn.WriteMessage(websocket.BinaryMessage, data)
 		if err != nil {
 			// Don't log as error, it just means client disconnected
