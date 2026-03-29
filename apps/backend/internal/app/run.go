@@ -444,6 +444,15 @@ func processExecutionTick(
 		renderedPrompt = buildExecutionPrompt(entry.IssueIdentifier, entry.Title, entry.Description, attempt)
 	}
 
+	// Include the original plan from the planning phase so the agent
+	// executes the SAME plan instead of creating a new one each turn.
+	if strings.EqualFold(entry.State, "In Progress") && warehouseDB != nil {
+		originalPlan := extractOriginalPlan(warehouseDB, entry.IssueID)
+		if originalPlan != "" {
+			renderedPrompt += "\n\n## YOUR PLAN (from planning phase — execute this, do NOT create a new plan)\n\n" + originalPlan
+		}
+	}
+
 	// On subsequent turns, append prior turn context so agent knows what it already did
 	if attempt > 1 && warehouseDB != nil {
 		priorContext := buildPriorTurnContext(warehouseDB, entry.IssueID, entry.IssueIdentifier)
@@ -891,6 +900,32 @@ func buildPriorTurnContext(warehouseDB *db.DB, issueID string, issueIdentifier s
 	ctx += "**Continue from where you left off. Do NOT restart from scratch. Check what files already exist before creating new ones.**\n"
 
 	return ctx
+}
+
+// extractOriginalPlan retrieves the first agent message containing 3+ checkboxes
+// from the issue's event history. This is the plan created during the Todo phase.
+func extractOriginalPlan(warehouseDB *db.DB, issueID string) string {
+	history, err := warehouseDB.GetUnifiedHistory(context.Background(), issueID)
+	if err != nil {
+		return ""
+	}
+	for _, h := range history {
+		msg, _ := h["message"].(string)
+		if msg == "" {
+			continue
+		}
+		count := 0
+		for _, line := range strings.Split(msg, "\n") {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "- [") || strings.HasPrefix(trimmed, "* [") {
+				count++
+			}
+		}
+		if count >= 3 {
+			return msg
+		}
+	}
+	return ""
 }
 
 // extractGitHubIssueNumber parses a GitHub issue URL and returns the issue number.
