@@ -407,8 +407,9 @@ export default function App() {
             // Just force a refresh to pick up whatever state the backend set
             fetchIssues(config).then((issues) => {
               setBoardIssues(issues)
-              // Only play notification if the issue still exists on the board
-              if (issueIdentifier && issues.some(i => (i.identifier || i.issue_identifier) === issueIdentifier)) {
+              // Only notify when issue reaches Review (not after every turn)
+              const issue = issues.find(i => (i.identifier || i.issue_identifier) === issueIdentifier)
+              if (issue && issue.state === 'Review') {
                 playNotification(issueIdentifier)
               }
             }).catch(() => {})
