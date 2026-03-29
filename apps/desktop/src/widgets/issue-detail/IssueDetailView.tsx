@@ -166,7 +166,7 @@ export function IssueDetailView({
   // Extract operational plan from the most recent agent message that contains checkboxes.
   // Agent restates the plan with updated checkboxes as it progresses — we want the LATEST version.
   const planItems: PlanItem[] = useMemo(() => {
-    const PLAN_EVENT_KINDS = new Set(['message', 'agent_message', 'item.completed', 'assistant', 'result/end_turn', 'result', 'pty'])
+    const PLAN_EVENT_KINDS = new Set(['message', 'agent_message', 'item.completed', 'assistant', 'result/end_turn', 'result', 'pty', 'stdout', 'stderr', 'output'])
     const messageEvents = issueHistory.filter(e =>
       PLAN_EVENT_KINDS.has(e.kind) && e.message && e.kind !== 'pty'
     )
@@ -673,7 +673,7 @@ export function IssueDetailView({
         {/* Terminal — embedded terminal view for the issue's agent PTY */}
         {bottomTab === 'output' && (
           <div className="h-full">
-            {config && isRunning ? (
+            {config && (isRunning || localState === 'Todo' || localState === 'In Progress') ? (
               <div className="w-full h-full px-2 py-1">
                 <TerminalView
                   sessionId={`issue-${identifier}`}
