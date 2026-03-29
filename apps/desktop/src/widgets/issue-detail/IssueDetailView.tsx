@@ -356,7 +356,13 @@ export function IssueDetailView({
       await stopIssue(config, identifier)
       setShowStopConfirm(false)
       setLocalState('Backlog')
-      onUpdate?.({ state: 'Backlog' })
+      // Clear all session artifacts
+      setIssueHistory([])
+      setLogs('')
+      setDiffFiles([])
+      setActiveDiffFile(null)
+      clearCachedPlan(issueId || identifier)
+      onUpdate?.({ state: 'Backlog', feedback: '' })
     } catch (err) {
       console.error('stop failed', err)
     }
