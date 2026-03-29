@@ -725,10 +725,18 @@ func processExecutionTick(
 		// Extract the plan from the agent's output and store it on the issue
 		// so the execution phase can include it in the prompt.
 		plan := extractPlanFromResult(result, eventsBuffer)
+		logger.Info().Str("issue_id", entry.IssueID).Int("events_count", len(eventsBuffer)).Int("output_len", len(result.Output)).Str("plan_found", fmt.Sprintf("%d chars", len(plan))).Msg("plan extraction attempt")
 		updateFields := map[string]any{"state": "In Progress"}
 		if plan != "" {
 			updateFields["description"] = liveIssue.Description + "\n\n## Agent Plan\n\n" + plan
 			logger.Info().Str("issue_id", entry.IssueID).Int("plan_length", len(plan)).Msg("extracted plan from planning phase")
+		} else {
+			logger.Warn().Str("issue_id", entry.IssueID).Int("events_count", len(eventsBuffer)).Msg("NO PLAN FOUND — events buffer may be empty or no message had 3+ checkboxes")
+			// Dump first few event messages for debugging
+			for i, e := range eventsBuffer {
+				if i >= 5 { break }
+				logger.Info().Int("idx", i).Str("kind", string(e.Kind)).Int("msg_len", len(e.Message)).Str("msg_preview", e.Message[:min(100, len(e.Message))]).Msg("event buffer sample")
+			}
 		}
 		logger.Info().Str("issue_id", entry.IssueID).Msg("planning complete; auto-advancing to In Progress")
 		if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, updateFields); err != nil {
