@@ -76,11 +76,23 @@ func (r *Registry) SetCommand(provider Provider, command string) {
 	}
 	switch p {
 	case ProviderClaude:
-		r.runners[p] = NewClaudeRunner(command)
+		runner := NewClaudeRunner(command)
+		if r.termManager != nil {
+			runner.WithTerminalManager(r.termManager)
+		}
+		r.runners[p] = runner
 	case ProviderOpenCode:
-		r.runners[p] = NewOpenCodeRunner(command)
+		runner := NewOpenCodeRunner(command)
+		if r.termManager != nil {
+			runner.WithTerminalManager(r.termManager)
+		}
+		r.runners[p] = runner
 	case ProviderGemini:
-		r.runners[p] = NewGeminiRunner(command)
+		runner := NewGeminiRunner(command)
+		if r.termManager != nil {
+			runner.WithTerminalManager(r.termManager)
+		}
+		r.runners[p] = runner
 	case ProviderUnsandbox:
 		client, err := unsandbox.NewClientFromEnv()
 		if err == nil {
