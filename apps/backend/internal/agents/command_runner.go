@@ -390,8 +390,22 @@ func (r *CommandRunner) runInPTY(
 				// as the user might want to interject.
 			}
 
-			// Detect completion event to stop waiting
-			if event.Kind == "turn.completed" || event.Kind == "result" || strings.Contains(event.Kind, "result/") {
+			// Detect completion event to stop waiting.
+			// JSON events: turn.completed, result, result/*
+			// PTY fallback: detect shell prompt return after agent exits,
+			// or Claude's exit markers in verbose output.
+			isComplete := event.Kind == "turn.completed" || event.Kind == "result" || strings.Contains(event.Kind, "result/")
+			if !isComplete && event.Kind == "stdout" {
+				msg := strings.TrimSpace(event.Message)
+				// Detect common agent exit patterns in PTY output
+				if strings.HasPrefix(msg, "$ ") || // shell prompt returned
+					strings.Contains(msg, "cost_usd") || // Claude verbose final summary
+					strings.Contains(msg, "\"session_id\"") || // Claude JSON result
+					strings.Contains(msg, "result\": {") { // generic result JSON
+					isComplete = true
+				}
+			}
+			if isComplete {
 				select {
 				case done <- true:
 				default:
