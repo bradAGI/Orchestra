@@ -4,11 +4,13 @@ package github
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/orchestra/orchestra/apps/backend/internal/db"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
 )
 
@@ -18,11 +20,13 @@ type Client struct {
 	repo       string
 	token      string
 	httpClient *http.Client
+	localDB    *db.DB
 }
 
 // NewClient creates a new GitHub tracker Client for the given repository.
 // If httpClient is nil, http.DefaultClient is used.
-func NewClient(owner, repo, token string, httpClient *http.Client) *Client {
+// If localDB is provided, the client will also clean up the local database when deleting issues.
+func NewClient(owner, repo, token string, httpClient *http.Client, localDB *db.DB) *Client {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
@@ -31,6 +35,7 @@ func NewClient(owner, repo, token string, httpClient *http.Client) *Client {
 		repo:       repo,
 		token:      token,
 		httpClient: httpClient,
+		localDB:    localDB,
 	}
 }
 
@@ -210,7 +215,8 @@ func (c *Client) UpdateIssue(ctx context.Context, identifier string, updates map
 	return c.FetchIssueByIdentifier(ctx, issueNumber)
 }
 
-// DeleteIssue closes the GitHub issue since GitHub does not support true deletion.
+// DeleteIssue closes the GitHub issue and cleans up the local database.
+// Since GitHub does not support true deletion, we close the issue and remove it from local storage.
 func (c *Client) DeleteIssue(ctx context.Context, identifier string) error {
 	issueNumber := identifier
 	if strings.Contains(identifier, "-") {
@@ -218,6 +224,7 @@ func (c *Client) DeleteIssue(ctx context.Context, identifier string) error {
 		issueNumber = parts[len(parts)-1]
 	}
 
+	// 1. Close the GitHub issue
 	body, err := json.Marshal(map[string]string{"state": "closed"})
 	if err != nil {
 		return err
@@ -243,6 +250,73 @@ func (c *Client) DeleteIssue(ctx context.Context, identifier string) error {
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("github api returned status %d for close issue %s", resp.StatusCode, identifier)
+	}
+
+	// 2. Clean up local database if available
+	if c.localDB != nil {
+		if err := c.cleanupLocalDatabase(ctx, identifier); err != nil {
+			return fmt.Errorf("cleanup local database after GitHub issue deletion: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// cleanupLocalDatabase performs the same cleanup operations as the SQLite tracker
+// to maintain consistency between GitHub and local state.
+func (c *Client) cleanupLocalDatabase(ctx context.Context, identifier string) error {
+	tx, err := c.localDB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("cleanup database begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Delete runs referencing this issue
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM runs
+		WHERE issue_id IN (
+			SELECT id FROM issues WHERE id = ? OR identifier = ?
+		)
+	`, identifier, identifier); err != nil {
+		return fmt.Errorf("delete issue runs: %w", err)
+	}
+
+	// Delete issue history
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM issue_history
+		WHERE issue_id IN (
+			SELECT id FROM issues WHERE id = ? OR identifier = ?
+		)
+	`, identifier, identifier); err != nil {
+		return fmt.Errorf("delete issue history: %w", err)
+	}
+
+	// Clear session.issue_id references
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE sessions SET issue_id = NULL
+		WHERE issue_id IN (
+			SELECT id FROM issues WHERE id = ? OR identifier = ?
+		)
+	`, identifier, identifier); err != nil {
+		return fmt.Errorf("clear session issue refs: %w", err)
+	}
+
+	// Delete the issue itself
+	result, err := tx.ExecContext(ctx, "DELETE FROM issues WHERE id = ? OR identifier = ?;", identifier, identifier)
+	if err != nil {
+		return fmt.Errorf("delete issue: %w", err)
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("delete issue rows affected: %w", err)
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("delete issue commit: %w", err)
 	}
 
 	return nil

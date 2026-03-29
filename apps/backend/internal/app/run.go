@@ -172,7 +172,7 @@ func newTrackerClient(cfg config.Config, localDB *db.DB) tracker.Client {
 		// For GitHub, Endpoint is owner/repo
 		parts := strings.Split(cfg.TrackerEndpoint, "/")
 		if len(parts) == 2 {
-			return trackergithub.NewClient(parts[0], parts[1], cfg.TrackerToken, nil)
+			return trackergithub.NewClient(parts[0], parts[1], cfg.TrackerToken, nil, localDB)
 		}
 	}
 	if localDB == nil {
