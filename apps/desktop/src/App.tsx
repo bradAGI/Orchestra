@@ -205,31 +205,9 @@ export default function App() {
     { id: 'master-shell', title: 'System Shell' }
   ])
 
-  // Sync open terminals with running sessions
-  useEffect(() => {
-    if (!snapshot?.running) return
-
-    setOpenTerminals(prev => {
-      // Always keep master-shell
-      const _base = prev.some(p => p.id === 'master-shell') ? [] : [{ id: 'master-shell', title: 'System Shell' }]
-
-      // Find sessions that are running but don't have a terminal window yet
-      const _activeRunningIds = snapshot.running.map(r => `issue-${r.issue_identifier}`)
-      const existingIds = prev.map(p => p.id)
-      
-      const newTerms = snapshot.running
-        .filter(r => !existingIds.includes(`issue-${r.issue_identifier}`))
-        .map(r => ({
-          id: `issue-${r.issue_identifier}`,
-          title: `Agent: ${r.issue_identifier}`,
-          projectId: boardIssues.find((issue) => issue.issue_id === r.issue_id)?.project_id
-        }))
-
-      if (newTerms.length === 0) return prev
-      
-      return [...prev, ...newTerms]
-    })
-  }, [snapshot, boardIssues])
+  // Terminals are for manual use only (quick-launch, user shells).
+  // Issue agent sessions run in subprocess mode — their output is
+  // shown in the inspector's Session tab, not in terminal tabs.
 
   const handleCloseTerminal = (id: string) => {
     setOpenTerminals(prev => prev.filter(t => t.id !== id))
