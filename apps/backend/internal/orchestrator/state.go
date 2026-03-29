@@ -927,12 +927,14 @@ func (s *Service) enqueueCandidates(candidates []tracker.Issue) {
 		if strings.EqualFold(issue.State, "Todo") {
 			desc = desc + "\n\n---\nMODE: PLAN ONLY — BE FAST.\n\nYour ONLY job is to output a plan. Do NOT write code, create files, or make changes.\n\n1. Spend at most 2-3 tool calls understanding the project structure (ls, read key files)\n2. Then IMMEDIATELY output your plan as markdown checkboxes:\n   - [ ] Step 1: ...\n   - [ ] Step 2: ...\n3. Stop after outputting the plan. Do NOT explore further.\n\nKeep the plan concise — 5-10 steps maximum. The human will review it before you execute."
 		} else if strings.EqualFold(issue.State, "In Progress") {
-			// For execution mode, tell the agent to skip exploration and execute directly
-			desc = desc + "\n\n---\nMODE: EXECUTE — DO NOT CREATE A NEW PLAN.\n\nYou ALREADY have a plan (included below). Execute it step by step.\nDo NOT re-plan, do NOT explore the codebase. Go straight to implementation.\n\nAfter completing each step, restate the FULL plan with [x] for completed steps:\n   - [x] Step 1: (done)\n   - [ ] Step 2: (next)\n\nWrite code, run tests, commit when done."
-			// If there's feedback from a Review rejection, include it
+			// CRITICAL: Put execution instruction BEFORE the description.
+			// Claude reads top-down — if the task description comes first,
+			// it starts planning before seeing "DO NOT PLAN".
+			execInstr := "IMPORTANT: YOU ARE IN EXECUTION MODE. A plan has ALREADY been created (shown below). DO NOT create a new plan. DO NOT explore the codebase. START WRITING CODE IMMEDIATELY.\n\nExecute each step of the plan below. After completing each step, restate the FULL plan with [x] for completed steps:\n   - [x] Step 1: (done)\n   - [ ] Step 2: (next)\n\nWrite code, run tests, commit when all steps are done.\n\n---\n\n"
 			if issue.Feedback != "" {
-				desc = desc + "\n\nFEEDBACK FROM REVIEW: " + issue.Feedback + "\n\nIncorporate this feedback into your implementation."
+				execInstr += "FEEDBACK FROM REVIEW (address this): " + issue.Feedback + "\n\n---\n\n"
 			}
+			desc = execInstr + desc
 		}
 
 		entry := RunningEntry{
