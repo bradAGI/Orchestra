@@ -410,13 +410,15 @@ export function IssueDetailView({
                   Request Changes
                 </button>
               )}
-              <button
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-red-500 border border-red-500/30 hover:bg-red-500/10 transition-colors"
-                onClick={async () => { await onUpdate({ state: 'Done' }); setLocalState('Done') }}
-              >
-                <X size={12} />
-                Close
-              </button>
+              {!prUrl && (
+                <button
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-red-500 border border-red-500/30 hover:bg-red-500/10 transition-colors"
+                  onClick={async () => { await onUpdate({ state: 'Done' }); setLocalState('Done') }}
+                >
+                  <X size={12} />
+                  Close
+                </button>
+              )}
             </>
           )}
           {localState === 'Done' && onUpdate && (
