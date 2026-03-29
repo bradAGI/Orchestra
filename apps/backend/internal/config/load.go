@@ -26,7 +26,7 @@ func Load() (Config, error) {
 	// The orchestrator delivers the prompt via PTY stdin after the agent boots.
 	// Token tracking comes from the telemetry watcher reading session files on disk.
 	agentCommandsDefault := map[string]string{
-		"CLAUDE":   "claude --dangerously-skip-permissions",
+		"CLAUDE":   "claude -p {{prompt}} --dangerously-skip-permissions --verbose",
 		"CODEX":    "codex --full-auto",
 		"GEMINI":   "gemini --yolo",
 		"OPENCODE": "opencode -p {{prompt}}",
