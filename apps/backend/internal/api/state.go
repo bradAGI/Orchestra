@@ -153,6 +153,29 @@ func (s *Server) CreateGitHubPR(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Push the branch to the remote before creating the PR.
+	// The worktree has local commits that GitHub doesn't know about yet.
+	if projectID != "" && body.Head != "" {
+		project, projErr := s.db.GetProjectByID(r.Context(), projectID)
+		if projErr == nil && project.RootPath != "" {
+			// Try pushing from the worktree first, then fall back to project root
+			pushDir := project.RootPath
+			if s.worktreeRoot != "" {
+				wtPath := filepath.Join(s.worktreeRoot, projectID, body.Head)
+				if info, statErr := os.Stat(wtPath); statErr == nil && info.IsDir() {
+					pushDir = wtPath
+				}
+			}
+			pushCmd := exec.CommandContext(r.Context(), "git", "push", "-u", "origin", body.Head)
+			pushCmd.Dir = pushDir
+			if pushOut, pushErr := pushCmd.CombinedOutput(); pushErr != nil {
+				s.logger.Warn().Err(pushErr).Str("output", string(pushOut)).Str("branch", body.Head).Msg("failed to push branch before PR creation")
+			} else {
+				s.logger.Info().Str("branch", body.Head).Msg("pushed branch to origin for PR creation")
+			}
+		}
+	}
+
 	pr, err := githubutils.CreatePullRequest(r.Context(), body.Owner, body.Repo, body.Token, githubutils.PRRequest{
 		Title: body.Title,
 		Body:  body.Body,
@@ -160,7 +183,8 @@ func (s *Server) CreateGitHubPR(w http.ResponseWriter, r *http.Request) {
 		Base:  body.Base,
 	})
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "pr_creation_failed", "pull request creation failed")
+		s.logger.Error().Err(err).Str("owner", body.Owner).Str("repo", body.Repo).Str("head", body.Head).Msg("github PR creation failed")
+		writeJSONError(w, http.StatusInternalServerError, "pr_creation_failed", fmt.Sprintf("pull request creation failed: %v", err))
 		return
 	}
 
