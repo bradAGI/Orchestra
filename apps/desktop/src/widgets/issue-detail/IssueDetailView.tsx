@@ -14,7 +14,6 @@ import { PRCreateDialog } from './PRCreateDialog'
 import { extractOperationalPlanItems, extractPlanFromText, parseDiff, type DiffFile, type PlanItem } from './IssueDetailUtils'
 import { getCachedPlan, setCachedPlan, clearCachedPlan } from './planCache'
 import { SessionTimeline } from './SessionTimeline'
-import { TerminalView } from '@/components/terminal/TerminalView'
 
 function DescriptionEditor({ value, onChange, onBlur, theme }: {
   value: string
@@ -389,7 +388,7 @@ export function IssueDetailView({
   const tabItems = [
     { id: 'details' as const, label: 'Details', icon: Info, count: undefined },
     { id: 'plan' as const, label: 'Plan', icon: CheckCircle2, count: planItems.length > 0 ? planItems.length : undefined },
-    { id: 'output' as const, label: 'Terminal', icon: Terminal, count: undefined },
+    { id: 'output' as const, label: 'Session', icon: Terminal, count: undefined },
     { id: 'changes' as const, label: 'Changes', icon: FileText, count: diffFiles.length > 0 ? diffFiles.length : undefined },
   ]
 
@@ -708,23 +707,9 @@ export function IssueDetailView({
           </div>
         )}
 
-        {/* Terminal — embedded terminal view for the issue's agent PTY */}
+        {/* Session — SSE event timeline for the issue's agent session */}
         {bottomTab === 'output' && (
-          <div className="h-full">
-            {config && localState !== 'Backlog' ? (
-              <div className="w-full h-full px-2 py-1">
-                <TerminalView
-                  sessionId={`issue-${identifier}`}
-                  projectId={projectId}
-                  baseUrl={config.baseUrl}
-                  apiToken={config.apiToken}
-                  theme={theme}
-                />
-              </div>
-            ) : (
-              <SessionTimeline logs={logs} loading={logsLoading} />
-            )}
-          </div>
+          <SessionTimeline logs={logs} loading={logsLoading} />
         )}
 
         {/* Changes */}
