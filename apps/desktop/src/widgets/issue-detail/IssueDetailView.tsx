@@ -165,53 +165,24 @@ export function IssueDetailView({
   // Extract operational plan from the most recent agent message that contains checkboxes.
   // Agent restates the plan with updated checkboxes as it progresses — we want the LATEST version.
   const planItems: PlanItem[] = useMemo(() => {
-    const PLAN_EVENT_KINDS = new Set(['message', 'agent_message', 'item.completed', 'assistant', 'result/end_turn', 'result', 'pty', 'stdout', 'stderr', 'output'])
+    // Subprocess mode events have structured kinds: message, assistant, result, etc.
+    const PLAN_EVENT_KINDS = new Set([
+      'message', 'agent_message', 'item.completed', 'assistant',
+      'result/end_turn', 'result', 'stdout', 'pty',
+    ])
     const messageEvents = issueHistory.filter(e =>
       PLAN_EVENT_KINDS.has(e.kind) && e.message
     )
 
-    // Strategy: find the newest plan from each source, then pick the one with
-    // the most items. History may be truncated by the DB; logs are complete.
     let historyPlan: PlanItem[] = []
     let logsPlan: PlanItem[] = []
 
-    // Source 1: issue history (structured events from DB)
+    // Source 1: issue history — scan newest-first for the most recent
+    // message with 3+ checkboxes (agent restates plan with updates)
     if (messageEvents.length > 0) {
-      // Try individual messages first (headless mode: one message has the full plan)
       for (const entry of [...messageEvents].reverse()) {
         const items = extractPlanFromText(entry.message!)
         if (items.length >= 3) { historyPlan = items; break }
-      }
-      // Interactive mode: each checkbox is its own stdout event.
-      // Find ALL contiguous groups of checkboxes, then pick the LATEST one
-      // with 3+ items (newest has the most up-to-date [x] marks).
-      if (historyPlan.length === 0) {
-        const groups: PlanItem[][] = []
-        let currentGroup: string[] = []
-        for (const entry of messageEvents) {
-          const msg = entry.message || ''
-          if (/^\s*[-*+]\s*\[[\sxX]\]/.test(msg)) {
-            currentGroup.push(msg)
-          } else {
-            if (currentGroup.length > 0) {
-              groups.push(extractPlanFromText(currentGroup.join('\n')))
-              currentGroup = []
-            }
-          }
-        }
-        if (currentGroup.length > 0) {
-          groups.push(extractPlanFromText(currentGroup.join('\n')))
-        }
-        // Pick the LAST group with 3+ items (most recent = updated checkboxes)
-        for (let i = groups.length - 1; i >= 0; i--) {
-          if (groups[i].length >= 3) { historyPlan = groups[i]; break }
-        }
-        // If no group has 3+, take the last group with any items
-        if (historyPlan.length === 0) {
-          for (let i = groups.length - 1; i >= 0; i--) {
-            if (groups[i].length > 0) { historyPlan = groups[i]; break }
-          }
-        }
       }
     }
 
