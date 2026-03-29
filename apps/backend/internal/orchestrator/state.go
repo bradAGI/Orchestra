@@ -150,7 +150,7 @@ func NewService() *Service {
 		retrying:         make([]RetryEntry, 0),
 		activeStates:     []string{"todo", "in progress"},
 		terminalStates:   []string{"done", "cancelled", "canceled", "closed", "duplicate"},
-		maxConcurrent:    4,
+		maxConcurrent:    16,
 		maxByState:       map[string]int{},
 		claimed:          map[string]bool{},
 		cancels:          make(map[string]context.CancelFunc),
