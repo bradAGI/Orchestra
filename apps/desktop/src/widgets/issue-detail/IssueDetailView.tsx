@@ -420,16 +420,7 @@ export function IssueDetailView({
             </>
           )}
           {localState === 'Done' && onUpdate && (
-            <button
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
-              onClick={async () => {
-                await onUpdate({ state: 'Backlog' })
-                setLocalState('Backlog')
-              }}
-            >
-              <X size={12} />
-              Reopen
-            </button>
+            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Completed</span>
           )}
           </div>
         </div>
