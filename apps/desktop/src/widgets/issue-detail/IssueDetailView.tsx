@@ -185,10 +185,29 @@ export function IssueDetailView({
         const items = extractPlanFromText(entry.message!)
         if (items.length >= 3) { historyPlan = items; break }
       }
-      // If no single message had 3+ items, concatenate all messages (interactive mode)
+      // If no single message had 3+ items, find the best contiguous group of
+      // checkbox events (interactive mode emits one checkbox per stdout event).
+      // The agent outputs the plan as a consecutive block — find the longest run.
       if (historyPlan.length === 0) {
-        const allText = messageEvents.map(e => e.message).join('\n')
-        historyPlan = extractPlanFromText(allText)
+        let bestGroup: PlanItem[] = []
+        let currentGroup: string[] = []
+        for (const entry of messageEvents) {
+          const msg = entry.message || ''
+          if (/^\s*[-*+]\s*\[[\sxX]\]/.test(msg)) {
+            currentGroup.push(msg)
+          } else {
+            if (currentGroup.length > 0) {
+              const items = extractPlanFromText(currentGroup.join('\n'))
+              if (items.length > bestGroup.length) bestGroup = items
+              currentGroup = []
+            }
+          }
+        }
+        if (currentGroup.length > 0) {
+          const items = extractPlanFromText(currentGroup.join('\n'))
+          if (items.length > bestGroup.length) bestGroup = items
+        }
+        historyPlan = bestGroup
       }
     }
 
@@ -681,7 +700,7 @@ export function IssueDetailView({
         {/* Terminal — embedded terminal view for the issue's agent PTY */}
         {bottomTab === 'output' && (
           <div className="h-full">
-            {config && (isRunning || localState === 'Todo' || localState === 'In Progress') ? (
+            {config && isRunning ? (
               <div className="w-full h-full px-2 py-1">
                 <TerminalView
                   sessionId={`issue-${identifier}`}
@@ -691,14 +710,21 @@ export function IssueDetailView({
                   theme={theme}
                 />
               </div>
-            ) : config && (localState === 'Review' || localState === 'Done') ? (
+            ) : localState === 'Backlog' ? (
+              <SessionTimeline logs={logs} loading={logsLoading} />
+            ) : (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground/20 gap-3">
                 <Terminal size={36} />
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Session completed</p>
-                <p className="text-[10px] text-muted-foreground/40">Agent finished execution. Review changes in the Changes tab.</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em]">
+                  {localState === 'Todo' || localState === 'In Progress' ? 'Waiting for agent...' : 'Session completed'}
+                </p>
+                <p className="text-[10px] text-muted-foreground/40">
+                  {localState === 'Todo' || localState === 'In Progress'
+                    ? 'The agent will appear here when it starts executing.'
+                    : 'Agent finished execution. Review changes in the Changes tab.'}
+                </p>
+                {(localState === 'Todo' || localState === 'In Progress') && <Loader2 size={14} className="animate-spin-smooth text-primary/30" />}
               </div>
-            ) : (
-              <SessionTimeline logs={logs} loading={logsLoading} />
             )}
           </div>
         )}
