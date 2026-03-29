@@ -928,7 +928,7 @@ func (s *Service) enqueueCandidates(candidates []tracker.Issue) {
 			desc = desc + "\n\n---\nMODE: PLAN ONLY — BE FAST.\n\nYour ONLY job is to output a plan. Do NOT write code, create files, or make changes.\n\n1. Spend at most 2-3 tool calls understanding the project structure (ls, read key files)\n2. Then IMMEDIATELY output your plan as markdown checkboxes:\n   - [ ] Step 1: ...\n   - [ ] Step 2: ...\n3. Stop after outputting the plan. Do NOT explore further.\n\nKeep the plan concise — 5-10 steps maximum. The human will review it before you execute."
 		} else if strings.EqualFold(issue.State, "In Progress") {
 			// For execution mode, tell the agent to skip exploration and execute directly
-			desc = desc + "\n\n---\nMODE: EXECUTE. You have already explored this codebase and created a plan. Skip codebase exploration — go straight to implementation. Follow your plan step by step. Write code, run tests, commit changes."
+			desc = desc + "\n\n---\nMODE: EXECUTE. You have already explored this codebase and created a plan. Skip codebase exploration — go straight to implementation. Follow your plan step by step. Write code, run tests, commit changes.\n\nIMPORTANT: After completing each step, restate your FULL plan with updated checkboxes. Mark completed steps with [x]:\n   - [x] Step 1: (completed)\n   - [ ] Step 2: (next)\nThis lets the human track your progress in real-time."
 			// If there's feedback from a Review rejection, include it
 			if issue.Feedback != "" {
 				desc = desc + "\n\nFEEDBACK FROM REVIEW: " + issue.Feedback + "\n\nIncorporate this feedback into your implementation."

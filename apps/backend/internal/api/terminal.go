@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/websocket"
@@ -62,28 +63,38 @@ func (s *Server) TerminalWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	// For issue-scoped sessions, try to attach to an existing PTY first.
-	// The orchestrator (command_runner.go runInPTY) is responsible for launching
-	// the agent — the WebSocket handler just provides a window into it.
-	// Only create a new bash session if no existing session is found.
+	// For issue-scoped sessions, ONLY attach to an existing PTY created by the
+	// orchestrator's command_runner.runInPTY(). Never create a competing session.
+	// For non-issue sessions (quick-launch, manual), create a bash shell.
 	var session *terminal.Session
 
 	if strings.HasPrefix(sessionID, "issue-") {
-		existing := s.termManager.GetSession(sessionID)
-		if existing != nil && !existing.Closed {
-			s.logger.Info().Str("session_id", sessionID).Msg("terminal: attaching to existing PTY session")
-			session = existing
-		} else {
-			// No agent session yet or agent finished — create a bash shell in the worktree.
-			s.logger.Info().Str("session_id", sessionID).Str("dir", dir).Bool("found_closed", existing != nil).Msg("terminal: creating new bash session for issue")
-			session, err = s.termManager.CreateSession(sessionID, dir, "/bin/bash")
+		// Poll for the orchestrator's PTY session — it may not exist yet if
+		// the inspector opened before the orchestrator dispatched.
+		for attempt := 0; attempt < 10; attempt++ {
+			existing := s.termManager.GetSession(sessionID)
+			if existing != nil && !existing.Closed {
+				s.logger.Info().Str("session_id", sessionID).Msg("terminal: attached to orchestrator PTY session")
+				session = existing
+				break
+			}
+			if attempt < 9 {
+				time.Sleep(2 * time.Second)
+			}
+		}
+		if session == nil {
+			s.logger.Warn().Str("session_id", sessionID).Msg("terminal: no orchestrator PTY session found after polling")
+			// Send a message to the client and close — don't create a competing bash session
+			conn.WriteMessage(websocket.TextMessage, []byte("\r\n\x1b[33mWaiting for agent to start...\x1b[0m\r\n"))
+			conn.Close()
+			return
 		}
 	} else {
 		session, err = s.termManager.CreateSession(sessionID, dir, "/bin/bash")
-	}
-	if err != nil {
-		s.logger.Error().Err(err).Msg("failed to create terminal session")
-		return
+		if err != nil {
+			s.logger.Error().Err(err).Msg("failed to create terminal session")
+			return
+		}
 	}
 
 	// Send all data to client — agents run in interactive mode (full TUI),

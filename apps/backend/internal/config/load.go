@@ -247,7 +247,12 @@ func Load() (Config, error) {
 	}
 
 	if strings.TrimSpace(worktreeRoot) == "" {
-		worktreeRoot = filepath.Join(os.Getenv("HOME"), ".orchestra", "worktrees")
+		// Default to workspace root so worktrees and diffs use the same base path
+		if strings.TrimSpace(workspaceRoot) != "" {
+			worktreeRoot = strings.TrimSpace(workspaceRoot)
+		} else {
+			worktreeRoot = filepath.Join(os.Getenv("HOME"), ".orchestra", "worktrees")
+		}
 	}
 
 	analyticsSyncInterval, err := time.ParseDuration(strings.TrimSpace(analyticsSyncIntervalRaw))
