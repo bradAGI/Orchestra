@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 import type { BackendConfig, IssueUpdatePayload, IssueHistoryEntry } from '@/lib/orchestra-client'
-import { fetchIssueHistory, fetchIssueDiff, fetchIssueLogs, gitCheckout, gitMerge, gitDeleteBranch, updateProjectGitHubIssue, stopIssue, createGitHubPR } from '@/lib/orchestra-client'
+import { fetchIssueHistory, fetchIssueDiff, fetchIssueLogs, updateProjectGitHubIssue, stopIssue, createGitHubPR } from '@/lib/orchestra-client'
 import type { SnapshotPayload } from '@/lib/orchestra-types'
 import type { TimelineItem } from '@/components/app-shell/types'
 import { AgentSelector } from '@/components/app-shell/shared/controls'
@@ -376,37 +376,14 @@ export function IssueDetailView({
                   PR Open
                 </a>
               )}
-              {/* Primary: Create PR (GitHub) or Merge & Close (local) */}
-              {typed.url && typeof typed.url === 'string' && (typed.url as string).includes('github.com') ? (
-                <button
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
-                  onClick={() => setPRDialogOpen(true)}
-                >
-                  <GitPullRequest size={14} />
-                  Create PR
-                </button>
-              ) : (
-                <button
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
-                  onClick={async () => {
-                    try {
-                      const branchName = (typed.branch_name as string) || ''
-                      if (branchName && branchName !== 'main') {
-                        await gitCheckout(config, projectId, 'main')
-                        await gitMerge(config, projectId, branchName)
-                        try { await gitDeleteBranch(config, projectId, branchName) } catch { /* branch cleanup optional */ }
-                      }
-                      await onUpdate({ state: 'Done' })
-                      setLocalState('Done')
-                    } catch (err) {
-                      console.error('Merge & Close failed:', err)
-                    }
-                  }}
-                >
-                  <GitPullRequest size={14} />
-                  Merge &amp; Close
-                </button>
-              )}
+              {/* Primary: Create PR */}
+              <button
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
+                onClick={() => setPRDialogOpen(true)}
+              >
+                <GitPullRequest size={14} />
+                Create PR
+              </button>
               {/* Secondary: Request Changes */}
               <button
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-muted/20 text-muted-foreground border border-border/30 hover:bg-muted/40 transition-colors"
