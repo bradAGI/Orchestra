@@ -927,13 +927,15 @@ func (s *Service) enqueueCandidates(candidates []tracker.Issue) {
 		if strings.EqualFold(issue.State, "Todo") {
 			desc = desc + "\n\n---\nMODE: PLAN ONLY — BE FAST.\n\nYour ONLY job is to output a plan. Do NOT write code, create files, or make changes.\n\n1. Spend at most 2-3 tool calls understanding the project structure (ls, read key files)\n2. Then IMMEDIATELY output your plan as markdown checkboxes:\n   - [ ] Step 1: ...\n   - [ ] Step 2: ...\n3. Stop after outputting the plan. Do NOT explore further.\n\nKeep the plan concise — 5-10 steps maximum. The human will review it before you execute."
 		} else if strings.EqualFold(issue.State, "In Progress") {
-			// CRITICAL: Put execution instruction BEFORE the description.
-			// Claude reads top-down — if the task description comes first,
-			// it starts planning before seeing "DO NOT PLAN".
-			execInstr := "IMPORTANT: YOU ARE IN EXECUTION MODE. A plan has ALREADY been created (shown below). DO NOT create a new plan. DO NOT explore the codebase. START WRITING CODE IMMEDIATELY.\n\nExecute each step of the plan below. After completing each step, restate the FULL plan with [x] for completed steps:\n   - [x] Step 1: (done)\n   - [ ] Step 2: (next)\n\nWrite code, run tests, commit when all steps are done.\n\n---\n\n"
+			// Build execution prompt: instruction + plan + task description
+			execInstr := "IMPORTANT: YOU ARE IN EXECUTION MODE. DO NOT CREATE A NEW PLAN.\n\nExecute the plan below step by step. START WRITING CODE IMMEDIATELY.\nAfter completing each step, restate the FULL plan with [x] for completed steps.\nWrite code, run tests, commit when all steps are done.\n\n"
 			if issue.Feedback != "" {
-				execInstr += "FEEDBACK FROM REVIEW (address this): " + issue.Feedback + "\n\n---\n\n"
+				execInstr += "FEEDBACK FROM REVIEW (address this): " + issue.Feedback + "\n\n"
 			}
+			if issue.Plan != "" {
+				execInstr += "## YOUR PLAN\n\n" + issue.Plan + "\n\n---\n\n"
+			}
+			execInstr += "## TASK\n\n"
 			desc = execInstr + desc
 		}
 

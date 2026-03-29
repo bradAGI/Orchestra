@@ -82,6 +82,8 @@ func runMigrations(db *sql.DB) error {
 		{"sessions", "turn_count", "INTEGER DEFAULT 0"},
 		// PR URL tracking on issues
 		{"issues", "pr_url", "TEXT DEFAULT ''"},
+		// Agent plan stored separately from description
+		{"issues", "plan", "TEXT DEFAULT ''"},
 	}
 
 	for _, m := range migrations {

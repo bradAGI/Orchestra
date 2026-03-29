@@ -41,7 +41,7 @@ func (c *Client) FetchCandidateIssues(ctx context.Context, activeStates []string
 		return []tracker.Issue{}, nil
 	}
 
-	query := "SELECT id, identifier, title, description, state, assignee_id, project_id, priority, branch_name, url, labels, blocked_by, provider, disabled_tools, created_at, updated_at, base_sha, feedback, pr_url FROM issues WHERE LOWER(TRIM(state)) IN ("
+	query := "SELECT id, identifier, title, description, state, assignee_id, project_id, priority, branch_name, url, labels, blocked_by, provider, disabled_tools, created_at, updated_at, base_sha, feedback, pr_url, plan FROM issues WHERE LOWER(TRIM(state)) IN ("
 	args := make([]any, len(activeStates))
 	for i, state := range activeStates {
 		args[i] = strings.ToLower(strings.TrimSpace(state))
@@ -61,7 +61,7 @@ func (c *Client) FetchIssuesByIDs(ctx context.Context, issueIDs []string) ([]tra
 		return []tracker.Issue{}, nil
 	}
 
-	query := "SELECT id, identifier, title, description, state, assignee_id, project_id, priority, branch_name, url, labels, blocked_by, provider, disabled_tools, created_at, updated_at, base_sha, feedback, pr_url FROM issues WHERE id IN ("
+	query := "SELECT id, identifier, title, description, state, assignee_id, project_id, priority, branch_name, url, labels, blocked_by, provider, disabled_tools, created_at, updated_at, base_sha, feedback, pr_url, plan FROM issues WHERE id IN ("
 	args := make([]any, len(issueIDs))
 	for i, id := range issueIDs {
 		args[i] = id
@@ -96,7 +96,7 @@ func (c *Client) FetchIssuesByStates(ctx context.Context, states []string) ([]tr
 
 // FetchIssues returns issues matching the given filter criteria including state, project, and assignee.
 func (c *Client) FetchIssues(ctx context.Context, filter tracker.IssueFilter) ([]tracker.Issue, error) {
-	query := "SELECT id, identifier, title, description, state, assignee_id, project_id, priority, branch_name, url, labels, blocked_by, provider, disabled_tools, created_at, updated_at, base_sha, feedback, pr_url FROM issues"
+	query := "SELECT id, identifier, title, description, state, assignee_id, project_id, priority, branch_name, url, labels, blocked_by, provider, disabled_tools, created_at, updated_at, base_sha, feedback, pr_url, plan FROM issues"
 	var where []string
 	var args []any
 
@@ -133,7 +133,7 @@ func (c *Client) SearchIssues(ctx context.Context, query string) ([]tracker.Issu
 		return []tracker.Issue{}, nil
 	}
 
-	sqlQuery := "SELECT id, identifier, title, description, state, assignee_id, project_id, priority, branch_name, url, labels, blocked_by, provider, disabled_tools, created_at, updated_at, base_sha, feedback, pr_url FROM issues WHERE title LIKE ? OR identifier LIKE ? OR id LIKE ?;"
+	sqlQuery := "SELECT id, identifier, title, description, state, assignee_id, project_id, priority, branch_name, url, labels, blocked_by, provider, disabled_tools, created_at, updated_at, base_sha, feedback, pr_url, plan FROM issues WHERE title LIKE ? OR identifier LIKE ? OR id LIKE ?;"
 	pattern := "%" + query + "%"
 	return c.queryIssues(ctx, sqlQuery, pattern, pattern, pattern)
 }
@@ -187,7 +187,7 @@ func (c *Client) UpdateIssue(ctx context.Context, identifier string, updates map
 		"title": true, "description": true, "state": true, "assignee_id": true,
 		"project_id": true, "priority": true, "branch_name": true, "url": true,
 		"labels": true, "blocked_by": true, "provider": true, "disabled_tools": true,
-		"base_sha": true, "feedback": true, "pr_url": true,
+		"base_sha": true, "feedback": true, "pr_url": true, "plan": true,
 	}
 
 	query := "UPDATE issues SET "
@@ -299,7 +299,7 @@ func (c *Client) DeleteIssue(ctx context.Context, identifier string) error {
 // FetchIssueByIdentifier returns a single issue matching the given identifier or ID,
 // or nil if not found.
 func (c *Client) FetchIssueByIdentifier(ctx context.Context, identifier string) (*tracker.Issue, error) {
-	query := "SELECT id, identifier, title, description, state, assignee_id, project_id, priority, branch_name, url, labels, blocked_by, provider, disabled_tools, created_at, updated_at, base_sha, feedback, pr_url FROM issues WHERE id = ? OR identifier = ?;"
+	query := "SELECT id, identifier, title, description, state, assignee_id, project_id, priority, branch_name, url, labels, blocked_by, provider, disabled_tools, created_at, updated_at, base_sha, feedback, pr_url, plan FROM issues WHERE id = ? OR identifier = ?;"
 	issues, err := c.queryIssues(ctx, query, identifier, identifier)
 	if err != nil {
 		return nil, err
@@ -320,11 +320,11 @@ func (c *Client) queryIssues(ctx context.Context, query string, args ...any) ([]
 	var issues []tracker.Issue
 	for rows.Next() {
 		var issue tracker.Issue
-		var title, description, assigneeID, projectID, branchName, url, labelsRaw, blockedByRaw, provider, disabledToolsRaw, createdAt, updatedAt, baseSHA, feedback, prURL sql.NullString
+		var title, description, assigneeID, projectID, branchName, url, labelsRaw, blockedByRaw, provider, disabledToolsRaw, createdAt, updatedAt, baseSHA, feedback, prURL, plan sql.NullString
 
 		if err := rows.Scan(
 			&issue.ID, &issue.Identifier, &title, &description, &issue.State, &assigneeID, &projectID, &issue.Priority,
-			&branchName, &url, &labelsRaw, &blockedByRaw, &provider, &disabledToolsRaw, &createdAt, &updatedAt, &baseSHA, &feedback, &prURL,
+			&branchName, &url, &labelsRaw, &blockedByRaw, &provider, &disabledToolsRaw, &createdAt, &updatedAt, &baseSHA, &feedback, &prURL, &plan,
 		); err != nil {
 			return nil, fmt.Errorf("scan issue: %w", err)
 		}
@@ -379,6 +379,9 @@ func (c *Client) queryIssues(ctx context.Context, query string, args ...any) ([]
 		}
 		if prURL.Valid {
 			issue.PRURL = prURL.String
+		}
+		if plan.Valid {
+			issue.Plan = plan.String
 		}
 
 		if len(c.workerAssigneeIDs) == 0 {

@@ -165,84 +165,39 @@ export function IssueDetailView({
   // Extract operational plan from the most recent agent message that contains checkboxes.
   // Agent restates the plan with updated checkboxes as it progresses — we want the LATEST version.
   const planItems: PlanItem[] = useMemo(() => {
-    // Subprocess mode events have structured kinds: message, assistant, result, etc.
-    const PLAN_EVENT_KINDS = new Set([
-      'message', 'agent_message', 'item.completed', 'assistant',
-      'result/end_turn', 'result', 'stdout', 'pty',
-    ])
-    const messageEvents = issueHistory.filter(e =>
-      PLAN_EVENT_KINDS.has(e.kind) && e.message
-    )
-
-    let historyPlan: PlanItem[] = []
-    let logsPlan: PlanItem[] = []
-
-    // Source 1: issue history — scan newest-first for the most recent
-    // message with 3+ checkboxes (agent restates plan with updates)
-    if (messageEvents.length > 0) {
-      for (const entry of [...messageEvents].reverse()) {
-        const items = extractPlanFromText(entry.message!)
-        if (items.length >= 3) { historyPlan = items; break }
+    // Priority 1: Use the dedicated plan field from the issue (stored during Todo → InProgress)
+    const issuePlan = (typed.plan as string) || ''
+    if (issuePlan) {
+      const basePlan = extractPlanFromText(issuePlan)
+      if (basePlan.length > 0) {
+        // Check if any events have updated [x] status — scan newest-first
+        const PLAN_EVENT_KINDS = new Set(['message', 'agent_message', 'item.completed', 'assistant', 'result/end_turn', 'result'])
+        const messageEvents = issueHistory.filter(e => PLAN_EVENT_KINDS.has(e.kind) && e.message)
+        for (const entry of [...messageEvents].reverse()) {
+          const updated = extractPlanFromText(entry.message!)
+          if (updated.length >= basePlan.length) {
+            // Agent restated plan with [x] marks — use the updated version
+            return updated
+          }
+        }
+        return basePlan
       }
     }
 
-    // Source 2: raw session logs (JSONL) — untruncated, scan newest-first
-    if (logs) {
-      const logLines = logs.split('\n').filter(l => l.trim())
-      for (let i = logLines.length - 1; i >= 0; i--) {
-        try {
-          const entry = JSON.parse(logLines[i])
-          let text = ''
-          if (typeof entry.message === 'string') {
-            text = entry.message
-          } else if (entry.message?.content) {
-            if (Array.isArray(entry.message.content)) {
-              text = entry.message.content
-                .filter((b: any) => b.type === 'text' && b.text)
-                .map((b: any) => b.text)
-                .join('\n')
-            } else if (typeof entry.message.content === 'string') {
-              text = entry.message.content
-            }
-          } else if (typeof entry.content === 'string') {
-            text = entry.content
-          } else if (typeof entry.text === 'string') {
-            text = entry.text
-          } else if (typeof entry.result === 'string') {
-            text = entry.result
-          }
-          if (text) {
-            const items = extractPlanFromText(text)
-            if (items.length >= 3) { logsPlan = items; break }
-          }
-        } catch { /* skip non-JSON lines */ }
-      }
-      // Fallback: try raw text extraction with unescaped newlines
-      if (logsPlan.length === 0) {
-        const unescaped = logs.replace(/\\n/g, '\n')
-        logsPlan = extractPlanFromText(unescaped)
-      }
+    // Priority 2: Extract from event history (fallback for older issues without plan field)
+    const PLAN_EVENT_KINDS = new Set(['message', 'agent_message', 'item.completed', 'assistant', 'result/end_turn', 'result'])
+    const messageEvents = issueHistory.filter(e => PLAN_EVENT_KINDS.has(e.kind) && e.message)
+    for (const entry of [...messageEvents].reverse()) {
+      const items = extractPlanFromText(entry.message!)
+      if (items.length >= 3) return items
     }
 
-    // Pick the source with more items (logs are untruncated, so usually better)
-    const bestPlan = logsPlan.length >= historyPlan.length ? logsPlan : historyPlan
-    if (bestPlan.length > 0) return bestPlan
-
-    // Fallback to timeline events
-    const fromTimeline = extractOperationalPlanItems(timeline, issueId, identifier, description)
-    if (fromTimeline.length > 0) return fromTimeline
-
-    // Final fallback: parse description
+    // Priority 3: Parse from description
     const descPlan = extractPlanFromText(description)
     if (descPlan.length > 0) return descPlan
 
-    // If nothing found from any source, use cached plan (keyed by issueId UUID to avoid stale data)
-    const cacheKey = issueId || identifier
-    const cached = getCachedPlan(cacheKey)
-    if (cached.length > 0) return cached
-
     return []
-  }, [issueHistory, timeline, issueId, identifier, description, logs])
+  }, [issueHistory, typed.plan, description])
   useEffect(() => {
     const cacheKey = issueId || identifier
     if (cacheKey && planItems.length > 0) {
@@ -343,10 +298,10 @@ export function IssueDetailView({
     }
   }
 
-  const handleReject = async (feedback: string, targetState: 'Todo' | 'In Progress') => {
+  const handleReject = async (feedback: string) => {
     setShowFeedback(false)
-    setLocalState(targetState)
-    onUpdate?.({ state: targetState, feedback })
+    setLocalState('Todo')
+    onUpdate?.({ state: 'Todo', feedback })
   }
 
   if (!result) {
@@ -373,52 +328,27 @@ export function IssueDetailView({
           <div className="flex items-center gap-2 shrink-0">
           {localState === 'Review' && config && projectId && onUpdate && (
             <>
-              {prUrl && (
-                <a
-                  href={prUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                >
-                  <Github size={12} />
-                  PR Open
-                </a>
-              )}
-              {prUrl ? (
-                <button
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg transition-all"
-                  onClick={async () => { await onUpdate({ state: 'Done' }); setLocalState('Done') }}
-                >
-                  <CheckCircle2 size={14} />
-                  Move to Done
-                </button>
-              ) : (
-                <button
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
-                  onClick={() => setPRDialogOpen(true)}
-                >
-                  <GitPullRequest size={14} />
-                  Create PR
-                </button>
-              )}
-              {!prUrl && (
-                <button
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-muted/20 text-muted-foreground border border-border/30 hover:bg-muted/40 transition-colors"
-                  onClick={() => setShowFeedback(true)}
-                >
-                  <Pencil size={12} />
-                  Request Changes
-                </button>
-              )}
-              {!prUrl && (
-                <button
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-red-500 border border-red-500/30 hover:bg-red-500/10 transition-colors"
-                  onClick={async () => { await onUpdate({ state: 'Done' }); setLocalState('Done') }}
-                >
-                  <X size={12} />
-                  Close
-                </button>
-              )}
+              <button
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
+                onClick={() => setPRDialogOpen(true)}
+              >
+                <GitPullRequest size={14} />
+                Create PR
+              </button>
+              <button
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-muted/20 text-muted-foreground border border-border/30 hover:bg-muted/40 transition-colors"
+                onClick={() => setShowFeedback(true)}
+              >
+                <Pencil size={12} />
+                Request Changes
+              </button>
+              <button
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-red-500 border border-red-500/30 hover:bg-red-500/10 transition-colors"
+                onClick={async () => { await onUpdate({ state: 'Done' }); setLocalState('Done') }}
+              >
+                <X size={12} />
+                Close
+              </button>
             </>
           )}
           {localState === 'Done' && onUpdate && (
@@ -765,7 +695,9 @@ export function IssueDetailView({
             const url = (result as any).html_url || result.url || ''
             setPrUrl(url)
             setPRDialogOpen(false)
-            if (onUpdate) await onUpdate({ pr_url: url })
+            // Auto-advance to Done after PR creation
+            if (onUpdate) await onUpdate({ pr_url: url, state: 'Done' })
+            setLocalState('Done')
           }}
           issueTitle={localTitle}
           issueDescription={description}

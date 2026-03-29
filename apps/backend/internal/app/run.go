@@ -342,6 +342,11 @@ func processExecutionTick(
 	}
 	publishLifecycleEvent(pubsub, "HOOK_STARTED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create"})
 
+	// Clean up stale worktree refs and branches before creating
+	pruneCmd := exec.CommandContext(context.Background(), "git", "worktree", "prune")
+	pruneCmd.Dir = project.RootPath
+	_ = pruneCmd.Run()
+
 	var wtPath string
 	var baseSHA string
 	wtPath, baseSHA, created, err = workspaceService.EnsureWorktree(project.RootPath, project.ID, branchName, workspaceHooks)
@@ -725,18 +730,13 @@ func processExecutionTick(
 		// Extract the plan from the agent's output and store it on the issue
 		// so the execution phase can include it in the prompt.
 		plan := extractPlanFromResult(result, eventsBuffer)
-		logger.Info().Str("issue_id", entry.IssueID).Int("events_count", len(eventsBuffer)).Int("output_len", len(result.Output)).Str("plan_found", fmt.Sprintf("%d chars", len(plan))).Msg("plan extraction attempt")
 		updateFields := map[string]any{"state": "In Progress"}
 		if plan != "" {
-			updateFields["description"] = liveIssue.Description + "\n\n## Agent Plan\n\n" + plan
+			// Store plan in dedicated field — NOT appended to description
+			updateFields["plan"] = plan
 			logger.Info().Str("issue_id", entry.IssueID).Int("plan_length", len(plan)).Msg("extracted plan from planning phase")
 		} else {
-			logger.Warn().Str("issue_id", entry.IssueID).Int("events_count", len(eventsBuffer)).Msg("NO PLAN FOUND — events buffer may be empty or no message had 3+ checkboxes")
-			// Dump first few event messages for debugging
-			for i, e := range eventsBuffer {
-				if i >= 5 { break }
-				logger.Info().Int("idx", i).Str("kind", string(e.Kind)).Int("msg_len", len(e.Message)).Str("msg_preview", e.Message[:min(100, len(e.Message))]).Msg("event buffer sample")
-			}
+			logger.Warn().Str("issue_id", entry.IssueID).Int("events_count", len(eventsBuffer)).Int("output_len", len(result.Output)).Msg("no plan found in agent output")
 		}
 		logger.Info().Str("issue_id", entry.IssueID).Msg("planning complete; auto-advancing to In Progress")
 		if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, updateFields); err != nil {
