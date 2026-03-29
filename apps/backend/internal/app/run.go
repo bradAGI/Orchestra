@@ -334,7 +334,12 @@ func processExecutionTick(
 
 	effectiveWorkspaceRoot = filepath.Dir(project.RootPath)
 
+	// Use the issue identifier as branch name. If the issue already has a
+	// branch_name from a previous dispatch, reuse it for continuity.
 	branchName := strings.ToLower(strings.ReplaceAll(entry.IssueIdentifier, " ", "-"))
+	if existingIssue, lookupErr := service.FetchIssueByID(context.Background(), entry.IssueID); lookupErr == nil && existingIssue.BranchName != "" {
+		branchName = existingIssue.BranchName
+	}
 	publishLifecycleEvent(pubsub, "HOOK_STARTED", map[string]any{"issue_id": entry.IssueID, "issue_identifier": entry.IssueIdentifier, "hook_type": "after_create"})
 
 	var wtPath string
@@ -625,13 +630,11 @@ func processExecutionTick(
 
 	service.RecordRunResult(entry.IssueID, activeProviderName, result.SessionID, result.Usage.InputTokens, result.Usage.OutputTokens, result.Usage.TotalTokens)
 
-	// Planning mode (Todo) should complete in 1 turn — the agent outputs its plan and we advance.
-	// Execution mode (In Progress) gets the full max-turns budget.
-	// Check the live DB state (not the dispatch entry which may be stale).
-	effectiveMaxTurns := service.GetMaxTurns()
-	if liveIssue, liveErr := service.FetchIssueByID(context.Background(), entry.IssueID); liveErr == nil && strings.EqualFold(liveIssue.State, "Todo") {
-		effectiveMaxTurns = 1
-	}
+	// Both planning (Todo) and execution (InProgress) complete in 1 turn.
+	// Claude Code handles the full task in a single session — re-invoking
+	// causes re-planning and context loss. The agent plans OR executes the
+	// entire plan in one invocation.
+	effectiveMaxTurns := 1
 	continueTurn, checkErr := service.ShouldContinueTurn(context.Background(), entry.IssueID, activeProviderName, attempt, effectiveMaxTurns)
 	if checkErr != nil {
 		runAfterHook()
