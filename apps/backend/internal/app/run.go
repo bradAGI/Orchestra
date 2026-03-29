@@ -722,8 +722,16 @@ func processExecutionTick(
 	}
 	currentState := liveIssue.State
 	if strings.EqualFold(currentState, "Todo") {
+		// Extract the plan from the agent's output and store it on the issue
+		// so the execution phase can include it in the prompt.
+		plan := extractPlanFromResult(result, eventsBuffer)
+		updateFields := map[string]any{"state": "In Progress"}
+		if plan != "" {
+			updateFields["description"] = liveIssue.Description + "\n\n## Agent Plan\n\n" + plan
+			logger.Info().Str("issue_id", entry.IssueID).Int("plan_length", len(plan)).Msg("extracted plan from planning phase")
+		}
 		logger.Info().Str("issue_id", entry.IssueID).Msg("planning complete; auto-advancing to In Progress")
-		if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"state": "In Progress"}); err != nil {
+		if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, updateFields); err != nil {
 			logger.Error().Err(err).Str("issue_id", entry.IssueID).Msg("FAILED to auto-advance to In Progress")
 		}
 	} else if strings.EqualFold(currentState, "In Progress") {
@@ -903,6 +911,48 @@ func buildPriorTurnContext(warehouseDB *db.DB, issueID string, issueIdentifier s
 	ctx += "**Continue from where you left off. Do NOT restart from scratch. Check what files already exist before creating new ones.**\n"
 
 	return ctx
+}
+
+// extractPlanFromResult extracts the plan from the agent's in-memory output
+// (result + events buffer) immediately after the planning turn completes.
+// This is more reliable than querying the DB, which may not have flushed yet.
+func extractPlanFromResult(result agents.TurnResult, events []agents.Event) string {
+	// Check the result output first
+	if result.Output != "" {
+		count := 0
+		for _, line := range strings.Split(result.Output, "\n") {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "- [") || strings.HasPrefix(trimmed, "* [") {
+				count++
+			}
+		}
+		if count >= 3 {
+			return result.Output
+		}
+	}
+	// Scan events for the message with the most checkboxes
+	bestMsg := ""
+	bestCount := 0
+	for _, e := range events {
+		if e.Message == "" {
+			continue
+		}
+		count := 0
+		for _, line := range strings.Split(e.Message, "\n") {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "- [") || strings.HasPrefix(trimmed, "* [") {
+				count++
+			}
+		}
+		if count > bestCount {
+			bestCount = count
+			bestMsg = e.Message
+		}
+	}
+	if bestCount >= 3 {
+		return bestMsg
+	}
+	return ""
 }
 
 // extractOriginalPlan retrieves the first agent message containing 3+ checkboxes
