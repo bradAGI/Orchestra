@@ -1063,16 +1063,37 @@ func (s *Server) DeleteIssueSession(w http.ResponseWriter, r *http.Request) {
 func (s *Server) PostIssueStop(w http.ResponseWriter, r *http.Request) {
 	identifier := chi.URLParam(r, "issue_identifier")
 
+	// Look up issue to get branch/project info for cleanup
+	issueData, _ := s.orchestrator.FetchIssueByIdentifier(r.Context(), identifier)
+
 	// Stop all sessions if the issue has an active runtime
 	runtime, ok := s.orchestrator.LookupIssue(identifier)
 	if ok {
 		s.orchestrator.StopAllSessionsForIssue(runtime.IssueID)
 	}
 
-	// Reset state to Backlog and clear feedback (bypasses transition validation)
+	// Clean up worktree and branch
+	if issueData != nil && issueData.BranchName != "" && issueData.ProjectID != "" {
+		if project, projErr := s.db.GetProjectByID(r.Context(), issueData.ProjectID); projErr == nil && project.RootPath != "" {
+			wtPath := filepath.Join(s.worktreeRoot, issueData.ProjectID, issueData.BranchName)
+			_ = os.RemoveAll(wtPath)
+			pruneCmd := exec.CommandContext(r.Context(), "git", "worktree", "prune")
+			pruneCmd.Dir = project.RootPath
+			_ = pruneCmd.Run()
+			delCmd := exec.CommandContext(r.Context(), "git", "branch", "-D", issueData.BranchName)
+			delCmd.Dir = project.RootPath
+			_ = delCmd.Run()
+			s.logger.Info().Str("branch", issueData.BranchName).Msg("cleaned up worktree on stop & reset")
+		}
+	}
+
+	// Reset state to Backlog and clear feedback, plan, branch, base_sha
 	issue, err := s.orchestrator.UpdateIssue(r.Context(), identifier, map[string]any{
-		"state":    "Backlog",
-		"feedback": "",
+		"state":      "Backlog",
+		"feedback":   "",
+		"plan":       "",
+		"branch_name": "",
+		"base_sha":   "",
 	})
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "update_failed", "failed to reset issue")
@@ -1087,11 +1108,36 @@ func (s *Server) PostIssueStop(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteIssue handles DELETE /api/v1/issues/{issue_identifier} by permanently
-// deleting the identified issue from the tracker.
+// deleting the identified issue from the tracker, cleaning up the worktree and branch.
 func (s *Server) DeleteIssue(w http.ResponseWriter, r *http.Request) {
 	identifier := chi.URLParam(r, "issue_identifier")
-	// Stop any running sessions before deleting
+
+	// Look up issue to get branch/project info BEFORE deleting
+	issue, _ := s.orchestrator.FetchIssueByIdentifier(r.Context(), identifier)
+
+	// Stop any running sessions
 	s.orchestrator.StopAllSessionsForIssue(identifier)
+
+	// Clean up worktree and branch if they exist
+	if issue != nil && issue.BranchName != "" && issue.ProjectID != "" {
+		if project, projErr := s.db.GetProjectByID(r.Context(), issue.ProjectID); projErr == nil && project.RootPath != "" {
+			// Remove worktree directory
+			wtPath := filepath.Join(s.worktreeRoot, issue.ProjectID, issue.BranchName)
+			if err := os.RemoveAll(wtPath); err != nil && !os.IsNotExist(err) {
+				s.logger.Warn().Err(err).Str("path", wtPath).Msg("failed to remove worktree directory")
+			}
+			// Prune and delete branch
+			pruneCmd := exec.CommandContext(r.Context(), "git", "worktree", "prune")
+			pruneCmd.Dir = project.RootPath
+			_ = pruneCmd.Run()
+			delCmd := exec.CommandContext(r.Context(), "git", "branch", "-D", issue.BranchName)
+			delCmd.Dir = project.RootPath
+			_ = delCmd.Run()
+			s.logger.Info().Str("branch", issue.BranchName).Str("worktree", wtPath).Msg("cleaned up worktree and branch on delete")
+		}
+	}
+
+	// Delete from tracker
 	if err := s.orchestrator.DeleteIssue(r.Context(), identifier); err != nil {
 		s.logger.Error().Err(err).Str("issue_identifier", identifier).Msg("failed to delete issue")
 		if err == sql.ErrNoRows {
