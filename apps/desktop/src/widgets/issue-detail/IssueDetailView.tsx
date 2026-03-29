@@ -384,29 +384,35 @@ export function IssueDetailView({
                   PR Open
                 </a>
               )}
-              {/* Primary: Create PR */}
-              <button
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
-                onClick={() => setPRDialogOpen(true)}
-              >
-                <GitPullRequest size={14} />
-                Create PR
-              </button>
-              {/* Secondary: Request Changes */}
-              <button
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-muted/20 text-muted-foreground border border-border/30 hover:bg-muted/40 transition-colors"
-                onClick={() => setShowFeedback(true)}
-              >
-                <Pencil size={12} />
-                Request Changes
-              </button>
-              {/* Destructive: Close/Abandon */}
+              {prUrl ? (
+                <button
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg transition-all"
+                  onClick={async () => { await onUpdate({ state: 'Done' }); setLocalState('Done') }}
+                >
+                  <CheckCircle2 size={14} />
+                  Move to Done
+                </button>
+              ) : (
+                <button
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
+                  onClick={() => setPRDialogOpen(true)}
+                >
+                  <GitPullRequest size={14} />
+                  Create PR
+                </button>
+              )}
+              {!prUrl && (
+                <button
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-muted/20 text-muted-foreground border border-border/30 hover:bg-muted/40 transition-colors"
+                  onClick={() => setShowFeedback(true)}
+                >
+                  <Pencil size={12} />
+                  Request Changes
+                </button>
+              )}
               <button
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-red-500 border border-red-500/30 hover:bg-red-500/10 transition-colors"
-                onClick={async () => {
-                  await onUpdate({ state: 'Done' })
-                  setLocalState('Done')
-                }}
+                onClick={async () => { await onUpdate({ state: 'Done' }); setLocalState('Done') }}
               >
                 <X size={12} />
                 Close
@@ -567,22 +573,9 @@ export function IssueDetailView({
                   )}
 
                   {localState === 'Review' && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-purple-500" />
-                        <span className="text-[11px] text-purple-400">Awaiting Review</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => { setLocalState('Done'); onUpdate?.({ state: 'Done' }) }} className="flex-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all">
-                          Approve
-                        </button>
-                        <button onClick={() => setShowFeedback(true)} className="flex-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all">
-                          Reject
-                        </button>
-                      </div>
-                      <button onClick={() => setShowStopConfirm(true)} className="w-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-muted/10 text-muted-foreground hover:bg-muted/20 transition-all">
-                        Stop &amp; Reset
-                      </button>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-purple-500" />
+                      <span className="text-[11px] text-purple-400">{prUrl ? 'PR Created' : 'Awaiting Review'}</span>
                     </div>
                   )}
 
