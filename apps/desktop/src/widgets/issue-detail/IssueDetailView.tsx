@@ -176,11 +176,19 @@ export function IssueDetailView({
     let historyPlan: PlanItem[] = []
     let logsPlan: PlanItem[] = []
 
-    // Source 1: issue history (structured events from DB, newest-first)
+    // Source 1: issue history (structured events from DB)
+    // In interactive mode, each checkbox is its own stdout event — concatenate
+    // all messages into one text block, then extract the plan with the most items.
     if (messageEvents.length > 0) {
+      // Try individual messages first (headless mode: one message has the full plan)
       for (const entry of [...messageEvents].reverse()) {
         const items = extractPlanFromText(entry.message!)
         if (items.length >= 3) { historyPlan = items; break }
+      }
+      // If no single message had 3+ items, concatenate all messages (interactive mode)
+      if (historyPlan.length === 0) {
+        const allText = messageEvents.map(e => e.message).join('\n')
+        historyPlan = extractPlanFromText(allText)
       }
     }
 
