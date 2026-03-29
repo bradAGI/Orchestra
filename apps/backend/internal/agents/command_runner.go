@@ -419,7 +419,11 @@ func (r *CommandRunner) runInPTY(
 	} else {
 		// Launch the interactive agent CLI
 		session.Write([]byte(resolvedCommand + "\n"))
-		// Give the agent time to boot its TUI before sending the prompt
+		// Give the agent time to boot — some CLIs show confirmation prompts
+		// (e.g. Claude's "Bypass Permissions" warning). Send Enter to dismiss,
+		// then wait for the TUI to fully initialize before sending the prompt.
+		time.Sleep(3 * time.Second)
+		session.Write([]byte("\n")) // Dismiss any confirmation prompt
 		time.Sleep(2 * time.Second)
 		// Send the prompt as the first user message
 		session.Write([]byte(finalPrompt + "\n"))
