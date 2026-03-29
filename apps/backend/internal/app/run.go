@@ -921,42 +921,58 @@ func buildPriorTurnContext(warehouseDB *db.DB, issueID string, issueIdentifier s
 	return ctx
 }
 
-// extractPlanFromResult extracts the plan from the agent's in-memory output
-// (result + events buffer) immediately after the planning turn completes.
+// extractPlanFromResult extracts the plan from the agent's in-memory output.
+// Scans event messages, raw output, and raw JSON payloads for checkbox items.
 func extractPlanFromResult(result agents.TurnResult, events []agents.Event) string {
-	// Collect all text content from multiple sources
-	var allText []string
+	// Strategy: collect ALL text from every source, find the block with most checkboxes.
 
-	// Source 1: event messages (may be empty for stream-json)
+	// Source 1: event messages
+	var allMessages []string
 	for _, e := range events {
 		if e.Message != "" {
-			allText = append(allText, e.Message)
+			allMessages = append(allMessages, e.Message)
+		}
+		// Also try extracting from Raw payload
+		if e.Raw != nil {
+			if text := agents.ExtractMessage(e.Raw); text != "" && text != e.Message {
+				allMessages = append(allMessages, text)
+			}
 		}
 	}
 
-	// Source 2: raw output — parse stream-json to extract text content
+	// Source 2: raw output lines — try as plain text AND as JSON
 	if result.Output != "" {
+		// Plain text scan: collect all checkbox lines
+		var checkboxLines []string
+		for _, line := range strings.Split(result.Output, "\n") {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "- [") || strings.HasPrefix(trimmed, "* [") {
+				checkboxLines = append(checkboxLines, trimmed)
+			}
+		}
+		if len(checkboxLines) >= 3 {
+			return strings.Join(checkboxLines, "\n")
+		}
+
+		// JSON line scan
 		for _, line := range strings.Split(result.Output, "\n") {
 			line = strings.TrimSpace(line)
 			if line == "" || !strings.HasPrefix(line, "{") {
 				continue
 			}
 			var payload map[string]any
-			if err := json.Unmarshal([]byte(line), &payload); err != nil {
-				continue
-			}
-			// Extract text from Claude's stream-json format
-			text := agents.ExtractMessage(payload)
-			if text != "" {
-				allText = append(allText, text)
+			if json.Unmarshal([]byte(line), &payload) == nil {
+				if text := agents.ExtractMessage(payload); text != "" {
+					allMessages = append(allMessages, text)
+				}
 			}
 		}
 	}
 
-	// Find the text block with the most checkboxes
+	// Find the message with the most checkboxes
 	bestMsg := ""
 	bestCount := 0
-	for _, text := range allText {
+	for _, text := range allMessages {
 		count := 0
 		for _, line := range strings.Split(text, "\n") {
 			trimmed := strings.TrimSpace(line)
@@ -972,6 +988,20 @@ func extractPlanFromResult(result agents.TurnResult, events []agents.Event) stri
 	if bestCount >= 3 {
 		return bestMsg
 	}
+
+	// Last resort: concatenate ALL event messages and scan as one block
+	allText := strings.Join(allMessages, "\n")
+	var checkboxLines []string
+	for _, line := range strings.Split(allText, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "- [") || strings.HasPrefix(trimmed, "* [") {
+			checkboxLines = append(checkboxLines, trimmed)
+		}
+	}
+	if len(checkboxLines) >= 3 {
+		return strings.Join(checkboxLines, "\n")
+	}
+
 	return ""
 }
 
