@@ -822,6 +822,15 @@ func (s *Server) GetIssueDiff(w http.ResponseWriter, r *http.Request) {
 			project, projErr := s.db.GetProjectByID(r.Context(), issue.ProjectID)
 			if projErr == nil && project.RootPath != "" && filepath.IsAbs(project.RootPath) {
 
+				s.logger.Info().
+					Str("identifier", identifier).
+					Str("worktree_root", s.worktreeRoot).
+					Str("project_id", issue.ProjectID).
+					Str("project_root", project.RootPath).
+					Str("branch_name", issue.BranchName).
+					Str("base_sha", issue.BaseSHA).
+					Msg("GetIssueDiff: computing diff")
+
 				// Branch-scoped diff: use base_sha...branch_name when available
 				if issue.BaseSHA != "" && issue.BranchName != "" {
 					var allDiff []byte
@@ -834,11 +843,15 @@ func (s *Server) GetIssueDiff(w http.ResponseWriter, r *http.Request) {
 
 					// Uncommitted changes inside the worktree (if it exists)
 					wtPath := filepath.Join(s.worktreeRoot, project.ID, issue.BranchName)
+					s.logger.Info().Str("wt_path", wtPath).Msg("GetIssueDiff: checking worktree")
 					if info, statErr := os.Stat(wtPath); statErr == nil && info.IsDir() {
+						s.logger.Info().Str("wt_path", wtPath).Msg("GetIssueDiff: worktree exists")
 						uncommitted, err := git.WorktreeDiff(r.Context(), wtPath)
 						if err == nil && len(uncommitted) > 0 {
 							allDiff = append(allDiff, []byte(uncommitted)...)
 						}
+					} else {
+						s.logger.Info().Str("wt_path", wtPath).Err(statErr).Msg("GetIssueDiff: worktree not found")
 					}
 
 					w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -852,7 +865,13 @@ func (s *Server) GetIssueDiff(w http.ResponseWriter, r *http.Request) {
 				// This avoids diffing the shared project root which leaks other issues' changes.
 				if s.worktreeRoot != "" {
 					projectWTDir := filepath.Join(s.worktreeRoot, project.ID)
+					s.logger.Info().Str("project_wt_dir", projectWTDir).Msg("GetIssueDiff: fallback scanning worktree dir")
 					if entries, err := os.ReadDir(projectWTDir); err == nil {
+						dirNames := make([]string, 0, len(entries))
+						for _, e := range entries {
+							dirNames = append(dirNames, e.Name())
+						}
+						s.logger.Info().Strs("entries", dirNames).Msg("GetIssueDiff: found entries in project worktree dir")
 						for _, entry := range entries {
 							if !entry.IsDir() {
 								continue
