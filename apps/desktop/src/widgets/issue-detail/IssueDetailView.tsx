@@ -168,7 +168,7 @@ export function IssueDetailView({
   const planItems: PlanItem[] = useMemo(() => {
     const PLAN_EVENT_KINDS = new Set(['message', 'agent_message', 'item.completed', 'assistant', 'result/end_turn', 'result', 'pty', 'stdout', 'stderr', 'output'])
     const messageEvents = issueHistory.filter(e =>
-      PLAN_EVENT_KINDS.has(e.kind) && e.message && e.kind !== 'pty'
+      PLAN_EVENT_KINDS.has(e.kind) && e.message
     )
 
     // Strategy: find the newest plan from each source, then pick the one with
@@ -177,19 +177,17 @@ export function IssueDetailView({
     let logsPlan: PlanItem[] = []
 
     // Source 1: issue history (structured events from DB)
-    // In interactive mode, each checkbox is its own stdout event — concatenate
-    // all messages into one text block, then extract the plan with the most items.
     if (messageEvents.length > 0) {
       // Try individual messages first (headless mode: one message has the full plan)
       for (const entry of [...messageEvents].reverse()) {
         const items = extractPlanFromText(entry.message!)
         if (items.length >= 3) { historyPlan = items; break }
       }
-      // If no single message had 3+ items, find the best contiguous group of
-      // checkbox events (interactive mode emits one checkbox per stdout event).
-      // The agent outputs the plan as a consecutive block — find the longest run.
+      // Interactive mode: each checkbox is its own stdout event.
+      // Find ALL contiguous groups of checkboxes, then pick the LATEST one
+      // with 3+ items (newest has the most up-to-date [x] marks).
       if (historyPlan.length === 0) {
-        let bestGroup: PlanItem[] = []
+        const groups: PlanItem[][] = []
         let currentGroup: string[] = []
         for (const entry of messageEvents) {
           const msg = entry.message || ''
@@ -197,17 +195,24 @@ export function IssueDetailView({
             currentGroup.push(msg)
           } else {
             if (currentGroup.length > 0) {
-              const items = extractPlanFromText(currentGroup.join('\n'))
-              if (items.length > bestGroup.length) bestGroup = items
+              groups.push(extractPlanFromText(currentGroup.join('\n')))
               currentGroup = []
             }
           }
         }
         if (currentGroup.length > 0) {
-          const items = extractPlanFromText(currentGroup.join('\n'))
-          if (items.length > bestGroup.length) bestGroup = items
+          groups.push(extractPlanFromText(currentGroup.join('\n')))
         }
-        historyPlan = bestGroup
+        // Pick the LAST group with 3+ items (most recent = updated checkboxes)
+        for (let i = groups.length - 1; i >= 0; i--) {
+          if (groups[i].length >= 3) { historyPlan = groups[i]; break }
+        }
+        // If no group has 3+, take the last group with any items
+        if (historyPlan.length === 0) {
+          for (let i = groups.length - 1; i >= 0; i--) {
+            if (groups[i].length > 0) { historyPlan = groups[i]; break }
+          }
+        }
       }
     }
 
@@ -706,7 +711,7 @@ export function IssueDetailView({
         {/* Terminal — embedded terminal view for the issue's agent PTY */}
         {bottomTab === 'output' && (
           <div className="h-full">
-            {config && isRunning ? (
+            {config && localState !== 'Backlog' ? (
               <div className="w-full h-full px-2 py-1">
                 <TerminalView
                   sessionId={`issue-${identifier}`}
@@ -716,21 +721,8 @@ export function IssueDetailView({
                   theme={theme}
                 />
               </div>
-            ) : localState === 'Backlog' ? (
-              <SessionTimeline logs={logs} loading={logsLoading} />
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-muted-foreground/20 gap-3">
-                <Terminal size={36} />
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em]">
-                  {localState === 'Todo' || localState === 'In Progress' ? 'Waiting for agent...' : 'Session completed'}
-                </p>
-                <p className="text-[10px] text-muted-foreground/40">
-                  {localState === 'Todo' || localState === 'In Progress'
-                    ? 'The agent will appear here when it starts executing.'
-                    : 'Agent finished execution. Review changes in the Changes tab.'}
-                </p>
-                {(localState === 'Todo' || localState === 'In Progress') && <Loader2 size={14} className="animate-spin-smooth text-primary/30" />}
-              </div>
+              <SessionTimeline logs={logs} loading={logsLoading} />
             )}
           </div>
         )}
