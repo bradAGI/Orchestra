@@ -1,0 +1,5 @@
+{
+  "message": "Runtime configuration for Claude Code",
+  "custom_instructions": "You are an autonomous coding agent...",
+  "preferred_tools": []
+}

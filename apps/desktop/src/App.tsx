@@ -1065,6 +1065,7 @@ export default function App() {
                     stats={warehouseStats}
                     loading={dataLoading}
                     config={config}
+                    projects={projects}
                     onInspectSession={handleInspectSession}
                     onCloneSession={handleCloneSession}
                   />
@@ -1109,9 +1110,9 @@ export default function App() {
                     apiToken={config.apiToken}
                     projects={projects}
                     onCloseTerminal={handleCloseTerminal}
-                    onAddTerminal={() => {
+                    onAddTerminal={(projectId) => {
                       const num = openTerminals.filter(t => t.id.startsWith('shell-')).length + 1
-                      setOpenTerminals(prev => [...prev, { id: `shell-${Date.now()}`, title: `Shell ${num}` }])
+                      setOpenTerminals(prev => [...prev, { id: `shell-${Date.now()}`, title: `Shell ${num}`, projectId }])
                     }}
                     onAddAgentTerminal={(id, title, command, projectId) => {
                       setOpenTerminals(prev => [...prev, { id, title, projectId, initialCommand: command }])

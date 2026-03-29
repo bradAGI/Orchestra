@@ -1,0 +1,7 @@
+[agent]
+name = "Codex"
+version = "1.0.0"
+
+[runtime]
+max_turns = 50
+timeout = "10m"

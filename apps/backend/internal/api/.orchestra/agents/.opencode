@@ -1,0 +1,7 @@
+{
+  "message": "Runtime configuration for OpenCode",
+  "capabilities": {
+    "browsing": true,
+    "shell": true
+  }
+}

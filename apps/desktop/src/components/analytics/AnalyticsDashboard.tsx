@@ -23,6 +23,7 @@ interface AnalyticsDashboardProps {
   stats: GlobalStats | null
   loading: boolean
   config: BackendConfig | null
+  projects?: { id: string; name: string }[]
   onInspectSession?: (sessionId: string) => void
   onCloneSession?: (session: SessionSummary) => void
 }
@@ -35,6 +36,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   stats,
   loading,
   config,
+  projects,
   onInspectSession,
   onCloneSession,
 }) => {
@@ -93,7 +95,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
       {/* Active view */}
       {activeView === 'executive' && (
-        <ExecutiveView stats={stats} analytics={analytics} />
+        <ExecutiveView stats={stats} analytics={analytics} projects={projects} />
       )}
       {activeView === 'operational' && (
         <OperationalView

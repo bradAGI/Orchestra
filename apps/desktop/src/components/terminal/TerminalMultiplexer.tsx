@@ -28,7 +28,7 @@ interface TerminalMultiplexerProps {
     apiToken?: string
     projects?: { id: string; name: string }[]
     onCloseTerminal: (id: string) => void
-    onAddTerminal?: () => void
+    onAddTerminal?: (projectId?: string) => void
     onAddAgentTerminal?: (id: string, title: string, command: string, projectId: string) => void
     theme?: 'light' | 'dark'
 }
@@ -105,7 +105,7 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
                         <p className="text-[10px] font-medium uppercase tracking-widest opacity-60">Deploy an agent or open a project shell to begin</p>
                         {onAddTerminal && (
                             <button
-                                onClick={onAddTerminal}
+                                onClick={() => onAddTerminal(selectedProjectId || undefined)}
                                 className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-all text-xs font-bold"
                             >
                                 <Plus size={14} />
@@ -161,7 +161,7 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
                         })}
                         {onAddTerminal && (
                             <button
-                                onClick={onAddTerminal}
+                                onClick={() => onAddTerminal(selectedProjectId || undefined)}
                                 className="flex items-center justify-center h-9 px-2.5 text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/30 transition-all shrink-0"
                                 title="New shell"
                             >

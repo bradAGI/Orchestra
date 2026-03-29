@@ -11,9 +11,10 @@ import { ROICard } from '../charts/ROICard'
 interface ExecutiveViewProps {
   stats: GlobalStats | null
   analytics: AnalyticsData
+  projects?: { id: string; name: string }[]
 }
 
-export const ExecutiveView: React.FC<ExecutiveViewProps> = ({ stats, analytics }) => {
+export const ExecutiveView: React.FC<ExecutiveViewProps> = ({ stats, analytics, projects }) => {
   const totalSpend = useMemo(() => {
     if (!analytics.cost.data?.length) {
       // Fallback to rough estimate from GlobalStats
@@ -68,6 +69,7 @@ export const ExecutiveView: React.FC<ExecutiveViewProps> = ({ stats, analytics }
           data={analytics.costByProject.data}
           loading={analytics.costByProject.loading}
           error={analytics.costByProject.error}
+          projects={projects}
         />
         <CostByModelChart
           data={analytics.cost.data}
