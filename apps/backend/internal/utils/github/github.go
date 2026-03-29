@@ -44,6 +44,11 @@ type Issue struct {
 		Login     string `json:"login"`
 		AvatarURL string `json:"avatar_url"`
 	} `json:"user"`
+	// PullRequest is non-nil when this "issue" is actually a pull request.
+	// GitHub's Issues API returns both issues and PRs.
+	PullRequest *struct {
+		URL string `json:"url"`
+	} `json:"pull_request,omitempty"`
 }
 
 // PullRequest represents a GitHub pull request with head/base branch information.
@@ -140,6 +145,9 @@ func ListIssues(ctx context.Context, owner, repo, token, state string, page int)
 	// Filter out pull requests (GitHub API returns PRs in the issues endpoint)
 	filtered := make([]Issue, 0, len(issues))
 	for _, issue := range issues {
+		if issue.PullRequest != nil {
+			continue // skip PRs — only return actual issues
+		}
 		filtered = append(filtered, issue)
 	}
 
