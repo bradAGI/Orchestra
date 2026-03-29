@@ -3,7 +3,7 @@ import type { ProviderPermissions, ProviderModelConfig } from '@/lib/orchestra-c
 import type { Project } from '@/lib/orchestra-types'
 import { CustomDropdown } from '@/components/app-shell/shared/controls'
 import { Folder } from 'lucide-react'
-import { MODELS_BY_PROVIDER, EFFORT_LEVELS, APPROVAL_MODES } from './constants'
+import { MODELS_BY_PROVIDER, EFFORT_LEVELS } from './constants'
 import type { Provider, Scope } from './types'
 
 interface ProviderHeaderProps {
@@ -24,7 +24,6 @@ export function ProviderHeader({
 }: ProviderHeaderProps) {
   const models = MODELS_BY_PROVIDER[provider] ?? []
   const efforts = EFFORT_LEVELS[provider] ?? []
-  const approvalModes = APPROVAL_MODES[provider] ?? []
 
   const scopeOptions = [
     { label: 'Global', value: 'GLOBAL', icon: <Folder size={10} className="text-muted-foreground/50" /> },
@@ -65,13 +64,7 @@ export function ProviderHeader({
           </>
         )}
 
-        <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40 shrink-0 ml-2">Mode</label>
-        <CustomDropdown
-          className="min-w-[120px]"
-          value={permissions.approval_mode}
-          options={approvalModes}
-          onChange={(val) => onPermissionsChange({ ...permissions, approval_mode: val })}
-        />
+
       </div>
 
       <CustomDropdown
