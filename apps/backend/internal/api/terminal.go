@@ -71,10 +71,11 @@ func (s *Server) TerminalWebSocket(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(sessionID, "issue-") {
 		existing := s.termManager.GetSession(sessionID)
 		if existing != nil && !existing.Closed {
+			s.logger.Info().Str("session_id", sessionID).Msg("terminal: attaching to existing PTY session")
 			session = existing
 		} else {
-			// No agent session yet — create a plain bash shell in the worktree.
-			// The orchestrator will launch the agent when it dispatches.
+			// No agent session yet or agent finished — create a bash shell in the worktree.
+			s.logger.Info().Str("session_id", sessionID).Str("dir", dir).Bool("found_closed", existing != nil).Msg("terminal: creating new bash session for issue")
 			session, err = s.termManager.CreateSession(sessionID, dir, "/bin/bash")
 		}
 	} else {
