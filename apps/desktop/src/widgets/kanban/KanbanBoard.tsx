@@ -77,6 +77,7 @@ export function KanbanBoard({
   const [deleteTaskPending, setDeleteTaskPending] = useState(false)
   const [deleteTaskError, setDeleteTaskError] = useState('')
   const [isDraggingOver, setIsDraggingOver] = useState<string | null>(null)
+  const [dragValidationMsg, setDragValidationMsg] = useState<string | null>(null)
   const [columnOrder, setColumnOrder] = useState<string[]>(['backlog', 'todo', 'progress', 'review', 'done'])
   const [draggingColumnId, setDraggingColumnId] = useState<string | null>(null)
 
@@ -177,7 +178,15 @@ export function KanbanBoard({
 
     // For Backlog -> Todo: require description, assignee, and project
     if (currentColumnId === 'backlog' && targetColumnId === 'todo') {
-      if (!issue.description || !issue.assignee_id || issue.assignee_id === 'Unassigned' || !issue.project_id) return
+      const missing: string[] = []
+      if (!issue.description) missing.push('description')
+      if (!issue.assignee_id || issue.assignee_id === 'Unassigned') missing.push('an assigned agent')
+      if (!issue.project_id) missing.push('a project')
+      if (missing.length > 0) {
+        setDragValidationMsg(`Cannot move to Todo — needs ${missing.join(', ')}`)
+        setTimeout(() => setDragValidationMsg(null), 4000)
+        return
+      }
     }
 
     const nextState = stateMap[targetColumnId]
@@ -352,6 +361,12 @@ export function KanbanBoard({
         </div>
         </div>
       </div>
+
+      {dragValidationMsg && (
+        <div className="mx-4 mb-2 px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[11px] font-bold animate-in fade-in slide-in-from-top-2 duration-300">
+          {dragValidationMsg}
+        </div>
+      )}
 
       {viewMode === 'board' ? (
         <div className="flex-1 grid grid-cols-5 gap-3 min-h-0 px-4">

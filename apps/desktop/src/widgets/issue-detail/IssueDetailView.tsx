@@ -507,7 +507,20 @@ export function IssueDetailView({
                 <div className="space-y-2">
                   <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Status</span>
 
-                  {localState === 'Backlog' && (
+                  {localState === 'Backlog' && (() => {
+                    const missingTitle = !localTitle?.trim()
+                    const missingDescription = !localDescription?.trim()
+                    const missingAssignee = !localAssignee || localAssignee === 'Unassigned' || localAssignee === 'unassigned'
+                    const missingProject = !projectId
+                    const canMove = !missingTitle && !missingDescription && !missingAssignee && !missingProject
+                    const issues = [
+                      missingTitle && 'Title is required',
+                      missingDescription && 'Description is required',
+                      missingAssignee && 'Assign an agent before moving to Todo',
+                      missingProject && 'Assign a project before moving to Todo',
+                    ].filter(Boolean)
+
+                    return (
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-muted-foreground/40" />
@@ -515,17 +528,25 @@ export function IssueDetailView({
                       </div>
                       <button
                         onClick={async () => {
-                          if (!localTitle?.trim() || !localDescription?.trim() || !localAssignee || localAssignee === 'Unassigned' || localAssignee === 'unassigned' || !projectId) return
+                          if (!canMove) return
                           setLocalState('Todo')
                           if (onUpdate) await onUpdate({ state: 'Todo' })
                         }}
-                        disabled={!localTitle?.trim() || !localDescription?.trim() || !localAssignee || localAssignee === 'Unassigned' || localAssignee === 'unassigned' || !projectId}
+                        disabled={!canMove}
                         className="w-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                       >
                         Move to Todo
                       </button>
+                      {issues.length > 0 && (
+                        <div className="space-y-1 pt-1">
+                          {issues.map((msg, i) => (
+                            <p key={i} className="text-[9px] font-medium text-amber-500">{msg}</p>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
+                    )
+                  })()}
 
                   {localState === 'Todo' && (
                     <div className="space-y-2">
