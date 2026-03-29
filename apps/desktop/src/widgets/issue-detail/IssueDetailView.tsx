@@ -679,7 +679,7 @@ export function IssueDetailView({
                   sessionId={`issue-${identifier}`}
                   projectId={projectId}
                   baseUrl={config.baseUrl}
-                  apiToken={config.token}
+                  apiToken={config.apiToken}
                   theme={theme}
                 />
               </div>
