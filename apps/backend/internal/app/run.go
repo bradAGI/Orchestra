@@ -923,30 +923,42 @@ func buildPriorTurnContext(warehouseDB *db.DB, issueID string, issueIdentifier s
 
 // extractPlanFromResult extracts the plan from the agent's in-memory output
 // (result + events buffer) immediately after the planning turn completes.
-// This is more reliable than querying the DB, which may not have flushed yet.
 func extractPlanFromResult(result agents.TurnResult, events []agents.Event) string {
-	// Check the result output first
-	if result.Output != "" {
-		count := 0
-		for _, line := range strings.Split(result.Output, "\n") {
-			trimmed := strings.TrimSpace(line)
-			if strings.HasPrefix(trimmed, "- [") || strings.HasPrefix(trimmed, "* [") {
-				count++
-			}
-		}
-		if count >= 3 {
-			return result.Output
+	// Collect all text content from multiple sources
+	var allText []string
+
+	// Source 1: event messages (may be empty for stream-json)
+	for _, e := range events {
+		if e.Message != "" {
+			allText = append(allText, e.Message)
 		}
 	}
-	// Scan events for the message with the most checkboxes
+
+	// Source 2: raw output — parse stream-json to extract text content
+	if result.Output != "" {
+		for _, line := range strings.Split(result.Output, "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" || !strings.HasPrefix(line, "{") {
+				continue
+			}
+			var payload map[string]any
+			if err := json.Unmarshal([]byte(line), &payload); err != nil {
+				continue
+			}
+			// Extract text from Claude's stream-json format
+			text := agents.ExtractMessage(payload)
+			if text != "" {
+				allText = append(allText, text)
+			}
+		}
+	}
+
+	// Find the text block with the most checkboxes
 	bestMsg := ""
 	bestCount := 0
-	for _, e := range events {
-		if e.Message == "" {
-			continue
-		}
+	for _, text := range allText {
 		count := 0
-		for _, line := range strings.Split(e.Message, "\n") {
+		for _, line := range strings.Split(text, "\n") {
 			trimmed := strings.TrimSpace(line)
 			if strings.HasPrefix(trimmed, "- [") || strings.HasPrefix(trimmed, "* [") {
 				count++
@@ -954,7 +966,7 @@ func extractPlanFromResult(result agents.TurnResult, events []agents.Event) stri
 		}
 		if count > bestCount {
 			bestCount = count
-			bestMsg = e.Message
+			bestMsg = text
 		}
 	}
 	if bestCount >= 3 {

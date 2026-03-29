@@ -557,7 +557,7 @@ func parseLineToEvent(provider Provider, source string, line string) Event {
 	if err := json.Unmarshal([]byte(trimmed), &payload); err == nil {
 		usage := extractUsage(payload)
 		kind := extractKind(provider, source, payload)
-		msg := extractMessage(payload)
+		msg := ExtractMessage(payload)
 		return Event{Provider: provider, Kind: kind, Message: msg, Raw: payload, Usage: usage, Timestamp: now, RawLine: rawLineForEvent}
 	}
 
@@ -572,7 +572,7 @@ func parseLineToEvent(provider Provider, source string, line string) Event {
 				event := Event{
 					Provider:  provider,
 					Kind:      extractKind(provider, source, node),
-					Message:   extractMessage(node),
+					Message:   ExtractMessage(node),
 					Raw:       node,
 					Usage:     extractUsage(node),
 					Timestamp: now,
@@ -677,7 +677,8 @@ func extractKind(provider Provider, source string, payload map[string]any) strin
 	return kind
 }
 
-func extractMessage(payload map[string]any) string {
+// ExtractMessage extracts human-readable text from a parsed JSON event payload.
+func ExtractMessage(payload map[string]any) string {
 	msg := firstString(payload, "message", "content", "text")
 	if msg != "" {
 		return msg
