@@ -166,7 +166,7 @@ export function IssueDetailView({
   // Extract operational plan from the most recent agent message that contains checkboxes.
   // Agent restates the plan with updated checkboxes as it progresses — we want the LATEST version.
   const planItems: PlanItem[] = useMemo(() => {
-    const PLAN_EVENT_KINDS = new Set(['message', 'agent_message', 'item.completed', 'assistant', 'result/end_turn', 'result'])
+    const PLAN_EVENT_KINDS = new Set(['message', 'agent_message', 'item.completed', 'assistant', 'result/end_turn', 'result', 'pty'])
     const messageEvents = issueHistory.filter(e =>
       PLAN_EVENT_KINDS.has(e.kind) && e.message && e.kind !== 'pty'
     )
