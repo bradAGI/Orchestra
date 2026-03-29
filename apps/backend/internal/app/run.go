@@ -729,14 +729,19 @@ func processExecutionTick(
 	if strings.EqualFold(currentState, "Todo") {
 		// Extract the plan from the agent's output and store it on the issue
 		// so the execution phase can include it in the prompt.
+		// Try extracting plan from in-memory data first
 		plan := extractPlanFromResult(result, eventsBuffer)
+		// If not found in memory, wait briefly then try from DB (events may have flushed)
+		if plan == "" && warehouseDB != nil {
+			time.Sleep(500 * time.Millisecond)
+			plan = extractOriginalPlan(warehouseDB, entry.IssueID)
+		}
 		updateFields := map[string]any{"state": "In Progress"}
 		if plan != "" {
-			// Store plan in dedicated field — NOT appended to description
 			updateFields["plan"] = plan
 			logger.Info().Str("issue_id", entry.IssueID).Int("plan_length", len(plan)).Msg("extracted plan from planning phase")
 		} else {
-			logger.Warn().Str("issue_id", entry.IssueID).Int("events_count", len(eventsBuffer)).Int("output_len", len(result.Output)).Msg("no plan found in agent output")
+			logger.Warn().Str("issue_id", entry.IssueID).Msg("no plan found — agent may not have output checkboxes")
 		}
 		logger.Info().Str("issue_id", entry.IssueID).Msg("planning complete; auto-advancing to In Progress")
 		if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, updateFields); err != nil {
