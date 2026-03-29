@@ -1107,6 +1107,7 @@ export default function App() {
                     activeTerminals={openTerminals}
                     baseUrl={config.baseUrl}
                     apiToken={config.apiToken}
+                    projects={projects}
                     onCloseTerminal={handleCloseTerminal}
                     onAddTerminal={() => {
                       const num = openTerminals.filter(t => t.id.startsWith('shell-')).length + 1

@@ -26,6 +26,7 @@ interface TerminalMultiplexerProps {
     activeTerminals: TerminalNode[]
     baseUrl: string
     apiToken?: string
+    projects?: { id: string; name: string }[]
     onCloseTerminal: (id: string) => void
     onAddTerminal?: () => void
     onAddAgentTerminal?: (id: string, title: string, command: string) => void
@@ -36,6 +37,7 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
     activeTerminals,
     baseUrl,
     apiToken,
+    projects,
     onCloseTerminal,
     onAddTerminal,
     onAddAgentTerminal,
@@ -44,6 +46,7 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
     const [currentNode, setCurrentNode] = useState<MosaicNode<string> | null>(null)
     const [activeTabId, setActiveTabId] = useState<string | null>(null)
     const [viewMode, setViewMode] = useState<ViewMode>('tabs')
+    const [selectedProjectId, setSelectedProjectId] = useState<string>('')
 
     const getIdsFromNode = (node: MosaicNode<string>): string[] => {
         if (typeof node === 'string') return [node]
@@ -165,16 +168,27 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
                 {/* Quick launch agents */}
                 {onAddAgentTerminal && (
                     <div className="flex items-center gap-1 px-2 border-l border-border/50">
+                        <select
+                            value={selectedProjectId}
+                            onChange={(e) => setSelectedProjectId(e.target.value)}
+                            className="px-2 py-1 rounded text-[10px] font-bold bg-background border border-border/40 text-foreground max-w-[140px]"
+                        >
+                            <option value="">Select project...</option>
+                            {projects?.map(p => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                        </select>
                         <Zap size={10} className="text-muted-foreground/30 mr-0.5" />
                         {agentCommands.map((agent) => (
                             <button
                                 key={agent.id}
+                                disabled={!selectedProjectId}
                                 onClick={() => onAddAgentTerminal(
                                     `${agent.id}-${Date.now()}`,
                                     agent.label,
                                     agent.cmd
                                 )}
-                                className={`px-2 py-1 rounded text-[10px] font-bold transition-all hover:bg-muted/50 ${agent.color} opacity-60 hover:opacity-100`}
+                                className={`px-2 py-1 rounded text-[10px] font-bold transition-all hover:bg-muted/50 ${agent.color} ${!selectedProjectId ? 'opacity-30 cursor-not-allowed' : 'opacity-60 hover:opacity-100'}`}
                             >
                                 {agent.label}
                             </button>
