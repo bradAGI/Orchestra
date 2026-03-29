@@ -761,11 +761,11 @@ export function IssueDetailView({
           onClose={() => setPRDialogOpen(false)}
           onSubmit={async ({ title: prTitle, body, base, head, draft }) => {
             const result = await createGitHubPR(config, identifier, { title: prTitle, body, base, head })
-            // Note: draft flag is informational — the backend API may not support it yet
             void draft
-            setPrUrl(result.url)
+            const url = (result as any).html_url || result.url || ''
+            setPrUrl(url)
             setPRDialogOpen(false)
-            if (onUpdate) await onUpdate({ pr_url: result.url })
+            if (onUpdate) await onUpdate({ pr_url: url })
           }}
           issueTitle={localTitle}
           issueDescription={description}
