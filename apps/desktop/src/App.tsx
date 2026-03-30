@@ -397,6 +397,10 @@ export default function App() {
           if (now - lastIssueFetchRef.current > 10000) {
             lastIssueFetchRef.current = now
             fetchIssues(config).then(setBoardIssues).catch(() => {})
+            // Also refresh the open issue detail so plan/state update live
+            if (issueLookupId) {
+              void executeIssueLookup(issueLookupId)
+            }
           }
         },
         onTimelineEvent: (eventType, envelope) => {

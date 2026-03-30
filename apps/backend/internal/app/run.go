@@ -563,6 +563,21 @@ func processExecutionTick(
 		publishRunEvent(pubsub, entry, activeProviderName, event)
 		eventsBuffer = append(eventsBuffer, event)
 
+		// Live plan update: if this event contains checkboxes with [x] marks,
+		// update the issue's plan field so the UI reflects progress in real-time.
+		if msg := strings.TrimSpace(event.Message); msg != "" && strings.Contains(msg, "- [x]") {
+			checkboxCount := 0
+			for _, line := range strings.Split(msg, "\n") {
+				t := strings.TrimSpace(line)
+				if strings.HasPrefix(t, "- [") || strings.HasPrefix(t, "* [") {
+					checkboxCount++
+				}
+			}
+			if checkboxCount >= 3 {
+				_, _ = service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"plan": msg})
+			}
+		}
+
 		// Persist to database in real-time
 		if warehouseDB != nil && event.SessionID != "" {
 			// Skip recording PTY echo noise (echoed prompts, shell decorations)
