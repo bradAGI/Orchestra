@@ -192,9 +192,29 @@ func (s *Server) CreateGitHubPR(w http.ResponseWriter, r *http.Request) {
 		Base:  body.Base,
 	})
 	if err != nil {
-		s.logger.Error().Err(err).Str("owner", body.Owner).Str("repo", body.Repo).Str("head", body.Head).Msg("github PR creation failed")
-		writeJSONError(w, http.StatusInternalServerError, "pr_creation_failed", fmt.Sprintf("pull request creation failed: %v", err))
-		return
+		// If a PR already exists for this branch, find and return it instead of failing.
+		if strings.Contains(err.Error(), "A pull request already exists") {
+			s.logger.Info().Str("head", body.Head).Msg("PR already exists for branch — looking up existing PR")
+			existing, lookupErr := githubutils.FindPullRequestByHead(r.Context(), body.Owner, body.Repo, body.Token, body.Head)
+			if lookupErr == nil && existing != nil {
+				pr = existing
+			} else {
+				s.logger.Error().Err(lookupErr).Msg("failed to find existing PR")
+				writeJSONError(w, http.StatusInternalServerError, "pr_creation_failed", fmt.Sprintf("pull request already exists but could not be found: %v", lookupErr))
+				return
+			}
+		} else {
+			s.logger.Error().Err(err).Str("owner", body.Owner).Str("repo", body.Repo).Str("head", body.Head).Msg("github PR creation failed")
+			writeJSONError(w, http.StatusInternalServerError, "pr_creation_failed", fmt.Sprintf("pull request creation failed: %v", err))
+			return
+		}
+	}
+
+	// Store the PR URL on the issue so the inspector can display it.
+	if pr.HTMLURL != "" {
+		if _, updateErr := s.orchestrator.UpdateIssue(r.Context(), identifier, map[string]any{"pr_url": pr.HTMLURL}); updateErr != nil {
+			s.logger.Warn().Err(updateErr).Str("issue_identifier", identifier).Msg("failed to store pr_url on issue")
+		}
 	}
 
 	writeJSON(w, http.StatusCreated, pr)
@@ -508,7 +528,7 @@ var validTransitions = map[string][]string{
 	"Backlog":     {"Todo"},
 	"Todo":        {"In Progress", "Backlog"},
 	"In Progress": {"Review", "Backlog"},
-	"Review":      {"Done", "Todo", "Backlog"},
+	"Review":      {"Done", "Todo", "In Progress", "Backlog"},
 	"Done":        {},
 }
 
@@ -564,10 +584,10 @@ func validateStateTransition(current, next string, issue *tracker.Issue, updates
 		}
 	}
 
-	// Gate: Review → Todo requires feedback field in updates
-	if current == "Review" && next == "Todo" {
+	// Gate: Review → Todo and Review → In Progress both require feedback
+	if current == "Review" && (next == "Todo" || next == "In Progress") {
 		if _, ok := updates["feedback"]; !ok {
-			return "cannot move from Review to Todo without providing feedback"
+			return fmt.Sprintf("cannot move from Review to %s without providing feedback", next)
 		}
 	}
 

@@ -748,12 +748,20 @@ func processExecutionTick(
 			logger.Error().Err(err).Str("issue_id", entry.IssueID).Msg("FAILED to auto-advance to In Progress")
 		}
 	} else if strings.EqualFold(currentState, "In Progress") {
-		// Extract updated plan with checked-off items from the execution output
-		// so the Review phase shows which steps the agent completed.
+		// Extract updated plan with checked-off items from the execution output.
+		// If the agent restated the plan with [x] marks, use that version.
 		updatedPlan := extractPlanFromResult(result, eventsBuffer)
 		if updatedPlan == "" && warehouseDB != nil {
 			time.Sleep(500 * time.Millisecond)
 			updatedPlan = extractOriginalPlan(warehouseDB, entry.IssueID)
+		}
+		// If the extracted plan has no checked items, the agent didn't restate
+		// the plan with [x] marks. Since the run completed successfully, mark
+		// all checkboxes as done as a fallback.
+		if updatedPlan != "" && !strings.Contains(updatedPlan, "- [x]") && !strings.Contains(updatedPlan, "- [X]") {
+			updatedPlan = strings.ReplaceAll(updatedPlan, "- [ ]", "- [x]")
+			updatedPlan = strings.ReplaceAll(updatedPlan, "* [ ]", "* [x]")
+			logger.Info().Str("issue_id", entry.IssueID).Msg("auto-checked plan items — agent completed without restating checkboxes")
 		}
 		updateFields := map[string]any{"state": "Review"}
 		if updatedPlan != "" {

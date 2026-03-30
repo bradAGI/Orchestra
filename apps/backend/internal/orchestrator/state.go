@@ -925,10 +925,21 @@ func (s *Service) enqueueCandidates(candidates []tracker.Issue) {
 
 		desc := issue.Description
 		if strings.EqualFold(issue.State, "Todo") {
-			desc = desc + "\n\n---\nMODE: PLAN ONLY — BE FAST.\n\nYour ONLY job is to output a plan. Do NOT write code, create files, or make changes.\n\n1. Spend at most 2-3 tool calls understanding the project structure (ls, read key files)\n2. Then IMMEDIATELY output your plan as markdown checkboxes:\n   - [ ] Step 1: ...\n   - [ ] Step 2: ...\n3. Stop after outputting the plan. Do NOT explore further.\n\nKeep the plan concise — 5-10 steps maximum. The human will review it before you execute."
+			planInstr := "\n\n---\nMODE: PLAN ONLY — BE FAST.\n\nYour ONLY job is to output a plan. Do NOT write code, create files, or make changes.\n\n"
+			if issue.Feedback != "" && issue.Plan != "" {
+				// Re-plan with context: show what was already done and what needs to change.
+				planInstr += "CONTEXT: This task was previously executed. The reviewer sent it back for changes.\n\n"
+				planInstr += "FEEDBACK FROM REVIEW (address this):\n" + issue.Feedback + "\n\n"
+				planInstr += "PREVIOUS PLAN (already executed — build on this, do NOT start from scratch):\n" + issue.Plan + "\n\n"
+				planInstr += "Create an UPDATED plan that addresses the feedback. Keep completed work, add new steps for the requested changes.\n"
+			} else if issue.Feedback != "" {
+				planInstr += "FEEDBACK FROM REVIEW (address this):\n" + issue.Feedback + "\n\n"
+			}
+			planInstr += "1. Spend at most 2-3 tool calls understanding the project structure (ls, read key files)\n2. Then IMMEDIATELY output your plan as markdown checkboxes:\n   - [ ] Step 1: ...\n   - [ ] Step 2: ...\n3. Stop after outputting the plan. Do NOT explore further.\n\nKeep the plan concise — 5-10 steps maximum. The human will review it before you execute."
+			desc = desc + planInstr
 		} else if strings.EqualFold(issue.State, "In Progress") {
 			// Build execution prompt: instruction + plan + task description
-			execInstr := "IMPORTANT: YOU ARE IN EXECUTION MODE. DO NOT CREATE A NEW PLAN.\n\nExecute the plan below step by step. START WRITING CODE IMMEDIATELY.\nAfter completing each step, restate the FULL plan with [x] for completed steps.\nWrite code, run tests, commit when all steps are done.\n\n"
+			execInstr := "IMPORTANT: YOU ARE IN EXECUTION MODE. DO NOT CREATE A NEW PLAN.\n\nExecute the plan below step by step. START WRITING CODE IMMEDIATELY.\nWrite code, run tests, commit when all steps are done.\n\nCRITICAL — YOUR FINAL MESSAGE MUST contain the full plan with checkboxes updated:\n  - [x] for completed steps\n  - [ ] for incomplete steps\nThis is required for tracking. Do NOT end with a prose summary instead.\n\n"
 			if issue.Feedback != "" {
 				execInstr += "FEEDBACK FROM REVIEW (address this): " + issue.Feedback + "\n\n"
 			}

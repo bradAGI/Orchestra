@@ -544,6 +544,37 @@ func CreatePullRequest(ctx context.Context, owner, repo, token string, pr PRRequ
 	return &prResp, nil
 }
 
+// FindPullRequestByHead looks up an open pull request for the given head branch.
+func FindPullRequestByHead(ctx context.Context, owner, repo, token, head string) (*PRResponse, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls?head=%s:%s&state=open", owner, repo, owner, head)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "token "+token)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, apiError(resp)
+	}
+
+	var prs []PRResponse
+	if err := json.NewDecoder(resp.Body).Decode(&prs); err != nil {
+		return nil, err
+	}
+	if len(prs) == 0 {
+		return nil, fmt.Errorf("no open PR found for head %s", head)
+	}
+	return &prs[0], nil
+}
+
 // TokenFromStored deserializes a stored token string.
 // It handles both legacy plain access tokens and the newer JSON format
 // that includes refresh token and expiry.
