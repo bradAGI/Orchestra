@@ -16,6 +16,10 @@ export type IssueDetailResult = {
   provider?: string
   disabled_tools?: string[]
   updated_at?: string
+  pr_url?: string
+  feedback?: string
+  plan?: string
+  base_sha?: string
   [key: string]: unknown
 }
 
