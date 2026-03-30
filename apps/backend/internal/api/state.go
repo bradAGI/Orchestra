@@ -345,6 +345,9 @@ func (s *Server) GetIssue(w http.ResponseWriter, r *http.Request) {
 			"created_at":       issue.CreatedAt,
 			"updated_at":       issue.UpdatedAt,
 			"base_sha":         issue.BaseSHA,
+			"feedback":         issue.Feedback,
+			"pr_url":           issue.PRURL,
+			"plan":             issue.Plan,
 			"status":           "IDLE",
 			"history":          history,
 			"attempts": map[string]any{
@@ -483,6 +486,9 @@ func (s *Server) GetIssue(w http.ResponseWriter, r *http.Request) {
 		response["created_at"] = issueDetails.CreatedAt
 		response["updated_at"] = issueDetails.UpdatedAt
 		response["base_sha"] = issueDetails.BaseSHA
+		response["feedback"] = issueDetails.Feedback
+		response["pr_url"] = issueDetails.PRURL
+		response["plan"] = issueDetails.Plan
 	}
 
 	writeJSON(w, http.StatusOK, response)

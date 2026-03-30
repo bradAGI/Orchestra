@@ -74,18 +74,22 @@ func (r *CommandRunner) RunTurn(ctx context.Context, request TurnRequest, onEven
 		return TurnResult{}, fmt.Errorf("agent command missing for provider %s", r.provider)
 	}
 
-	// Inject ToolSpecs as a JSON file if present
-	if len(request.ToolSpecs) > 0 {
-		toolsPath := filepath.Join(request.Workspace, "tools.json")
-		toolsData, _ := json.MarshalIndent(request.ToolSpecs, "", "  ")
-		_ = os.WriteFile(toolsPath, toolsData, 0o644)
-	}
-
-	// Inject ResourceSpecs as a JSON file if present
-	if len(request.ResourceSpecs) > 0 {
-		resPath := filepath.Join(request.Workspace, "resources.json")
-		resData, _ := json.MarshalIndent(request.ResourceSpecs, "", "  ")
-		_ = os.WriteFile(resPath, resData, 0o644)
+	// Inject ToolSpecs and ResourceSpecs into .orchestra/ subdirectory so they
+	// don't pollute the project's git history when agents run `git add -A`.
+	if len(request.ToolSpecs) > 0 || len(request.ResourceSpecs) > 0 {
+		orchDir := filepath.Join(request.Workspace, ".orchestra")
+		_ = os.MkdirAll(orchDir, 0o755)
+		if len(request.ToolSpecs) > 0 {
+			toolsData, _ := json.MarshalIndent(request.ToolSpecs, "", "  ")
+			_ = os.WriteFile(filepath.Join(orchDir, "tools.json"), toolsData, 0o644)
+		}
+		if len(request.ResourceSpecs) > 0 {
+			resData, _ := json.MarshalIndent(request.ResourceSpecs, "", "  ")
+			_ = os.WriteFile(filepath.Join(orchDir, "resources.json"), resData, 0o644)
+		}
+		// Ensure .orchestra/ is gitignored in the worktree
+		gitignorePath := filepath.Join(request.Workspace, ".gitignore")
+		ensureGitignoreEntry(gitignorePath, ".orchestra/")
 	}
 
 	finalPrompt := strings.TrimSpace(request.Prompt)
@@ -871,6 +875,25 @@ func shellQuote(value string) string {
 		return "''"
 	}
 	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
+}
+
+// ensureGitignoreEntry appends entry to the .gitignore file if not already present.
+func ensureGitignoreEntry(gitignorePath, entry string) {
+	data, _ := os.ReadFile(gitignorePath)
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(line) == entry {
+			return
+		}
+	}
+	f, err := os.OpenFile(gitignorePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	if len(data) > 0 && !strings.HasSuffix(string(data), "\n") {
+		_, _ = f.WriteString("\n")
+	}
+	_, _ = f.WriteString(entry + "\n")
 }
 
 func shouldIgnoreScannerError(scanErr error, cmdErr error) bool {

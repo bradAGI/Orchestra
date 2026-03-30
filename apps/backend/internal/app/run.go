@@ -748,8 +748,20 @@ func processExecutionTick(
 			logger.Error().Err(err).Str("issue_id", entry.IssueID).Msg("FAILED to auto-advance to In Progress")
 		}
 	} else if strings.EqualFold(currentState, "In Progress") {
+		// Extract updated plan with checked-off items from the execution output
+		// so the Review phase shows which steps the agent completed.
+		updatedPlan := extractPlanFromResult(result, eventsBuffer)
+		if updatedPlan == "" && warehouseDB != nil {
+			time.Sleep(500 * time.Millisecond)
+			updatedPlan = extractOriginalPlan(warehouseDB, entry.IssueID)
+		}
+		updateFields := map[string]any{"state": "Review"}
+		if updatedPlan != "" {
+			updateFields["plan"] = updatedPlan
+			logger.Info().Str("issue_id", entry.IssueID).Int("plan_length", len(updatedPlan)).Msg("updated plan with execution progress")
+		}
 		logger.Info().Str("issue_id", entry.IssueID).Msg("execution complete; auto-advancing to Review")
-		if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"state": "Review"}); err != nil {
+		if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, updateFields); err != nil {
 			logger.Error().Err(err).Str("issue_id", entry.IssueID).Msg("FAILED to auto-advance to Review")
 		}
 	} else {
