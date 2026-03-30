@@ -772,6 +772,21 @@ func processExecutionTick(
 		if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, updateFields); err != nil {
 			logger.Error().Err(err).Str("issue_id", entry.IssueID).Msg("FAILED to auto-advance to Review")
 		}
+
+		// If a PR already exists, push the branch so new commits appear on the PR.
+		if liveIssue.PRURL != "" && workspacePath != "" {
+			branchName := liveIssue.BranchName
+			if branchName == "" {
+				branchName = strings.ToLower(strings.ReplaceAll(entry.IssueIdentifier, " ", "-"))
+			}
+			pushCmd := exec.CommandContext(context.Background(), "git", "push", "--force-with-lease", "-u", "origin", branchName)
+			pushCmd.Dir = workspacePath
+			if pushOut, pushErr := pushCmd.CombinedOutput(); pushErr != nil {
+				logger.Warn().Err(pushErr).Str("output", string(pushOut)).Str("branch", branchName).Msg("failed to push branch after feedback cycle")
+			} else {
+				logger.Info().Str("issue_id", entry.IssueID).Str("branch", branchName).Msg("pushed branch to update existing PR")
+			}
+		}
 	} else {
 		logger.Info().Str("issue_id", entry.IssueID).Str("state", currentState).Msg("run succeeded but state is not auto-advanceable; skipping")
 	}
