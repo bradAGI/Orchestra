@@ -235,7 +235,7 @@ func TestLoad_InvalidMaxConcurrentFallsBackToDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected config load success, got err=%v", err)
 	}
-	if cfg.MaxConcurrent != 16 {
-		t.Fatalf("expected fallback max concurrent 16, got=%d", cfg.MaxConcurrent)
+	if cfg.MaxConcurrent != 6 {
+		t.Fatalf("expected fallback max concurrent 6, got=%d", cfg.MaxConcurrent)
 	}
 }

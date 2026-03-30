@@ -206,7 +206,7 @@ func Load() (Config, error) {
 		}
 	}
 	if maxConcurrent == 0 {
-		maxConcurrent = 16
+		maxConcurrent = 6
 	}
 	maxConcurrentByState := parseStateConcurrencyCSV(maxConcurrentByStateRaw)
 	if len(maxConcurrentByState) == 0 {
