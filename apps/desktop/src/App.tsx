@@ -414,6 +414,10 @@ export default function App() {
               }
             }).catch(() => {})
             lastIssueFetchRef.current = Date.now()
+            // Re-fetch the issue detail so the inspector shows updated plan/state
+            if (issueIdentifier) {
+              void executeIssueLookup(issueIdentifier)
+            }
           }
         },
         onStatus: (message) => {
