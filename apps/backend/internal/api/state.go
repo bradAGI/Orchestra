@@ -169,7 +169,16 @@ func (s *Server) CreateGitHubPR(w http.ResponseWriter, r *http.Request) {
 			pushCmd := exec.CommandContext(r.Context(), "git", "push", "-u", "origin", body.Head)
 			pushCmd.Dir = pushDir
 			if pushOut, pushErr := pushCmd.CombinedOutput(); pushErr != nil {
-				s.logger.Warn().Err(pushErr).Str("output", string(pushOut)).Str("branch", body.Head).Msg("failed to push branch before PR creation")
+				s.logger.Warn().Err(pushErr).Str("output", string(pushOut)).Str("branch", body.Head).Msg("regular push failed, retrying with --force-with-lease")
+				// Retry with --force-with-lease: the branch may have stale history
+				// from a previous dispatch (e.g., re-plan or re-execute cycle).
+				forceCmd := exec.CommandContext(r.Context(), "git", "push", "--force-with-lease", "-u", "origin", body.Head)
+				forceCmd.Dir = pushDir
+				if forceOut, forceErr := forceCmd.CombinedOutput(); forceErr != nil {
+					s.logger.Error().Err(forceErr).Str("output", string(forceOut)).Str("branch", body.Head).Msg("force push also failed — PR creation may fail")
+				} else {
+					s.logger.Info().Str("branch", body.Head).Msg("force-pushed branch to origin for PR creation")
+				}
 			} else {
 				s.logger.Info().Str("branch", body.Head).Msg("pushed branch to origin for PR creation")
 			}
