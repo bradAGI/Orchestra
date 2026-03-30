@@ -491,6 +491,13 @@ export default function App() {
     setErrorMessage('')
     try {
       await postRefresh(config)
+      const [updatedIssues, updatedProjects] = await Promise.all([
+        fetchIssues(config),
+        fetchProjects(config),
+      ])
+      setBoardIssues(updatedIssues)
+      setProjects(updatedProjects)
+      setGithubBacklogIssues([])
       setStatusMessage('Refresh queued successfully.')
     } catch (err) {
       setOperatorError('refresh failed', err)
