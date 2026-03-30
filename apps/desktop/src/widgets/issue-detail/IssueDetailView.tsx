@@ -632,7 +632,7 @@ export function IssueDetailView({
                       <div className={`mt-0.5 h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${item.done ? 'bg-primary border-primary text-primary-foreground' : 'border-border/50'}`}>
                         {item.done && <CheckCircle2 size={12} />}
                       </div>
-                      <div className={`text-sm leading-relaxed prose prose-sm prose-invert max-w-none prose-p:my-0 prose-code:text-primary/70 ${item.done ? 'text-muted-foreground/40 line-through opacity-50' : 'text-foreground'}`}>
+                      <div className={`text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none prose-p:my-0 prose-code:text-primary/70 ${item.done ? 'text-muted-foreground/40 line-through opacity-50' : 'text-foreground'}`}>
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{item.text}</ReactMarkdown>
                       </div>
                     </div>
