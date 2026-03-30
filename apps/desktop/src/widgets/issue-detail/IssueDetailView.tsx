@@ -508,15 +508,20 @@ export function IssueDetailView({
                         <span className="text-[11px] text-purple-400">{prUrl ? 'PR Created' : 'Awaiting Review'}</span>
                       </div>
                       {prUrl && (
-                        <a
-                          href={prUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/5 border border-primary/10 hover:bg-primary/10 transition-colors"
+                        <button
+                          onClick={() => {
+                            const bridge = (window as any).orchestraDesktop
+                            if (bridge?.openExternal) {
+                              void bridge.openExternal(prUrl)
+                            } else {
+                              window.open(prUrl, '_blank')
+                            }
+                          }}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/5 border border-primary/10 hover:bg-primary/10 transition-colors w-full text-left"
                         >
                           <GitPullRequest size={12} className="text-primary shrink-0" />
                           <span className="text-[10px] font-mono text-primary truncate">{prUrl.replace('https://github.com/', '')}</span>
-                        </a>
+                        </button>
                       )}
                       {(typed.feedback as string) && (
                         <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
