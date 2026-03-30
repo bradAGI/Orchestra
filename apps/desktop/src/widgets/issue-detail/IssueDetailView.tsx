@@ -436,6 +436,15 @@ export function IssueDetailView({
                   {localDescription || 'No description'}
                 </div>
               )}
+              {(typed.feedback as string) && (
+                <div className="mx-4 mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Pencil size={12} className="text-amber-500" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Review Feedback</span>
+                  </div>
+                  <p className="text-sm text-foreground/80 leading-relaxed">{typed.feedback as string}</p>
+                </div>
+              )}
             </div>
 
             {/* Sidebar properties */}
@@ -512,12 +521,6 @@ export function IssueDetailView({
                         <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                         <span className="text-[11px] text-amber-400">Executing</span>
                       </div>
-                      {(typed.feedback as string) && (
-                        <div className="p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/10">
-                          <div className="text-[8px] font-bold uppercase tracking-widest text-amber-500 mb-1">Feedback</div>
-                          <p className="text-[10px] text-amber-200/70 leading-relaxed">{typed.feedback as string}</p>
-                        </div>
-                      )}
                       <button onClick={() => setShowStopConfirm(true)} className="w-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all">
                         Stop &amp; Reset
                       </button>
@@ -545,12 +548,6 @@ export function IssueDetailView({
                           <GitPullRequest size={12} className="text-primary shrink-0" />
                           <span className="text-[10px] font-mono text-primary truncate">{prUrl.replace('https://github.com/', '')}</span>
                         </button>
-                      )}
-                      {(typed.feedback as string) && (
-                        <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
-                          <div className="text-[8px] font-bold uppercase tracking-widest text-amber-500 mb-1.5">Feedback</div>
-                          <p className="text-[10px] text-amber-200/70 leading-relaxed">{typed.feedback as string}</p>
-                        </div>
                       )}
                     </div>
                   )}
