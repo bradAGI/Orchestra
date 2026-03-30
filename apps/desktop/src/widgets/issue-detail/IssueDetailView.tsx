@@ -301,8 +301,15 @@ export function IssueDetailView({
 
   const handleReject = async (feedback: string) => {
     setShowFeedback(false)
-    setLocalState('Todo')
-    onUpdate?.({ state: 'Todo', feedback })
+    if (prUrl) {
+      // PR exists — go straight to execution, no re-planning
+      setLocalState('In Progress')
+      onUpdate?.({ state: 'In Progress', feedback })
+    } else {
+      // No PR — re-plan with feedback context
+      setLocalState('Todo')
+      onUpdate?.({ state: 'Todo', feedback })
+    }
   }
 
   if (!result) {
@@ -732,6 +739,7 @@ export function IssueDetailView({
         <FeedbackDialog
           onSubmit={handleReject}
           onCancel={() => setShowFeedback(false)}
+          hasPR={!!prUrl}
         />
       )}
 

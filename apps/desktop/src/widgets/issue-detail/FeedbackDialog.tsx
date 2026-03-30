@@ -3,9 +3,10 @@ import { useState } from 'react'
 interface FeedbackDialogProps {
   onSubmit: (feedback: string) => void
   onCancel: () => void
+  hasPR?: boolean
 }
 
-export function FeedbackDialog({ onSubmit, onCancel }: FeedbackDialogProps) {
+export function FeedbackDialog({ onSubmit, onCancel, hasPR }: FeedbackDialogProps) {
   const [feedback, setFeedback] = useState('')
 
   const handleSubmit = () => {
@@ -19,7 +20,9 @@ export function FeedbackDialog({ onSubmit, onCancel }: FeedbackDialogProps) {
       <div className="bg-card border border-border/40 rounded-xl shadow-lg p-6 max-w-md w-full mx-4">
         <h3 className="text-sm font-bold text-foreground mb-3">Request Changes</h3>
         <p className="text-[11px] text-muted-foreground mb-3">
-          Describe what needs to change. The agent will re-plan with your feedback and prior work context.
+          {hasPR
+            ? 'Describe what needs to change. The agent will make the changes directly and update the PR.'
+            : 'Describe what needs to change. The agent will re-plan with your feedback and prior work context.'}
         </p>
         <textarea
           value={feedback}
@@ -41,7 +44,7 @@ export function FeedbackDialog({ onSubmit, onCancel }: FeedbackDialogProps) {
             disabled={!feedback.trim()}
             className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
           >
-            Send Feedback
+            {hasPR ? 'Update PR' : 'Send Feedback'}
           </button>
         </div>
       </div>
