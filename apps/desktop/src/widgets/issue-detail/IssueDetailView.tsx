@@ -8,6 +8,7 @@ import { fetchIssueHistory, fetchIssueDiff, fetchIssueLogs, updateProjectGitHubI
 import type { SnapshotPayload } from '@/lib/orchestra-types'
 import type { TimelineItem } from '@/components/app-shell/types'
 import { AgentSelector } from '@/components/app-shell/shared/controls'
+import { AppTooltip } from '@/components/ui/tooltip-wrapper'
 import type { IssueDetailResult } from './types'
 import { FeedbackDialog } from './FeedbackDialog'
 import { PRCreateDialog } from './PRCreateDialog'
@@ -328,27 +329,49 @@ export function IssueDetailView({
           <div className="flex items-center gap-2 shrink-0">
           {localState === 'Review' && config && projectId && onUpdate && (
             <>
-              <button
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
-                onClick={() => setPRDialogOpen(true)}
-              >
-                <GitPullRequest size={14} />
-                Create PR
-              </button>
-              <button
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-muted/20 text-muted-foreground border border-border/30 hover:bg-muted/40 transition-colors"
-                onClick={() => setShowFeedback(true)}
-              >
-                <Pencil size={12} />
-                Request Changes
-              </button>
-              <button
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-red-500 border border-red-500/30 hover:bg-red-500/10 transition-colors"
-                onClick={async () => { await onUpdate({ state: 'Done' }); setLocalState('Done') }}
-              >
-                <X size={12} />
-                Close
-              </button>
+              {prUrl ? (
+                <AppTooltip content="Open pull request in browser" side="bottom">
+                  <button
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg shadow-emerald-600/20 transition-all"
+                    onClick={() => {
+                      const bridge = (window as any).orchestraDesktop
+                      if (bridge?.openExternal) { void bridge.openExternal(prUrl) }
+                      else { window.open(prUrl, '_blank') }
+                    }}
+                  >
+                    <GitPullRequest size={14} />
+                    View PR
+                  </button>
+                </AppTooltip>
+              ) : (
+                <AppTooltip content="Push branch and create a GitHub pull request" side="bottom">
+                  <button
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
+                    onClick={() => setPRDialogOpen(true)}
+                  >
+                    <GitPullRequest size={14} />
+                    Create PR
+                  </button>
+                </AppTooltip>
+              )}
+              <AppTooltip content="Send feedback and re-dispatch the agent to make changes" side="bottom">
+                <button
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-muted/20 text-muted-foreground border border-border/30 hover:bg-muted/40 transition-colors"
+                  onClick={() => setShowFeedback(true)}
+                >
+                  <Pencil size={12} />
+                  Request Changes
+                </button>
+              </AppTooltip>
+              <AppTooltip content="Close this task and clean up the worktree" side="bottom">
+                <button
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-red-500 border border-red-500/30 hover:bg-red-500/10 transition-colors"
+                  onClick={async () => { await onUpdate({ state: 'Done' }); setLocalState('Done') }}
+                >
+                  <X size={12} />
+                  Close
+                </button>
+              </AppTooltip>
             </>
           )}
           {localState === 'Done' && onUpdate && (
