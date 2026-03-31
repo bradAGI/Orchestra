@@ -137,14 +137,15 @@ func Checkout(ctx context.Context, dir, branch string) error {
 	return nil
 }
 
-// DeleteBranch deletes the specified local branch.
+// DeleteBranch deletes the specified local branch. Uses -D (force) to handle
+// branches with unmerged changes — the branch manager UI already confirms with the user.
 func DeleteBranch(ctx context.Context, dir, name string) error {
-	cmd := exec.CommandContext(ctx, "git", "branch", "-d", name)
+	cmd := exec.CommandContext(ctx, "git", "branch", "-D", name)
 	cmd.Dir = dir
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("git branch -d failed: %v - %s", err, stderr.String())
+		return fmt.Errorf("git branch -D failed: %v - %s", err, stderr.String())
 	}
 	return nil
 }
