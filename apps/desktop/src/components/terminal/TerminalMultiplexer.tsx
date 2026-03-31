@@ -161,9 +161,14 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
                         })}
                         {onAddTerminal && (
                             <button
-                                onClick={() => onAddTerminal(selectedProjectId || undefined)}
-                                className="flex items-center justify-center h-9 px-2.5 text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/30 transition-all shrink-0"
-                                title="New shell"
+                                disabled={!selectedProjectId}
+                                onClick={() => selectedProjectId && onAddTerminal(selectedProjectId)}
+                                className={`flex items-center justify-center h-9 px-2.5 transition-all shrink-0 ${
+                                    !selectedProjectId
+                                        ? 'text-muted-foreground/15 cursor-not-allowed'
+                                        : 'text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/30'
+                                }`}
+                                title={selectedProjectId ? 'New shell' : 'Select a project first'}
                             >
                                 <Plus size={14} />
                             </button>

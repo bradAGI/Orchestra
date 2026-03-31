@@ -24,6 +24,7 @@ interface TerminalViewProps {
 export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId, baseUrl, apiToken, onClose: _onClose, initialCommand, theme }) => {
     const terminalRef = useRef<HTMLDivElement>(null)
     const xtermRef = useRef<Terminal | null>(null)
+    const fitAddonRef = useRef<FitAddon | null>(null)
     const wsRef = useRef<WebSocket | null>(null)
 
     useEffect(() => {
@@ -61,6 +62,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
         })
 
         const fitAddon = new FitAddon()
+        fitAddonRef.current = fitAddon
         term.loadAddon(fitAddon)
         term.open(terminalRef.current)
         // Delay initial fit to ensure the container has its final dimensions.
@@ -137,11 +139,23 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
             resizeObserver.observe(terminalRef.current)
         }
 
+        // IntersectionObserver to re-fit when terminal becomes visible again
+        // (e.g. navigating away from Terminals section and back)
+        const intersectionObserver = new IntersectionObserver((entries) => {
+            if (entries[0]?.isIntersecting) {
+                requestAnimationFrame(handleResize)
+            }
+        })
+        if (terminalRef.current) {
+            intersectionObserver.observe(terminalRef.current)
+        }
+
         window.addEventListener('resize', handleResize)
 
         return () => {
             window.removeEventListener('resize', handleResize)
             resizeObserver.disconnect()
+            intersectionObserver.disconnect()
             ws.close()
             term.dispose()
         }
