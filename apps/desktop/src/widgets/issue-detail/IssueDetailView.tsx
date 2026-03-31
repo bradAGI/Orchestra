@@ -166,39 +166,21 @@ export function IssueDetailView({
   // Extract operational plan from the most recent agent message that contains checkboxes.
   // Agent restates the plan with updated checkboxes as it progresses — we want the LATEST version.
   const planItems: PlanItem[] = useMemo(() => {
-    // Priority 1: Use the dedicated plan field from the issue (stored during Todo → InProgress)
+    // The plan field from the API is the source of truth — the backend updates it
+    // during planning (Todo→InProgress) and after execution (InProgress→Review),
+    // as well as live during execution when the agent restates checkboxes.
     const issuePlan = (typed.plan as string) || ''
     if (issuePlan) {
-      const basePlan = extractPlanFromText(issuePlan)
-      if (basePlan.length > 0) {
-        // Check if any events have updated [x] status — scan newest-first
-        const PLAN_EVENT_KINDS = new Set(['message', 'agent_message', 'item.completed', 'assistant', 'result/end_turn', 'result'])
-        const messageEvents = issueHistory.filter(e => PLAN_EVENT_KINDS.has(e.kind) && e.message)
-        for (const entry of [...messageEvents].reverse()) {
-          const updated = extractPlanFromText(entry.message!)
-          if (updated.length >= basePlan.length) {
-            // Agent restated plan with [x] marks — use the updated version
-            return updated
-          }
-        }
-        return basePlan
-      }
+      const items = extractPlanFromText(issuePlan)
+      if (items.length > 0) return items
     }
 
-    // Priority 2: Extract from event history (fallback for older issues without plan field)
-    const PLAN_EVENT_KINDS = new Set(['message', 'agent_message', 'item.completed', 'assistant', 'result/end_turn', 'result'])
-    const messageEvents = issueHistory.filter(e => PLAN_EVENT_KINDS.has(e.kind) && e.message)
-    for (const entry of [...messageEvents].reverse()) {
-      const items = extractPlanFromText(entry.message!)
-      if (items.length >= 3) return items
-    }
-
-    // Priority 3: Parse from description
+    // Fallback: extract from description (for issues created with inline checkboxes)
     const descPlan = extractPlanFromText(description)
     if (descPlan.length > 0) return descPlan
 
     return []
-  }, [issueHistory, typed.plan, description])
+  }, [typed.plan, description])
   useEffect(() => {
     const cacheKey = issueId || identifier
     if (cacheKey && planItems.length > 0) {
