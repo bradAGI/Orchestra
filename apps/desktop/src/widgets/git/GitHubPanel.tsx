@@ -204,21 +204,23 @@ export function GitHubPanel({
   }
 
   return (
-    <div className="border-t border-border/40">
-      {/* Header */}
-      <button
-        onClick={() => setCollapsed((v) => !v)}
-        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/10"
-      >
-        {collapsed ? <ChevronRight size={14} className="text-muted-foreground" /> : <ChevronDown size={14} className="text-muted-foreground" />}
-        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">GitHub</span>
-        <span className="text-[9px] text-muted-foreground/50 ml-1">
-          {issues.length} issues / {prs.length} PRs
-        </span>
-      </button>
+    <div className={forceTab ? 'h-full flex flex-col' : 'border-t border-border/40'}>
+      {/* Header — hidden when parent controls the tab */}
+      {!forceTab && (
+        <button
+          onClick={() => setCollapsed((v) => !v)}
+          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/10"
+        >
+          {collapsed ? <ChevronRight size={14} className="text-muted-foreground" /> : <ChevronDown size={14} className="text-muted-foreground" />}
+          <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">GitHub</span>
+          <span className="text-[9px] text-muted-foreground/50 ml-1">
+            {issues.length} issues / {prs.length} PRs
+          </span>
+        </button>
+      )}
 
-      {!collapsed && (
-        <div className="px-3 pb-3">
+      {(forceTab || !collapsed) && (
+        <div className={forceTab ? 'flex-1 overflow-auto px-3 py-3' : 'px-3 pb-3'}>
           {/* Error state */}
           {loadError && (
             <div className="mb-2 p-2 bg-red-500/10 border border-red-500/20 rounded-lg">
