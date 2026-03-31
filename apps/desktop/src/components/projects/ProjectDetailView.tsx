@@ -327,7 +327,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                     {/* Badges */}
                     <div className="flex items-center gap-1.5">
                         {isConnected ? (
-                            <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1 h-5 px-1.5 text-[10px]">
+                            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 gap-1 h-5 px-1.5 text-[10px]">
                                 <Github size={10} />
                                 {project.github_owner}/{project.github_repo}
                             </Badge>
@@ -363,9 +363,9 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                         </AppTooltip>
 
                         {isConnected ? (
-                            <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] text-green-500 hover:text-green-400 hover:bg-green-500/10 gap-1.5"
+                            <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] text-primary hover:text-primary/80 hover:bg-primary/10 gap-1.5"
                                 onClick={() => void handleDisconnectGitHub()} disabled={githubPending}>
-                                <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                                <div className="h-1.5 w-1.5 rounded-full bg-primary" />
                                 Disconnect
                             </Button>
                         ) : isGitHub ? (

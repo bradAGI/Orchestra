@@ -238,7 +238,7 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
                       <span className="text-sm font-bold truncate group-hover:text-primary transition-colors">{project.name}</span>
                       {hasGit && <GitBranch className="h-3 w-3 shrink-0 text-muted-foreground/30" />}
                       {project.github_token ? (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-500/10 text-green-500 border border-green-500/20">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary border border-primary/20">
                           GitHub Connected
                         </span>
                       ) : project.github_owner ? (
