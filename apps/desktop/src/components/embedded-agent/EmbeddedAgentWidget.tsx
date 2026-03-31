@@ -13,29 +13,12 @@ interface EmbeddedAgentWidgetProps {
 
 function AgentIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 64 64" className={className} aria-hidden="true" role="img">
-      <defs>
-        <linearGradient id="agent-logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="currentColor" />
-          <stop offset="100%" stopColor="currentColor" stopOpacity="0.6" />
-        </linearGradient>
-      </defs>
-      <circle
-        cx="32" cy="32" r="24"
-        fill="none"
-        stroke="url(#agent-logo-gradient)"
-        strokeWidth="6"
-        strokeDasharray="110 40"
-        strokeLinecap="round"
-        transform="rotate(-10 32 32)"
-      />
-      <rect
-        x="24" y="24" width="16" height="16" rx="3"
-        fill="url(#agent-logo-gradient)"
-        transform="rotate(45 32 32)"
-      />
-      <circle cx="32" cy="32" r="3" fill="currentColor" fillOpacity="0.9" />
-    </svg>
+    <img
+      src="/Orchesta.png"
+      alt="Orchestra"
+      className={`${className ?? ''} invert dark:invert-0`}
+      aria-hidden="true"
+    />
   )
 }
 

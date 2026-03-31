@@ -63,8 +63,8 @@ export function SidebarNav({
       <div className="flex h-full flex-col">
         <div className="mb-1.5 flex justify-center pt-6">
           <div className="flex items-center gap-2">
-            <span className="grid h-12 w-12 shrink-0 place-items-center text-foreground">
-              <AppMonogramIcon className="h-10 w-10" />
+            <span className="grid h-28 w-28 shrink-0 place-items-center text-foreground">
+              <AppMonogramIcon className="h-24 w-24" />
             </span>
             {!sidebarCollapsed ? (
               <div className="min-w-0">
@@ -138,37 +138,11 @@ const NavTooltipContent = memo(function NavTooltipContent({ label, description }
 
 function AppMonogramIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 64 64" className={className} aria-hidden="true" role="img">
-      <defs>
-        <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="hsl(var(--primary))" />
-          <stop offset="100%" stopColor="hsl(var(--primary) / 0.6)" />
-        </linearGradient>
-      </defs>
-      {/* Outer ring segments */}
-      <circle
-        cx="32"
-        cy="32"
-        r="24"
-        fill="none"
-        stroke="url(#logo-gradient)"
-        strokeWidth="6"
-        strokeDasharray="110 40"
-        strokeLinecap="round"
-        transform="rotate(-10 32 32)"
-      />
-      {/* Inner geometric diamond */}
-      <rect
-        x="24"
-        y="24"
-        width="16"
-        height="16"
-        rx="3"
-        fill="url(#logo-gradient)"
-        transform="rotate(45 32 32)"
-      />
-      {/* Center point */}
-      <circle cx="32" cy="32" r="3" fill="currentColor" fillOpacity="0.9" />
-    </svg>
+    <img
+      src="/Orchesta.png"
+      alt="Orchestra"
+      className={`${className ?? ''} dark:invert`}
+      aria-hidden="true"
+    />
   )
 }
