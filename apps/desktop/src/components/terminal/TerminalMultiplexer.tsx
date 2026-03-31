@@ -110,6 +110,7 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
                                     value={selectedProjectId}
                                     projects={projects ?? []}
                                     onChange={setSelectedProjectId}
+                                    direction="down"
                                 />
                                 <button
                                     disabled={!selectedProjectId}
@@ -208,16 +209,14 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
                 {/* Bottom row: agent quick-launch */}
                 {onAddAgentTerminal && (
                     <div className="flex items-center gap-2 px-2 py-1.5 border-t border-border/30 bg-muted/20">
-                        <div className="flex items-center gap-1.5 shrink-0">
-                            <Zap size={10} className="text-muted-foreground/40" />
-                            <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground/40">Launch</span>
+                        <div className="rounded-lg border border-border/30 bg-card/50">
+                            <ProjectSelector
+                                value={selectedProjectId}
+                                projects={projects ?? []}
+                                onChange={setSelectedProjectId}
+                                direction="down"
+                            />
                         </div>
-                        <ProjectSelector
-                            value={selectedProjectId}
-                            projects={projects ?? []}
-                            onChange={setSelectedProjectId}
-                        />
-                        <div className="h-3 w-px bg-border/50" />
                         <div className="flex items-center gap-1">
                             {agentCommands.map((agent) => (
                                 <button

@@ -160,10 +160,12 @@ export function ProjectSelector({
   value,
   projects,
   onChange,
+  direction = 'up',
 }: {
   value: string
   projects: { id: string; name: string }[]
   onChange: (id: string) => void
+  direction?: 'up' | 'down'
 }) {
   const project = projects.find((p) => p.id === value)
 
@@ -171,7 +173,7 @@ export function ProjectSelector({
     <CustomDropdown
       className="bg-transparent border-none hover:bg-muted/20 !h-10 !px-3 rounded-lg transition-colors shadow-none"
       value={value}
-      direction="up"
+      direction={direction}
       options={[
         { label: 'Select Project', value: '', icon: <FolderTree className="h-3.5 w-3.5 opacity-40" /> },
         ...projects.map((p) => ({ label: p.name, value: p.id, icon: <Folder className="h-3.5 w-3.5 text-primary/60" /> })),
