@@ -106,12 +106,14 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
                         <p className="text-[10px] font-medium uppercase tracking-widest opacity-60">Select a project and open a shell to begin</p>
                         {onAddTerminal && (
                             <div className="mt-4 flex items-center gap-2 justify-center">
-                                <ProjectSelector
-                                    value={selectedProjectId}
-                                    projects={projects ?? []}
-                                    onChange={setSelectedProjectId}
-                                    direction="down"
-                                />
+                                <div className="rounded-lg border border-border/30 bg-card/50">
+                                    <ProjectSelector
+                                        value={selectedProjectId}
+                                        projects={projects ?? []}
+                                        onChange={setSelectedProjectId}
+                                        direction="down"
+                                    />
+                                </div>
                                 <button
                                     disabled={!selectedProjectId}
                                     onClick={() => selectedProjectId && onAddTerminal(selectedProjectId)}
