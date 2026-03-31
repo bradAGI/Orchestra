@@ -102,15 +102,32 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
                     </div>
                     <div className="text-center space-y-3 relative z-10">
                         <p className="text-sm font-black uppercase tracking-[0.3em]">No Active Terminals</p>
-                        <p className="text-[10px] font-medium uppercase tracking-widest opacity-60">Deploy an agent or open a project shell to begin</p>
+                        <p className="text-[10px] font-medium uppercase tracking-widest opacity-60">Select a project and open a shell to begin</p>
                         {onAddTerminal && (
-                            <button
-                                onClick={() => onAddTerminal(selectedProjectId || undefined)}
-                                className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-all text-xs font-bold"
-                            >
-                                <Plus size={14} />
-                                Open Terminal
-                            </button>
+                            <div className="mt-4 flex items-center gap-2 justify-center">
+                                <select
+                                    value={selectedProjectId}
+                                    onChange={(e) => setSelectedProjectId(e.target.value)}
+                                    className="px-3 py-2 rounded-lg text-[11px] bg-card border border-border/40 text-foreground outline-none"
+                                >
+                                    <option value="">Select project...</option>
+                                    {projects?.map(p => (
+                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                    ))}
+                                </select>
+                                <button
+                                    disabled={!selectedProjectId}
+                                    onClick={() => selectedProjectId && onAddTerminal(selectedProjectId)}
+                                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                                        !selectedProjectId
+                                            ? 'bg-muted/20 text-muted-foreground/30 cursor-not-allowed'
+                                            : 'bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20'
+                                    }`}
+                                >
+                                    <Plus size={14} />
+                                    Open Terminal
+                                </button>
+                            </div>
                         )}
                     </div>
                 </div>
