@@ -313,15 +313,17 @@ export function GitHubPanel({
                       <span className="text-[11px] text-foreground truncate flex-1">
                         #{issue.number} {issue.title}
                       </span>
-                      <a
-                        href={issue.html_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const bridge = (window as any).orchestraDesktop
+                          if (bridge?.openExternal) { void bridge.openExternal(issue.html_url) }
+                          else { window.open(issue.html_url, '_blank') }
+                        }}
                         className="text-muted-foreground/40 hover:text-muted-foreground"
                       >
                         <ExternalLink size={10} />
-                      </a>
+                      </button>
                     </div>
                     {expandedIssue === issue.number && (
                       <div className="ml-6 px-2 py-1 text-[10px] text-muted-foreground">

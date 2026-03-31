@@ -411,7 +411,7 @@ export function GitTab({
       {/* PRs tab */}
       {activeSubTab === 'prs' && (
         hasGitHub ? (
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-hidden min-h-0">
             <GitHubPanel
               projectId={project.id}
               config={config}
@@ -433,7 +433,7 @@ export function GitTab({
       {/* Issues tab */}
       {activeSubTab === 'issues' && (
         hasGitHub ? (
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-hidden min-h-0">
             <GitHubPanel
               projectId={project.id}
               config={config}
