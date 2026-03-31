@@ -154,6 +154,10 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false)
 
   const handleRefreshRef = useRef<(() => Promise<void>) | null>(null)
+  const issueLookupIdRef = useRef(issueLookupId)
+  issueLookupIdRef.current = issueLookupId
+  const executeIssueLookupRef = useRef(executeIssueLookup)
+  executeIssueLookupRef.current = executeIssueLookup
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -398,8 +402,8 @@ export default function App() {
             lastIssueFetchRef.current = now
             fetchIssues(config).then(setBoardIssues).catch(() => {})
             // Also refresh the open issue detail so plan/state update live
-            if (issueLookupId) {
-              void executeIssueLookup(issueLookupId)
+            if (issueLookupIdRef.current) {
+              void executeIssueLookupRef.current(issueLookupIdRef.current)
             }
           }
         },
@@ -420,7 +424,7 @@ export default function App() {
             lastIssueFetchRef.current = Date.now()
             // Re-fetch the issue detail so the inspector shows updated plan/state
             if (issueIdentifier) {
-              void executeIssueLookup(issueIdentifier)
+              void executeIssueLookupRef.current(issueIdentifier)
             }
           }
         },
