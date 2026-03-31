@@ -205,9 +205,7 @@ export default function App() {
   const [selectedProjectID, setSelectedProjectID] = useState<string | null>(null)
   const [dataLoading, setDataLoading] = useState(false)
 
-  const [openTerminals, setOpenTerminals] = useState<TerminalNode[]>([
-    { id: 'master-shell', title: 'System Shell' }
-  ])
+  const [openTerminals, setOpenTerminals] = useState<TerminalNode[]>([])
 
   // Terminals are for manual use only (quick-launch, user shells).
   // Issue agent sessions run in subprocess mode — their output is
@@ -1130,8 +1128,10 @@ export default function App() {
                     projects={projects}
                     onCloseTerminal={handleCloseTerminal}
                     onAddTerminal={(projectId) => {
-                      const num = openTerminals.filter(t => t.id.startsWith('shell-')).length + 1
-                      setOpenTerminals(prev => [...prev, { id: `shell-${Date.now()}`, title: `Shell ${num}`, projectId }])
+                      if (!projectId) return
+                      const proj = projects.find(p => p.id === projectId)
+                      const name = proj?.name ?? 'Shell'
+                      setOpenTerminals(prev => [...prev, { id: `shell-${Date.now()}`, title: `${name} Shell`, projectId }])
                     }}
                     onAddAgentTerminal={(id, title, command, projectId) => {
                       setOpenTerminals(prev => [...prev, { id, title, projectId, initialCommand: command }])

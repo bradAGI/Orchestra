@@ -313,97 +313,99 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         <div className="flex flex-col h-full bg-background/20 overflow-hidden">
             {/* Header */}
             <div className="shrink-0 border-b border-border/30 bg-background/60 backdrop-blur-xl sticky top-0 z-20">
-                {/* Top bar: back + actions */}
-                <div className="flex items-center justify-between px-6 pt-4 pb-2">
-                    <Button variant="ghost" size="sm" onClick={onBack} className="h-7 text-muted-foreground hover:text-foreground gap-1.5 -ml-2 text-[11px] font-medium">
-                        <ArrowLeft size={14} /> Back
+                {/* Header row */}
+                <div className="flex items-center gap-3 px-4 py-1.5">
+                    {/* Back */}
+                    <Button variant="ghost" onClick={onBack} className="h-8 px-2 text-muted-foreground hover:text-foreground gap-1 shrink-0 text-xs font-medium">
+                        <ArrowLeft size={15} /> Back
                     </Button>
-                    <div className="flex items-center gap-1">
+
+                    {/* Divider */}
+                    <div className="h-4 w-px bg-border/40 shrink-0" />
+
+                    {/* Project name */}
+                    <h1 className="text-sm font-semibold tracking-tight truncate shrink-0">{project.name}</h1>
+
+                    {/* Path */}
+                    <div className="flex items-center gap-1 text-[11px] text-muted-foreground/40 font-mono min-w-0 truncate">
+                        <span className="truncate">{project.root_path}</span>
+                        <AppTooltip content="Open folder">
+                            <button onClick={() => void handleOpenFolder()} className="p-0.5 hover:text-primary transition-colors shrink-0">
+                                <ExternalLink size={10} />
+                            </button>
+                        </AppTooltip>
+                    </div>
+
+                    {/* Spacer */}
+                    <div className="flex-1" />
+
+                    {/* GitHub status */}
+                    {isConnected ? (
+                        <>
+                            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 gap-1 h-5 px-2 text-[10px] font-semibold shrink-0">
+                                <Github size={10} />
+                                {project.github_owner}/{project.github_repo}
+                            </Badge>
+                            <Button variant="ghost" size="sm" className="h-5 px-1.5 text-[10px] text-muted-foreground/40 hover:text-foreground hover:bg-muted/20 gap-1 shrink-0"
+                                onClick={() => void handleDisconnectGitHub()} disabled={githubPending}>
+                                Disconnect
+                            </Button>
+                        </>
+                    ) : isGitHub ? (
+                        <>
+                            <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-500 border-amber-500/20 gap-1 h-5 px-2 text-[10px] font-semibold shrink-0">
+                                <Github size={10} />
+                                {project.github_owner}/{project.github_repo}
+                            </Badge>
+                            <Button variant="default" size="sm" className="h-5 px-2 text-[10px] gap-1 shadow-sm font-semibold shrink-0"
+                                onClick={() => void handleConnectGitHub()} disabled={githubPending}>
+                                <Github size={10} />
+                                {githubPending ? 'Connecting...' : 'Connect'}
+                            </Button>
+                        </>
+                    ) : project.remote_url ? (
+                        <Badge variant="outline" className="bg-muted/30 text-muted-foreground border-border/30 gap-1 h-5 px-2 text-[10px] font-semibold shrink-0">
+                            <GitBranch size={10} /> Git
+                        </Badge>
+                    ) : null}
+
+                    {/* Divider */}
+                    <div className="h-4 w-px bg-border/40 shrink-0" />
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-0.5 shrink-0">
                         <AppTooltip content="Refresh project">
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground/60 hover:text-foreground" onClick={handleRefresh} disabled={refreshing}>
-                                <RefreshCcw size={14} className={refreshing ? 'animate-refresh-spin' : ''} />
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground/50 hover:text-foreground" onClick={handleRefresh} disabled={refreshing}>
+                                <RefreshCcw size={13} className={refreshing ? 'animate-refresh-spin' : ''} />
                             </Button>
                         </AppTooltip>
                         {project.remote_url && (
                             <AppTooltip content="Open repository in browser">
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground/60 hover:text-foreground"
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground/50 hover:text-foreground"
                                     onClick={() => void openExternal(sshToHttps(project.remote_url))}>
-                                    <Globe size={14} />
+                                    <Globe size={13} />
                                 </Button>
                             </AppTooltip>
                         )}
                         <AppTooltip content="Remove project">
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground/60 hover:text-red-400"
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground/50 hover:text-red-400"
                                 onClick={() => setIsDeleteDialogOpen(true)}>
-                                <Trash2 size={14} />
+                                <Trash2 size={13} />
                             </Button>
                         </AppTooltip>
-                    </div>
-                </div>
-
-                {/* Project identity */}
-                <div className="px-6 pb-4">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary border border-primary/15 flex items-center justify-center shrink-0">
-                            <Folder size={18} />
-                        </div>
-                        <div className="min-w-0">
-                            <h1 className="text-xl font-bold tracking-tight truncate">{project.name}</h1>
-                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/50 font-mono mt-0.5">
-                                <span className="truncate">{project.root_path}</span>
-                                <AppTooltip content="Open folder">
-                                    <button onClick={() => void handleOpenFolder()} className="p-0.5 hover:text-primary transition-colors shrink-0">
-                                        <ExternalLink size={10} />
-                                    </button>
-                                </AppTooltip>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Badges + GitHub action */}
-                    <div className="flex items-center gap-2 mt-3">
-                        {isConnected ? (
-                            <>
-                                <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 gap-1.5 h-6 px-2.5 text-[10px] font-semibold">
-                                    <Github size={11} />
-                                    {project.github_owner}/{project.github_repo}
-                                </Badge>
-                                <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] text-muted-foreground/50 hover:text-foreground hover:bg-muted/20 gap-1"
-                                    onClick={() => void handleDisconnectGitHub()} disabled={githubPending}>
-                                    <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                                    Disconnect
-                                </Button>
-                            </>
-                        ) : isGitHub ? (
-                            <>
-                                <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-500 border-amber-500/20 gap-1.5 h-6 px-2.5 text-[10px] font-semibold">
-                                    <Github size={11} />
-                                    {project.github_owner}/{project.github_repo}
-                                </Badge>
-                                <Button variant="default" size="sm" className="h-6 px-3 text-[10px] gap-1.5 shadow-sm font-semibold"
-                                    onClick={() => void handleConnectGitHub()} disabled={githubPending}>
-                                    <Github size={11} />
-                                    {githubPending ? 'Connecting...' : 'Connect'}
-                                </Button>
-                            </>
-                        ) : project.remote_url ? (
-                            <Badge variant="outline" className="bg-muted/30 text-muted-foreground border-border/30 gap-1.5 h-6 px-2.5 text-[10px] font-semibold">
-                                <GitBranch size={11} /> Git
-                            </Badge>
-                        ) : null}
                     </div>
                 </div>
 
                 {/* Error banner */}
                 {githubError && (
-                    <div className="mx-6 mb-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-[11px] text-red-500 dark:text-red-400 flex items-center justify-between">
+                    <div className="mx-4 mb-1.5 px-3 py-1.5 rounded-md bg-red-500/10 border border-red-500/20 text-[11px] text-red-500 dark:text-red-400 flex items-center justify-between">
                         <span>{githubError}</span>
                         <button onClick={() => setGithubError('')} className="ml-2 hover:text-red-300"><X size={12} /></button>
                     </div>
                 )}
 
                 {/* Tabs */}
-                <div className="flex gap-0 px-6 border-t border-border/20">
+                <div className="flex gap-0 px-4 border-t border-border/20">
                     {tabs.map((tab) => {
                         const disabled = tab.needsPath && !pathExists
                         return (

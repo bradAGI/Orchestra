@@ -1384,6 +1384,131 @@ export async function updateProviderHooks(config: BackendConfig, provider: strin
     })
 }
 
+/* ================================================================== */
+/*  Claude-specific config endpoints                                   */
+/* ================================================================== */
+
+export interface ClaudeSettingsResponse {
+  settings: Record<string, unknown>
+  path: string
+  exists: boolean
+}
+
+export interface ClaudeInstructionsResponse {
+  content: string
+  path: string
+  exists: boolean
+}
+
+export interface ClaudeFileEntry {
+  name: string
+  content: string
+  path: string
+}
+
+export interface ClaudeFileListResponse {
+  items: ClaudeFileEntry[]
+  dir: string
+}
+
+export async function fetchClaudeSettings(config: BackendConfig, scope: string, projectId?: string): Promise<ClaudeSettingsResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON<ClaudeSettingsResponse>(config, `/api/v1/agents/claude/settings?${params}`)
+}
+
+export async function updateClaudeSettings(config: BackendConfig, scope: string, settings: Record<string, unknown>, projectId?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/claude/settings?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ settings }),
+  })
+}
+
+export async function fetchClaudeInstructions(config: BackendConfig, scope: string, projectId?: string): Promise<ClaudeInstructionsResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON<ClaudeInstructionsResponse>(config, `/api/v1/agents/claude/instructions?${params}`)
+}
+
+export async function updateClaudeInstructions(config: BackendConfig, scope: string, content: string, projectId?: string, path?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/claude/instructions?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content, path }),
+  })
+}
+
+export async function fetchClaudeRules(config: BackendConfig, scope: string, projectId?: string): Promise<ClaudeFileListResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON<ClaudeFileListResponse>(config, `/api/v1/agents/claude/rules?${params}`)
+}
+
+export async function updateClaudeRule(config: BackendConfig, scope: string, name: string, content: string, projectId?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/claude/rules?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, content }),
+  })
+}
+
+export async function deleteClaudeRule(config: BackendConfig, scope: string, name: string, projectId?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/claude/rules/${encodeURIComponent(name)}?${params}`, { method: 'DELETE' })
+}
+
+export async function fetchClaudeSkills(config: BackendConfig, scope: string, projectId?: string): Promise<ClaudeFileListResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON<ClaudeFileListResponse>(config, `/api/v1/agents/claude/skills?${params}`)
+}
+
+export async function updateClaudeSkill(config: BackendConfig, scope: string, name: string, content: string, projectId?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/claude/skills?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, content }),
+  })
+}
+
+export async function deleteClaudeSkill(config: BackendConfig, scope: string, name: string, projectId?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/claude/skills/${encodeURIComponent(name)}?${params}`, { method: 'DELETE' })
+}
+
+export async function fetchClaudeSubAgents(config: BackendConfig, scope: string, projectId?: string): Promise<ClaudeFileListResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON<ClaudeFileListResponse>(config, `/api/v1/agents/claude/subagents?${params}`)
+}
+
+export async function updateClaudeSubAgent(config: BackendConfig, scope: string, name: string, content: string, projectId?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/claude/subagents?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, content }),
+  })
+}
+
+export async function deleteClaudeSubAgent(config: BackendConfig, scope: string, name: string, projectId?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/claude/subagents/${encodeURIComponent(name)}?${params}`, { method: 'DELETE' })
+}
+
 /**
  * Checks the health status of the speech-to-text subsystem.
  * @param config - Backend connection configuration.

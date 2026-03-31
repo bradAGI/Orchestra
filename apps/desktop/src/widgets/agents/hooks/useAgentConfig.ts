@@ -120,7 +120,9 @@ export function useAgentConfig(
   }, [configs, provider])
 
   const categoryCounts = useMemo((): Record<CategoryId, number> => ({
+    settings: 0,
     instructions: configsByCategory('instructions').length,
+    permissions: 0,
     skills: configsByCategory('skills').length,
     hooks: hooks.length,
     mcp: providerMcpServers.length + orchestraMcpServers.length,

@@ -61,13 +61,13 @@ export function SidebarNav({
       </AppTooltip>
 
       <div className="flex h-full flex-col">
-        <div className="mb-1.5 flex justify-center pt-6">
-          <div className="flex items-center gap-2">
+        <div className="mb-1 flex justify-center pt-2">
+          <div className="flex flex-col items-center">
             <span className="grid h-28 w-28 shrink-0 place-items-center text-foreground">
               <AppMonogramIcon className="h-24 w-24" />
             </span>
             {!sidebarCollapsed ? (
-              <div className="min-w-0">
+              <div className="min-w-0 -mt-3">
                 <p className="truncate text-xl font-black uppercase tracking-[0.15em] text-foreground dark:text-muted-foreground leading-none">Orchestra</p>
               </div>
             ) : null}

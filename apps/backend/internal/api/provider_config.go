@@ -986,6 +986,556 @@ func writeOpenCodeModel(home string, model ProviderModelConfig) error {
 }
 
 /* ================================================================== */
+/*  Claude-specific config endpoints                                   */
+/* ================================================================== */
+
+// resolveProjectRoot looks up the project root path from the DB given a project_id query param.
+func (s *Server) resolveProjectRoot(r *http.Request) (string, error) {
+	projectID := r.URL.Query().Get("project_id")
+	if projectID == "" || s.db == nil {
+		return "", fmt.Errorf("project_id required")
+	}
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		return "", fmt.Errorf("project not found: %w", err)
+	}
+	if project.RootPath == "" {
+		return "", fmt.Errorf("project has no root path")
+	}
+	return project.RootPath, nil
+}
+
+// GetClaudeSettings returns the full ~/.claude/settings.json (global) or
+// {projectRoot}/.claude/settings.json (project).
+func (s *Server) GetClaudeSettings(w http.ResponseWriter, r *http.Request) {
+	scope := r.URL.Query().Get("scope")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "home_dir", "cannot determine home directory")
+		return
+	}
+
+	var settingsPath string
+	switch scope {
+	case "project":
+		root, err := s.resolveProjectRoot(r)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", err.Error())
+			return
+		}
+		settingsPath = filepath.Join(root, ".claude", "settings.json")
+	default:
+		settingsPath = claudeSettingsPath(home)
+	}
+
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			writeJSON(w, http.StatusOK, map[string]any{"settings": map[string]any{}, "path": settingsPath, "exists": false})
+			return
+		}
+		writeJSONError(w, http.StatusInternalServerError, "read_failed", err.Error())
+		return
+	}
+
+	var cfg map[string]any
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "parse_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"settings": cfg, "path": settingsPath, "exists": true})
+}
+
+// PostClaudeSettings writes the full settings.json for the given scope.
+func (s *Server) PostClaudeSettings(w http.ResponseWriter, r *http.Request) {
+	scope := r.URL.Query().Get("scope")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "home_dir", "cannot determine home directory")
+		return
+	}
+
+	var body struct {
+		Settings map[string]any `json:"settings"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+		return
+	}
+
+	var settingsPath string
+	switch scope {
+	case "project":
+		root, err := s.resolveProjectRoot(r)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", err.Error())
+			return
+		}
+		settingsPath = filepath.Join(root, ".claude", "settings.json")
+	default:
+		settingsPath = claudeSettingsPath(home)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(settingsPath), 0755); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "mkdir_failed", err.Error())
+		return
+	}
+	data, err := json.MarshalIndent(body.Settings, "", "  ")
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "marshal_failed", err.Error())
+		return
+	}
+	if err := os.WriteFile(settingsPath, data, 0644); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "write_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// GetClaudeInstructions returns the CLAUDE.md for the given scope.
+func (s *Server) GetClaudeInstructions(w http.ResponseWriter, r *http.Request) {
+	scope := r.URL.Query().Get("scope")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "home_dir", "cannot determine home directory")
+		return
+	}
+
+	var candidates []string
+	switch scope {
+	case "project":
+		root, err := s.resolveProjectRoot(r)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", err.Error())
+			return
+		}
+		candidates = []string{
+			filepath.Join(root, "CLAUDE.md"),
+			filepath.Join(root, ".claude", "CLAUDE.md"),
+		}
+	default:
+		candidates = []string{
+			filepath.Join(home, ".claude", "CLAUDE.md"),
+		}
+	}
+
+	for _, path := range candidates {
+		data, err := os.ReadFile(path)
+		if err == nil {
+			writeJSON(w, http.StatusOK, map[string]any{"content": string(data), "path": path, "exists": true})
+			return
+		}
+	}
+
+	// Not found — return empty with the preferred path for creation
+	writeJSON(w, http.StatusOK, map[string]any{"content": "", "path": candidates[0], "exists": false})
+}
+
+// PostClaudeInstructions writes the CLAUDE.md for the given scope.
+func (s *Server) PostClaudeInstructions(w http.ResponseWriter, r *http.Request) {
+	scope := r.URL.Query().Get("scope")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "home_dir", "cannot determine home directory")
+		return
+	}
+
+	var body struct {
+		Content string `json:"content"`
+		Path    string `json:"path,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+		return
+	}
+
+	var target string
+	if body.Path != "" {
+		target = body.Path
+	} else {
+		switch scope {
+		case "project":
+			root, err := s.resolveProjectRoot(r)
+			if err != nil {
+				writeJSONError(w, http.StatusBadRequest, "project", err.Error())
+				return
+			}
+			target = filepath.Join(root, "CLAUDE.md")
+		default:
+			target = filepath.Join(home, ".claude", "CLAUDE.md")
+		}
+	}
+
+	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "mkdir_failed", err.Error())
+		return
+	}
+	if err := os.WriteFile(target, []byte(body.Content), 0644); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "write_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// claudeFileEntry is a single discovered file for rules/skills/subagents.
+type claudeFileEntry struct {
+	Name    string `json:"name"`
+	Content string `json:"content"`
+	Path    string `json:"path"`
+}
+
+// listClaudeDir lists all .md files in a directory, returning their name, content, and path.
+// It follows symlinks to resolve directories and files correctly.
+func listClaudeDir(dir string) []claudeFileEntry {
+	var entries []claudeFileEntry
+	dirEntries, err := os.ReadDir(dir)
+	if err != nil {
+		return entries
+	}
+	for _, de := range dirEntries {
+		fullPath := filepath.Join(dir, de.Name())
+
+		// Resolve symlinks to determine real type
+		isDir := de.IsDir()
+		if de.Type()&os.ModeSymlink != 0 {
+			if resolved, err := os.Stat(fullPath); err == nil {
+				isDir = resolved.IsDir()
+			} else {
+				continue // broken symlink
+			}
+		}
+
+		if isDir {
+			// Check for AGENT.md inside the directory
+			agentPath := filepath.Join(fullPath, "AGENT.md")
+			if data, err := os.ReadFile(agentPath); err == nil {
+				entries = append(entries, claudeFileEntry{Name: de.Name(), Content: string(data), Path: agentPath})
+				continue
+			}
+			// Fallback: first .md file inside the directory
+			subEntries, _ := os.ReadDir(fullPath)
+			for _, sub := range subEntries {
+				subPath := filepath.Join(fullPath, sub.Name())
+				// Resolve symlinks for sub-entries too
+				subIsDir := sub.IsDir()
+				if sub.Type()&os.ModeSymlink != 0 {
+					if resolved, err := os.Stat(subPath); err == nil {
+						subIsDir = resolved.IsDir()
+					}
+				}
+				if !subIsDir && strings.HasSuffix(strings.ToLower(sub.Name()), ".md") {
+					if data, err := os.ReadFile(subPath); err == nil {
+						entries = append(entries, claudeFileEntry{Name: de.Name(), Content: string(data), Path: subPath})
+						break
+					}
+				}
+			}
+			continue
+		}
+		if !strings.HasSuffix(strings.ToLower(de.Name()), ".md") {
+			continue
+		}
+		data, err := os.ReadFile(fullPath)
+		if err != nil {
+			continue
+		}
+		name := strings.TrimSuffix(de.Name(), filepath.Ext(de.Name()))
+		entries = append(entries, claudeFileEntry{Name: name, Content: string(data), Path: fullPath})
+	}
+	return entries
+}
+
+// GetClaudeRules lists .md files in .claude/rules/.
+func (s *Server) GetClaudeRules(w http.ResponseWriter, r *http.Request) {
+	scope := r.URL.Query().Get("scope")
+	home, _ := os.UserHomeDir()
+
+	var dir string
+	switch scope {
+	case "project":
+		root, err := s.resolveProjectRoot(r)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", err.Error())
+			return
+		}
+		dir = filepath.Join(root, ".claude", "rules")
+	default:
+		dir = filepath.Join(home, ".claude", "rules")
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"items": listClaudeDir(dir), "dir": dir})
+}
+
+// PostClaudeRule creates or updates a rule .md file.
+func (s *Server) PostClaudeRule(w http.ResponseWriter, r *http.Request) {
+	scope := r.URL.Query().Get("scope")
+	home, _ := os.UserHomeDir()
+
+	var body struct {
+		Name    string `json:"name"`
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+		return
+	}
+
+	var dir string
+	switch scope {
+	case "project":
+		root, err := s.resolveProjectRoot(r)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", err.Error())
+			return
+		}
+		dir = filepath.Join(root, ".claude", "rules")
+	default:
+		dir = filepath.Join(home, ".claude", "rules")
+	}
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "mkdir_failed", err.Error())
+		return
+	}
+	name := body.Name
+	if !strings.HasSuffix(name, ".md") {
+		name += ".md"
+	}
+	path := filepath.Join(dir, filepath.Base(name))
+	if err := os.WriteFile(path, []byte(body.Content), 0644); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "write_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "path": path})
+}
+
+// DeleteClaudeRule deletes a rule .md file.
+func (s *Server) DeleteClaudeRule(w http.ResponseWriter, r *http.Request) {
+	scope := r.URL.Query().Get("scope")
+	home, _ := os.UserHomeDir()
+	name := chi.URLParam(r, "name")
+
+	var dir string
+	switch scope {
+	case "project":
+		root, err := s.resolveProjectRoot(r)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", err.Error())
+			return
+		}
+		dir = filepath.Join(root, ".claude", "rules")
+	default:
+		dir = filepath.Join(home, ".claude", "rules")
+	}
+
+	if !strings.HasSuffix(name, ".md") {
+		name += ".md"
+	}
+	path := filepath.Join(dir, filepath.Base(name))
+	if err := os.Remove(path); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "delete_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// GetClaudeSkills lists .md files in .claude/skills/.
+func (s *Server) GetClaudeSkills(w http.ResponseWriter, r *http.Request) {
+	scope := r.URL.Query().Get("scope")
+	home, _ := os.UserHomeDir()
+
+	var dir string
+	switch scope {
+	case "project":
+		root, err := s.resolveProjectRoot(r)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", err.Error())
+			return
+		}
+		dir = filepath.Join(root, ".claude", "skills")
+	default:
+		dir = filepath.Join(home, ".claude", "skills")
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"items": listClaudeDir(dir), "dir": dir})
+}
+
+// PostClaudeSkill creates or updates a skill .md file.
+func (s *Server) PostClaudeSkill(w http.ResponseWriter, r *http.Request) {
+	scope := r.URL.Query().Get("scope")
+	home, _ := os.UserHomeDir()
+
+	var body struct {
+		Name    string `json:"name"`
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+		return
+	}
+
+	var dir string
+	switch scope {
+	case "project":
+		root, err := s.resolveProjectRoot(r)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", err.Error())
+			return
+		}
+		dir = filepath.Join(root, ".claude", "skills")
+	default:
+		dir = filepath.Join(home, ".claude", "skills")
+	}
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "mkdir_failed", err.Error())
+		return
+	}
+	name := body.Name
+	if !strings.HasSuffix(name, ".md") {
+		name += ".md"
+	}
+	path := filepath.Join(dir, filepath.Base(name))
+	if err := os.WriteFile(path, []byte(body.Content), 0644); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "write_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "path": path})
+}
+
+// DeleteClaudeSkill deletes a skill .md file.
+func (s *Server) DeleteClaudeSkill(w http.ResponseWriter, r *http.Request) {
+	scope := r.URL.Query().Get("scope")
+	home, _ := os.UserHomeDir()
+	name := chi.URLParam(r, "name")
+
+	var dir string
+	switch scope {
+	case "project":
+		root, err := s.resolveProjectRoot(r)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", err.Error())
+			return
+		}
+		dir = filepath.Join(root, ".claude", "skills")
+	default:
+		dir = filepath.Join(home, ".claude", "skills")
+	}
+
+	if !strings.HasSuffix(name, ".md") {
+		name += ".md"
+	}
+	path := filepath.Join(dir, filepath.Base(name))
+	if err := os.Remove(path); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "delete_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// GetClaudeSubAgents lists agent definitions in .claude/agents/.
+func (s *Server) GetClaudeSubAgents(w http.ResponseWriter, r *http.Request) {
+	scope := r.URL.Query().Get("scope")
+	home, _ := os.UserHomeDir()
+
+	var dir string
+	switch scope {
+	case "project":
+		root, err := s.resolveProjectRoot(r)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", err.Error())
+			return
+		}
+		dir = filepath.Join(root, ".claude", "agents")
+	default:
+		dir = filepath.Join(home, ".claude", "agents")
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"items": listClaudeDir(dir), "dir": dir})
+}
+
+// PostClaudeSubAgent creates or updates a sub-agent .md file.
+func (s *Server) PostClaudeSubAgent(w http.ResponseWriter, r *http.Request) {
+	scope := r.URL.Query().Get("scope")
+	home, _ := os.UserHomeDir()
+
+	var body struct {
+		Name    string `json:"name"`
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
+		return
+	}
+
+	var dir string
+	switch scope {
+	case "project":
+		root, err := s.resolveProjectRoot(r)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", err.Error())
+			return
+		}
+		dir = filepath.Join(root, ".claude", "agents")
+	default:
+		dir = filepath.Join(home, ".claude", "agents")
+	}
+
+	// Create as a directory with AGENT.md inside
+	agentDir := filepath.Join(dir, filepath.Base(body.Name))
+	if err := os.MkdirAll(agentDir, 0755); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "mkdir_failed", err.Error())
+		return
+	}
+	path := filepath.Join(agentDir, "AGENT.md")
+	if err := os.WriteFile(path, []byte(body.Content), 0644); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "write_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "path": path})
+}
+
+// DeleteClaudeSubAgent deletes a sub-agent directory or file.
+func (s *Server) DeleteClaudeSubAgent(w http.ResponseWriter, r *http.Request) {
+	scope := r.URL.Query().Get("scope")
+	home, _ := os.UserHomeDir()
+	name := chi.URLParam(r, "name")
+
+	var dir string
+	switch scope {
+	case "project":
+		root, err := s.resolveProjectRoot(r)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", err.Error())
+			return
+		}
+		dir = filepath.Join(root, ".claude", "agents")
+	default:
+		dir = filepath.Join(home, ".claude", "agents")
+	}
+
+	target := filepath.Join(dir, filepath.Base(name))
+	info, err := os.Stat(target)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "not_found", "agent not found")
+		return
+	}
+	if info.IsDir() {
+		err = os.RemoveAll(target)
+	} else {
+		err = os.Remove(target)
+	}
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "delete_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+/* ================================================================== */
 /*  Generic helpers                                                    */
 /* ================================================================== */
 
