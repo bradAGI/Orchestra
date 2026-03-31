@@ -36,13 +36,14 @@ import { CreateRepoDialog } from './CreateRepoDialog'
 import { StashPanel } from './StashPanel'
 import { ConflictBanner } from './ConflictBanner'
 
-type SubTab = 'changes' | 'history' | 'branches' | 'github'
+type SubTab = 'changes' | 'history' | 'branches' | 'prs' | 'issues'
 
 const subTabs: { key: SubTab; label: string }[] = [
   { key: 'changes', label: 'Changes' },
   { key: 'history', label: 'History' },
   { key: 'branches', label: 'Branches' },
-  { key: 'github', label: 'GitHub' },
+  { key: 'prs', label: 'PRs' },
+  { key: 'issues', label: 'Issues' },
 ]
 
 function classifyFiles(files: GitStatusEntry[]): { unstaged: GitStatusEntry[]; staged: GitStatusEntry[] } {
@@ -407,8 +408,8 @@ export function GitTab({
         </div>
       )}
 
-      {/* GitHub tab */}
-      {activeSubTab === 'github' && (
+      {/* PRs tab */}
+      {activeSubTab === 'prs' && (
         hasGitHub ? (
           <div className="flex-1 overflow-auto">
             <GitHubPanel
@@ -416,22 +417,36 @@ export function GitTab({
               config={config}
               githubToken={project.github_token ?? ''}
               onOpenPR={setActivePR}
+              forceTab="prs"
             />
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center space-y-3">
               <p className="text-muted-foreground text-sm">No GitHub repository connected</p>
-              {project.github_token ? (
-                <button
-                  onClick={() => setShowCreateRepo(true)}
-                  className="px-4 py-2 text-[11px] font-bold uppercase tracking-widest rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-all"
-                >
-                  Create GitHub Repository
-                </button>
-              ) : (
-                <p className="text-[10px] text-muted-foreground/50">Connect GitHub first to create a repository</p>
-              )}
+              <p className="text-[10px] text-muted-foreground/50">Connect GitHub in project settings to view pull requests</p>
+            </div>
+          </div>
+        )
+      )}
+
+      {/* Issues tab */}
+      {activeSubTab === 'issues' && (
+        hasGitHub ? (
+          <div className="flex-1 overflow-auto">
+            <GitHubPanel
+              projectId={project.id}
+              config={config}
+              githubToken={project.github_token ?? ''}
+              onOpenPR={setActivePR}
+              forceTab="issues"
+            />
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center space-y-3">
+              <p className="text-muted-foreground text-sm">No GitHub repository connected</p>
+              <p className="text-[10px] text-muted-foreground/50">Connect GitHub in project settings to view issues</p>
             </div>
           </div>
         )

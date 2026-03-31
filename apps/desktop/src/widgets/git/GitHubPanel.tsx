@@ -29,14 +29,16 @@ export function GitHubPanel({
   projectId,
   config,
   onOpenPR,
+  forceTab,
 }: {
   projectId: string
   config: BackendConfig
   githubToken: string
   onOpenPR: (pr: GitHubPR) => void
+  forceTab?: 'issues' | 'prs'
 }) {
   const [collapsed, setCollapsed] = useState(false)
-  const [tab, setTab] = useState<SubTab>('issues')
+  const [tab, setTab] = useState<SubTab>(forceTab ?? 'issues')
   const [issueFilter, setIssueFilter] = useState<IssueFilter>('open')
   const [issues, setIssues] = useState<GitHubIssue[]>([])
   const [prs, setPRs] = useState<GitHubPR[]>([])
@@ -228,25 +230,27 @@ export function GitHubPanel({
             </div>
           )}
 
-          {/* Sub-tabs */}
-          <div className="flex gap-2 mb-2">
-            <button
-              onClick={() => setTab('issues')}
-              className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded ${
-                tab === 'issues' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <CircleDot size={10} /> Issues
-            </button>
-            <button
-              onClick={() => setTab('prs')}
-              className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded ${
-                tab === 'prs' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <GitPullRequest size={10} /> PRs
-            </button>
-          </div>
+          {/* Sub-tabs — hidden when parent controls the tab */}
+          {!forceTab && (
+            <div className="flex gap-2 mb-2">
+              <button
+                onClick={() => setTab('issues')}
+                className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded ${
+                  tab === 'issues' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <CircleDot size={10} /> Issues
+              </button>
+              <button
+                onClick={() => setTab('prs')}
+                className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded ${
+                  tab === 'prs' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <GitPullRequest size={10} /> PRs
+              </button>
+            </div>
+          )}
 
           {/* Issues tab */}
           {tab === 'issues' && (
