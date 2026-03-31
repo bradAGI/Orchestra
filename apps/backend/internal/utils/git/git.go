@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -277,6 +278,152 @@ func Merge(ctx context.Context, dir, branch string) error {
 		return fmt.Errorf("git merge failed: %v - %s", err, stderr.String())
 	}
 	return nil
+}
+
+// BranchInfo holds enriched metadata for a single git branch.
+type BranchInfo struct {
+	Name              string `json:"name"`
+	IsRemote          bool   `json:"is_remote"`
+	LastCommitSHA     string `json:"last_commit_sha"`
+	LastCommitMessage string `json:"last_commit_message"`
+	LastCommitDate    string `json:"last_commit_date"`
+	LastCommitAuthor  string `json:"last_commit_author"`
+	Ahead             int    `json:"ahead"`
+	Behind            int    `json:"behind"`
+	IsDefault         bool   `json:"is_default"`
+	IsCurrent         bool   `json:"is_current"`
+}
+
+// BranchesDetail returns the default branch name and detailed metadata for every
+// local and remote branch in the repository at dir.
+func BranchesDetail(ctx context.Context, dir string) (string, []BranchInfo, error) {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	// 1. Current branch
+	currentBranch, err := CurrentBranch(ctx, dir)
+	if err != nil {
+		return "", nil, fmt.Errorf("get current branch: %w", err)
+	}
+
+	// 2. Default branch
+	defaultBranch := DefaultBranch(ctx, dir)
+
+	// 3. Local branches
+	localCmd := exec.CommandContext(ctx, "git", "branch", "--format=%(refname:short)")
+	localCmd.Dir = dir
+	var localOut, localErr bytes.Buffer
+	localCmd.Stdout = &localOut
+	localCmd.Stderr = &localErr
+	if err := localCmd.Run(); err != nil {
+		return "", nil, fmt.Errorf("git branch failed: %v - %s", err, localErr.String())
+	}
+
+	// 4. Remote branches
+	remoteCmd := exec.CommandContext(ctx, "git", "branch", "-r", "--format=%(refname:short)")
+	remoteCmd.Dir = dir
+	var remoteOut, remoteErr bytes.Buffer
+	remoteCmd.Stdout = &remoteOut
+	remoteCmd.Stderr = &remoteErr
+	// Non-fatal if remote listing fails (e.g. no remotes)
+	_ = remoteCmd.Run()
+
+	var branches []BranchInfo
+
+	// Process local branches
+	for _, name := range splitLines(localOut.String()) {
+		if name == "" {
+			continue
+		}
+		info := BranchInfo{
+			Name:      name,
+			IsRemote:  false,
+			IsDefault: name == defaultBranch,
+			IsCurrent: name == currentBranch,
+		}
+		fillCommitInfo(ctx, dir, name, &info)
+		fillAheadBehind(ctx, dir, defaultBranch, name, &info)
+		branches = append(branches, info)
+	}
+
+	// Process remote branches
+	for _, raw := range splitLines(remoteOut.String()) {
+		if raw == "" || strings.Contains(raw, "HEAD") {
+			continue
+		}
+		// Strip "origin/" prefix for the display name
+		name := raw
+		if idx := strings.Index(raw, "/"); idx >= 0 {
+			name = raw[idx+1:]
+		}
+		info := BranchInfo{
+			Name:      name,
+			IsRemote:  true,
+			IsDefault: name == defaultBranch,
+			IsCurrent: false,
+		}
+		// Use the full remote ref for git log
+		fillCommitInfo(ctx, dir, raw, &info)
+		branches = append(branches, info)
+	}
+
+	return defaultBranch, branches, nil
+}
+
+// fillCommitInfo populates the last commit fields of a BranchInfo.
+func fillCommitInfo(ctx context.Context, dir, ref string, info *BranchInfo) {
+	cmd := exec.CommandContext(ctx, "git", "log", "-1", "--format=%H|%s|%aI|%an", ref)
+	cmd.Dir = dir
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	if err := cmd.Run(); err != nil {
+		return
+	}
+	parts := strings.SplitN(strings.TrimSpace(stdout.String()), "|", 4)
+	if len(parts) >= 1 {
+		info.LastCommitSHA = parts[0]
+	}
+	if len(parts) >= 2 {
+		info.LastCommitMessage = parts[1]
+	}
+	if len(parts) >= 3 {
+		info.LastCommitDate = parts[2]
+	}
+	if len(parts) >= 4 {
+		info.LastCommitAuthor = parts[3]
+	}
+}
+
+// fillAheadBehind populates the ahead/behind counts relative to the default branch.
+func fillAheadBehind(ctx context.Context, dir, defaultBranch, branch string, info *BranchInfo) {
+	if branch == defaultBranch {
+		return
+	}
+	cmd := exec.CommandContext(ctx, "git", "rev-list", "--count", "--left-right",
+		defaultBranch+"..."+branch)
+	cmd.Dir = dir
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	if err := cmd.Run(); err != nil {
+		return
+	}
+	parts := strings.Fields(strings.TrimSpace(stdout.String()))
+	if len(parts) == 2 {
+		info.Behind, _ = strconv.Atoi(parts[0])
+		info.Ahead, _ = strconv.Atoi(parts[1])
+	}
+}
+
+// splitLines splits s on newlines and returns non-empty trimmed lines.
+func splitLines(s string) []string {
+	var lines []string
+	for _, line := range strings.Split(strings.TrimSpace(s), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			lines = append(lines, line)
+		}
+	}
+	return lines
 }
 
 // ParseGitHubRemote extracts the owner and repository name from a GitHub remote URL,

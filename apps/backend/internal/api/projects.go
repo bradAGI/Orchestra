@@ -867,6 +867,33 @@ func (s *Server) GetProjectGitBranches(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) GetProjectGitBranchesDetail(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
+		return
+	}
+
+	if err := workspace.ValidateProjectPath(project.RootPath, s.config.ProjectRoots); err != nil {
+		s.logger.Warn().Err(err).Str("path", project.RootPath).Msg("unauthorized git branches detail attempt")
+		writeJSONError(w, http.StatusForbidden, "unauthorized_project_path", "unauthorized project path")
+		return
+	}
+
+	defaultBranch, branches, err := git.BranchesDetail(r.Context(), project.RootPath)
+	if err != nil {
+		s.logger.Warn().Err(err).Str("project_id", projectID).Msg("failed to get branch details")
+		writeJSONError(w, http.StatusInternalServerError, "git_failed", "failed to get branch details")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"default_branch": defaultBranch,
+		"branches":       branches,
+	})
+}
+
 func (s *Server) CreateProjectGitHubIssue(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "project_id")
 	project, err := s.db.GetProjectByID(r.Context(), projectID)

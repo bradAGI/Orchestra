@@ -1113,6 +1113,29 @@ export async function fetchDefaultBranch(config: BackendConfig, projectId: strin
   return result.branch
 }
 
+export type BranchDetail = {
+  name: string
+  is_remote: boolean
+  last_commit_sha: string
+  last_commit_message: string
+  last_commit_date: string
+  last_commit_author: string
+  ahead: number
+  behind: number
+  is_default: boolean
+  is_current: boolean
+}
+
+export type BranchesDetailResponse = {
+  current: string
+  default_branch: string
+  branches: BranchDetail[]
+}
+
+export async function fetchProjectGitBranchesDetail(config: BackendConfig, projectId: string): Promise<BranchesDetailResponse> {
+  return requestJSON<BranchesDetailResponse>(config, `/api/v1/projects/${encodeURIComponent(projectId)}/git/branches/detail`)
+}
+
 /**
  * Fetches GitHub pull requests for a project.
  * @param config - Backend connection configuration.

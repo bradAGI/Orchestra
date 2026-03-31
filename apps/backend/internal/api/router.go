@@ -169,6 +169,7 @@ func NewRouterWithPubSub(
 	protected.Post("/api/v1/projects/{project_id}/github/create-repo", server.PostCreateGitHubRepo)
 	protected.Get("/api/v1/projects/{project_id}/git/default-branch", server.GetDefaultBranch)
 	protected.Get("/api/v1/projects/{project_id}/git/branches", server.GetProjectGitBranches)
+	protected.Get("/api/v1/projects/{project_id}/git/branches/detail", server.GetProjectGitBranchesDetail)
 	protected.Get("/api/v1/projects/{project_id}/github/issues", server.GetProjectGitHubIssues)
 	protected.Post("/api/v1/projects/{project_id}/github/issues", server.CreateProjectGitHubIssue)
 	protected.Patch("/api/v1/projects/{project_id}/github/issues/{number}", server.UpdateProjectGitHubIssue)

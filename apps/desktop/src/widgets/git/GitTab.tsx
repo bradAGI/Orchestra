@@ -24,6 +24,7 @@ import {
   gitConflictResolve,
 } from '@/lib/orchestra-client'
 import { BranchBar } from './BranchBar'
+import { BranchManagerView } from './BranchManagerView'
 import { StagingArea } from './StagingArea'
 import { CommitBar } from './CommitBar'
 import { CommitTimeline } from './CommitTimeline'
@@ -35,11 +36,12 @@ import { CreateRepoDialog } from './CreateRepoDialog'
 import { StashPanel } from './StashPanel'
 import { ConflictBanner } from './ConflictBanner'
 
-type SubTab = 'changes' | 'history' | 'github'
+type SubTab = 'changes' | 'history' | 'branches' | 'github'
 
 const subTabs: { key: SubTab; label: string }[] = [
   { key: 'changes', label: 'Changes' },
   { key: 'history', label: 'History' },
+  { key: 'branches', label: 'Branches' },
   { key: 'github', label: 'GitHub' },
 ]
 
@@ -395,6 +397,13 @@ export function GitTab({
               onModeChange={setDiffMode}
             />
           </div>
+        </div>
+      )}
+
+      {/* Branches tab */}
+      {activeSubTab === 'branches' && (
+        <div className="flex-1 overflow-hidden min-h-0">
+          <BranchManagerView config={config} projectId={project.id} />
         </div>
       )}
 
