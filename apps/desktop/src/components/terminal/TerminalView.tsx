@@ -63,7 +63,13 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
         const fitAddon = new FitAddon()
         term.loadAddon(fitAddon)
         term.open(terminalRef.current)
-        try { fitAddon.fit() } catch { /* container may have zero dimensions */ }
+        // Delay initial fit to ensure the container has its final dimensions.
+        // Without this, xterm renders at a smaller size and doesn't fill the container.
+        requestAnimationFrame(() => {
+            try { fitAddon.fit() } catch { /* container may have zero dimensions */ }
+            // Double-fit after a short delay to catch late layout shifts
+            setTimeout(() => { try { fitAddon.fit() } catch {} }, 100)
+        })
 
         xtermRef.current = term
 
