@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Mosaic, MosaicWindow, MosaicNode } from 'react-mosaic-component'
 import { TerminalView, clearInitialCommandTracking } from './TerminalView'
-import { Plus, X, Terminal as TerminalIcon, Columns2, Square, Zap } from 'lucide-react'
+import { Plus, X, Terminal as TerminalIcon, Columns2, Square, Zap, Folder, FolderTree } from 'lucide-react'
+import { ProjectSelector } from '@/components/app-shell/shared/controls'
 
 import 'react-mosaic-component/react-mosaic-component.css'
 import './multiplexer.css'
@@ -105,16 +106,11 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
                         <p className="text-[10px] font-medium uppercase tracking-widest opacity-60">Select a project and open a shell to begin</p>
                         {onAddTerminal && (
                             <div className="mt-4 flex items-center gap-2 justify-center">
-                                <select
+                                <ProjectSelector
                                     value={selectedProjectId}
-                                    onChange={(e) => setSelectedProjectId(e.target.value)}
-                                    className="px-3 py-2 rounded-lg text-[11px] bg-card border border-border/40 text-foreground outline-none"
-                                >
-                                    <option value="">Select project...</option>
-                                    {projects?.map(p => (
-                                        <option key={p.id} value={p.id}>{p.name}</option>
-                                    ))}
-                                </select>
+                                    projects={projects ?? []}
+                                    onChange={setSelectedProjectId}
+                                />
                                 <button
                                     disabled={!selectedProjectId}
                                     onClick={() => selectedProjectId && onAddTerminal(selectedProjectId)}
@@ -216,16 +212,11 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
                             <Zap size={10} className="text-muted-foreground/40" />
                             <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground/40">Launch</span>
                         </div>
-                        <select
+                        <ProjectSelector
                             value={selectedProjectId}
-                            onChange={(e) => setSelectedProjectId(e.target.value)}
-                            className="px-2 py-1 rounded-lg text-[11px] bg-card border border-border/40 text-foreground outline-none max-w-[160px] truncate"
-                        >
-                            <option value="">Project...</option>
-                            {projects?.map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
-                        </select>
+                            projects={projects ?? []}
+                            onChange={setSelectedProjectId}
+                        />
                         <div className="h-3 w-px bg-border/50" />
                         <div className="flex items-center gap-1">
                             {agentCommands.map((agent) => (
