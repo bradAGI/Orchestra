@@ -764,7 +764,6 @@ func processExecutionTick(
 		}
 	} else if strings.EqualFold(currentState, "In Progress") {
 		// Extract updated plan with checked-off items from the execution output.
-		// If the agent restated the plan with [x] marks, use that version.
 		updatedPlan := extractPlanFromResult(result, eventsBuffer)
 		if updatedPlan == "" && warehouseDB != nil {
 			time.Sleep(500 * time.Millisecond)
@@ -778,6 +777,22 @@ func processExecutionTick(
 			updatedPlan = strings.ReplaceAll(updatedPlan, "* [ ]", "* [x]")
 			logger.Info().Str("issue_id", entry.IssueID).Msg("auto-checked plan items — agent completed without restating checkboxes")
 		}
+
+		// Gate: if the plan still has unchecked items, don't advance to Review.
+		// Save progress and stay in In Progress so the orchestrator dispatches
+		// another turn to finish the remaining steps.
+		hasUnchecked := strings.Contains(updatedPlan, "- [ ]") || strings.Contains(updatedPlan, "* [ ]")
+		if hasUnchecked && entry.TurnCount < 20 {
+			logger.Info().Str("issue_id", entry.IssueID).Int64("turn", entry.TurnCount).Msg("plan has unchecked items — staying in In Progress for another turn")
+			if updatedPlan != "" {
+				if _, err := service.UpdateIssue(context.Background(), entry.IssueIdentifier, map[string]any{"plan": updatedPlan}); err != nil {
+					logger.Warn().Err(err).Msg("failed to save partial plan progress")
+				}
+			}
+			// Don't advance — the orchestrator will re-dispatch
+			return
+		}
+
 		updateFields := map[string]any{"state": "Review"}
 		if updatedPlan != "" {
 			updateFields["plan"] = updatedPlan
