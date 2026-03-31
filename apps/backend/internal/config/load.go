@@ -21,7 +21,7 @@ func Load() (Config, error) {
 		workspaceDefault = filepath.Join(os.TempDir(), "orchestra_workspaces")
 	}
 	agentProviderDefault := "CODEX"
-	agentMaxTurnsDefault := 10
+	agentMaxTurnsDefault := 25
 	agentCommandsDefault := map[string]string{
 		"CLAUDE":   "claude -p {{prompt}} --output-format stream-json --verbose --dangerously-skip-permissions",
 		"CODEX":    "codex exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox --json {{prompt}}",
