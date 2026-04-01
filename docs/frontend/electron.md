@@ -102,7 +102,7 @@ Agent API tokens (for Claude, OpenAI, etc.) are stored in `<userData>/agent-toke
 
 - **Persist**: Each token is encrypted with `safeStorage.encryptString()` and stored as base64
 - **Load**: Tokens are decrypted with `safeStorage.decryptString()`
-- **Fallback**: If encryption is unavailable, tokens are stored in plaintext
+- **Fallback**: If encryption is unavailable, persistence is skipped and a warning is logged
 
 #### 5. System Integration
 
@@ -122,7 +122,7 @@ The preload script (`electron/preload.cjs`) uses `contextBridge.exposeInMainWorl
 
 | Method | IPC Channel | Description |
 |--------|-------------|-------------|
-| `getBackendConfig()` | `orchestra:get-backend-config` | Get active backend URL, token, and agent tokens |
+| `getBackendConfig()` | `orchestra:get-backend-config` | Get active backend URL, token, and agent-token count |
 | `setBackendConfig(config)` | `orchestra:set-backend-config` | Update the active profile's connection settings |
 | `getBackendProfiles()` | `orchestra:get-backend-profiles` | List all backend connection profiles |
 | `setActiveBackendProfile(id)` | `orchestra:set-active-backend-profile` | Switch to a different profile |
@@ -148,7 +148,7 @@ sequenceDiagram
 
     R->>P: window.orchestraDesktop.getBackendConfig()
     P->>M: ipcRenderer.invoke('orchestra:get-backend-config')
-    M-->>P: { baseUrl, apiToken, agentTokens }
+    M-->>P: { baseUrl, apiToken, agentTokensCount }
     P-->>R: config object
 
     R->>R: Initialize orchestra-client with config
@@ -207,7 +207,7 @@ The Electron shell applies several security hardening measures:
 
 **Context Bridge isolation**: The renderer can only access main-process functionality through the `window.orchestraDesktop` object defined in the preload script. No raw `ipcRenderer` or Node.js APIs are exposed. Agent tokens returned via `getAgentTokens()` are masked (`********`) to prevent accidental leakage in the renderer.
 
-**Credential encryption**: Agent API tokens are encrypted at rest using Electron's `safeStorage` API, which delegates to the OS keychain (macOS Keychain, Windows DPAPI, or Linux libsecret). If OS-level encryption is unavailable, tokens fall back to plaintext storage.
+**Credential encryption**: Agent API tokens are encrypted at rest using Electron's `safeStorage` API, which delegates to the OS keychain (macOS Keychain, Windows DPAPI, or Linux libsecret). If OS-level encryption is unavailable, the app skips persistence rather than writing plaintext token values.
 
 ---
 

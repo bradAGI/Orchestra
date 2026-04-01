@@ -203,16 +203,14 @@ Frontend navigation section identifiers. Used by the desktop app to track which 
 
 | Value | Description | Layer |
 |---|---|---|
-| `DASHBOARD` | Main dashboard overview | Frontend only |
-| `RUNNING` | Currently running agent sessions | Frontend only |
 | `ISSUES` | Issue list and management | Frontend only |
 | `PROJECTS` | Project list and management | Frontend only |
+| `CONSOLE` | Terminal and harness surfaces | Frontend only |
 | `AGENTS` | Agent configuration and status | Frontend only |
 | `WAREHOUSE` | Data warehouse and analytics | Frontend only |
 | `SANDBOX` | Unsandbox remote execution | Frontend only |
 | `SETTINGS` | Application settings | Frontend only |
 | `DOCS` | Documentation viewer | Frontend only |
-| `CONSOLE` | Terminal/console interface | Frontend only |
 
 **Frontend definition** (`apps/desktop/src/app/routes/sections.tsx`): Section identifiers are defined inline as string literal union types in the navigation routes configuration.
 

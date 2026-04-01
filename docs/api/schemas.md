@@ -89,13 +89,13 @@ The schema is identical to the create request except no fields are required. Any
 ### Issue list response
 
 **Endpoint:** `GET /api/v1/issues`
-**Root type:** `object` — `{"issues": Issue[], "total": number}`
+**Root type:** `array` — `Issue[]`
 **Item required fields:** `id`, `identifier`, `title`, `state`
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `id` | string | yes | Internal UUID |
-| `identifier` | string | yes | Human-readable identifier (e.g. `ORK-42`) |
+| `identifier` | string | yes | Human-readable identifier (for example `OPS-42` or a project-prefixed ID) |
 | `title` | string | yes | Issue title |
 | `state` | string | yes | Tracker state |
 | `description` | string | no | Issue body |
@@ -150,12 +150,15 @@ Extends the list-item fields with runtime data, workspace paths, and session log
 | `created_at` | string | no | ISO-8601 creation timestamp |
 | `updated_at` | string | no | ISO-8601 last-update timestamp |
 | `base_sha` | string | no | Git SHA at the start of the run |
+| `feedback` | string | no | Review feedback persisted on the issue |
+| `pr_url` | string | no | Linked pull request URL |
+| `plan` | string | no | Stored markdown plan shared across planning and execution |
 | `attempts` | object | yes | `{ restart_count: number, current_retry_attempt: number }` |
 | `workspace` | object | no | `{ path: string }` -- workspace directory |
 | `workspace_path` | string | no | Alternate workspace path field |
 | `running` | RunningEntry/null | no | Current running entry if status is RUNNING |
 | `retry` | RetryEntry/null | no | Current retry entry if status is RETRYING |
-| `logs` | object | yes | `{ codex_session_logs: [{ label, path, url? }] }` |
+| `logs` | object | yes | Session log references grouped under `codex_session_logs` for backward-compatible clients |
 | `recent_events` | array | yes | Recent lifecycle events |
 | `last_error` | string/null | no | Most recent error message |
 | `tracked` | object | no | Tracked state metadata |
@@ -302,8 +305,8 @@ This is the primary polling/snapshot endpoint (`GET /api/v1/state`). Also sent a
 | Field | Type | Description |
 |---|---|---|
 | `issue_id` | string | Issue UUID |
-| `issue_identifier` | string | Human-readable ID (e.g. `ORK-42`) |
-| `state` | string | Lifecycle state (typically `RUNNING`) |
+| `issue_identifier` | string | Human-readable ID (for example `OPS-42` or a project-prefixed ID) |
+| `state` | string | Workflow state for the issue or runtime entry |
 | `session_id` | string | Active session UUID |
 | `provider` | string | enum: `CODEX`, `CLAUDE`, `OPENCODE`, `GEMINI`, `UNSANDBOX` |
 | `title` | string | Issue title |
@@ -425,21 +428,20 @@ Per-session token consumption, used in `RunningEntry.tokens` and `TurnResult`.
 
 ### Migration plan response
 
-**Required fields:** `from`, `to`, `dry_run`, `result`
+**Required fields:** `from`, `to`, `result`
 
 | Field | Type | Description |
 |---|---|---|
-| `from` | string | Source workspace layout version |
-| `to` | string | Target workspace layout version |
-| `dry_run` | boolean | Always `true` for a plan request |
-| `result.applied` | boolean | Whether changes would be applied |
+| `from` | string | Source workspace root |
+| `to` | string | Target workspace root |
+| `result.applied` | boolean | `false` for a plan request |
 | `result.actions` | array | List of planned migration actions |
 
 ### Migration execute response
 
 **Required fields:** `from`, `to`, `result`
 
-Same structure as the plan response without the `dry_run` field.
+Same structure as the plan response, but `result.applied` is `true` when the migration has been executed.
 
 **Migration action object** (required fields: `type`, `source`, `target`):
 

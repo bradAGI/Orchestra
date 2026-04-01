@@ -3,7 +3,7 @@
 Backend endpoints for managing LLM provider API keys used by the embedded agent widget.
 
 **Source:** `apps/backend/internal/api/agent_providers.go`
-**Router:** `apps/backend/internal/api/router.go` (lines 193-194)
+**Router:** `apps/backend/internal/api/router.go`
 
 ---
 
