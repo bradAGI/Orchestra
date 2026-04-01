@@ -20,7 +20,7 @@ Identifies which ML agent backend processes an issue. Defined in all three layer
 | `CLAUDE` | Anthropic Claude Code agent | Backend, Frontend, Schema |
 | `OPENCODE` | OpenCode agent | Backend, Frontend, Schema |
 | `GEMINI` | Google Gemini agent | Backend, Frontend, Schema |
-| `UNSANDBOX` | Remote execution via the unsandbox platform | Frontend, Schema only |
+| `UNSANDBOX` | Remote execution via the unsandbox platform | Backend, Frontend, Schema |
 
 **Backend definition** (`apps/backend/internal/agents/types.go`):
 
@@ -37,7 +37,7 @@ const (
 
 **JSON Schema usage:** The `provider` field in `issue.create.request.schema.json`, `issue.update.request.schema.json`, `issue.response.schema.json`, `issues.list.response.schema.json`, and `state.response.schema.json` constrains values to `["CODEX", "CLAUDE", "OPENCODE", "GEMINI", "UNSANDBOX"]`.
 
-**Note:** `UNSANDBOX` is defined in the frontend and JSON schemas but not in the backend Go constants, as unsandbox execution is handled through a separate code path rather than the standard `Runner` interface.
+**Note:** The core provider constants in `internal/agents/types.go` cover `CODEX`, `CLAUDE`, `OPENCODE`, and `GEMINI`. `UNSANDBOX` is also supported by the backend registry, but its provider constant is declared in `internal/agents/unsandbox_runner.go`.
 
 **Normalization:** `NormalizeProvider(s string)` converts any input to UPPERCASE for backward compatibility.
 
@@ -199,7 +199,7 @@ graph LR
 
 ## SectionID
 
-Frontend navigation section identifiers. Used by the desktop app to track which section/view is active. This enum is frontend-only and does not have a backend Go counterpart or JSON schema constraint.
+Frontend navigation section identifiers. Used by the desktop app to track which section/view is active. This type is frontend-only and does not have a backend Go counterpart or JSON schema constraint.
 
 | Value | Description | Layer |
 |---|---|---|
