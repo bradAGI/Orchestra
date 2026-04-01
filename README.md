@@ -4,96 +4,69 @@
 
 # Orchestra
 
-Orchesta is a multi-agent orchestration platform for dispatching software tasks to coding agents.
+Orchestra manages coding agents (Claude, Codex, OpenCode, Gemini) to automatically resolve GitHub issues and development tasks.
 
 ## Status
 
-This repository is under active development and is not production-ready. Interfaces, workflows, and configuration may change.
+⚠️ **Early Development** - Interfaces and workflows may change without notice.
 
 ## What It Does
 
-- Runs a Go backend (`orchestrad`) that owns orchestration, issue state, agent execution, and event streaming.
-- Provides an Electron + React desktop app for projects, issues, analytics, terminals, and agent operations.
-- Includes an embedded in-app AI assistant with provider-backed chat, tool execution, and inline rich UI rendering.
-- Supports multiple coding agents including Codex, Claude, Gemini, OpenCode, and optional Unsandbox integration.
-- Streams lifecycle events to clients over SSE and supports interactive terminal sessions over WebSocket.
-- Works with memory, SQLite, or GitHub-backed issue tracking.
+Orchestra connects your local projects and GitHub issues to AI coding agents for automated development workflows.
 
-## Architecture
+**Project Integration**
+- Connect local Git repositories and remote GitHub projects
+- Sync issues, pull requests, and project state automatically
+- Track work across multiple repositories and teams
+- Maintain isolated git worktrees for safe agent execution
 
-```mermaid
-graph TB
-    subgraph Frontends
-        DESKTOP["Desktop App"]
-        TUI["TUI Dashboard"]
-        AGENT["Embedded Agent"]
-    end
+![Project Dashboard](docs/screenshots/project-dashboard.png)
+*Local and remote project management*
 
-    subgraph Backend["orchestrad (Go)"]
-        API["REST API"]
-        ORCH["Orchestrator"]
-        PUB["PubSub / SSE"]
-        REG["Agent Registry"]
-        TRACKER["Tracker"]
-        DB["SQLite / Analytics"]
-        WS["Workspace + Git"]
-        TERM["Terminal WS"]
-        MCP["MCP Client"]
-    end
+**Automated Task Planning**
+- Break down GitHub issues into executable tasks
+- Generate implementation plans with agent assignments
+- Schedule work across multiple coding agents
+- Track dependencies and completion status
 
-    subgraph Providers
-        CODEX["Codex"]
-        CLAUDE["Claude"]
-        GEMINI["Gemini"]
-        OPENCODE["OpenCode"]
-        UNSANDBOX["Unsandbox"]
-        GH["GitHub"]
-        LLM["LLM APIs"]
-        MCP_SRV["MCP Servers"]
-    end
+![Task Planning](docs/screenshots/task-planning.png)
+*Automated task breakdown and planning*
 
-    DESKTOP --> API
-    TUI --> API
-    AGENT --> API
-    API --> ORCH
-    API --> PUB
-    API --> TERM
-    ORCH --> REG
-    ORCH --> TRACKER
-    ORCH --> DB
-    ORCH --> WS
-    REG --> CODEX
-    REG --> CLAUDE
-    REG --> GEMINI
-    REG --> OPENCODE
-    REG --> UNSANDBOX
-    TRACKER --> GH
-    AGENT --> LLM
-    ORCH --> MCP
-    MCP --> MCP_SRV
-```
+**Kanban Workflow**
+- Visual issue board with drag-and-drop organization
+- Real-time status updates from agent execution  
+- Progress tracking from "To Do" to "Done"
+- Integration with GitHub project boards
 
-## Applications
+![Kanban Board](docs/screenshots/kanban-board.png)
+*Visual workflow management*
 
-| App | Path | Purpose |
-| --- | --- | --- |
-| Backend | `apps/backend/` | API server, orchestrator, tracker, agent runners, telemetry, terminals |
-| Desktop | `apps/desktop/` | Electron app for issue management, monitoring, analytics, docs, and embedded agent workflows |
-| TUI | `apps/tui/` | Bubble Tea dashboard for local orchestration workflows |
-| Shared Protocol | `packages/protocol/` | Shared JSON schemas and API contract support |
+**Multi-Agent Orchestration**
+- Deploy Claude, Codex, OpenCode, and Gemini agents simultaneously
+- Load balance work across available agents
+- Configure agent-specific skills, tools, and permissions
+- Monitor agent performance and resource usage
 
-## Embedded Agent
+![Agent Dashboard](docs/screenshots/agent-dashboard.png)
+*Multi-agent coordination and monitoring*
 
-The desktop app includes an embedded assistant that can talk to external LLM providers and invoke local Orchestra tools. Current capabilities in the repo include:
+**GitHub Integration**
+- Import issues directly from GitHub repositories
+- Create pull requests from completed agent work
+- Sync labels, milestones, and project metadata
+- Authenticate with GitHub tokens for private repos
 
-- Provider-backed chat via Anthropic, OpenAI, Google, and OpenRouter-compatible models
-- Tool-driven workflows spanning issues, projects, git, sessions, search, scheduling, and MCP-backed operations
-- Inline UI rendering through `json-render`
-- Voice input via Whisper-based STT configuration
-- Searchable model selection and connection testing in settings
-- Watch-mode style notifications tied to backend activity
+![GitHub Sync](docs/screenshots/github-sync.png)
+*Seamless GitHub repository integration*
 
-See [Embedded Agent Architecture](docs/architecture/embedded-agent.md) and [Embedded Agent Setup](docs/guides/embedded-agent-setup.md).
+**Embedded AI Assistant**
+- Chat interface with multiple LLM providers
+- Execute tools directly in your project context
+- Voice input via Whisper and rich UI responses
+- Access to 40+ development and automation tools
+
+![Embedded Agent](docs/screenshots/embedded-agent.png)
+*Integrated AI assistant for development tasks*
 
 ## Quick Start
 
@@ -109,8 +82,8 @@ See [Embedded Agent Architecture](docs/architecture/embedded-agent.md) and [Embe
 
 ```bash
 cd apps/backend
-go build -o orchestrad ./cmd/orchestrad/
-./orchestrad --workspace-root /path/to/your/project
+go build -o orchestrd ./cmd/orchestrd/
+./orchestrd --workspace-root /path/to/your/project
 ```
 
 Default bind address is `127.0.0.1:4010`.
@@ -138,11 +111,9 @@ You can also run the root shortcut:
 make dash
 ```
 
-## First-Run Configuration
+## Configuration
 
 Runtime configuration is loaded from environment variables, with optional overrides from `WORKFLOW.md`.
-
-Common settings:
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
@@ -150,44 +121,55 @@ Common settings:
 | `ORCHESTRA_SERVER_PORT` | Backend bind port | `4010` |
 | `ORCHESTRA_API_TOKEN` | Required when binding to a non-loopback host | unset |
 | `ORCHESTRA_WORKSPACE_ROOT` | Root directory for agent workspaces | `~/.orchestra/workspaces` |
-| `ORCHESTRA_WORKTREE_ROOT` | Root directory for git worktrees | same as workspace root |
 | `ORCHESTRA_AGENT_PROVIDER` | Default agent provider | `CODEX` |
-| `ORCHESTRA_AGENT_MAX_TURNS` | Max turns per agent run | `25` |
-| `ORCHESTRA_TRACKER_TYPE` | Tracker backend selector. `github` enables GitHub; local runtime otherwise uses the SQLite-backed tracker | unset |
-| `ORCHESTRA_TRACKER_ENDPOINT` | Tracker endpoint or repo identifier | unset |
-| `ORCHESTRA_TRACKER_TOKEN` | Tracker auth token | unset |
+| `ORCHESTRA_TRACKER_TYPE` | Tracker backend: `github` or `sqlite` | unset |
+| `ORCHESTRA_TRACKER_ENDPOINT` | GitHub repo (owner/repo) | unset |
+| `ORCHESTRA_TRACKER_TOKEN` | GitHub token | unset |
 
 Example local setup:
-
 ```bash
 export ORCHESTRA_AGENT_PROVIDER=CODEX
 export ORCHESTRA_TRACKER_TYPE=sqlite
 export ORCHESTRA_WORKSPACE_ROOT="$HOME/.orchestra/workspaces"
 ```
 
-For GitHub-backed issue tracking:
-
+For GitHub issues:
 ```bash
 export ORCHESTRA_TRACKER_TYPE=github
 export ORCHESTRA_TRACKER_ENDPOINT=owner/repo
 export ORCHESTRA_TRACKER_TOKEN=ghp_xxx
 ```
 
-Full reference: [Configuration Guide](docs/guides/configuration.md).
+## Screenshots
+
+The following screenshots show Orchestra in action:
+
+### Main Dashboard
+![Main Dashboard](docs/screenshots/main-dashboard.png)
+*Overview of active issues, agents, and system status*
+
+### Issue Detail View
+![Issue Detail](docs/screenshots/issue-detail.png)
+*Detailed view of issue progress, agent logs, and generated solutions*
+
+### Agent Configuration
+![Agent Settings](docs/screenshots/agent-settings.png)
+*Configure agent behavior, tools, and integrations*
+
+### Real-time Execution
+![Agent Execution](docs/screenshots/agent-execution.png)
+*Watch agents work in real-time with live logs and progress tracking*
 
 ## Development
 
 ### Backend
-
 ```bash
 cd apps/backend
 go test ./...
-go build -o orchestrad ./cmd/orchestrad/
-go build -o orchestra ./cmd/orchestra/
+go build -o orchestrd ./cmd/orchestrd/
 ```
 
 ### Desktop
-
 ```bash
 cd apps/desktop
 npm run typecheck
@@ -195,15 +177,73 @@ npm run test
 npm run build
 ```
 
-Additional repo scripts include smoke tests, parity verification, release-readiness checks, and platform packaging via `npm run dist:desktop`.
-
 ### TUI
-
 ```bash
 cd apps/tui
 go test ./...
 go run .
 ```
+
+## Architecture
+
+```mermaid
+graph TB
+    subgraph Frontends
+        DESKTOP["Desktop App"]
+        TUI["TUI Dashboard"]
+        AGENT["Embedded Agent"]
+    end
+
+    subgraph Backend["orchestrd (Go)"]
+        API["REST API"]
+        ORCH["Orchestrator"]
+        PUB["PubSub / SSE"]
+        REG["Agent Registry"]
+        TRACKER["Tracker"]
+        DB["SQLite / Analytics"]
+        WS["Workspace + Git"]
+        TERM["Terminal WS"]
+        MCP["MCP Client"]
+    end
+
+    subgraph Providers
+        CODEX["Codex"]
+        CLAUDE["Claude"]
+        GEMINI["Gemini"]
+        OPENCODE["OpenCode"]
+        GH["GitHub"]
+        LLM["LLM APIs"]
+        MCP_SRV["MCP Servers"]
+    end
+
+    DESKTOP --> API
+    TUI --> API
+    AGENT --> API
+    API --> ORCH
+    API --> PUB
+    API --> TERM
+    ORCH --> REG
+    ORCH --> TRACKER
+    ORCH --> DB
+    ORCH --> WS
+    REG --> CODEX
+    REG --> CLAUDE
+    REG --> GEMINI
+    REG --> OPENCODE
+    TRACKER --> GH
+    AGENT --> LLM
+    ORCH --> MCP
+    MCP --> MCP_SRV
+```
+
+## Applications
+
+| App | Path | Purpose |
+| --- | --- | --- |
+| Backend | `apps/backend/` | API server, orchestrator, tracker, agent runners |
+| Desktop | `apps/desktop/` | Electron app for issue management, monitoring, analytics |
+| TUI | `apps/tui/` | Terminal dashboard for local workflows |
+| Protocol | `packages/protocol/` | Shared JSON schemas and API contracts |
 
 ## Repository Layout
 
@@ -221,14 +261,12 @@ go run .
 
 ## Documentation
 
-- [Docs Index](docs/index.md)
 - [Getting Started](docs/guides/getting-started.md)
 - [Architecture Overview](docs/architecture/overview.md)
-- [Backend Internals](docs/backend/orchestrator.md)
 - [Desktop Architecture](docs/architecture/desktop.md)
-- [Embedded Agent Architecture](docs/architecture/embedded-agent.md)
 - [API Reference](docs/api/reference.md)
 - [Development Guide](docs/guides/development.md)
+- [Configuration](docs/guides/configuration.md)
 - [Deployment](docs/operations/deployment.md)
 
 ## License
