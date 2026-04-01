@@ -127,7 +127,7 @@ expect-cli -m "Check the issue Session tab while the run is active. If a related
 
 **expect-cli:**
 ```bash
-expect-cli -m "Open the test task inspector. Verify state is InProgress. Check Plan tab still has checkboxes. Check Terminal tab shows live agent execution. Check Changes tab shows files being modified. Verify title is not editable." -y
+expect-cli -m "Open the test task inspector. Verify state is InProgress. Check Plan tab still has checkboxes. Check Session tab shows live agent execution. Check Changes tab shows files being modified. Verify title is not editable." -y
 ```
 
 ---
@@ -166,7 +166,7 @@ expect-cli -m "Open the test task inspector. Verify state is InProgress. Check P
 
 **expect-cli:**
 ```bash
-expect-cli -m "Open the test task inspector in Review state. Verify three buttons: Create PR, Request Changes, Close. Check Plan tab shows completed checkboxes. Check Terminal tab shows session completed. Check Changes tab shows all file changes." -y
+expect-cli -m "Open the test task inspector in Review state. Verify three buttons: Create PR, Request Changes, Close. Check Plan tab shows completed checkboxes. Check Session tab shows session completed. Check Changes tab shows all file changes." -y
 ```
 
 ---
@@ -217,14 +217,14 @@ expect-cli -m "Open the test task in Review. Click Request Changes. Verify feedb
 - [ ] PR URL stored on the issue
 - [ ] "PR Open" badge/link appears in inspector header
 - [ ] Link opens GitHub PR in new tab
-- [ ] Issue stays in **Review** (not auto-advanced to Done)
+- [ ] Issue automatically advances to **Done** after PR creation
 
 ### Non-GitHub Projects
 - [ ] If no GitHub remote is configured, verify the review flow still allows closing the task without PR creation
 
 **expect-cli:**
 ```bash
-expect-cli -m "Open the test task in Review. Click Create PR. Verify dialog opens with pre-filled title, description, and branches. Submit. Verify PR Open badge appears with GitHub link. Verify issue stays in Review state." -y
+expect-cli -m "Open the test task in Review. Click Create PR. Verify dialog opens with pre-filled title, description, and branches. Submit. Verify PR Open badge appears with GitHub link. Verify issue auto-advances to Done." -y
 ```
 
 ---
@@ -253,12 +253,12 @@ expect-cli -m "Open the test task in Review (with PR created). Click Close. Veri
 
 ### Agent Fails During Planning
 - [ ] If agent errors out during Todo, issue should NOT auto-advance
-- [ ] Error visible in Terminal tab
+- [ ] Error visible in Session tab
 - [ ] User can retry by moving back to Todo
 
 ### Agent Fails During Execution
 - [ ] If agent errors out during InProgress, should NOT advance to Review
-- [ ] Error visible in Terminal tab
+- [ ] Error visible in Session tab
 - [ ] Changes tab shows partial changes (if any)
 
 ### Wrong Agent Provider
@@ -303,8 +303,7 @@ GitHub Issues / Manual Create / Embedded Agent
         ▼
    REVIEW — human reviews
         │
-        ├── Create PR → PR on GitHub → CI/CD reviews
-        │   └── PR merged → Done (cleanup)
+        ├── Create PR → PR on GitHub → Done
         │
         ├── Request Changes → feedback dialog
         │   ├── Re-execute → InProgress (with feedback)
@@ -318,6 +317,6 @@ GitHub Issues / Manual Create / Embedded Agent
 - **Interactive yolo mode**: Agents run as full TUIs (`claude --dangerously-skip-permissions`, `codex --full-auto`, `gemini --yolo`)
 - **Token tracking**: Telemetry watcher reads session files from disk
 - **Plan extraction**: Reads markdown checkboxes from agent messages
-- **Terminal tab in inspector**: Shows live PTY when running, "Session completed" when done
+- **Session tab in inspector**: Shows live PTY when running, "Session completed" when done
 - **PR creation**: Orchestra's job ends at the PR — CI/CD handles code review from there
 - **The circle**: CI/CD finds issues → new issues created → Backlog → agents fix them
