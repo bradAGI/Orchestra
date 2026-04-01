@@ -4,7 +4,7 @@
 
 # Orchestra
 
-Early-stage multi-agent orchestration platform for dispatching software tasks to coding agents, tracking execution in real time, and managing the surrounding workspace, tracker, and tooling from a desktop app or terminal UI.
+Multi-agent orchestration platform for dispatching software tasks to coding agents.
 
 ## Status
 
