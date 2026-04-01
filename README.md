@@ -20,8 +20,6 @@ Orchestra connects your local projects and GitHub issues to AI coding agents for
 - Track work across multiple repositories and teams
 - Maintain isolated git worktrees for safe agent execution
 
-![Project Dashboard](docs/screenshots/project-dashboard.png)
-*Local and remote project management*
 
 **Automated Task Planning**
 - Break down GitHub issues into executable tasks
@@ -29,8 +27,6 @@ Orchestra connects your local projects and GitHub issues to AI coding agents for
 - Schedule work across multiple coding agents
 - Track dependencies and completion status
 
-![Task Planning](docs/screenshots/task-planning.png)
-*Automated task breakdown and planning*
 
 **Kanban Workflow**
 - Visual issue board with drag-and-drop organization
@@ -38,8 +34,6 @@ Orchestra connects your local projects and GitHub issues to AI coding agents for
 - Progress tracking from "To Do" to "Done"
 - Integration with GitHub project boards
 
-![Kanban Board](docs/screenshots/kanban-board.png)
-*Visual workflow management*
 
 **Multi-Agent Orchestration**
 - Deploy Claude, Codex, OpenCode, and Gemini agents simultaneously
@@ -47,8 +41,6 @@ Orchestra connects your local projects and GitHub issues to AI coding agents for
 - Configure agent-specific skills, tools, and permissions
 - Monitor agent performance and resource usage
 
-![Agent Dashboard](docs/screenshots/agent-dashboard.png)
-*Multi-agent coordination and monitoring*
 
 **GitHub Integration**
 - Import issues directly from GitHub repositories
@@ -56,8 +48,6 @@ Orchestra connects your local projects and GitHub issues to AI coding agents for
 - Sync labels, milestones, and project metadata
 - Authenticate with GitHub tokens for private repos
 
-![GitHub Sync](docs/screenshots/github-sync.png)
-*Seamless GitHub repository integration*
 
 **Embedded AI Assistant**
 - Chat interface with multiple LLM providers
@@ -65,8 +55,6 @@ Orchestra connects your local projects and GitHub issues to AI coding agents for
 - Voice input via Whisper and rich UI responses
 - Access to 40+ development and automation tools
 
-![Embedded Agent](docs/screenshots/embedded-agent.png)
-*Integrated AI assistant for development tasks*
 
 ## Quick Start
 
@@ -140,25 +128,6 @@ export ORCHESTRA_TRACKER_ENDPOINT=owner/repo
 export ORCHESTRA_TRACKER_TOKEN=ghp_xxx
 ```
 
-## Screenshots
-
-The following screenshots show Orchestra in action:
-
-### Main Dashboard
-![Main Dashboard](docs/screenshots/main-dashboard.png)
-*Overview of active issues, agents, and system status*
-
-### Issue Detail View
-![Issue Detail](docs/screenshots/issue-detail.png)
-*Detailed view of issue progress, agent logs, and generated solutions*
-
-### Agent Configuration
-![Agent Settings](docs/screenshots/agent-settings.png)
-*Configure agent behavior, tools, and integrations*
-
-### Real-time Execution
-![Agent Execution](docs/screenshots/agent-execution.png)
-*Watch agents work in real-time with live logs and progress tracking*
 
 ## Development
 
