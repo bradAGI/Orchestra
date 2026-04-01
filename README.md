@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="apps/desktop/public/Orchesta.png" alt="Orchesta logo" width="220" />
+  <img src="apps/desktop/public/Orchesta-inverted.png" alt="Orchestra logo" width="220" />
 </p>
 
 # Orchestra
