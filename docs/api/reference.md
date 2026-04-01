@@ -101,6 +101,7 @@ Full git workflow operations scoped to a project.
 | `GET` | `/api/v1/projects/{project_id}/git/status` | Working tree status (staged, unstaged, untracked) |
 | `GET` | `/api/v1/projects/{project_id}/git/diff` | Current diff |
 | `GET` | `/api/v1/projects/{project_id}/git/branches` | List branches |
+| `GET` | `/api/v1/projects/{project_id}/git/branches/detail` | List branches with detailed metadata and ahead/behind status |
 | `POST` | `/api/v1/projects/{project_id}/git/branches` | Create a new branch |
 | `DELETE` | `/api/v1/projects/{project_id}/git/branches/{branch}` | Delete a branch |
 | `POST` | `/api/v1/projects/{project_id}/git/checkout` | Checkout a branch |
@@ -166,6 +167,8 @@ Each provider (`codex`, `claude`, `opencode`, `gemini`) exposes sub-routes for g
 |--------|------|-------------|
 | `GET` | `/api/v1/agents/{provider}/mcp` | List MCP servers for a provider |
 | `POST` | `/api/v1/agents/{provider}/mcp` | Add an MCP server to a provider |
+| `PUT` | `/api/v1/agents/{provider}/mcp/{name}` | Replace a provider MCP server definition |
+| `PATCH` | `/api/v1/agents/{provider}/mcp/{name}` | Toggle a provider MCP server's enabled state |
 | `DELETE` | `/api/v1/agents/{provider}/mcp/{name}` | Remove an MCP server from a provider |
 | `GET` | `/api/v1/agents/{provider}/permissions` | Get provider permissions |
 | `POST` | `/api/v1/agents/{provider}/permissions` | Update provider permissions |
@@ -280,7 +283,7 @@ Manage embedded-agent provider credentials stored under the Orchestra user confi
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/v1/workspace/migration/plan` | Preview a workspace migration plan without executing |
+| `GET` | `/api/v1/workspace/migration/plan` | Preview a workspace migration plan without executing (query params: `from`, `to`) |
 | `POST` | `/api/v1/workspace/migrate` | Execute workspace migration |
 
 ---

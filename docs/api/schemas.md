@@ -17,7 +17,7 @@ The Orchestra protocol layer defines a shared set of JSON schemas (draft-07) in 
 |---|---|---|---|
 | `error.response.schema.json` | Response | `object` | Standard error envelope for any 4xx/5xx |
 | `issue.create.request.schema.json` | Request | `object` | Body for `POST /api/v1/issues` |
-| `issue.update.request.schema.json` | Request | `object` | Body for `PATCH /api/v1/issues/:identifier` |
+| `issue.update.request.schema.json` | Request | `object` | Body for `PATCH /api/v1/issues/{issue_identifier}` |
 | `issue.response.schema.json` | Response | `object` | Detailed single-issue response with runtime data |
 | `issues.list.response.schema.json` | Response | `array` | Flat issue list response |
 | `project.create.request.schema.json` | Request | `object` | Body for `POST /api/v1/projects` |
@@ -81,7 +81,7 @@ All error responses share a single envelope. The TypeScript equivalent is `APIEr
 
 ### IssueUpdateRequest
 
-**Endpoint:** `PATCH /api/v1/issues/:identifier`
+**Endpoint:** `PATCH /api/v1/issues/{issue_identifier}`
 **Required fields:** none (all optional, partial update)
 
 The schema is identical to the create request except no fields are required. Any subset of fields may be sent to apply a partial update.
@@ -123,7 +123,7 @@ The schema is identical to the create request except no fields are required. Any
 
 ### IssueDetailPayload
 
-**Endpoint:** `GET /api/v1/issues/:identifier`
+**Endpoint:** `GET /api/v1/issues/{issue_identifier}`
 **Required fields:** `issue_id`, `issue_identifier`, `status`, `attempts`, `logs`, `recent_events`
 
 Extends the list-item fields with runtime data, workspace paths, and session logs.
