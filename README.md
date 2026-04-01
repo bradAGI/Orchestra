@@ -12,7 +12,7 @@ Orchestra is a desktop development workspace that integrates AI coding agents wi
 
 ## What It Does
 
-Orchestra connects your local projects and GitHub issues to AI coding agents for automated development workflows.
+Orchestra connects your local projects and GitHub to AI coding agents (Claude Code, Codex CLI, Gemini CLI, and Opencode) to automate development workflows.
 
 **Project Integration**
 - Connect local Git repositories and remote GitHub projects
