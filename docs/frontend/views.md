@@ -1,66 +1,43 @@
 # 4.2 Views & Dashboards
 
 > **Source files:**
-> - `apps/desktop/src/components/dashboard/DashboardOverview.tsx` -- Operations hub
+> - `apps/desktop/src/App.tsx` -- Section routing and top-level state
 > - `apps/desktop/src/widgets/issue-detail/IssueDetailView.tsx` -- Task inspector
 > - `apps/desktop/src/widgets/issue-detail/types.ts` -- Issue detail types
 > - `apps/desktop/src/widgets/issue-detail/IssueDetailUtils.tsx` -- Diff parsing, plan extraction
 > - `apps/desktop/src/components/projects/ProjectGrid.tsx` -- Project listing
 > - `apps/desktop/src/components/projects/ProjectDetailView.tsx` -- Project inspector
 > - `apps/desktop/src/components/agents/AgentsDashboard.tsx` -- Agent configuration
+> - `apps/desktop/src/components/analytics/AnalyticsDashboard.tsx` -- Analytics views
+> - `apps/desktop/src/components/docs/DocsDashboard.tsx` -- Documentation browser
 
-The Orchestra desktop application provides several interconnected views for managing machine learning agent operations. Each view corresponds to a sidebar section and renders as the main content area.
+The Orchestra desktop application provides several interconnected views for managing task execution, project workspaces, terminals, agent configuration, analytics, documentation, and sandbox execution. Each view corresponds to a sidebar section rendered from `App.tsx`.
 
 ---
 
-### Dashboard View (Operations Hub)
+### Section Model
 
-**Component:** `DashboardOverview`
-**Section:** `DASHBOARD`
+The sidebar currently exposes these top-level sections:
 
-The operations hub is the landing page. It displays three metric cards at the top, an active projects grid, and a runtime events panel.
-
-```mermaid
-graph TD
-    subgraph DashboardOverview
-        MC1[MetricCard: Active Agents]
-        MC2[MetricCard: Total Throughput]
-        MC3[MetricCard: Project Load]
-        PG[Active Projects Grid]
-        RE[Runtime Events Panel]
-    end
-
-    MC1 --> |snapshot.running.length| DATA[SnapshotPayload]
-    MC2 --> |warehouseStats.total_tokens| WH[GlobalStats]
-    MC3 --> |projects.length| PR["Project[]"]
-    PG --> |sorted by activity| PR
-```
-
-#### Metric Cards
-
-| Card | Data Source | Description |
-|------|------------|-------------|
-| Active Agents | `snapshot.running.length` | Number of agent sessions currently executing |
-| Total Throughput | `warehouseStats.total_tokens` | Cumulative tasks finalized since epoch |
-| Project Load | `projects.length` | Number of repositories managed |
-
-#### Project Sorting
-
-Projects in the grid are sorted by:
-1. **Active sessions** -- projects with running agent sessions appear first
-2. **Session count** -- projects with more total sessions rank higher
-3. **Alphabetical** -- fallback sort by project name
-
-Each project card displays the project name, root path, in-progress session count, and cumulative token usage.
+| Section ID | Label | Purpose |
+|------------|-------|---------|
+| `ISSUES` | Tasks | Kanban board and task inspector |
+| `PROJECTS` | Projects | Repository management, files, and git workflows |
+| `CONSOLE` | Terminals | Embedded terminal tabs |
+| `AGENTS` | Agents | Global agent/provider configuration |
+| `WAREHOUSE` | Analytics | Usage analytics and session inspection |
+| `SANDBOX` | Sandbox | Remote execution via unsandbox |
+| `SETTINGS` | Settings | Backend profiles, notifications, migrations, integrations |
+| `DOCS` | Documentation | In-app docs browser |
 
 ---
 
 ### Issue Detail View (Task Inspector)
 
 **Component:** `IssueDetailView`
-**Section:** Opened as an overlay from the `ISSUES` kanban board
+**Section:** Opened from the `ISSUES` board as a modal inspector
 
-The issue detail view is the most complex component in the application. It provides a multi-tab inspector for individual tasks with full lifecycle management.
+The issue detail view is the main task inspector. It provides a multi-tab interface for individual tasks with lifecycle management, diff/log inspection, and PR workflows.
 
 ```mermaid
 graph LR
@@ -100,7 +77,7 @@ The inspector works with a flexible issue type:
 
 #### Tabs
 
-**Overview** -- Displays the task description with an inline markdown editor (toggle between edit and preview modes), agent assignment selector, state management, and an operational plan extracted from the description.
+**Overview** -- Displays the task description with inline editing, assignment and state controls, tool/provider settings, and an operational plan extracted from the description.
 
 **History** -- Fetches and displays the issue's activity timeline via `fetchIssueHistory()`. Each entry shows the event kind, message, timestamp, provider, and token usage (input/output).
 
@@ -108,7 +85,7 @@ The inspector works with a flexible issue type:
 
 **Logs** -- Raw agent session logs fetched via `fetchIssueLogs()`.
 
-**PR** -- GitHub pull request creation and management. Supports creating PRs from the task's branch, viewing PR status, and managing the merge lifecycle.
+**PR** -- GitHub pull request creation and management. Supports creating PRs from the task's branch, viewing PR status, and reviewing merge-related details.
 
 #### Operational Plan Extraction
 
@@ -145,15 +122,20 @@ Activity thresholds:
 
 #### ProjectDetailView
 
-The single-project inspector has three tabs:
+The single-project inspector currently has three tabs:
 
 | Tab | Content |
 |-----|---------|
-| **Overview** | Project stats, GitHub issue list, kanban board scoped to this project |
-| **Files** | Interactive file tree browser with content preview (`fetchProjectTree`, `fetchProjectFileContent`) |
-| **Git** | Git history, status, diff viewer, branch management via `GitTab` widget |
+| **Overview** | Project metadata, connectivity state, GitHub issue list, and project-scoped kanban board |
+| **Files** | Interactive file tree browser with filtering, lazy folder loading, and content preview |
+| **Git** | Branch/status/diff/stash/conflict/PR workflows via `GitTab` |
 
-Props include handlers for issue CRUD, session stopping, terminal navigation, and project deletion.
+The project view also handles:
+
+- GitHub connect/disconnect flows
+- file-tree refresh and preview
+- project deletion confirmation
+- jumping from project work into terminal tabs
 
 ---
 
@@ -162,7 +144,7 @@ Props include handlers for issue CRUD, session stopping, terminal navigation, an
 **Component:** `AgentsDashboard`
 **Section:** `AGENTS`
 
-Provides a per-provider configuration interface for the four supported agent providers:
+Provides a per-provider configuration interface for the supported agent providers. The `components/agents/AgentsDashboard.tsx` entry point now re-exports the widget implementation from `src/widgets/agents/`.
 
 | Provider | Description |
 |----------|-------------|
@@ -171,23 +153,7 @@ Provides a per-provider configuration interface for the four supported agent pro
 | `gemini` | Google's Gemini CLI -- multimodal and context-aware |
 | `opencode` | OpenCode -- JSON-formatted agent sessions |
 
-```mermaid
-graph TD
-    subgraph AgentsDashboard
-        PS[Provider Selector]
-        MC[Model Configuration]
-        PM[Permissions Editor]
-        MCP[MCP Server Manager]
-        HK[Hooks Editor]
-        CF[Config File Editor]
-    end
-
-    PS --> MC
-    PS --> PM
-    PS --> MCP
-    PS --> HK
-    PS --> CF
-```
+The current agent dashboard is organized into provider-oriented categories and panels rather than a single flat form.
 
 For each provider, the dashboard manages:
 
@@ -197,6 +163,8 @@ For each provider, the dashboard manages:
 - **Hooks** (`fetchProviderHooks` / `updateProviderHooks`) -- lifecycle hooks (event matchers, commands, timeouts)
 - **Config files** (`fetchAgentConfigs` / `updateAgentConfigByPath`) -- raw configuration file editor with markdown preview
 
+Claude also has dedicated panels for settings, instructions, rules, skills, and sub-agents, backed by the Claude-specific backend routes.
+
 ---
 
 ### Analytics Dashboard
@@ -204,7 +172,15 @@ For each provider, the dashboard manages:
 **Components:** `AnalyticsDashboard`, `SessionDetailView`
 **Section:** `WAREHOUSE`
 
-The analytics view displays aggregate token usage statistics and session archives fetched from `/api/v1/warehouse/stats`. The `SessionDetailView` provides detailed inspection of individual completed sessions.
+The analytics area is no longer just a warehouse summary. `AnalyticsDashboard` exposes three views:
+
+| View | Purpose |
+|------|---------|
+| `executive` | High-level spend, usage, and ROI summaries |
+| `operational` | Session-level inspection and operational health |
+| `optimization` | Cost-efficiency and optimization guidance |
+
+It pulls data through `useAnalyticsData()` and combines `/warehouse/stats` with analytics-specific endpoints. `SessionDetailView` provides drill-down for individual sessions.
 
 ---
 
@@ -213,7 +189,22 @@ The analytics view displays aggregate token usage statistics and session archive
 **Component:** `SandboxDashboard`
 **Section:** `SANDBOX`
 
-Provides a UI for remote code execution via the unsandbox platform. Manages unsandbox API key configuration, code execution with language selection, and session/service monitoring.
+Provides a UI for remote code execution via the unsandbox platform. Manages unsandbox configuration, execution requests, and remote session/service monitoring.
+
+---
+
+### Documentation Browser
+
+**Component:** `DocsDashboard`
+**Section:** `DOCS`
+
+The docs view is an in-app documentation browser backed by `/api/v1/docs` and `/api/v1/docs/*`. It supports:
+
+- tree navigation through the docs hierarchy
+- markdown rendering with GitHub-flavored markdown
+- generated table-of-contents navigation
+- authenticated image loading for doc assets
+- Mermaid and D3-based diagram rendering inline
 
 ---
 
@@ -224,6 +215,8 @@ Additional widget modules used across views:
 | Widget | Location | Used By |
 |--------|----------|---------|
 | `KanbanBoard` | `widgets/kanban/` | ISSUES section, ProjectDetailView |
-| `OperationsQueueCard` | `widgets/running/` | RUNNING section |
+| `OperationsQueueCard` | `widgets/running/` | Running-queue summaries embedded in task and operations surfaces |
 | `GitTab` | `widgets/git/` | ProjectDetailView |
 | `TerminalMultiplexer` | `components/terminal/` | CONSOLE section |
+
+`RUNNING` is no longer a top-level sidebar section; running activity is surfaced through the task board, analytics, and inspector flows.

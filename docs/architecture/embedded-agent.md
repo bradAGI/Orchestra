@@ -7,7 +7,7 @@
 
 ## Overview
 
-The embedded agent is a floating chat widget built into the Orchestra desktop app. It acts as a machine learning co-pilot that can navigate the UI, call Orchestra APIs, render rich UI inline via json-render, and connect to MCP servers for extensible tooling. All inference runs client-side in the Electron renderer using AI SDK `streamText()` — there is no server-side chat endpoint.
+The embedded agent is a floating chat widget built into the Orchestra desktop app. It acts as an in-app assistant that can navigate the UI, call Orchestra APIs, render rich UI inline via json-render, and connect to MCP servers for extensible tooling. All inference runs client-side in the renderer using AI SDK `streamText()` — there is no server-side chat endpoint.
 
 ---
 
@@ -66,7 +66,7 @@ Single mount in `App.tsx`:
 />
 ```
 
-The widget communicates with the rest of the app only through `onNavigate` and the Orchestra REST API.
+The widget communicates with the rest of the app through `onNavigate`, the Orchestra REST API, and the `orchestra-data-changed` browser event used to trigger list refreshes after mutations.
 
 ---
 
@@ -127,16 +127,16 @@ Key implementation detail: OpenRouter and OpenAI use `provider.chat(modelId)` (C
 
 ### API Key Storage
 
-Keys are stored server-side at `~/.orchestra/agent-providers.json` (permissions `0600`), managed by the Go backend:
+Keys are stored by the backend at `~/.orchestra/agent-providers.json` (permissions `0600`):
 
-- `GET /api/v1/config/agent-providers` — returns keys (localhost only, behind auth middleware)
+- `GET /api/v1/config/agent-providers` — returns configured provider status and keys
 - `POST /api/v1/config/agent-providers` — save/update a single provider's key
 
 Keys are fetched into memory on panel open and never persisted client-side.
 
 ### Model Selection Persistence
 
-Provider and model choices are persisted in `localStorage` under `orchestra-agent-provider-prefs`. On mount, `useProviderConfig` loads saved prefs and fetches the model list from the provider API. If no saved model exists, it picks from `PREFERRED_DEFAULTS` (e.g., `claude-sonnet-4-6` for Claude, `gpt-4o` for OpenAI).
+Provider and model choices are persisted in `localStorage` under `orchestra-agent-provider-prefs`. On mount, `useProviderConfig` loads saved prefs, fetches configured keys from the backend, and then fetches the model list from the selected provider API. If no saved model exists, it picks from `PREFERRED_DEFAULTS` such as `anthropic/claude-sonnet-4` for OpenRouter, `gpt-4o` for OpenAI, `claude-sonnet-4-6` for Claude, and `gemini-2.5-flash` for Gemini.
 
 ---
 
@@ -158,7 +158,7 @@ createMetaTools(allDomainTools)  → search_tools, get_tool_schema
 
 ### Progressive Tool Discovery
 
-To avoid overwhelming the model context, `meta-tools.ts` maintains a `TOOL_REGISTRY` — a flat list of all 40+ tools with category, summary, prerequisites, and mutation/confirmation flags. The LLM calls `search_tools(category="git")` to discover tools, then `get_tool_schema(tool_name="git_stash")` to inspect parameters before calling.
+To avoid overwhelming the model context, `meta-tools.ts` maintains a `TOOL_REGISTRY` — a flat list of tools with category, summary, prerequisites, and mutation/confirmation flags. The LLM calls `search_tools(category="git")` to discover tools, then `get_tool_schema(tool_name="git_stash")` to inspect parameters before calling.
 
 ### Confirmation Gates
 
@@ -179,7 +179,7 @@ The implementation uses a **custom renderer** in `JsonRenderBlock.tsx` rather th
 
 ### Actions
 
-Actions wired to buttons/chips: `navigate`, `send_chat`, `copy_to_clipboard`. The `dispatch_agent` action only sets the provider on an issue — it does not change issue state directly.
+Actions wired to buttons/chips: `navigate`, `send_chat`, `copy_to_clipboard`. The `dispatch_agent` tool only sets the provider and assignee on an issue — it does not change issue state directly.
 
 ### render_ui Tool
 
@@ -192,13 +192,9 @@ The LLM invokes `render_ui` with a JSON spec. The tool returns `{ type: 'json_re
 Provider configuration lives in **Settings > Integrations** via `EmbeddedAgentConfigForm` (in `apps/desktop/src/components/settings/SettingsCard.tsx`). The form provides:
 
 - Provider dropdown (OpenRouter, Claude, OpenAI, Gemini)
-- API key input with save/remove/test connection
+- API key input with save/test connection
 - `ModelSearchDropdown` — searchable model selector populated from the provider API
 - Model selection persisted to localStorage on save
-
-### Browser Dev Mode Fallback
-
-In development (non-Electron), `useProviderConfig` detects when the backend is unavailable and allows manual key entry directly in the config form, bypassing the backend key storage.
 
 ---
 
@@ -208,6 +204,7 @@ In development (non-Electron), `useProviderConfig` detects when the backend is u
 - **localStorage Persistence:**
   - `orchestra-embedded-agent-chat` — conversation history (survives app restart, cleared via "Clear chat")
   - `orchestra-agent-provider-prefs` — selected provider ID and model ID
+  - `orchestra-watch-mode` — watch-mode enabled state and tracked event types
 - **No server-side chat persistence.** Conversations are local only.
 
 ---

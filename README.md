@@ -153,7 +153,7 @@ Common settings:
 | `ORCHESTRA_WORKTREE_ROOT` | Root directory for git worktrees | same as workspace root |
 | `ORCHESTRA_AGENT_PROVIDER` | Default agent provider | `CODEX` |
 | `ORCHESTRA_AGENT_MAX_TURNS` | Max turns per agent run | `25` |
-| `ORCHESTRA_TRACKER_TYPE` | Tracker backend: `memory`, `sqlite`, or `github` | `memory` |
+| `ORCHESTRA_TRACKER_TYPE` | Tracker backend selector. `github` enables GitHub; local runtime otherwise uses the SQLite-backed tracker | unset |
 | `ORCHESTRA_TRACKER_ENDPOINT` | Tracker endpoint or repo identifier | unset |
 | `ORCHESTRA_TRACKER_TOKEN` | Tracker auth token | unset |
 

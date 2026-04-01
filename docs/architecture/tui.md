@@ -2,7 +2,7 @@
 
 > **Source files:** `apps/tui/main.go`, `apps/tui/manager.go`, `apps/tui/styles.go`
 
-The Orchestra TUI is a lightweight terminal dashboard built with Go and Bubble Tea. It manages the lifecycle of the backend (`orchestrad`) and desktop frontend processes, providing a unified control panel for starting, stopping, and monitoring both services. It is the primary developer tool for running Orchestra locally.
+The Orchestra TUI is a lightweight terminal dashboard built with Go and Bubble Tea. It manages the lifecycle of the backend (`orchestrad`) and desktop frontend dev process, providing a unified control panel for starting, stopping, and monitoring both services.
 
 ---
 
@@ -64,7 +64,7 @@ The `model` struct holds all application state:
 | `width`, `height` | `int` | Terminal dimensions |
 | `ready` | `bool` | Whether the viewport has been initialized |
 | `followLogs` | `bool` | Auto-scroll to latest log output |
-| `noStart` | `bool` | Skip auto-start on launch (flag) |
+| `noStart` | `bool` | Parsed flag retained in the model, though services currently start manually via keyboard control |
 
 ### Keyboard Controls
 
@@ -138,8 +138,10 @@ When a service is stopped, the cancel function is called, which terminates the p
 
 | Service | Command | Working Directory | Environment |
 |---------|---------|-------------------|-------------|
-| Backend | `./apps/backend/orchestrad` | `../../` (repo root) | `ORCHESTRA_SERVER_PORT=4010`, `ORCHESTRA_SERVER_HOST=0.0.0.0`, `ORCHESTRA_WORKSPACE_ROOT=/tmp/orchestra`, `ORCHESTRA_API_TOKEN=dev-token` |
+| Backend | `./apps/backend/orchestrad` | `../..` (repo root from `apps/tui`) | `ORCHESTRA_SERVER_PORT=4010`, `ORCHESTRA_SERVER_HOST=0.0.0.0`, `ORCHESTRA_WORKSPACE_ROOT=/tmp/orchestra`, `ORCHESTRA_API_TOKEN=dev-token` |
 | Frontend | `npm run dev` | `../desktop` | `ORCHESTRA_API_TOKEN=dev-token` |
+
+Services currently start manually via the `s` key. `Init()` only starts the UI tick loop; it does not auto-start managed processes.
 
 ---
 

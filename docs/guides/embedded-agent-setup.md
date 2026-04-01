@@ -13,8 +13,10 @@
    - **Gemini** — Google's models directly
 4. Enter your API key for the selected provider
 5. Click **Save**
+6. Pick a model from the searchable model dropdown
+7. Optionally click **Test Connection**
 
-The key is stored on your local machine at `~/.orchestra/agent-providers.json` with restrictive permissions. It is never sent anywhere except to the selected provider's API.
+The key is stored on your local machine at `~/.orchestra/agent-providers.json` with restrictive permissions. It is only used by the desktop app when calling the selected provider API.
 
 ---
 
@@ -24,12 +26,14 @@ After saving an API key, the model dropdown populates from the provider's API:
 
 - **OpenRouter:** Shows all models that support tool calling (filtered by `tools` parameter support)
 - **OpenAI:** Shows `gpt-*` and `o*` models (excludes audio, embedding, image models)
-- **Claude:** Static list of current Claude models (no list-models API available)
+- **Claude:** Static list of current Claude models (Anthropic does not expose a list-models API for this flow)
 - **Gemini:** Shows models that support `generateContent`
 
 Use the **search box** in the model dropdown to filter by name. Your selection is persisted across sessions.
 
-### Recommended Models
+### Default Preferences
+
+If you have no saved model preference, the app currently prefers:
 
 | Provider | Model | Notes |
 |----------|-------|-------|
@@ -42,7 +46,7 @@ Use the **search box** in the model dropdown to filter by name. Your selection i
 
 ## 3. Test the Connection
 
-Click **Test Connection** in the settings form. This sends a minimal request to the provider to verify the API key is valid and the model is accessible. A green check confirms success; an error message indicates what went wrong.
+Click **Test Connection** in the settings form. This sends a minimal generation request to the selected provider and model to verify the API key is valid and the model is reachable.
 
 ---
 
@@ -76,14 +80,14 @@ Click the **clear** button in the panel header. This removes all messages from l
 
 ## 5. Available Tools
 
-The agent has access to 40+ tools organized by category. Core tools are available immediately; specialized tools are discovered on demand.
+The agent has a core tool set available immediately, with additional tools discoverable on demand through `search_tools` and `get_tool_schema`.
 
 ### Always Available
 
 | Tool | Purpose |
 |------|---------|
 | `list_issues` / `create_issue` / `update_issue` | Issue management |
-| `dispatch_agent` | Start an agent on an issue |
+| `dispatch_agent` | Assign an agent provider to an issue |
 | `list_projects` / `find_projects` | Project operations |
 | `navigate_to` / `open_settings_tab` | App navigation |
 | `search_issues` | Find issues by query |
@@ -97,7 +101,7 @@ The agent has access to 40+ tools organized by category. Core tools are availabl
 |----------|-------|
 | **git** | git_status, git_history, git_branches, git_commit_flow, git_sync, git_stash |
 | **sessions** | summarize_session, get_session_logs, get_raw_logs, list_sessions, get_session_detail |
-| **search** | search_sessions, search_docs, get_warehouse_stats |
+| **search** | search_sessions, search_docs, get_warehouse_stats, get_project_stats, find_projects |
 | **code** | execute_code, check_sandbox_status, list_sandbox_sessions |
 | **scheduling** | schedule_reminder, schedule_action, cancel_schedule, list_schedules |
 | **mcp** | list_mcp_servers, discover_mcp_tools, mcp_server_status |
@@ -110,6 +114,7 @@ The agent has access to 40+ tools organized by category. Core tools are availabl
 - "What's the git status of my project?" — shows modified/staged files
 - "Remind me to check the build in 10 minutes" — sets a reminder
 - "What agents are running?" — shows orchestrator state
+- "Show me projects named symphony" — resolves projects with `find_projects`
 
 ---
 
@@ -121,7 +126,7 @@ The provider is overloaded. Wait a moment and retry, or switch to a different mo
 
 ### "API key invalid or expired"
 
-Your key may have been revoked or expired. Go to Settings > Integrations, remove the old key, and enter a new one.
+Your key may have been revoked or expired. Go to Settings > Integrations, enter a valid key for the provider again, and save it.
 
 ### "Rate limit exceeded" (429)
 
@@ -138,7 +143,7 @@ Check that you have an internet connection. The agent calls provider APIs direct
 ### Chat not responding
 
 - Check that a provider and model are configured (Settings > Integrations)
-- Try clearing the chat (header button) — a corrupted conversation can cause issues
+- Try clearing the chat (header button) if the current conversation has become noisy or unhelpful
 - Check the DevTools console (`Ctrl+Shift+I`) for error details
 
 ### Backend not reachable

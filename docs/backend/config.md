@@ -5,7 +5,7 @@
 > - `apps/backend/internal/config/load.go`
 > - `apps/backend/internal/agents/config.go`
 
-Orchestra's backend configuration is resolved through a layered system: environment variables take highest priority, followed by WORKFLOW.md overrides, followed by compiled defaults. The `agents` package provides a parallel config discovery system that locates and aggregates agent-specific configuration files across global and project scopes.
+Orchestra's backend configuration is resolved through a layered system: environment variables take highest priority, followed by `WORKFLOW.md` overrides, followed by compiled defaults. The `agents` package provides a parallel config discovery system that locates and aggregates agent-specific configuration files across global and project scopes.
 
 ---
 
@@ -38,22 +38,23 @@ For each configuration field, `Load()` follows this precedence:
 | `ORCHESTRA_SERVER_HOST` | string | `127.0.0.1` | HTTP server bind address |
 | `ORCHESTRA_SERVER_PORT` | int | `4010` | HTTP server port |
 | `ORCHESTRA_WORKSPACE_ROOT` | string | `~/.orchestra/workspaces` | Root directory for issue workspaces |
+| `ORCHESTRA_WORKTREE_ROOT` | string | same as workspace root | Root directory for per-issue git worktrees |
 | `ORCHESTRA_API_TOKEN` | string | *(empty)* | Bearer token for API authentication |
 | `ORCHESTRA_WORKFLOW_FILE` | string | `WORKFLOW.md` | Path to the workflow definition file |
 | `ORCHESTRA_AGENT_PROVIDER` | string | `CODEX` | Default agent provider (CODEX, CLAUDE, OPENCODE, GEMINI) |
-| `ORCHESTRA_AGENT_MAX_TURNS` | int | `10` | Maximum agent execution turns per run |
+| `ORCHESTRA_AGENT_MAX_TURNS` | int | `25` | Maximum agent execution turns per run |
 | `ORCHESTRA_AGENT_COMMAND_CODEX` | string | `codex exec ...` | Shell command template for Codex agent |
 | `ORCHESTRA_AGENT_COMMAND_CLAUDE` | string | `claude -p ...` | Shell command template for Claude agent |
-| `ORCHESTRA_AGENT_COMMAND_OPENCODE` | string | `opencode run ...` | Shell command template for OpenCode agent |
+| `ORCHESTRA_AGENT_COMMAND_OPENCODE` | string | `opencode -p ...` | Shell command template for OpenCode agent |
 | `ORCHESTRA_AGENT_COMMAND_GEMINI` | string | `gemini -p ...` | Shell command template for Gemini agent |
 | `ORCHESTRA_AGENT_COMMAND_UNSANDBOX` | string | *(empty)* | Shell command template for Unsandbox agent |
-| `ORCHESTRA_TRACKER_TYPE` | string | *(empty)* | Tracker backend type (e.g. `sqlite`, `github`) |
-| `ORCHESTRA_TRACKER_ENDPOINT` | string | *(empty)* | External tracker API endpoint |
+| `ORCHESTRA_TRACKER_TYPE` | string | *(empty)* | Tracker backend type. `github` selects GitHub; other values fall back to the local SQLite-backed tracker in normal runtime |
+| `ORCHESTRA_TRACKER_ENDPOINT` | string | *(empty)* | Tracker-specific endpoint, such as `owner/repo` for GitHub |
 | `ORCHESTRA_TRACKER_TOKEN` | string | *(empty)* | Authentication token for external tracker |
 | `ORCHESTRA_TRACKER_WORKER_ASSIGNEE_IDS` | CSV | *(empty)* | Comma-separated assignee IDs that represent worker agents |
 | `ORCHESTRA_ACTIVE_STATES` | CSV | `Todo,In Progress` | Issue states considered actionable |
 | `ORCHESTRA_TERMINAL_STATES` | CSV | `Done,Cancelled,Canceled,Closed,Duplicate` | Issue states considered terminal |
-| `ORCHESTRA_MAX_CONCURRENT` | int | `16` | Global maximum concurrent agent runs |
+| `ORCHESTRA_MAX_CONCURRENT` | int | `6` | Global maximum concurrent agent runs |
 | `ORCHESTRA_MAX_CONCURRENT_BY_STATE` | CSV | *(empty)* | Per-state concurrency limits (format: `state:limit,state:limit`) |
 | `ORCHESTRA_WORKSPACE_AFTER_CREATE` | string | *(empty)* | Shell hook run after workspace creation |
 | `ORCHESTRA_WORKSPACE_BEFORE_REMOVE` | string | *(empty)* | Shell hook run before workspace removal |
@@ -70,6 +71,10 @@ For each configuration field, `Load()` follows this precedence:
 | `ORCHESTRA_STT_WHISPER_MODEL` | string | *(empty)* | Path to Whisper model file |
 | `ORCHESTRA_STT_WHISPER_THREADS` | int | `0` | Number of Whisper threads |
 | `ORCHESTRA_STT_WHISPER_LANGUAGE` | string | `en` | Whisper language code |
+| `ORCHESTRA_ANTHROPIC_ADMIN_KEY` | string | *(empty)* | Anthropic Admin API key for organization-level usage sync |
+| `ORCHESTRA_OPENAI_ADMIN_KEY` | string | *(empty)* | OpenAI Admin API key for organization-level usage sync |
+| `ORCHESTRA_ANALYTICS_SYNC_INTERVAL` | duration | `1h` | Interval for external analytics sync jobs |
+| `ORCHESTRA_ANALYTICS_EXTERNAL_ENABLED` | bool | `false` | Enables external analytics synchronization |
 
 ### Default Agent Commands
 
@@ -79,7 +84,7 @@ Each agent provider has a built-in command template using `{{prompt}}` as a plac
 |----------|----------------|
 | CODEX | `codex exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox --json {{prompt}}` |
 | CLAUDE | `claude -p {{prompt}} --output-format stream-json --verbose --dangerously-skip-permissions` |
-| OPENCODE | `opencode run {{prompt}} --format json` |
+| OPENCODE | `opencode -p {{prompt}} -f json` |
 | GEMINI | `gemini -p {{prompt}} --output-format stream-json --approval-mode yolo` |
 
 ---
@@ -93,12 +98,15 @@ type Config struct {
     Host                     string
     Port                     int
     WorkspaceRoot            string
+    WorktreeRoot             string
     APIToken                 string
     WorkflowFile             string
     AgentProvider            string
     AgentCommands            map[string]string
     AgentMaxTurns            int
     TrackerType              string
+    TrackerEndpoint          string
+    TrackerToken             string
     MaxConcurrent            int
     MaxConcurrentByState     map[string]int
     WorkspaceHooks           workspace.Hooks
@@ -106,6 +114,10 @@ type Config struct {
     TelemetryProviders       []string
     TelemetryRetentionDays   int
     TelemetryStoreRawPayload bool
+    AnthropicAdminKey        string
+    OpenAIAdminKey           string
+    AnalyticsSyncInterval    time.Duration
+    AnalyticsExternalEnabled bool
     // ... additional fields
 }
 ```
@@ -211,6 +223,12 @@ Four functions support runtime config operations:
 - **`UpdateGlobalAgentConfig(workspaceRoot, name, content)`** -- Writes to `.orchestra/agents/<name>`
 - **`GetGlobalConfigMap(workspaceRoot, name)`** -- Reads a JSON config file and returns it as `map[string]any`
 - **`LoadGlobalWorkspaceDefaults(workspaceRoot)`** -- Convenience wrapper that reads `workspace.json`
+
+## Runtime Notes
+
+- Binding to a non-loopback host requires `ORCHESTRA_API_TOKEN`; startup fails otherwise.
+- `ORCHESTRA_WORKFLOW_FILE` defaults to `WORKFLOW.md` and can override several config fields when environment variables are unset.
+- In normal local runtime, the backend opens the warehouse database under `<workspaceRoot>/.orchestra/warehouse.db` and uses the SQLite tracker unless `ORCHESTRA_TRACKER_TYPE=github`.
 
 ---
 

@@ -6,7 +6,7 @@
 > - `apps/backend/internal/api/auth.go` — Bearer token authentication
 > - `packages/protocol/schemas/v1/` — JSON Schema definitions
 
-Orchestra exposes a REST API under `/api/v1/` served by `orchestrad`. All endpoints return JSON unless otherwise noted. Protected endpoints require a Bearer token in the `Authorization` header. POST requests to `/api/` paths must use `Content-Type: application/json`.
+Orchestra exposes a REST API under `/api/v1/` served by `orchestrad`. All endpoints return JSON unless otherwise noted. Protected endpoints require a Bearer token in the `Authorization` header when `ORCHESTRA_API_TOKEN` is configured. Mutation requests to `/api/` paths are expected to use `Content-Type: application/json`.
 
 ---
 
@@ -16,11 +16,11 @@ Orchestra exposes a REST API under `/api/v1/` served by `orchestrad`. All endpoi
 |------|-------|
 | Base URL | `http://{host}:{port}/api/v1` |
 | Auth header | `Authorization: Bearer {token}` |
-| Content type | `application/json` (required for POST/PATCH/PUT) |
+| Content type | `application/json` for JSON mutation requests |
 | Rate limit | 20 req/s sustained, 60 burst |
 | Request timeout | 30 seconds |
 
-If no `APIToken` is set in the server configuration, authentication is disabled and all routes are public.
+If no `APIToken` is set in the server configuration, auth middleware is not applied to the protected route set. The terminal WebSocket route is registered outside the auth wrapper.
 
 ---
 
@@ -174,6 +174,27 @@ Each provider (`codex`, `claude`, `opencode`, `gemini`) exposes sub-routes for g
 | `GET` | `/api/v1/agents/{provider}/hooks` | Get provider lifecycle hooks |
 | `POST` | `/api/v1/agents/{provider}/hooks` | Update provider lifecycle hooks |
 
+### Claude-Specific Configuration
+
+Claude exposes additional native-config management routes beyond the provider-generic endpoints.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/agents/claude/settings` | Get Claude settings document |
+| `POST` | `/api/v1/agents/claude/settings` | Update Claude settings |
+| `GET` | `/api/v1/agents/claude/instructions` | Get Claude instructions |
+| `POST` | `/api/v1/agents/claude/instructions` | Update Claude instructions |
+| `DELETE` | `/api/v1/agents/claude/instructions` | Remove Claude instructions |
+| `GET` | `/api/v1/agents/claude/rules` | List Claude rules |
+| `POST` | `/api/v1/agents/claude/rules` | Add or update a Claude rule |
+| `DELETE` | `/api/v1/agents/claude/rules/{name}` | Delete a Claude rule |
+| `GET` | `/api/v1/agents/claude/skills` | List Claude skills |
+| `POST` | `/api/v1/agents/claude/skills` | Add or update a Claude skill |
+| `DELETE` | `/api/v1/agents/claude/skills/{name}` | Delete a Claude skill |
+| `GET` | `/api/v1/agents/claude/subagents` | List Claude sub-agents |
+| `POST` | `/api/v1/agents/claude/subagents` | Add or update a Claude sub-agent |
+| `DELETE` | `/api/v1/agents/claude/subagents/{name}` | Delete a Claude sub-agent |
+
 ---
 
 ### MCP (Model Context Protocol)
@@ -207,6 +228,32 @@ Data warehouse and aggregated telemetry statistics.
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/v1/warehouse/stats` | Global token usage, provider breakdown, recent sessions |
+| `GET` | `/api/v1/analytics/daily` | Daily rollup metrics |
+| `GET` | `/api/v1/analytics/cost` | Cost analytics summary |
+| `GET` | `/api/v1/analytics/cost/optimization` | Cost optimization recommendations |
+| `GET` | `/api/v1/analytics/performance` | Performance analytics |
+| `GET` | `/api/v1/analytics/rate-limits` | Rate-limit analytics |
+| `GET` | `/api/v1/analytics/productivity` | Productivity analytics |
+| `GET` | `/api/v1/analytics/productivity/sessions` | Productivity session breakdown |
+| `GET` | `/api/v1/analytics/budgets` | List analytics budgets |
+| `POST` | `/api/v1/analytics/budgets` | Create or update a budget |
+| `DELETE` | `/api/v1/analytics/budgets/{id}` | Delete a budget |
+| `POST` | `/api/v1/analytics/external/sync` | Trigger external analytics sync |
+| `GET` | `/api/v1/analytics/external/status` | External analytics sync status |
+| `GET` | `/api/v1/analytics/external/reconcile` | External analytics reconciliation preview |
+| `GET` | `/api/v1/external/status` | Alias for external analytics sync status |
+| `GET` | `/api/v1/external/reconcile` | Alias for external analytics reconciliation preview |
+
+---
+
+### Agent Provider Keys
+
+Manage embedded-agent provider credentials stored under the Orchestra user config directory.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/config/agent-providers` | List saved provider-key status for `openrouter`, `claude`, `openai`, and `gemini` |
+| `POST` | `/api/v1/config/agent-providers` | Save or clear a provider API key |
 
 ---
 
@@ -252,17 +299,6 @@ Manage remote execution environments via the unsandbox/unturf/permacomputer plat
 | `GET` | `/api/v1/config/unsandbox` | Get unsandbox configuration (API keys) |
 | `POST` | `/api/v1/config/unsandbox` | Update unsandbox configuration |
 | `DELETE` | `/api/v1/config/unsandbox` | Delete unsandbox configuration |
-
----
-
-### Agent Provider Keys
-
-Manage embedded agent provider API keys (Anthropic, OpenAI, Google).
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/v1/config/agent-providers` | Get stored agent provider API keys |
-| `POST` | `/api/v1/config/agent-providers` | Save agent provider API keys |
 
 ---
 

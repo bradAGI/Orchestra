@@ -18,10 +18,11 @@
 - `selectedProjectId?: string` — current project (for context suggestions)
 
 **Behavior:**
-- Renders a floating action button (bottom-right, 56px circle with Orchestra SVG icon)
+- Renders a floating action button (bottom-right, 56px circle using `/Orchesta.png`)
 - Button hidden when panel is open
 - Global keyboard shortcut: `Ctrl+.` (or `Cmd+.`) toggles the panel
 - Button pulses when streaming or watch mode is active
+- Badge shows unread watch-mode notifications
 
 ### EmbeddedAgentPanel
 
@@ -43,7 +44,7 @@
 - Wires `useProviderConfig`, `useEmbeddedChat`, `useWatchMode`, `useScheduler`, `useContextSuggestions`
 - Exposes `EmbeddedAgentContextValue` via `useEmbeddedAgent()` hook
 
-**Context value includes:** `messages`, `sendMessage`, `isStreaming`, `stop`, `clearChat`, `isPanelOpen`, `togglePanel`, `providerConfig`, `watchMode`, `scheduler`, `contextSuggestions`.
+**Context value includes:** `messages`, `sendMessage`, `isStreaming`, `stop`, `clearChat`, `isPanelOpen`, `togglePanel`, `providerConfig`, `availableKeys`, `watchMode`, `scheduler`, `contextSuggestions`.
 
 ---
 
@@ -117,7 +118,8 @@ Table rendering handles object values in cells and adds horizontal scroll for wi
 `components/WatchNotifications.tsx` — Displays proactive notifications from orchestrator events.
 
 - Connected via `useWatchMode` hook (SSE subscription)
-- Shows toast-style notifications when issues change state, sessions complete, etc.
+- Shows inline notifications for completions, failures, retries, stalls, and informational events
+- Supports action buttons such as review diff, view issue, view logs, retry, and stop
 
 ### SchedulePanel
 
@@ -145,7 +147,7 @@ Located in `apps/desktop/src/components/settings/SettingsCard.tsx`:
 Rendered under Settings > Integrations tab.
 
 - Provider dropdown (OpenRouter, Claude, OpenAI, Gemini)
-- API key input with save, remove, and test connection buttons
+- API key input with save and test connection actions
 - Model selector via `ModelSearchDropdown`
 - Saves provider/model preference to localStorage
 - Saves API key to backend via `POST /api/v1/config/agent-providers`
@@ -157,4 +159,4 @@ Searchable model selector populated from provider APIs.
 - Text filter narrows the model list as you type
 - Shows loading state while models are being fetched
 - Displays model ID and friendly name
-- Falls back to manual input if model fetching fails
+- Filters client-side and caps the open dropdown to the first 100 matches

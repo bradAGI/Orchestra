@@ -72,10 +72,10 @@ flowchart LR
 
 ```dockerfile
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD ["/usr/local/bin/orchestra", "healthz"]
+  CMD ["/usr/local/bin/orchestra", "check"]
 ```
 
-The container exposes a health check via the `orchestra healthz` CLI command, polled every 30 seconds with a 5-second startup grace period.
+The container health check uses the `orchestra check` CLI command, polled every 30 seconds with a 5-second startup grace period.
 
 ## 6.2.3 Registry Publishing
 

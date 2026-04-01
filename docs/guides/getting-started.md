@@ -60,7 +60,7 @@ The `orchestrad` daemon initializes logging via `logging.New()`, then delegates 
 
 1. Loads configuration from environment variables and `WORKFLOW.md`
 2. Sets up the HTTP server with Chi router
-3. Registers agent runners, tracker, and event bus
+3. Registers agent runners, tracker, terminal manager, and event bus
 4. Begins listening on the configured host and port (default: `127.0.0.1:4010`)
 
 ### Verify the Backend
@@ -108,14 +108,14 @@ cd apps/tui
 go run .
 ```
 
-The TUI is built with Bubble Tea and provides a terminal-based interface to the same backend API.
+The TUI is built with Bubble Tea and acts as a local process manager for the backend and desktop dev processes.
 
 ## 7.6 First-Run Walkthrough
 
 ```mermaid
 flowchart TD
     START[Start orchestrad] --> CONFIG[Config loaded from env + WORKFLOW.md]
-    CONFIG --> TRACKER[Tracker initialized: memory/sqlite/github]
+    CONFIG --> TRACKER[Tracker initialized: sqlite or github]
     TRACKER --> AGENTS[Agent registry populated]
     AGENTS --> READY["API ready on :4010"]
     READY --> DESKTOP[Connect desktop or TUI]
@@ -129,11 +129,7 @@ flowchart TD
    ./orchestrad --workspace-root ~/projects/my-repo
    ```
 
-2. **Configure your tracker** (optional). By default Orchestra uses an in-memory tracker. For persistent storage, set:
-   ```bash
-   export ORCHESTRA_TRACKER_TYPE=sqlite
-   ```
-   For GitHub Issues integration:
+2. **Configure your tracker** (optional). Local runtime uses the SQLite-backed tracker by default. To use GitHub Issues instead, set:
    ```bash
    export ORCHESTRA_TRACKER_TYPE=github
    export ORCHESTRA_TRACKER_ENDPOINT=owner/repo
@@ -145,7 +141,7 @@ flowchart TD
    export ORCHESTRA_AGENT_PROVIDER=CLAUDE   # or CODEX, OPENCODE, GEMINI
    ```
 
-4. **Launch the desktop app** (`npm run dev` from `apps/desktop/`) or TUI (`go run .` from `apps/tui/`).
+4. **Launch the desktop app** (`npm run dev` from `apps/desktop/`) or the TUI (`go run .` from `apps/tui/`) if you want a terminal process manager.
 
 5. **Create an issue** through the UI and dispatch it to an agent. Monitor progress in real time via the event stream.
 

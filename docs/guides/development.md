@@ -135,10 +135,10 @@ cd ../.. && make build
 | `go-chi/chi/v5` | v5.2.5 | HTTP router |
 | `go-chi/cors` | v1.2.2 | CORS middleware |
 | `rs/zerolog` | v1.34.0 | Structured logging |
-| `modernc.org/sqlite` | v1.46.2 | Pure-Go SQLite driver |
+| `modernc.org/sqlite` | v1.47.0 | Pure-Go SQLite driver |
 | `google/go-github/v69` | v69.2.0 | GitHub API client |
 | `gorilla/websocket` | v1.5.3 | WebSocket support (terminal streaming) |
-| `pelletier/go-toml/v2` | v2.2.4 | TOML parsing |
+| `pelletier/go-toml/v2` | v2.3.0 | TOML parsing |
 | `xeipuuv/gojsonschema` | v1.2.0 | JSON schema validation |
 | `google/uuid` | v1.6.0 | UUID generation |
 | `creack/pty` | v1.1.24 | Pseudo-terminal for agent processes |
@@ -154,7 +154,7 @@ cd ../.. && make build
 | `electron` | ^41.0.2 | Desktop shell |
 | `vite` | ^8.0.0 | Build tool and dev server |
 | `typescript` | ^5.7.2 | Type system |
-| `tailwindcss` | ^3.4.16 | Utility-first CSS |
+| `@tailwindcss/postcss` / Tailwind CSS v4 | ^4.2.2 | Utility-first CSS pipeline |
 | `@radix-ui/*` | various | Accessible UI primitives (dialog, tooltip, slot) |
 | `react-markdown` | ^10.1.0 | Markdown rendering |
 | `recharts` | ^3.8.0 | Charting library |
@@ -162,7 +162,7 @@ cd ../.. && make build
 | `d3` | ^7.9.0 | Data visualization |
 | `cmdk` | ^1.1.1 | Command palette |
 | `lucide-react` | ^0.577.0 | Icon library |
-| `vitest` | ^2.1.8 | Test runner |
+| `vitest` | ^4.1.0 | Test runner |
 | `electron-builder` | ^26.8.1 | Desktop packaging |
 
 ## 7.2.4 Code Conventions
@@ -234,7 +234,7 @@ flowchart TD
     FMT --> TEST[Run tests]
     TEST --> SMOKE[Run smoke tests]
     SMOKE --> PR[Open Pull Request]
-    PR --> CI[CI: backend + desktop-smoke + make-all + pr-lint]
+    PR --> CI[CI: backend + desktop-smoke + make-all + pr-lint + claude-review]
     CI --> REVIEW[Code review]
     REVIEW --> MERGE[Merge to main]
 ```

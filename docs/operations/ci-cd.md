@@ -2,7 +2,7 @@
 
 > **Source files:** `.github/workflows/*.yml`, `.github/actions/`
 
-Orchestra uses GitHub Actions for continuous integration, testing, and release automation. All workflows use pinned action SHAs, concurrency groups to avoid duplicate runs, and reusable composite actions for Go and Node.js setup.
+Orchestra uses GitHub Actions for continuous integration, review automation, testing, and release automation. The workflows use concurrency groups to avoid duplicate runs, and most build/test workflows rely on reusable composite actions for Go and Node.js setup.
 
 ## 6.1.1 Workflow Overview
 
@@ -21,6 +21,7 @@ flowchart TD
         DS[orchestra-desktop-smoke]
         MA[make-all]
         PRL[pr-description-lint]
+        CRV[claude-review]
     end
 
     subgraph Release["Release Pipelines"]
@@ -38,8 +39,8 @@ flowchart TD
         GHR[GitHub Release]
     end
 
-    PR --> BE & DS & MA & PRL
-    PUSH --> BE & DS & MA
+    PR --> BE & DS & MA & PRL & CRV
+    PUSH --> BE & DS & MA & CRV
     TAG --> CP & DR
     CRON --> DS
     MANUAL --> CP & DR & RA
@@ -56,9 +57,10 @@ flowchart TD
 
 | Workflow | File | Trigger | Purpose | Key Steps |
 |----------|------|---------|---------|-----------|
+| **claude-review** | `claude-review.yml` | PR open/sync and `@claude` comments | Automated Claude review workflow | Runs `anthropics/claude-code-action` with `--max-turns 5` |
 | **orchestra-backend** | `orchestra-backend.yml` | PR/push on `apps/backend/**` | Backend CI: lint, vet, test, race detection | `gofmt` check, `go vet`, `go test -coverprofile`, `go test -race`, naming guard script |
 | **orchestra-desktop-smoke** | `orchestra-desktop-smoke.yml` | PR/push on `apps/desktop/**` or `apps/backend/**`, daily cron (07:00 UTC), manual | Desktop release gate validation | `npm ci`, `npm run release:gate` (parity + readiness), upload parity report |
-| **make-all** | `make-all.yml` | PR/push on `apps/tui/**` or `Makefile` | TUI build and test | `go test -coverprofile`, `make build` |
+| **make-all** | `make-all.yml` | PR/push on `apps/tui/**` or `Makefile` | TUI build and test | `make build`, `go test -race ./...` |
 | **pr-description-lint** | `pr-description-lint.yml` | PR opened/edited/reopened/synchronize/ready_for_review | Validate PR description format | Write PR body to file, `go run ./apps/backend/cmd/orchestra check-pr-body` |
 | **orchestra-container-publish** | `orchestra-container-publish.yml` | Tag `v*`, manual | Build and push backend container to GHCR | Docker login, metadata extraction (semver + SHA tags), `docker build-push` using `ops/docker/Dockerfile.backend` |
 | **orchestra-desktop-release** | `orchestra-desktop-release.yml` | Tag `v*`, manual (with title + notes inputs) | Build desktop installers for all platforms and publish GitHub Release | Validate release notes (require `## Summary` and `## Validation`), build backend sidecar per OS, `npm run dist:desktop`, upload artifacts, `gh release create` |
@@ -86,8 +88,8 @@ Single job that runs the full desktop release gate:
 
 Single job for TUI validation:
 
-- Runs `go test -coverprofile=coverage.out ./...` in `apps/tui/`
 - Verifies `make build` completes successfully
+- Runs `go test -race ./...` in `apps/tui/`
 
 ## 6.1.4 Release Pipelines Detail
 
@@ -119,14 +121,14 @@ Output formats per platform:
 
 ## 6.1.5 Reusable Actions
 
-All workflows reference composite actions from `.github/actions/`:
+Most build/test workflows reference composite actions from `.github/actions/`:
 
 - **setup-go-cached** -- Sets up Go with module caching, parameterized by `go-mod-path` and `go-sum-path`.
 - **setup-node-cached** -- Sets up Node.js with npm caching, parameterized by `cache-dependency-path`.
 
 ## 6.1.6 Common Configuration
 
-All workflows share these settings:
+Most repo-owned workflows share these settings:
 
 - **Concurrency:** `group: ${{ github.workflow }}-${{ github.ref }}` with `cancel-in-progress: true` to avoid redundant runs.
 - **Permissions:** Least-privilege (`contents: read` for CI, `contents: write` + `packages: write` only where needed).

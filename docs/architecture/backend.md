@@ -2,7 +2,7 @@
 
 > **Source files:** `apps/backend/cmd/orchestrad/`, `apps/backend/internal/`
 
-The Orchestra backend is a single Go binary (`orchestrad`) that serves the REST API, manages agent lifecycles, tracks issues, and streams events to connected frontends. It is structured as a set of internal packages with clear dependency boundaries, all wired together in the `app` package at startup.
+The Orchestra backend is a single Go binary (`orchestrad`) that serves the REST API, owns the orchestration state machine, tracks issues, streams events to connected frontends, manages PTY terminals, and runs analytics and telemetry background workers. It is structured as internal packages wired together by `internal/app` at startup.
 
 ---
 
@@ -97,7 +97,7 @@ graph TD
 | `tracker/memory` | `internal/tracker/memory/` | In-memory issue store for development | - |
 | `tracker/sqlite` | `internal/tracker/sqlite/` | SQLite-backed persistent issue store | - |
 | `tracker/github` | `internal/tracker/github/` | GitHub Issues integration | - |
-| `tools` | `internal/tools/` | Tool specifications and executors for tracker queries | `LinearToolExecutor`, `TrackerToolSpecs()` |
+| `tools` | `internal/tools/` | Agent tool specifications and tracker-backed tool executor | `LinearToolExecutor`, `TrackerToolSpecs()` |
 | `mcp` | `internal/mcp/` | Model Context Protocol JSON-RPC stdio client | `Client`, `NewClient()` |
 | `telemetry` | `internal/telemetry/` | Agent log file watcher for token usage extraction | - |
 | `workspace` | `internal/workspace/` | Working directory and git branch management | - |
@@ -116,7 +116,9 @@ graph TD
 | `utils/github` | `internal/utils/github/` | GitHub API client utilities | - |
 | `workflow` | `internal/workflow/` | YAML frontmatter parser and workflow document store | `Document`, `LoadFile()`, `Parse()` |
 | `unsandbox` | `internal/unsandbox/` | Client for the Unsandbox remote execution platform | - |
-| `unfirehose` | `internal/unfirehose/` | Event stream client for external event sources | - |
+| `analytics` | `internal/analytics/` | Cost, productivity, rate-limit, and external usage aggregation support | - |
+| `pricing` | `internal/pricing/` | Provider pricing helpers used by analytics calculations | - |
+| `unfirehose` | `internal/unfirehose/` | Session logging sink for external event capture | `Logger` |
 
 ---
 
@@ -127,7 +129,7 @@ The `agents` package defines a `Provider` type and registers runners for each su
 | Provider | Runner File | Description |
 |----------|------------|-------------|
 | `CLAUDE` | `claude_runner.go` | Anthropic Claude CLI agent |
-| `CODEX` | `codex_appserver.go` | OpenAI Codex app server runner |
+| `CODEX` | `codex_runner.go` / `codex_appserver.go` | Codex CLI runner and app-server integration support |
 | `GEMINI` | `gemini_runner.go` | Google Gemini agent runner |
 | `OPENCODE` | `opencode_runner.go` | OpenCode agent runner |
 | `UNSANDBOX` | `unsandbox_runner.go` | Remote execution via Unsandbox platform |
@@ -152,7 +154,7 @@ flowchart LR
     REQ --> MW --> ROUTER --> HANDLER --> ORCH --> HANDLER --> RESP
 ```
 
-1. **Middleware chain** -- Chi applies middleware in order: `RequestID` -> `RealIP` -> `Recoverer` -> `RequestLogger` -> `RateLimit(20, 60)` -> `contentTypeGuard` -> `Timeout(30s)` -> `CORS`.
+1. **Middleware chain** -- Chi applies middleware in order: `RequestID` -> `RealIP` -> `Recoverer` -> `RequestLogger` -> `RateLimit(20, 60)` -> `securityHeaders` -> `contentTypeGuard` -> `Timeout(30s)` -> `CORS`.
 2. **Route matching** -- Chi matches the method and path to a registered handler on the `Server` struct.
 3. **Handler execution** -- The handler validates the request, calls into the orchestrator or database, and serializes the response as JSON.
 4. **Error handling** -- Errors are returned as `{"error": "<code>", "message": "<detail>"}` with appropriate HTTP status codes.
@@ -166,6 +168,7 @@ flowchart LR
 | `Recoverer` | Chi built-in | Catches panics and returns 500 |
 | `RequestLogger` | `api/router.go` | Structured request/response logging via zerolog |
 | `RateLimit` | `api/ratelimit.go` | Token bucket rate limiter (20 req/s sustained, 60 burst) |
+| `securityHeaders` | `api/router.go` | Adds `nosniff`, frame, referrer, and permissions hardening headers |
 | `contentTypeGuard` | `api/router.go` | Validates `Content-Type` on mutation requests |
 | `Timeout` | Chi built-in | 30-second request timeout |
 | `CORS` | `go-chi/cors` | Cross-origin request handling for desktop app |
@@ -190,8 +193,8 @@ graph TD
 
 | Backend | Use Case | Persistence | External Dependencies |
 |---------|----------|-------------|----------------------|
-| `memory` | Development, testing | None (process lifetime) | None |
-| `sqlite` | Default production | `warehouse.db` file | None |
+| `memory` | Tests or explicit in-memory fallback | None (process lifetime) | None |
+| `sqlite` | Default local runtime when the warehouse DB is available | `warehouse.db` file | None |
 | `github` | GitHub-integrated workflows | GitHub API | GitHub token, network access |
 
 ---
@@ -212,6 +215,14 @@ Key operations:
 | Reconcile | `ReconcileRunningStates()` | Syncs running entries against tracker state, removing terminal issues |
 | Snapshot | `Snapshot()` | Returns a point-in-time view of all running/retrying state for SSE |
 | Retry | Schedule via `RetryEntry` | Queues a failed issue for re-dispatch after a delay |
+
+At startup, `app.Run()` also:
+
+- opens the warehouse database under `<workspaceRoot>/.orchestra/warehouse.db`
+- restores persisted orchestrator state from SQLite
+- merges MCP server definitions from config and the database
+- starts background workers for execution polling, refreshes, garbage collection, daily metrics rollups, and telemetry ingestion
+- initializes the terminal manager, provider registry, tracker client, and optional unfirehose session logger
 
 ---
 

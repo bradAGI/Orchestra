@@ -2,7 +2,7 @@
 
 > **Source files:** `apps/desktop/src/`, `apps/desktop/electron/`, `apps/desktop/vite.config.ts`, `apps/desktop/package.json`
 
-The Orchestra desktop application is an Electron app with a React 19 renderer. It provides a full GUI for managing projects, monitoring agent runs, browsing issues, viewing session logs, and interacting with terminal sessions. The frontend connects to the `orchestrad` backend via REST API calls and receives real-time updates through SSE.
+The Orchestra desktop application is an Electron app with a React 19 renderer. It provides a GUI for managing tasks, projects, terminals, agent configuration, analytics, documentation, and sandbox execution. The frontend connects to `orchestrad` via REST API calls and receives live state updates through SSE.
 
 ---
 
@@ -18,33 +18,33 @@ graph TD
     PRELOAD --> REACT
 
     subgraph React_App ["React Component Tree"]
-        APP["App.tsx<br/><small>root component</small>"]
-        SHELL["app-shell/<br/><small>layout, nav, sidebar</small>"]
-        DASH["dashboard/<br/><small>overview metrics</small>"]
-        AGENTS_UI["agents/<br/><small>agent config & status</small>"]
-        PROJECTS["projects/<br/><small>project management</small>"]
-        WAREHOUSE["warehouse/<br/><small>session history</small>"]
-        SANDBOX["sandbox/<br/><small>issue testing</small>"]
-        SETTINGS["settings/<br/><small>app configuration</small>"]
-        TERMINAL_UI["terminal/<br/><small>embedded terminal</small>"]
-        TASKS["tasks/<br/><small>issue list & detail</small>"]
-        DOCS["docs/<br/><small>documentation viewer</small>"]
-        DIAGRAMS["diagrams/<br/><small>architecture diagrams</small>"]
-        UI["ui/<br/><small>design system primitives</small>"]
+        APP["App.tsx<br/><small>root state + orchestration</small>"]
+        APPDIR["app/<br/><small>section registry + shell layout</small>"]
+        SHELL["app-shell/<br/><small>sidebar, top bar, dialogs</small>"]
+        TASKS["widgets/kanban + issue-detail<br/><small>task board and inspector</small>"]
+        PROJECTS["projects/ + widgets/git<br/><small>project and git workflows</small>"]
+        AGENTS_UI["widgets/agents<br/><small>provider configuration</small>"]
+        ANALYTICS["analytics/<br/><small>executive, operational, optimization views</small>"]
+        SANDBOX["sandbox/<br/><small>remote execution</small>"]
+        SETTINGS["settings + app-shell panels<br/><small>backend and app config</small>"]
+        TERMINAL_UI["terminal/<br/><small>embedded multiplexer</small>"]
+        DOCS["docs/<br/><small>markdown browser + diagrams</small>"]
+        EMBEDDED["embedded-agent/<br/><small>in-app AI assistant</small>"]
+        UI["ui/<br/><small>shared primitives</small>"]
     end
 
     REACT --> APP
-    APP --> SHELL
-    SHELL --> DASH
+    APP --> APPDIR
+    APPDIR --> SHELL
     SHELL --> AGENTS_UI
     SHELL --> PROJECTS
-    SHELL --> WAREHOUSE
+    SHELL --> ANALYTICS
     SHELL --> SANDBOX
     SHELL --> SETTINGS
     SHELL --> TERMINAL_UI
     SHELL --> TASKS
     SHELL --> DOCS
-    SHELL --> DIAGRAMS
+    SHELL --> EMBEDDED
     SHELL -.-> UI
 ```
 
@@ -56,35 +56,32 @@ graph TD
 |-----------|---------|-----------|
 | `electron/` | Electron main process and preload | `main.cjs`, `preload.cjs` |
 | `src/` | React application root | `main.tsx`, `App.tsx`, `index.css` |
-| `src/components/app-shell/` | Application shell: layout, navigation, sidebar, status bar | Navigation routing, section switching |
-| `src/components/dashboard/` | Overview dashboard with metrics and charts | Token usage, active runs, project stats |
-| `src/components/agents/` | Agent configuration and status panels | Provider selection, agent settings |
-| `src/components/projects/` | Project management views | Project list, project detail, file tree |
-| `src/components/warehouse/` | Session history and log browsing | Session list, session detail, log viewer |
-| `src/components/sandbox/` | Issue creation and testing sandbox | Quick-dispatch forms |
-| `src/components/settings/` | Application and backend configuration | API token, workspace root, provider keys |
-| `src/components/terminal/` | Embedded terminal (WebSocket PTY) | Terminal emulator, session management |
-| `src/components/tasks/` | Issue list and detail views | Issue table, status badges, filters |
-| `src/components/docs/` | Documentation viewer | Markdown rendering |
-| `src/components/diagrams/` | Architecture diagram viewer | Mermaid rendering |
-| `src/components/ui/` | Design system primitives (Radix-based) | Buttons, inputs, dialogs, tooltips, tabs |
-| `src/lib/` | Core libraries and state management | API client, runtime store, SSE sync, enums |
-| `src/hooks/` | Custom React hooks | Shared stateful logic |
-| `src/types/` | TypeScript type definitions | Shared interfaces |
-| `src/widgets/` | Standalone widget components | Reusable composite UI elements |
+| `src/app/` | App shell layout and section registry | `layout/AppShell.tsx`, `routes/sections.tsx` |
+| `src/components/app-shell/` | Sidebar, top bar, and shared shell panels/dialogs | Shell chrome, inspector dialogs, settings cards |
+| `src/components/projects/` | Project-level screens | `ProjectGrid`, `ProjectDetailView` |
+| `src/components/analytics/` | Analytics dashboard and session inspection | `AnalyticsDashboard`, `SessionDetailView`, subviews/charts/tables |
+| `src/components/docs/` | Documentation browser | Markdown rendering, tree navigation, TOC |
+| `src/components/embedded-agent/` | Embedded assistant UI | Widget, tools, provider interactions |
+| `src/components/sandbox/` | Remote execution UI | Sandbox dashboard |
+| `src/components/terminal/` | Embedded terminal workspace | `TerminalMultiplexer` |
+| `src/components/ui/` | Shared primitives | dialogs, tooltips, skeletons, buttons |
+| `src/hooks/` | App-level state hooks | backend config, notifications, issue lookup, migration |
+| `src/lib/` | API client and runtime synchronization | `orchestra-client`, `runtime-sync`, `runtime-store` |
+| `src/types/` | TypeScript types | shared frontend interfaces |
+| `src/widgets/` | Larger reusable feature modules | agents, git, issue-detail, kanban, running |
 
 ---
 
 ### State Management Architecture
 
-The frontend uses a three-layer state architecture that separates data fetching, state storage, and UI rendering:
+The frontend uses a three-layer state architecture that separates data fetching, state synchronization, and UI rendering:
 
 ```mermaid
 flowchart LR
     BACKEND["orchestrad<br/>Backend"]
     CLIENT["orchestra-client.ts<br/><small>API calls</small>"]
     SYNC["runtime-sync.ts<br/><small>SSE + polling</small>"]
-    STORE["runtime-store.ts<br/><small>state container</small>"]
+    STORE["runtime-store.ts<br/><small>snapshot diffing + timeline helpers</small>"]
     COMPONENTS["React Components<br/><small>UI rendering</small>"]
 
     BACKEND -- "REST responses" --> CLIENT
@@ -97,13 +94,13 @@ flowchart LR
 
 #### `orchestra-client.ts` -- API Client
 
-The API client provides typed methods for all backend endpoints. It accepts a `BackendConfig` object with `baseUrl`, `apiToken`, and optional `mcpServers` configuration. All methods return typed responses or throw structured errors.
+The API client provides typed methods for backend endpoints used throughout the app. It accepts a `BackendConfig` object with `baseUrl` and `apiToken`. Methods return typed responses or throw structured errors normalized for the UI.
 
 Key types exported:
 
 | Type | Purpose |
 |------|---------|
-| `BackendConfig` | Connection configuration (`baseUrl`, `apiToken`, `mcpServers`) |
+| `BackendConfig` | Connection configuration (`baseUrl`, `apiToken`) |
 | `IssueListItem` | Issue summary for list views |
 | `IssueHistoryEntry` | Session event history entry |
 | `ProjectTreeNode` | File tree node for project browsing |
@@ -141,6 +138,15 @@ Provides snapshot diffing and timeline event management:
 - `applySnapshotUpdate()` -- Compares fingerprints to avoid unnecessary re-renders when snapshot data has not changed.
 - `appendTimelineEvent()` -- Prepends new events to the timeline with deduplication and a configurable max size (default 50 items).
 
+At the application level, `App.tsx` also owns the primary UI state for:
+
+- active section selection
+- backend profiles and auth state
+- task board data and inspector dialogs
+- project list and analytics data loading
+- open terminal tabs
+- theme, palette, and notification preferences
+
 ---
 
 ### Electron IPC Bridge
@@ -159,7 +165,7 @@ flowchart TD
 
 | Layer | File | Capabilities |
 |-------|------|-------------|
-| **Main process** | `electron/main.cjs` | Window management, system tray, native menus, file system access |
+| **Main process** | `electron/main.cjs` | Window management, native integrations, keyboard shortcuts, external opening |
 | **Preload script** | `electron/preload.cjs` | Exposes a safe subset of Node.js APIs to the renderer via `contextBridge` |
 | **Renderer process** | `src/main.tsx` | React app running in a Chromium sandbox with access only to the preload API |
 
@@ -174,14 +180,25 @@ flowchart TD
 | **Vite** | Build tool | Development server with HMR, production bundling |
 | **Tailwind CSS** | Utility-first | Styling via utility classes, no separate CSS modules |
 | **Radix UI** | Headless primitives | Accessible component primitives (dialogs, tooltips, tabs, etc.) |
-| **Recharts** | Dashboard charts | Token usage, run metrics, project statistics |
+| **Recharts** | Analytics and dashboard charts | Token usage, cost, productivity, performance visuals |
 | **Electron** | Desktop shell | Native window, system tray, IPC bridge, auto-update |
 
 ---
 
 ### Enum Values
 
-Enum values used throughout the frontend (e.g., `Provider`, `IssueStatus`, `SSEEventType`, `SectionID`) are defined as string literal types inline where needed. See the [Enum Reference](../enums.md) for the full list of values and their backend Go counterparts.
+The primary shell sections are currently:
+
+- `ISSUES`
+- `PROJECTS`
+- `CONSOLE`
+- `AGENTS`
+- `WAREHOUSE`
+- `SANDBOX`
+- `SETTINGS`
+- `DOCS`
+
+These are defined in `src/app/routes/sections.tsx` alongside the sidebar metadata and visibility helpers.
 
 ---
 

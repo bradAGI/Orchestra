@@ -6,7 +6,7 @@
 > - `apps/backend/internal/tracker/sqlite/client.go`
 > - `apps/backend/internal/tracker/github/client.go`
 
-The tool system bridges agent tool calls to tracker operations, providing agents with the ability to query issues, update issue state, and request handoffs to other agent providers. Tools are defined as MCP-compatible specifications and executed through the `LinearToolExecutor`.
+The tool system bridges agent tool calls to tracker operations, providing agents with the ability to query issues, update issue state, and request handoffs to other agent providers. Tools are defined as MCP-compatible specifications and executed through the `LinearToolExecutor`, which is injected into the execution worker during backend startup.
 
 ---
 
@@ -33,7 +33,7 @@ flowchart TD
 
 ## LinearToolExecutor
 
-The `LinearToolExecutor` is the primary tool dispatcher. It wraps a `tracker.Client` and routes tool calls by name.
+The `LinearToolExecutor` is the current tool dispatcher. It wraps a `tracker.Client` and routes tool calls by name.
 
 ```go
 type LinearToolExecutor struct {
@@ -56,6 +56,12 @@ executor := tools.NewLinearToolExecutor(trackerClient)
 3. **Dispatch** to the appropriate handler based on tool name
 4. **Return** a response map with `success` (bool) and `contentItems` (array of text items)
 
+The current runtime exposes three tracker-backed tools:
+
+- `tracker_query`
+- `update_issue`
+- `request_handoff`
+
 ---
 
 ## Tool Specifications
@@ -72,7 +78,7 @@ Queries issue tracker state for dispatch and refresh operations.
 | `issue_ids` | string[] | No | Issue IDs to query (for `issue_states_by_ids` and `issues_by_ids` modes) |
 | `states` | string[] | No | States to filter by (for `issues_by_states` mode) |
 | `active_states` | string[] | No | Active states for candidate query (default mode) |
-| `query` | string | No | Search query text |
+| `query` | string | No | Reserved query text field. The current implementation does not use it directly |
 
 #### Query Modes
 
@@ -130,7 +136,7 @@ The payload within `contentItems[0].text` is a pretty-printed JSON string contai
 
 ## Tracker Backends
 
-The `tracker.Client` interface defines the contract for issue tracking operations. Orchestra ships with two implementations:
+The `tracker.Client` interface defines the contract for issue tracking operations. Orchestra currently ships with three implementations:
 
 ### SQLite Client
 
@@ -143,6 +149,12 @@ The default local tracker that persists issues in the Orchestra SQLite database.
 - Worker assignment detection via `workerAssigneeIDs` set
 - Transactional deletion that cascades to runs, history, and session references
 - LIKE-based text search across titles, identifiers, and IDs
+
+### Memory Client
+
+> **Source file:** `apps/backend/internal/tracker/memory/client.go`
+
+An in-memory tracker used for tests and fallback scenarios. It keeps issue state in process memory only and does not persist across restarts.
 
 ### GitHub Client
 
@@ -173,6 +185,16 @@ The `tracker.Client` interface defines the full contract for issue tracking back
 | `CreateIssue(ctx, ...)` | Creates a new issue |
 | `UpdateIssue(ctx, identifier, updates)` | Applies field updates |
 | `DeleteIssue(ctx, identifier)` | Removes an issue |
+
+## Runtime Wiring
+
+At startup, `app.Run()` creates the tool executor with:
+
+```go
+toolExecutor := tools.NewLinearToolExecutor(trackerClient)
+```
+
+That executor and `TrackerToolSpecs()` are then passed into the execution worker so agent turns can invoke tracker-backed tools while running.
 
 ---
 

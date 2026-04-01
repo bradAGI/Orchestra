@@ -2,7 +2,7 @@
 
 > **Source files:** `apps/backend/`, `apps/desktop/`, `apps/tui/`, `packages/`
 
-Orchestra is a multi-agent orchestration platform that dispatches issues to machine learning coding agents, monitors their execution in real time, and surfaces results through a desktop GUI and terminal dashboard. It coordinates multiple agent providers (Claude, Gemini, Codex, OpenCode, Unsandbox) behind a unified Go backend, streaming lifecycle events to connected frontends over SSE.
+Orchestra is a multi-agent orchestration platform that dispatches issues to coding agents, monitors their execution in real time, and surfaces results through an Electron desktop app and terminal dashboard. It coordinates multiple agent providers (Claude, Gemini, Codex, OpenCode, Unsandbox) behind a unified Go backend, streaming lifecycle events to connected frontends over SSE.
 
 This documentation covers the system architecture, API surface, backend internals, frontend structure, operational guidance, and reference enums.
 
@@ -99,16 +99,16 @@ Orchestra is organized as a monorepo with three applications:
 | Application | Language | Location | Purpose |
 |-------------|----------|----------|---------|
 | **Backend** (`orchestrad`) | Go | `apps/backend/` | REST API, agent dispatch, issue tracking, SSE events |
-| **Desktop** | TypeScript / React | `apps/desktop/` | Electron GUI for project management, issue monitoring, git operations |
-| **TUI** | Go | `apps/tui/` | Bubble Tea terminal dashboard for starting/stopping services |
+| **Desktop** | TypeScript / React | `apps/desktop/` | Electron GUI for tasks, projects, analytics, terminals, docs, and embedded-agent workflows |
+| **TUI** | Go | `apps/tui/` | Bubble Tea process manager for backend/frontend dev services |
 
 Supporting infrastructure lives in `packages/` (shared modules), `ops/` (operational tooling), and `licenses/` (dependency attribution).
 
 ### Key Concepts
 
-- **Issue** -- A unit of work dispatched to an agent. Issues move through states: `open` -> `in_progress` -> `done` / `error`.
+- **Issue** -- A unit of work dispatched to an agent. Common states in the current workflow include `Backlog`, `Todo`, `In Progress`, `Review`, and `Done`.
 - **Agent** -- A machine learning coding provider (Claude, Gemini, Codex, OpenCode, Unsandbox) that executes issues.
-- **Tracker** -- A pluggable backend for issue storage: in-memory, SQLite, or GitHub Issues.
+- **Tracker** -- A pluggable backend for issue storage. In normal local runtime the backend uses SQLite, with GitHub integration available when configured.
 - **Session** -- A single agent execution run against an issue, with token usage and event history.
 - **Snapshot** -- A point-in-time summary of all running and retrying issues, streamed to frontends.
 - **Workspace** -- An isolated directory (with its own git branch) where an agent works on an issue.

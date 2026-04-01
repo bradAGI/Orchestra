@@ -8,7 +8,7 @@
 > - `ops/docker/Dockerfile.backend` -- Container build
 > - `Makefile` -- TUI build targets
 
-Orchestra is deployed as a set of cooperating binaries: the `orchestrad` backend server, the `orchestra` CLI, an optional Electron desktop application, and an optional TUI dashboard. This document covers how to build and deploy each component.
+Orchestra is deployed as a set of cooperating binaries: the `orchestrad` backend server, the `orchestra` CLI, an optional Electron desktop application, and an optional TUI dashboard. This document covers how to build and run each component from the current repository.
 
 ---
 
@@ -34,7 +34,7 @@ graph TD
 
     ELECTRON -->|spawns| SIDECAR
     REACT -->|HTTP/SSE| SIDECAR
-    TUI -->|HTTP| OD
+    TUI -->|manages process| OD
     OC -->|HTTP| OD
     DOCKER -->|contains| OD
     DOCKER -->|contains| OC
@@ -96,6 +96,13 @@ The `dist:prep` step:
 1. Runs `vite build` to compile the React frontend
 2. Executes `scripts/stage-backend-binary.mjs` to copy the correct platform `orchestrad` binary into `resources/backend/<platform>-<arch>/`
 
+`stage-backend-binary.mjs` resolves the backend binary from:
+
+- `ORCHESTRA_BACKEND_BIN` if explicitly provided
+- `apps/desktop/resources/backend/<platform>-<arch>/`
+- `apps/backend/orchestrad`
+- `apps/backend/dist/orchestra/orchestrad`
+
 #### Platform Targets
 
 | Platform | Output Format | Output Path |
@@ -131,6 +138,8 @@ make build    # outputs to ./orchestra-dash
 make install  # installs to /usr/local/bin/orchestra-dash
 ```
 
+The TUI manages backend and frontend dev processes, but it does not auto-start them on launch; start/stop is driven from the UI with the `s` key.
+
 ---
 
 ### Docker Container
@@ -158,18 +167,16 @@ docker run -p 4010:4010 orchestra-backend
 #### Security Considerations
 
 - **API Token**: Required when binding to non-loopback addresses. The backend enforces this at startup.
-- **Token encryption**: Set `ORCHESTRA_TOKEN_KEY` to enable AES encryption of stored agent tokens at rest.
+- **Token encryption**: Set `ORCHESTRA_TOKEN_KEY` to enable AES-based encryption for stored tokens handled by the backend database layer.
 - **TLS**: Terminate TLS at a reverse proxy (nginx, Caddy) in front of `orchestrad`.
 
 #### Health Check
 
-The `orchestra healthz` CLI command provides a health check endpoint suitable for load balancers and container orchestrators:
+The backend exposes HTTP health endpoints at `/healthz` and `/api/v1/healthz`. The CLI also exposes a check command:
 
 ```bash
-/usr/local/bin/orchestra healthz
+/usr/local/bin/orchestra check
 ```
-
-The Docker image includes a `HEALTHCHECK` directive using this command with 30-second intervals.
 
 ---
 

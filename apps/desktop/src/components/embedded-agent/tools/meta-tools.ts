@@ -53,7 +53,7 @@ const TOOL_REGISTRY: ToolRegistryEntry[] = [
   {
     name: 'dispatch_agent',
     category: 'issues',
-    summary: 'Dispatch an agent to work on an issue (sets state to "in progress").',
+    summary: 'Assign an agent provider to an issue without changing the issue state.',
     when: 'User asks to dispatch, assign, or start an agent on an issue.',
     mutates: true,
     confirm: false,
