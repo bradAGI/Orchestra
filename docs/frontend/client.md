@@ -166,12 +166,12 @@ Converts any error to a user-friendly display string.
 
 | Function | Method | Endpoint | Returns |
 |----------|--------|----------|---------|
-| `fetchProviderPermissions` | GET | `/api/v1/agents/:provider/permissions` | `ProviderPermissions` |
-| `updateProviderPermissions` | POST | `/api/v1/agents/:provider/permissions` | `void` |
-| `fetchProviderModel` | GET | `/api/v1/agents/:provider/model` | `ProviderModelConfig` |
-| `updateProviderModel` | POST | `/api/v1/agents/:provider/model` | `void` |
-| `fetchProviderHooks` | GET | `/api/v1/agents/:provider/hooks` | `ProviderHook[]` |
-| `updateProviderHooks` | POST | `/api/v1/agents/:provider/hooks` | `void` |
+| `fetchProviderPermissions` | GET | `/api/v1/agents/{provider}/permissions` | `ProviderPermissions` |
+| `updateProviderPermissions` | POST | `/api/v1/agents/{provider}/permissions` | `void` |
+| `fetchProviderModel` | GET | `/api/v1/agents/{provider}/model` | `ProviderModelConfig` |
+| `updateProviderModel` | POST | `/api/v1/agents/{provider}/model` | `void` |
+| `fetchProviderHooks` | GET | `/api/v1/agents/{provider}/hooks` | `ProviderHook[]` |
+| `updateProviderHooks` | POST | `/api/v1/agents/{provider}/hooks` | `void` |
 | `fetchClaudeSettings` | GET | `/api/v1/agents/claude/settings` | `ClaudeSettingsResponse` |
 | `updateClaudeSettings` | POST | `/api/v1/agents/claude/settings` | `void` |
 | `fetchClaudeInstructions` | GET | `/api/v1/agents/claude/instructions` | `ClaudeInstructionsResponse` |
