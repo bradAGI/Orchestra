@@ -72,16 +72,17 @@ Converts any error to a user-friendly display string.
 |----------|--------|----------|---------|
 | `fetchIssues` | GET | `/api/v1/issues?states=&project_id=&assignee_id=` | `IssueListItem[]` |
 | `createIssue` | POST | `/api/v1/issues` | `IssueListItem` |
-| `fetchIssueDetail` | GET | `/api/v1/issues/:id` | `IssueListItem` |
-| `updateIssue` | PATCH | `/api/v1/issues/:id` | `IssueListItem` |
-| `deleteIssue` | DELETE | `/api/v1/issues/:id` | `void` |
+| `fetchIssueDetail` | GET | `/api/v1/issues/{issue_identifier}` | `IssueListItem` |
+| `updateIssue` | PATCH | `/api/v1/issues/{issue_identifier}` | `IssueListItem` |
+| `deleteIssue` | DELETE | `/api/v1/issues/{issue_identifier}` | `void` |
 | `searchIssues` | GET | `/api/v1/search?q=` | `IssueListItem[]` |
-| `stopIssueSession` | DELETE | `/api/v1/issues/:id/session` | `void` |
-| `fetchIssueHistory` | GET | `/api/v1/issues/:id/history` | `IssueHistoryEntry[]` |
-| `fetchIssueLogs` | GET | `/api/v1/issues/:id/logs` | `string` (raw text) |
-| `fetchIssueDiff` | GET | `/api/v1/issues/:id/diff` | `string` (unified diff) |
-| `fetchArtifacts` | GET | `/api/v1/issues/:id/artifacts` | `string[]` |
-| `fetchArtifactContent` | GET | `/api/v1/issues/:id/artifacts/:path` | `string` |
+| `stopIssueSession` | DELETE | `/api/v1/issues/{issue_identifier}/session` | `void` |
+| `stopIssue` | POST | `/api/v1/issues/{issue_identifier}/stop` | `IssueListItem` |
+| `fetchIssueHistory` | GET | `/api/v1/issues/{issue_identifier}/history` | `IssueHistoryEntry[]` |
+| `fetchIssueLogs` | GET | `/api/v1/issues/{issue_identifier}/logs` | `string` (raw text) |
+| `fetchIssueDiff` | GET | `/api/v1/issues/{issue_identifier}/diff` | `string` (unified diff) |
+| `fetchArtifacts` | GET | `/api/v1/issues/{issue_identifier}/artifacts` | `string[]` |
+| `fetchArtifactContent` | GET | `/api/v1/issues/{issue_identifier}/artifacts/{path}` | `string` |
 
 #### Sessions
 
@@ -146,7 +147,7 @@ Converts any error to a user-friendly display string.
 | `mergePR` | PUT | `/api/v1/projects/:id/github/pulls/:num/merge` | `void` |
 | `fetchPRComments` | GET | `/api/v1/projects/:id/github/pulls/:num/comments` | `unknown[]` |
 | `disconnectProjectGitHub` | POST | `/api/v1/projects/:id/github/disconnect` | `void` |
-| `createGitHubPR` | POST | `/api/v1/issues/:id/pr` | `GitHubPRResult` |
+| `createGitHubPR` | POST | `/api/v1/issues/{issue_identifier}/pr` | `GitHubPRResult` |
 | `createGitHubRepo` | POST | `/api/v1/projects/:id/github/create-repo` | `CreateRepoResult` |
 
 #### Agent Configuration
@@ -217,7 +218,7 @@ Converts any error to a user-friendly display string.
 
 | Function | Method | Endpoint | Returns |
 |----------|--------|----------|---------|
-| `fetchWorkspaceMigrationPlan` | GET | `/api/v1/workspace/migration/plan` | `WorkspaceMigrationResult` |
+| `fetchWorkspaceMigrationPlan` | GET | `/api/v1/workspace/migration/plan?from=&to=` | `WorkspaceMigrationResult` |
 | `applyWorkspaceMigration` | POST | `/api/v1/workspace/migrate` | `WorkspaceMigrationResult` |
 
 #### Unsandbox (Remote Execution)
