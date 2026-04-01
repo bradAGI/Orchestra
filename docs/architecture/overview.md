@@ -120,25 +120,25 @@ sequenceDiagram
 
     User->>Desktop: Create issue
     Desktop->>API: POST /api/v1/issues
-    API->>Orchestrator: Create issue in Backlog
+    API->>Orchestrator: Create issue in BACKLOG
     Orchestrator->>Tracker: Store issue
     API-->>Desktop: Issue created
-    User->>Desktop: Move Backlog issue to Todo
-    Desktop->>API: PATCH /api/v1/issues/{id} {state:"Todo"}
+    User->>Desktop: Move BACKLOG issue to TODO
+    Desktop->>API: PATCH /api/v1/issues/{identifier} {state:"todo"}
     API->>Orchestrator: Update issue state
-    Orchestrator->>AgentRegistry: Claim & run
+    Orchestrator->>AgentRegistry: Claim issue and start run
     AgentRegistry->>Agent: Execute (Claude/Gemini/...)
     Agent-->>AgentRegistry: Stream progress
     AgentRegistry-->>Orchestrator: Update state
     Orchestrator->>PubSub: Publish(RUN_STARTED)
     PubSub-->>API: Fan-out event
-    API-->>Desktop: SSE: RUN_STARTED + snapshot
+    API-->>Desktop: SSE: RUN_STARTED + snapshot (issue in IN_PROGRESS)
     Agent-->>AgentRegistry: Completion
-    AgentRegistry-->>Orchestrator: Mark done
+    AgentRegistry-->>Orchestrator: Mark run successful
     Orchestrator->>PubSub: Publish(RUN_SUCCEEDED)
-    Orchestrator->>Tracker: Update state
+    Orchestrator->>Tracker: Advance issue to REVIEW
     PubSub-->>API: Fan-out event
-    API-->>Desktop: SSE: RUN_SUCCEEDED + snapshot
+    API-->>Desktop: SSE: RUN_SUCCEEDED + snapshot (issue in REVIEW)
     Desktop-->>User: Show result
 ```
 

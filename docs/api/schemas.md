@@ -19,7 +19,7 @@ The Orchestra protocol layer defines a shared set of JSON schemas (draft-07) in 
 | `issue.create.request.schema.json` | Request | `object` | Body for `POST /api/v1/issues` |
 | `issue.update.request.schema.json` | Request | `object` | Body for `PATCH /api/v1/issues/:identifier` |
 | `issue.response.schema.json` | Response | `object` | Detailed single-issue response with runtime data |
-| `issues.list.response.schema.json` | Response | `object` | Wrapped issue list with total count |
+| `issues.list.response.schema.json` | Response | `array` | Flat issue list response |
 | `project.create.request.schema.json` | Request | `object` | Body for `POST /api/v1/projects` |
 | `project.response.schema.json` | Response | `object` | Single project with optional stats |
 | `projects.list.response.schema.json` | Response | `array` | Array of project objects |
@@ -34,7 +34,7 @@ The Orchestra protocol layer defines a shared set of JSON schemas (draft-07) in 
 | `mcp.tools.response.schema.json` | Response | `array` | Available MCP tools |
 | `stt.health.response.schema.json` | Response | `object` | Speech-to-text service health |
 | `stt.transcribe.response.schema.json` | Response | `object` | Speech-to-text transcription result |
-| `workspace.migration.plan.response.schema.json` | Response | `object` | Dry-run migration plan |
+| `workspace.migration.plan.response.schema.json` | Response | `object` | Workspace migration plan payload |
 | `workspace.migrate.response.schema.json` | Response | `object` | Executed migration result |
 
 ---
