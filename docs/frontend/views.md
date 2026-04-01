@@ -78,7 +78,7 @@ The inspector works with a flexible issue type:
 
 #### Tabs
 
-**Details** -- Displays task metadata, editable title/description in Backlog only, assignee/provider state, and review controls such as Create PR, Request Changes, and Close when applicable.
+**Details** -- Displays task metadata, editable title/description in Backlog only, assignee/provider state, and review controls such as Create PR, View PR, Request Changes, and Close when applicable. Creating a PR from Review currently updates the task with the PR URL and advances it to Done.
 
 **Plan** -- Renders the backend-stored markdown plan as checkbox items. The backend updates this plan during planning, during execution progress, and again when a run completes.
 

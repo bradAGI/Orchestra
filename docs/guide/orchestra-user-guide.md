@@ -49,7 +49,7 @@ The inspector shows:
 - Editable title and description (with Edit button)
 - Agent and project selectors
 - Status: **"Draft — drag to Todo when ready"**
-- Auto-created GitHub issue link
+- GitHub link when the task is connected to an external GitHub issue
 
 **Moving to Todo:** Drag the task card from Backlog to Todo. The backend rejects the transition unless title, description, assignee, and project are all present.
 
@@ -97,6 +97,8 @@ Review the work across all tabs:
 
 If a PR already exists, **Request Changes** sends the task directly back to **In Progress**. If no PR exists yet, the same action sends the task back to **Todo** for re-planning with feedback context.
 
+Creating a PR currently publishes the branch and then auto-advances the task to **Done**. If a PR already exists, the header switches to **View PR** instead.
+
 ### Done — Completed
 
 ![Done Inspector](screenshots/15-done-inspector.png)
@@ -127,6 +129,7 @@ The stop/reset flow is available from active states. It:
 | Backlog → Todo | Drag | Title + description + agent + project required |
 | Todo → In Progress | Automatic or button | Successful planning run auto-advances; some views also expose a launch/promotion control |
 | In Progress → Review | Automatic | Agent completes |
+| Review → Done | Automatic | Create PR publishes the branch and closes the task |
 | Review → Done | Button | Close the task |
 | Review → Todo | Button | Request Changes without an existing PR |
 | Review → In Progress | Button | Request Changes when a PR already exists |
@@ -185,4 +188,4 @@ The Git tab supports working-tree review, branch operations, stash/conflict hand
 5. **Review the plan** — check the Plan tab
 6. **In Progress begins** — after planning succeeds, the backend advances the task and the agent executes
 7. **Review** — create/view a PR, request changes, or close the task
-8. **Ship it** — use the project Git view for commit, push, merge, and PR review workflows
+8. **Done** — creating the PR or closing the task moves it out of the active board
