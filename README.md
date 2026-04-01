@@ -4,7 +4,7 @@
 
 # Orchestra
 
-Multi-agent orchestration platform for dispatching software tasks to coding agents.
+Orchesta is a multi-agent orchestration platform for dispatching software tasks to coding agents.
 
 ## Status
 
