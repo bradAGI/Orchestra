@@ -406,9 +406,9 @@ Per-session token consumption, used in `RunningEntry.tokens` and `TurnResult`.
 
 | Field | Type | Description |
 |---|---|---|
-| `ready` | boolean | Whether the STT service is operational |
-| `binary` | string | Path to the STT binary |
-| `model` | string | Loaded model identifier |
+| `ready` | boolean | Whether backend Whisper transcription is operational |
+| `binary` | string | Resolved Whisper binary path |
+| `model` | string | Configured Whisper model path |
 | `language` | string | Configured language code |
 | `reason` | string | Reason if not ready |
 
@@ -419,8 +419,8 @@ Per-session token consumption, used in `RunningEntry.tokens` and `TurnResult`.
 | Field | Type | Description |
 |---|---|---|
 | `text` | string | Transcribed text |
-| `elapsed_ms` | number | Processing time in milliseconds |
-| `language` | string | Detected or configured language |
+| `elapsed_ms` | number | Backend processing time in milliseconds |
+| `language` | string | Request or configured language used for transcription |
 
 ---
 

@@ -95,6 +95,8 @@ flowchart LR
 
 ### Speech-to-Text (Whisper)
 
+These variables configure the backend `/api/v1/stt/*` endpoints. The desktop app can still fall back to its local Whisper worker when the backend STT service is unavailable.
+
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `ORCHESTRA_STT_WHISPER_BIN` | string | _(none)_ | Path to whisper.cpp binary |

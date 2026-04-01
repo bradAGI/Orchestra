@@ -71,6 +71,8 @@ For each configuration field, `Load()` follows this precedence:
 | `ORCHESTRA_STT_WHISPER_MODEL` | string | *(empty)* | Path to Whisper model file |
 | `ORCHESTRA_STT_WHISPER_THREADS` | int | `0` | Number of Whisper threads |
 | `ORCHESTRA_STT_WHISPER_LANGUAGE` | string | `en` | Whisper language code |
+
+These settings only affect the backend STT endpoints. The desktop app also ships a local Whisper worker fallback for voice input when backend transcription is not ready.
 | `ORCHESTRA_ANTHROPIC_ADMIN_KEY` | string | *(empty)* | Anthropic Admin API key for organization-level usage sync |
 | `ORCHESTRA_OPENAI_ADMIN_KEY` | string | *(empty)* | OpenAI Admin API key for organization-level usage sync |
 | `ORCHESTRA_ANALYTICS_SYNC_INTERVAL` | duration | `1h` | Interval for external analytics sync jobs |

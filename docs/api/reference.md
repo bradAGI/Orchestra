@@ -265,8 +265,8 @@ Manage embedded-agent provider credentials stored under the Orchestra user confi
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/v1/telemetry/health` | Telemetry subsystem health |
-| `GET` | `/api/v1/stt/health` | Speech-to-text service health |
-| `POST` | `/api/v1/stt/transcribe` | Transcribe audio input |
+| `GET` | `/api/v1/stt/health` | Report whether backend Whisper transcription is ready and which binary/model/language are configured |
+| `POST` | `/api/v1/stt/transcribe` | Transcribe a multipart `audio` upload with optional `language` override |
 
 ---
 
