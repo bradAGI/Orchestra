@@ -89,66 +89,66 @@ Converts any error to a user-friendly display string.
 | Function | Method | Endpoint | Returns |
 |----------|--------|----------|---------|
 | `fetchSessions` | GET | `/api/v1/sessions` | `SessionSummary[]` |
-| `fetchSessionDetail` | GET | `/api/v1/sessions/:id` | `SessionDetail` |
+| `fetchSessionDetail` | GET | `/api/v1/sessions/{session_id}` | `SessionDetail` |
 
 #### Projects
 
 | Function | Method | Endpoint | Returns |
 |----------|--------|----------|---------|
 | `fetchProjects` | GET | `/api/v1/projects` | `Project[]` |
-| `fetchProjectStats` | GET | `/api/v1/projects/:id` | `ProjectStats` |
+| `fetchProjectStats` | GET | `/api/v1/projects/{project_id}` | `ProjectStats` |
 | `createProject` | POST | `/api/v1/projects` | `Project` |
-| `deleteProject` | DELETE | `/api/v1/projects/:id` | `void` |
-| `refreshProject` | POST | `/api/v1/projects/:id/refresh` | `void` |
-| `fetchProjectTree` | GET | `/api/v1/projects/:id/tree` | `ProjectTreeNode[]` |
-| `fetchProjectFileContent` | GET | `/api/v1/projects/:id/file?path=` | `string` |
+| `deleteProject` | DELETE | `/api/v1/projects/{project_id}` | `void` |
+| `refreshProject` | POST | `/api/v1/projects/{project_id}/refresh` | `void` |
+| `fetchProjectTree` | GET | `/api/v1/projects/{project_id}/tree` | `ProjectTreeNode[]` |
+| `fetchProjectFileContent` | GET | `/api/v1/projects/{project_id}/file?path=` | `string` |
 
 #### Git Operations
 
 | Function | Method | Endpoint | Returns |
 |----------|--------|----------|---------|
-| `fetchProjectGitHistory` | GET | `/api/v1/projects/:id/git` | `GitCommit[]` |
-| `fetchProjectGitStatus` | GET | `/api/v1/projects/:id/git/status` | `GitStatusEntry[]` |
-| `fetchProjectGitDiff` | GET | `/api/v1/projects/:id/git/diff` | `string` |
-| `fetchProjectGitBranches` | GET | `/api/v1/projects/:id/git/branches` | `GitBranches` |
-| `gitCommit` | POST | `/api/v1/projects/:id/git/commit` | `void` |
-| `gitPush` | POST | `/api/v1/projects/:id/git/push` | `void` |
-| `gitPull` | POST | `/api/v1/projects/:id/git/pull` | `void` |
-| `gitFetch` | POST | `/api/v1/projects/:id/git/fetch` | `void` |
-| `gitCheckout` | POST | `/api/v1/projects/:id/git/checkout` | `void` |
-| `gitCreateBranch` | POST | `/api/v1/projects/:id/git/branches` | `void` |
-| `gitDeleteBranch` | DELETE | `/api/v1/projects/:id/git/branches/:name` | `void` |
-| `gitStage` | POST | `/api/v1/projects/:id/git/stage` | `void` |
-| `gitUnstage` | POST | `/api/v1/projects/:id/git/unstage` | `void` |
-| `gitMerge` | POST | `/api/v1/projects/:id/git/merge` | `void` |
-| `gitStash` | POST | `/api/v1/projects/:id/git/stash` | `void` |
-| `gitStashPop` | POST | `/api/v1/projects/:id/git/stash/pop` | `void` |
-| `gitStashList` | GET | `/api/v1/projects/:id/git/stash/list` | `StashEntry[]` |
-| `gitStashApply` | POST | `/api/v1/projects/:id/git/stash/apply` | `void` |
-| `gitStashDrop` | POST | `/api/v1/projects/:id/git/stash/drop` | `void` |
-| `gitGetConflicts` | GET | `/api/v1/projects/:id/git/conflicts` | `ConflictStatus` |
-| `gitMergeAbort` | POST | `/api/v1/projects/:id/git/merge/abort` | `void` |
-| `gitConflictResolve` | POST | `/api/v1/projects/:id/git/resolve` | `void` |
-| `fetchDefaultBranch` | GET | `/api/v1/projects/:id/git/default-branch` | `string` |
-| `fetchProjectGitBranchesDetail` | GET | `/api/v1/projects/:id/git/branches/detail` | `BranchesDetailResponse` |
+| `fetchProjectGitHistory` | GET | `/api/v1/projects/{project_id}/git` | `GitCommit[]` |
+| `fetchProjectGitStatus` | GET | `/api/v1/projects/{project_id}/git/status` | `GitStatusEntry[]` |
+| `fetchProjectGitDiff` | GET | `/api/v1/projects/{project_id}/git/diff` | `string` |
+| `fetchProjectGitBranches` | GET | `/api/v1/projects/{project_id}/git/branches` | `GitBranches` |
+| `gitCommit` | POST | `/api/v1/projects/{project_id}/git/commit` | `void` |
+| `gitPush` | POST | `/api/v1/projects/{project_id}/git/push` | `void` |
+| `gitPull` | POST | `/api/v1/projects/{project_id}/git/pull` | `void` |
+| `gitFetch` | POST | `/api/v1/projects/{project_id}/git/fetch` | `void` |
+| `gitCheckout` | POST | `/api/v1/projects/{project_id}/git/checkout` | `void` |
+| `gitCreateBranch` | POST | `/api/v1/projects/{project_id}/git/branches` | `void` |
+| `gitDeleteBranch` | DELETE | `/api/v1/projects/{project_id}/git/branches/{branch}` | `void` |
+| `gitStage` | POST | `/api/v1/projects/{project_id}/git/stage` | `void` |
+| `gitUnstage` | POST | `/api/v1/projects/{project_id}/git/unstage` | `void` |
+| `gitMerge` | POST | `/api/v1/projects/{project_id}/git/merge` | `void` |
+| `gitStash` | POST | `/api/v1/projects/{project_id}/git/stash` | `void` |
+| `gitStashPop` | POST | `/api/v1/projects/{project_id}/git/stash/pop` | `void` |
+| `gitStashList` | GET | `/api/v1/projects/{project_id}/git/stash/list` | `StashEntry[]` |
+| `gitStashApply` | POST | `/api/v1/projects/{project_id}/git/stash/apply` | `void` |
+| `gitStashDrop` | POST | `/api/v1/projects/{project_id}/git/stash/drop` | `void` |
+| `gitGetConflicts` | GET | `/api/v1/projects/{project_id}/git/conflicts` | `ConflictStatus` |
+| `gitMergeAbort` | POST | `/api/v1/projects/{project_id}/git/merge/abort` | `void` |
+| `gitConflictResolve` | POST | `/api/v1/projects/{project_id}/git/resolve` | `void` |
+| `fetchDefaultBranch` | GET | `/api/v1/projects/{project_id}/git/default-branch` | `string` |
+| `fetchProjectGitBranchesDetail` | GET | `/api/v1/projects/{project_id}/git/branches/detail` | `BranchesDetailResponse` |
 
 #### GitHub Integration
 
 | Function | Method | Endpoint | Returns |
 |----------|--------|----------|---------|
-| `fetchProjectGitHubIssues` | GET | `/api/v1/projects/:id/github/issues` | `GitHubIssue[]` |
-| `createProjectGitHubIssue` | POST | `/api/v1/projects/:id/github/issues` | `GitHubIssue` |
-| `updateProjectGitHubIssue` | PATCH | `/api/v1/projects/:id/github/issues/:num` | `GitHubIssue` |
-| `fetchProjectGitHubPulls` | GET | `/api/v1/projects/:id/github/pulls` | `GitHubPR[]` |
-| `fetchProjectGitHubPullDiff` | GET | `/api/v1/projects/:id/github/pulls/:num/diff` | `string` |
-| `createProjectGitHubPull` | POST | `/api/v1/projects/:id/github/pulls` | `{ html_url, number }` |
-| `fetchPRReviews` | GET | `/api/v1/projects/:id/github/pulls/:num/reviews` | `unknown[]` |
-| `submitPRReview` | POST | `/api/v1/projects/:id/github/pulls/:num/reviews` | `void` |
-| `mergePR` | PUT | `/api/v1/projects/:id/github/pulls/:num/merge` | `void` |
-| `fetchPRComments` | GET | `/api/v1/projects/:id/github/pulls/:num/comments` | `unknown[]` |
-| `disconnectProjectGitHub` | POST | `/api/v1/projects/:id/github/disconnect` | `void` |
+| `fetchProjectGitHubIssues` | GET | `/api/v1/projects/{project_id}/github/issues` | `GitHubIssue[]` |
+| `createProjectGitHubIssue` | POST | `/api/v1/projects/{project_id}/github/issues` | `GitHubIssue` |
+| `updateProjectGitHubIssue` | PATCH | `/api/v1/projects/{project_id}/github/issues/{number}` | `GitHubIssue` |
+| `fetchProjectGitHubPulls` | GET | `/api/v1/projects/{project_id}/github/pulls` | `GitHubPR[]` |
+| `fetchProjectGitHubPullDiff` | GET | `/api/v1/projects/{project_id}/github/pulls/{number}/diff` | `string` |
+| `createProjectGitHubPull` | POST | `/api/v1/projects/{project_id}/github/pulls` | `{ html_url, number }` |
+| `fetchPRReviews` | GET | `/api/v1/projects/{project_id}/github/pulls/{number}/reviews` | `unknown[]` |
+| `submitPRReview` | POST | `/api/v1/projects/{project_id}/github/pulls/{number}/reviews` | `void` |
+| `mergePR` | PUT | `/api/v1/projects/{project_id}/github/pulls/{number}/merge` | `void` |
+| `fetchPRComments` | GET | `/api/v1/projects/{project_id}/github/pulls/{number}/comments` | `unknown[]` |
+| `disconnectProjectGitHub` | POST | `/api/v1/projects/{project_id}/github/disconnect` | `void` |
 | `createGitHubPR` | POST | `/api/v1/issues/{issue_identifier}/pr` | `GitHubPRResult` |
-| `createGitHubRepo` | POST | `/api/v1/projects/:id/github/create-repo` | `CreateRepoResult` |
+| `createGitHubRepo` | POST | `/api/v1/projects/{project_id}/github/create-repo` | `CreateRepoResult` |
 
 #### Agent Configuration
 
@@ -197,7 +197,7 @@ Converts any error to a user-friendly display string.
 | `fetchMCPTools` | GET | `/api/v1/mcp/tools` | `MCPTool[]` |
 | `fetchMCPServers` | GET | `/api/v1/mcp/servers` | `MCPServer[]` |
 | `createMCPServer` | POST | `/api/v1/mcp/servers` | `MCPServer` |
-| `deleteMCPServer` | DELETE | `/api/v1/mcp/servers/:id` | `void` |
+| `deleteMCPServer` | DELETE | `/api/v1/mcp/servers/{id}` | `void` |
 
 #### Analytics
 
