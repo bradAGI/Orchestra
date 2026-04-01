@@ -4,7 +4,7 @@
 
 # Orchestra
 
-Orchestra manages coding agents (Claude, Codex, OpenCode, Gemini) to automatically resolve GitHub issues and development tasks.
+Orchestra is a desktop development workspace that integrates AI coding agents with project management, terminals, and real-time collaboration tools.
 
 ## Status
 
