@@ -1,120 +1,111 @@
+<p align="center">
+  <img src="apps/desktop/public/Orchesta.png" alt="Orchesta logo" width="220" />
+</p>
+
 # Orchestra
 
-⚠️ Early Development Notice: This project is in early development and is not yet ready for production use. Features may change, break, or be incomplete. Use at your own risk.
+Early-stage multi-agent orchestration platform for dispatching software tasks to coding agents, tracking execution in real time, and managing the surrounding workspace, tracker, and tooling from a desktop app or terminal UI.
 
-Multi-agent orchestration platform that coordinates machine learning coding agents to autonomously resolve issues from project trackers. Orchestra dispatches work to agents (Claude, Codex, OpenCode, Gemini), monitors their execution via real-time event streaming, and manages retries, workspaces, and MCP tool integrations — all through an Electron desktop app or a terminal TUI.
+## Status
+
+This repository is under active development and is not production-ready. Interfaces, workflows, and configuration may change.
+
+## What It Does
+
+- Runs a Go backend (`orchestrad`) that owns orchestration, issue state, agent execution, and event streaming.
+- Provides an Electron + React desktop app for projects, issues, analytics, terminals, and agent operations.
+- Includes an embedded in-app AI assistant with provider-backed chat, tool execution, and inline rich UI rendering.
+- Supports multiple coding agents including Codex, Claude, Gemini, OpenCode, and optional Unsandbox integration.
+- Streams lifecycle events to clients over SSE and supports interactive terminal sessions over WebSocket.
+- Works with memory, SQLite, or GitHub-backed issue tracking.
+
+## Architecture
 
 ```mermaid
 graph TB
-    subgraph Desktop["Desktop App (Electron + React)"]
-        UI[Dashboard / Issue Inspector]
-        SSE[SSE Event Stream]
-        EA[Embedded Agent Widget]
+    subgraph Frontends
+        DESKTOP["Desktop App"]
+        TUI["TUI Dashboard"]
+        AGENT["Embedded Agent"]
     end
 
-    subgraph LLM["LLM Providers"]
-        OR[OpenRouter]
-        AN[Anthropic]
-        OA[OpenAI]
-        GO[Google]
+    subgraph Backend["orchestrad (Go)"]
+        API["REST API"]
+        ORCH["Orchestrator"]
+        PUB["PubSub / SSE"]
+        REG["Agent Registry"]
+        TRACKER["Tracker"]
+        DB["SQLite / Analytics"]
+        WS["Workspace + Git"]
+        TERM["Terminal WS"]
+        MCP["MCP Client"]
     end
 
-    subgraph Backend["Backend (Go + Chi)"]
-        API[REST API]
-        ORC[Orchestrator Service]
-        PUB[PubSub Event Bus]
-        TRK[Issue Tracker]
-        REG[Agent Registry]
+    subgraph Providers
+        CODEX["Codex"]
+        CLAUDE["Claude"]
+        GEMINI["Gemini"]
+        OPENCODE["OpenCode"]
+        UNSANDBOX["Unsandbox"]
+        GH["GitHub"]
+        LLM["LLM APIs"]
+        MCP_SRV["MCP Servers"]
     end
 
-    subgraph Agents["Agent Runners"]
-        CX[Codex]
-        CL[Claude]
-        OC[OpenCode]
-        GM[Gemini]
-    end
-
-    subgraph Infra["Infrastructure"]
-        MCP[MCP Servers]
-        DB[(SQLite / Memory)]
-        GH[GitHub API]
-    end
-
-    UI -->|HTTP| API
-    SSE -->|SSE| PUB
-    EA -->|HTTP| API
-    EA -->|AI SDK| OR & AN & OA & GO
-    API --> ORC
-    ORC --> REG
-    REG --> CX & CL & OC & GM
-    ORC --> TRK
-    TRK --> DB
-    TRK --> GH
-    CX & CL & OC & GM -->|Events| PUB
-    ORC --> MCP
+    DESKTOP --> API
+    TUI --> API
+    AGENT --> API
+    API --> ORCH
+    API --> PUB
+    API --> TERM
+    ORCH --> REG
+    ORCH --> TRACKER
+    ORCH --> DB
+    ORCH --> WS
+    REG --> CODEX
+    REG --> CLAUDE
+    REG --> GEMINI
+    REG --> OPENCODE
+    REG --> UNSANDBOX
+    TRACKER --> GH
+    AGENT --> LLM
+    ORCH --> MCP
+    MCP --> MCP_SRV
 ```
+
+## Applications
+
+| App | Path | Purpose |
+| --- | --- | --- |
+| Backend | `apps/backend/` | API server, orchestrator, tracker, agent runners, telemetry, terminals |
+| Desktop | `apps/desktop/` | Electron app for issue management, monitoring, analytics, docs, and embedded agent workflows |
+| TUI | `apps/tui/` | Bubble Tea dashboard for local orchestration workflows |
+| Shared Protocol | `packages/protocol/` | Shared JSON schemas and API contract support |
 
 ## Embedded Agent
 
-A floating chat widget built into the desktop app that acts as an ML-powered co-pilot. Converse with the agent via text or voice, and it uses tools to manage your tasks, navigate the UI, query the orchestrator, and render rich interactive components inline.
+The desktop app includes an embedded assistant that can talk to external LLM providers and invoke local Orchestra tools. Current capabilities in the repo include:
 
-- **Multi-provider LLM** — OpenRouter, Anthropic (Claude), OpenAI, Google (Gemini) via AI SDK 6
-- **Tool system** — 40+ tools across issues, projects, git, sessions, search, code execution, scheduling, and MCP servers
-- **Rich UI rendering** — json-render spec produces tables, cards, metrics, badges, alerts, and action buttons inline in chat
-- **Voice input** — hold-to-talk STT via Whisper
-- **Dynamic model fetching** — models loaded from each provider's API, filtered to tool-calling capable models only
-- **Searchable model selector** — type to filter through hundreds of models in Settings
-- **Watch mode** — monitors orchestrator events and notifies you of completions, failures, and retries
-- **Keyboard shortcut** — `Ctrl+.` toggles the agent panel from anywhere
+- Provider-backed chat via Anthropic, OpenAI, Google, and OpenRouter-compatible models
+- Tool-driven workflows spanning issues, projects, git, sessions, search, scheduling, and MCP-backed operations
+- Inline UI rendering through `json-render`
+- Voice input via Whisper-based STT configuration
+- Searchable model selection and connection testing in settings
+- Watch-mode style notifications tied to backend activity
 
-Configure in **Settings > Integrations** — pick a provider, enter an API key, select a model, and test the connection.
-
-See [docs/guides/embedded-agent-setup.md](docs/guides/embedded-agent-setup.md) for the full setup guide and [docs/architecture/embedded-agent.md](docs/architecture/embedded-agent.md) for architecture details.
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Backend | Go 1.25, Chi router, zerolog, SQLite |
-| Desktop | Electron, React 19, TypeScript, Vite, Tailwind CSS v4, Radix UI |
-| Embedded Agent | AI SDK 6, json-render, MCP TypeScript SDK, Whisper STT |
-| TUI | Go, Bubble Tea |
-| Agents | Codex, Claude Code, OpenCode, Gemini CLI |
-| Protocol | JSON over HTTP, Server-Sent Events, WebSocket (terminals) |
-| CI/CD | GitHub Actions, Docker (GHCR) |
-
-## Project Structure
-
-```
-Orchestra/
-├── apps/
-│   ├── backend/          # Go backend — API server, orchestrator, agent runners
-│   │   ├── cmd/          # Entry points: orchestrad (daemon), orchestra (CLI)
-│   │   └── internal/     # All business logic (see docs/backend/)
-│   ├── desktop/          # Electron + React frontend
-│   │   ├── electron/     # Main process, preload, IPC bridge
-│   │   └── src/          # React app, components, state management
-│   │       └── components/embedded-agent/  # Chat widget, tools, json-render
-│   └── tui/              # Terminal UI (Bubble Tea)
-├── packages/
-│   └── protocol/         # Shared JSON schemas for API contracts
-├── ops/
-│   └── docker/           # Dockerfile for backend container
-├── docs/                 # Documentation wiki (DeepWiki format)
-└── .github/
-    ├── workflows/        # CI/CD pipelines
-    └── actions/          # Reusable composite actions
-```
+See [Embedded Agent Architecture](docs/architecture/embedded-agent.md) and [Embedded Agent Setup](docs/guides/embedded-agent-setup.md).
 
 ## Quick Start
 
 ### Prerequisites
 
 - Go 1.25+
-- Node.js 22+ and npm
-- At least one agent CLI installed (e.g., `claude`, `codex`)
+- Node.js 22+
+- npm
+- Git
+- At least one installed agent CLI on `PATH`: `codex`, `claude`, `opencode`, or `gemini`
 
-### Run the Backend
+### 1. Start the Backend
 
 ```bash
 cd apps/backend
@@ -122,7 +113,9 @@ go build -o orchestrad ./cmd/orchestrad/
 ./orchestrad --workspace-root /path/to/your/project
 ```
 
-### Run the Desktop App
+Default bind address is `127.0.0.1:4010`.
+
+### 2. Start the Desktop App
 
 ```bash
 cd apps/desktop
@@ -130,48 +123,114 @@ npm install
 npm run dev
 ```
 
-### Run the TUI
+This launches Vite and Electron together for local development.
+
+### 3. Start the TUI
 
 ```bash
 cd apps/tui
 go run .
 ```
 
-## Configuration
+You can also run the root shortcut:
 
-Orchestra is configured through environment variables. Key settings:
+```bash
+make dash
+```
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ORCHESTRA_WORKSPACE_ROOT` | Root directory for agent workspaces | `.` |
+## First-Run Configuration
+
+Runtime configuration is loaded from environment variables, with optional overrides from `WORKFLOW.md`.
+
+Common settings:
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `ORCHESTRA_SERVER_HOST` | Backend bind host | `127.0.0.1` |
+| `ORCHESTRA_SERVER_PORT` | Backend bind port | `4010` |
+| `ORCHESTRA_API_TOKEN` | Required when binding to a non-loopback host | unset |
+| `ORCHESTRA_WORKSPACE_ROOT` | Root directory for agent workspaces | `~/.orchestra/workspaces` |
+| `ORCHESTRA_WORKTREE_ROOT` | Root directory for git worktrees | same as workspace root |
 | `ORCHESTRA_AGENT_PROVIDER` | Default agent provider | `CODEX` |
-| `ORCHESTRA_TRACKER_TYPE` | Issue tracker backend (`memory`, `sqlite`, `github`) | `memory` |
-| `ORCHESTRA_API_TOKEN` | Bearer token for API authentication | _(none)_ |
-| `ORCHESTRA_HOST` | Server bind address | `127.0.0.1:3284` |
-| `CODEX_COMMAND` | Path to Codex CLI | `codex` |
-| `CLAUDE_COMMAND` | Path to Claude CLI | `claude` |
-| `OPENCODE_COMMAND` | Path to OpenCode CLI | `opencode` |
-| `GEMINI_COMMAND` | Path to Gemini CLI | `gemini` |
+| `ORCHESTRA_AGENT_MAX_TURNS` | Max turns per agent run | `25` |
+| `ORCHESTRA_TRACKER_TYPE` | Tracker backend: `memory`, `sqlite`, or `github` | `memory` |
+| `ORCHESTRA_TRACKER_ENDPOINT` | Tracker endpoint or repo identifier | unset |
+| `ORCHESTRA_TRACKER_TOKEN` | Tracker auth token | unset |
 
-See [docs/guides/configuration.md](docs/guides/configuration.md) for the full reference.
+Example local setup:
+
+```bash
+export ORCHESTRA_AGENT_PROVIDER=CODEX
+export ORCHESTRA_TRACKER_TYPE=sqlite
+export ORCHESTRA_WORKSPACE_ROOT="$HOME/.orchestra/workspaces"
+```
+
+For GitHub-backed issue tracking:
+
+```bash
+export ORCHESTRA_TRACKER_TYPE=github
+export ORCHESTRA_TRACKER_ENDPOINT=owner/repo
+export ORCHESTRA_TRACKER_TOKEN=ghp_xxx
+```
+
+Full reference: [Configuration Guide](docs/guides/configuration.md).
+
+## Development
+
+### Backend
+
+```bash
+cd apps/backend
+go test ./...
+go build -o orchestrad ./cmd/orchestrad/
+go build -o orchestra ./cmd/orchestra/
+```
+
+### Desktop
+
+```bash
+cd apps/desktop
+npm run typecheck
+npm run test
+npm run build
+```
+
+Additional repo scripts include smoke tests, parity verification, release-readiness checks, and platform packaging via `npm run dist:desktop`.
+
+### TUI
+
+```bash
+cd apps/tui
+go test ./...
+go run .
+```
+
+## Repository Layout
+
+```text
+.
+├── apps/
+│   ├── backend/
+│   ├── desktop/
+│   └── tui/
+├── docs/
+├── ops/
+├── packages/
+└── .github/
+```
 
 ## Documentation
 
-Full documentation lives in [`docs/`](docs/index.md), structured as a DeepWiki:
-
-- [Overview](docs/index.md)
-- [Architecture](docs/architecture/overview.md)
-- [API Reference](docs/api/reference.md)
-- [Backend Internals](docs/backend/orchestrator.md)
-- [Frontend Architecture](docs/frontend/components.md)
-- [Operations](docs/operations/deployment.md)
+- [Docs Index](docs/index.md)
 - [Getting Started](docs/guides/getting-started.md)
+- [Architecture Overview](docs/architecture/overview.md)
+- [Backend Internals](docs/backend/orchestrator.md)
+- [Desktop Architecture](docs/architecture/desktop.md)
 - [Embedded Agent Architecture](docs/architecture/embedded-agent.md)
-- [Embedded Agent Setup](docs/guides/embedded-agent-setup.md)
-- [Embedded Agent Components](docs/frontend/embedded-agent-components.md)
-- [Agent Provider API](docs/api/agent-providers.md)
-- [Enum Reference](docs/enums.md)
+- [API Reference](docs/api/reference.md)
+- [Development Guide](docs/guides/development.md)
+- [Deployment](docs/operations/deployment.md)
 
 ## License
 
-See [LICENSE](LICENSE) for details.
+See [LICENSE](LICENSE).
