@@ -67,9 +67,9 @@ The orb hides when the panel is open.
 
 ### Voice Input
 
-- Click and hold the **microphone button** next to the text input
-- Speak your message
-- Release to transcribe (uses Whisper)
+- Click the **microphone button** next to the text input to start recording
+- Click it again to stop and transcribe
+- Transcription uses the backend STT endpoint when available, with a local Whisper worker fallback in the desktop app
 - Edit the transcription if needed, then press Enter to send
 
 ### Clearing the Conversation

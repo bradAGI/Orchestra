@@ -22,8 +22,8 @@ apps/desktop/src/components/embedded-agent/
 ├── components/
 │   ├── MessageList.tsx            # Scrollable message area with auto-scroll
 │   ├── MessageBubble.tsx          # Single message: markdown, json-render, tool feedback
-│   ├── ChatInput.tsx              # Text input + send + voice toggle
-│   ├── VoiceInput.tsx             # Hold-to-talk mic (Whisper client)
+│   ├── ChatInput.tsx              # Text input + send + voice input
+│   ├── VoiceInput.tsx             # Click-to-record mic using shared Whisper client
 │   ├── ToolFeedback.tsx           # Collapsible tool call/result display
 │   ├── JsonRenderBlock.tsx        # Custom json-render renderer (not @json-render/react Renderer)
 │   ├── WatchNotifications.tsx     # Proactive notifications from orchestrator events
@@ -73,7 +73,7 @@ The widget communicates with the rest of the app through `onNavigate`, the Orche
 ## Data Flow
 
 ```
-User input (text or voice via Whisper)
+User input (text or voice via backend-or-local Whisper)
     │
     v
 useEmbeddedChat hook

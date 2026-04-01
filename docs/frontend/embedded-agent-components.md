@@ -79,11 +79,12 @@
 
 ### VoiceInput
 
-`components/VoiceInput.tsx` — Hold-to-talk microphone button.
+`components/VoiceInput.tsx` — Click-to-record microphone button.
 
-- Uses existing Whisper client from `@/lib/whisper-client`
-- Visual states: idle, recording (pulsing red), processing (spinner)
-- Transcription inserted into chat input on release; user can edit before sending
+- Uses the shared Whisper client from `@/lib/whisper-client`
+- Prefers backend STT when `/api/v1/stt/health` reports ready, otherwise falls back to the local worker pipeline
+- Visual states: idle, loading model, recording, processing
+- Transcription is inserted into the chat input after the second click; user can edit before sending
 
 ---
 

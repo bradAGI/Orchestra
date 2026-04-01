@@ -5,7 +5,7 @@ import {
   Dialog,
   DialogContent,
 } from '@/components/ui/dialog'
-import { getWhisperClient, type WhisperStatus } from '@/lib/whisper-client'
+import { getWhisperClient, setWhisperBackendConfig, type WhisperStatus } from '@/lib/whisper-client'
 import { validateTaskTitle, validateTaskDescription } from '@/lib/validation'
 import {
   type BackendConfig,
@@ -18,7 +18,7 @@ import { AgentSelector, ProjectSelector } from '@/components/app-shell/shared/co
 export function CreateTaskDialog({
   open,
   onOpenChange,
-  config: _config,
+  config,
   initialState,
   availableAgents,
   allTools: _allTools = [],
@@ -51,6 +51,10 @@ export function CreateTaskDialog({
   const [whisperStatus, setWhisperStatus] = useState<WhisperStatus>({ state: 'idle' })
   const transcriptionCancelledRef = useRef(false)
   const activeFieldRef = useRef<'title' | 'description'>('description')
+
+  useEffect(() => {
+    setWhisperBackendConfig(config)
+  }, [config])
 
   useEffect(() => {
     if (open) {
@@ -134,7 +138,7 @@ export function CreateTaskDialog({
     try {
       const client = getWhisperClient(setWhisperStatus)
       const pcm = await client.stopRecording()
-      if (pcm.length === 0 || transcriptionCancelledRef.current) return
+      if (transcriptionCancelledRef.current) return
       const text = await client.transcribe(pcm)
       if (!transcriptionCancelledRef.current && text.trim()) {
         if (activeFieldRef.current === 'title') {

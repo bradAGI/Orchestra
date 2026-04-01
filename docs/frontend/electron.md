@@ -81,7 +81,7 @@ createWindow() {
 
 The window loads either the Vite dev server URL (development) or the built `dist/index.html` (production).
 
-GPU features (`Vulkan`, `WebGPU`) are enabled for WebGPU-based Whisper inference in the browser.
+WebGPU is enabled for the local Transformers.js Whisper fallback path. The app does not force Vulkan because that can destabilize the renderer on Wayland.
 
 #### 3. Profile Management
 
