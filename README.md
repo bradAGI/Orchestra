@@ -52,8 +52,8 @@ Orchestra connects your local projects and GitHub to AI coding agents (Claude Co
 **Embedded AI Assistant**
 - Chat interface with multiple LLM providers
 - Execute tools directly in your project context
-- Voice input via Whisper and rich UI responses
-- Access to 40+ development and automation tools
+- Voice input via Whisper
+- JSON Render Generative UI responses
 
 
 ## Quick Start
