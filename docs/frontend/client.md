@@ -82,7 +82,7 @@ Converts any error to a user-friendly display string.
 | `fetchIssueLogs` | GET | `/api/v1/issues/{issue_identifier}/logs` | `string` (raw text) |
 | `fetchIssueDiff` | GET | `/api/v1/issues/{issue_identifier}/diff` | `string` (unified diff) |
 | `fetchArtifacts` | GET | `/api/v1/issues/{issue_identifier}/artifacts` | `string[]` |
-| `fetchArtifactContent` | GET | `/api/v1/issues/{issue_identifier}/artifacts/{path}` | `string` |
+| `fetchArtifactContent` | GET | `/api/v1/issues/{issue_identifier}/artifacts/*` | `string` |
 
 #### Sessions
 
