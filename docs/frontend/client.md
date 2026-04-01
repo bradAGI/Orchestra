@@ -254,7 +254,7 @@ Converts any error to a user-friendly display string.
 | Function | Method | Endpoint | Returns |
 |----------|--------|----------|---------|
 | `fetchDocs` | GET | `/api/v1/docs` | `DocItem[]` |
-| `fetchDocContent` | GET | `/api/v1/docs/:path` | `string` |
+| `fetchDocContent` | GET | `/api/v1/docs/*` | `string` |
 
 ---
 
