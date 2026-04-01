@@ -2,7 +2,7 @@
 
 > **Source files:**
 > - `apps/desktop/src/App.tsx` -- Root application shell and state orchestration
-> - `apps/desktop/src/app/routes/sections.ts` -- Section routing and visibility
+> - `apps/desktop/src/app/routes/sections.tsx` -- Section routing and visibility
 > - `apps/desktop/src/components/app-shell/sidebar-nav.tsx` -- Sidebar navigation
 > - `apps/desktop/src/components/app-shell/panels.tsx` -- Panel re-exports
 > - `apps/desktop/src/components/app-shell/types.ts` -- Shared UI types
@@ -14,13 +14,13 @@ The Orchestra desktop frontend is a single-page React application rendered insid
 
 ### Section Routing
 
-All navigation is driven by the `SectionID` type defined in `apps/desktop/src/app/routes/sections.ts`. There is no client-side router -- the active section is held in React state and toggled by the sidebar.
+All navigation is driven by the `SectionID` type defined in `apps/desktop/src/app/routes/sections.tsx`. There is no client-side router -- the active section is held in React state and toggled by the sidebar.
 
 | SectionID | Label | Category | Description |
 |-----------|-------|----------|-------------|
 | `ISSUES` | Tasks | Tracker | Task board and inspector |
 | `PROJECTS` | Projects | Workspace | Local workspace grouping |
-| `CONSOLE` | Live Console | Runtime | Multi-agent terminal dock |
+| `CONSOLE` | Terminals | Runtime | Coding harnesses and development shells |
 | `AGENTS` | Agents | Compute | Global agent configurations |
 | `WAREHOUSE` | Analytics | Analytics | Token usage and session archives |
 | `SANDBOX` | Sandbox | Compute | Remote code execution via unsandbox |
@@ -77,7 +77,7 @@ The `App.tsx` component is the root orchestrator. It:
 | Component | File | Purpose |
 |-----------|------|---------|
 | `KanbanBoard` | `widgets/kanban/KanbanBoard.tsx` | Drag-and-drop task board with column grouping by state |
-| `IssueDetailView` | `widgets/issue-detail/IssueDetailView.tsx` | Full inspector with tabs: overview, history, diff, logs, PR |
+| `IssueDetailView` | `widgets/issue-detail/IssueDetailView.tsx` | Full inspector with tabs for details, plan, session output, and generated changes |
 | `CreateTaskDialog` | `components/tasks/CreateTaskDialog.tsx` | Modal for creating new tasks |
 
 #### Projects (`components/projects/`)
@@ -88,15 +88,17 @@ The `App.tsx` component is the root orchestrator. It:
 | `ProjectDetailView` | `ProjectDetailView.tsx` | Single project inspector: overview, file tree, git tab |
 | `CreateProjectDialog` | `CreateProjectDialog.tsx` | Dialog to register a new project by root path |
 
-#### Agents (`components/agents/`)
+#### Agents (`components/agents/`, `widgets/agents/`)
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| `AgentsDashboard` | `AgentsDashboard.tsx` | Per-provider config editor: model, permissions, MCP servers, hooks |
+| `AgentsDashboard` | `components/agents/AgentsDashboard.tsx` | Entry point that re-exports the provider configuration workspace from `widgets/agents/` |
+| `CategoryList` | `widgets/agents/CategoryList.tsx` | Provider category rail used to switch between settings panels |
+| `ProviderHeader` | `widgets/agents/ProviderHeader.tsx` | Provider summary header with connection and model context |
 
-Supported providers: `claude`, `codex`, `gemini`, `opencode`.
+Supported providers: `claude`, `codex`, `gemini`, `opencode`, and optional unsandbox-backed tools surfaced through settings/integrations.
 
-#### Analytics / Analytics (`components/warehouse/`)
+#### Analytics (`components/analytics/`)
 
 | Component | File | Purpose |
 |-----------|------|---------|
@@ -138,7 +140,7 @@ Supported providers: `claude`, `codex`, `gemini`, `opencode`.
 
 ### Sidebar Navigation
 
-The sidebar is defined declaratively in `sections.ts` via the `sidebarItems` array. Each entry maps an `id` (SectionID), a human-readable `label`, a `description`, and a Lucide icon. The `SidebarNav` component renders these items with keyboard navigation support (arrow keys) and a collapsible rail mode.
+The sidebar is defined declaratively in `sections.tsx` via the `sidebarItems` array. Each entry maps an `id` (SectionID), a human-readable `label`, a `description`, and a Lucide icon. The `SidebarNav` component renders these items with keyboard navigation support (arrow keys) and a collapsible rail mode.
 
 ```mermaid
 graph TD

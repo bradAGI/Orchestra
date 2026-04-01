@@ -35,7 +35,7 @@ expect-cli -m "Navigate to task board. Click Create Task. Fill in title 'Test Ta
 
 ## Step 2: Move to Todo
 
-**Action:** Click the issue to open inspector, click "Move to Todo".
+**Action:** Move the issue from Backlog to Todo from the board.
 
 **Verify:**
 - [ ] State changes to **Todo**
@@ -56,40 +56,39 @@ expect-cli -m "Find the test task in Backlog. Click it to open inspector. Click 
 **Action:** Open the Issue Inspector while in Todo state.
 
 ### Plan Tab
-- [ ] Agent is running in **PLAN ONLY** mode (max 1 turn)
+- [ ] Agent is running in planning mode
 - [ ] Agent outputs a plan as markdown checkboxes (`- [ ] Step 1: ...`)
 - [ ] Plan tab displays the extracted checkboxes
 
-### Terminal Tab
-- [ ] Shows live agent TUI output (interactive mode)
+### Session Tab
+- [ ] Shows planning output for the active run
 - [ ] Agent is in the worktree directory
 
 ### Changes Tab
-- [ ] **Empty** — no code changes during planning phase
+- [ ] Remains scoped to the issue worktree only
 
 ### Title & Description
-- [ ] Title and description are still **editable** in Todo state
+- [ ] Title and description are **not editable** in Todo state
 
 **expect-cli:**
 ```bash
-expect-cli -m "Open the test task inspector. Check Plan tab for checkboxes. Check Terminal tab for live agent output. Check Changes tab is empty. Verify title/description are editable." -y
+expect-cli -m "Open the test task inspector. Check Plan tab for checkboxes. Check Session tab for planning output. Check Changes tab stays scoped to the issue worktree. Verify title and description are read-only." -y
 ```
 
 ---
 
-## Step 4: Verify Terminal Session
+## Step 4: Verify Terminal / Session Surfaces
 
-**Action:** Switch to the Terminals section in sidebar.
+**Action:** Inspect the live run through the issue Session tab, and optionally compare with the Terminals section if a related harness is open.
 
-- [ ] A terminal session exists for this issue
-- [ ] Terminal shows the **correct agent** running (matches assigned provider)
+- [ ] The issue Session tab shows the **correct agent** running (matches assigned provider)
 - [ ] Agent is in the issue's **worktree directory** (not project root)
-- [ ] Terminal shows interactive TUI output (not JSON noise)
+- [ ] If a terminal harness is opened for the issue, it stays scoped to that issue or shell
 - [ ] No text injection from other sessions
 
 **expect-cli:**
 ```bash
-expect-cli -m "Click Terminals in the sidebar. Look for a terminal tab for the test issue. Verify agent is running with interactive TUI output. Take screenshot." -y
+expect-cli -m "Check the issue Session tab while the run is active. If a related harness is opened in Terminals, verify it shows the same issue-specific workspace context and not another task's output." -y
 ```
 
 ---
@@ -99,7 +98,7 @@ expect-cli -m "Click Terminals in the sidebar. Look for a terminal tab for the t
 **Action:** Wait for the planning agent to finish and exit.
 
 **Verify:**
-- [ ] State automatically advances from **Todo** to **InProgress**
+- [ ] State automatically advances from **Todo** to **InProgress** after the planning run succeeds
 - [ ] No manual intervention required
 - [ ] Title and description become **read-only**
 - [ ] Plan from Todo phase is preserved in Plan tab
@@ -114,9 +113,9 @@ expect-cli -m "Click Terminals in the sidebar. Look for a terminal tab for the t
 - [ ] Shows the plan from the Todo phase
 - [ ] Checkboxes may update as agent completes steps
 
-### Terminal Tab
+### Session Tab
 - [ ] Shows live execution — agent writing code, running tests
-- [ ] Same content as the Terminals section for this issue
+- [ ] If a terminal harness is opened for the issue, it remains scoped to the same worktree
 
 ### Changes Tab
 - [ ] Changes appear as the agent writes code
@@ -152,7 +151,7 @@ expect-cli -m "Open the test task inspector. Verify state is InProgress. Check P
 - [ ] **Create PR** button is visible (primary/green)
 - [ ] **Request Changes** button is visible (secondary/outline)
 - [ ] **Close** button is visible (red/destructive)
-- [ ] Old "Merge & Close" button is gone (unless no GitHub remote)
+- [ ] Old "Merge & Close" button is gone from the review header
 
 ### Plan Tab
 - [ ] Plan checkboxes are checked off (completed steps)
@@ -221,8 +220,7 @@ expect-cli -m "Open the test task in Review. Click Request Changes. Verify feedb
 - [ ] Issue stays in **Review** (not auto-advanced to Done)
 
 ### Non-GitHub Projects
-- [ ] If no GitHub remote, "Create PR" falls back to "Merge & Close"
-- [ ] Direct merge: checkout main → merge branch → delete branch → Done
+- [ ] If no GitHub remote is configured, verify the review flow still allows closing the task without PR creation
 
 **expect-cli:**
 ```bash
@@ -278,7 +276,7 @@ expect-cli -m "Open the test task in Review (with PR created). Click Close. Veri
 
 ### PR Creation Failures
 - [ ] Invalid branch → helpful error in dialog
-- [ ] No GitHub remote → falls back to direct merge option
+- [ ] No GitHub remote → review flow still surfaces a non-PR close path
 - [ ] Network error → error message shown, dialog stays open for retry
 
 ### Feedback Loop
@@ -297,11 +295,11 @@ GitHub Issues / Manual Create / Embedded Agent
    BACKLOG (editable)
         │ User moves to Todo
         ▼
-   TODO — agent plans (MODE=PLAN ONLY)
-        │ Auto-advance
+   TODO — agent plans
+        │ Auto-advance on successful planning run
         ▼
-   IN PROGRESS — agent executes (MODE=EXECUTE)
-        │ Auto-advance
+   IN PROGRESS — agent executes
+        │ Auto-advance on successful execution run
         ▼
    REVIEW — human reviews
         │

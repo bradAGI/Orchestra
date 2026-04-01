@@ -113,6 +113,7 @@ Converts any error to a user-friendly display string.
 | `gitCommit` | POST | `/api/v1/projects/:id/git/commit` | `void` |
 | `gitPush` | POST | `/api/v1/projects/:id/git/push` | `void` |
 | `gitPull` | POST | `/api/v1/projects/:id/git/pull` | `void` |
+| `gitFetch` | POST | `/api/v1/projects/:id/git/fetch` | `void` |
 | `gitCheckout` | POST | `/api/v1/projects/:id/git/checkout` | `void` |
 | `gitCreateBranch` | POST | `/api/v1/projects/:id/git/branches` | `void` |
 | `gitDeleteBranch` | DELETE | `/api/v1/projects/:id/git/branches/:name` | `void` |
@@ -121,6 +122,14 @@ Converts any error to a user-friendly display string.
 | `gitMerge` | POST | `/api/v1/projects/:id/git/merge` | `void` |
 | `gitStash` | POST | `/api/v1/projects/:id/git/stash` | `void` |
 | `gitStashPop` | POST | `/api/v1/projects/:id/git/stash/pop` | `void` |
+| `gitStashList` | GET | `/api/v1/projects/:id/git/stash/list` | `StashEntry[]` |
+| `gitStashApply` | POST | `/api/v1/projects/:id/git/stash/apply` | `void` |
+| `gitStashDrop` | POST | `/api/v1/projects/:id/git/stash/drop` | `void` |
+| `gitGetConflicts` | GET | `/api/v1/projects/:id/git/conflicts` | `ConflictStatus` |
+| `gitMergeAbort` | POST | `/api/v1/projects/:id/git/merge/abort` | `void` |
+| `gitConflictResolve` | POST | `/api/v1/projects/:id/git/resolve` | `void` |
+| `fetchDefaultBranch` | GET | `/api/v1/projects/:id/git/default-branch` | `string` |
+| `fetchProjectGitBranchesDetail` | GET | `/api/v1/projects/:id/git/branches/detail` | `BranchesDetailResponse` |
 
 #### GitHub Integration
 
@@ -138,6 +147,7 @@ Converts any error to a user-friendly display string.
 | `fetchPRComments` | GET | `/api/v1/projects/:id/github/pulls/:num/comments` | `unknown[]` |
 | `disconnectProjectGitHub` | POST | `/api/v1/projects/:id/github/disconnect` | `void` |
 | `createGitHubPR` | POST | `/api/v1/issues/:id/pr` | `GitHubPRResult` |
+| `createGitHubRepo` | POST | `/api/v1/projects/:id/github/create-repo` | `CreateRepoResult` |
 
 #### Agent Configuration
 
@@ -161,6 +171,20 @@ Converts any error to a user-friendly display string.
 | `updateProviderModel` | POST | `/api/v1/agents/:provider/model` | `void` |
 | `fetchProviderHooks` | GET | `/api/v1/agents/:provider/hooks` | `ProviderHook[]` |
 | `updateProviderHooks` | POST | `/api/v1/agents/:provider/hooks` | `void` |
+| `fetchClaudeSettings` | GET | `/api/v1/agents/claude/settings` | `ClaudeSettingsResponse` |
+| `updateClaudeSettings` | POST | `/api/v1/agents/claude/settings` | `void` |
+| `fetchClaudeInstructions` | GET | `/api/v1/agents/claude/instructions` | `ClaudeInstructionsResponse` |
+| `updateClaudeInstructions` | POST | `/api/v1/agents/claude/instructions` | `void` |
+| `deleteClaudeInstructions` | DELETE | `/api/v1/agents/claude/instructions` | `void` |
+| `fetchClaudeRules` | GET | `/api/v1/agents/claude/rules` | `ClaudeFileListResponse` |
+| `updateClaudeRule` | POST | `/api/v1/agents/claude/rules` | `void` |
+| `deleteClaudeRule` | DELETE | `/api/v1/agents/claude/rules/:name` | `void` |
+| `fetchClaudeSkills` | GET | `/api/v1/agents/claude/skills` | `ClaudeFileListResponse` |
+| `updateClaudeSkill` | POST | `/api/v1/agents/claude/skills` | `void` |
+| `deleteClaudeSkill` | DELETE | `/api/v1/agents/claude/skills/:name` | `void` |
+| `fetchClaudeSubAgents` | GET | `/api/v1/agents/claude/subagents` | `ClaudeFileListResponse` |
+| `updateClaudeSubAgent` | POST | `/api/v1/agents/claude/subagents` | `void` |
+| `deleteClaudeSubAgent` | DELETE | `/api/v1/agents/claude/subagents/:name` | `void` |
 | `fetchProviderMCPServers` | GET | `/api/v1/agents/:provider/mcp` | `ProviderMCPServer[]` |
 | `addProviderMCPServer` | POST | `/api/v1/agents/:provider/mcp` | `void` |
 | `deleteProviderMCPServer` | DELETE | `/api/v1/agents/:provider/mcp/:name` | `void` |
@@ -174,11 +198,20 @@ Converts any error to a user-friendly display string.
 | `createMCPServer` | POST | `/api/v1/mcp/servers` | `MCPServer` |
 | `deleteMCPServer` | DELETE | `/api/v1/mcp/servers/:id` | `void` |
 
-#### Analytics / Analytics
+#### Analytics
 
 | Function | Method | Endpoint | Returns |
 |----------|--------|----------|---------|
 | `fetchWarehouseStats` | GET | `/api/v1/warehouse/stats` | `GlobalStats` |
+| `fetchAnalyticsDaily` | GET | `/api/v1/analytics/daily` | `DailyStats[]` |
+| `fetchAnalyticsCost` | GET | `/api/v1/analytics/cost` | `CostRecord[]` |
+| `fetchAnalyticsCostOptimization` | GET | `/api/v1/analytics/cost/optimization` | `CostOptimization` |
+| `fetchAnalyticsPerformance` | GET | `/api/v1/analytics/performance` | `PerformanceRecord[]` |
+| `fetchAnalyticsRateLimits` | GET | `/api/v1/analytics/rate-limits` | `unknown` |
+| `fetchAnalyticsProductivity` | GET | `/api/v1/analytics/productivity` | `ProductivityRecord[]` |
+| `fetchAnalyticsBudgets` | GET | `/api/v1/analytics/budgets` | `BudgetRecord[]` |
+| `fetchExternalReconcile` | GET | `/api/v1/analytics/external/reconcile` | `ExternalReconciliation` |
+| `fetchExternalStatus` | GET | `/api/v1/analytics/external/status` | `ExternalStatus` |
 
 #### Workspace Migration
 
@@ -205,6 +238,13 @@ Converts any error to a user-friendly display string.
 |----------|--------|----------|---------|
 | `fetchSTTHealth` | GET | `/api/v1/stt/health` | `STTHealth` |
 | `transcribeAudio` | POST | `/api/v1/stt/transcribe` | `STTTranscriptionResult` |
+
+#### Embedded Agent Provider Keys
+
+| Function | Method | Endpoint | Returns |
+|----------|--------|----------|---------|
+| `fetchAgentProviderKeys` | GET | `/api/v1/config/agent-providers` | provider-key status map |
+| `saveAgentProviderKey` | POST | `/api/v1/config/agent-providers` | `void` |
 
 #### Documentation
 

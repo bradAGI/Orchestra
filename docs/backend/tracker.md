@@ -41,6 +41,9 @@ type Client interface {
 | `Provider` | `string` | Preferred agent provider |
 | `DisabledTools` | `[]string` | Tools to exclude from runs |
 | `BaseSHA` | `string` | Base git commit SHA |
+| `Feedback` | `string` | Review feedback captured for re-plan or re-execute flows |
+| `PRURL` | `string` | Linked GitHub pull request URL |
+| `Plan` | `string` | Stored markdown plan used across planning and execution phases |
 | `CreatedAt` / `UpdatedAt` | `string` | Timestamps |
 
 ### IssueFilter
@@ -70,7 +73,7 @@ graph TD
 | Identifier format | `OPS-{n}` | `{PREFIX}-{n}` (project-based) | `{repo}-{number}` |
 | Worker assignment | Configurable assignee set | Configurable assignee set | Not implemented |
 | Search | Title/description/identifier substring | SQL LIKE on title/identifier/id | Not implemented |
-| Create/Update/Delete | Full support | Full support | Partial (create not implemented) |
+| Create/Update/Delete | Full support | Full support | Partial (delete closes the remote issue instead of deleting it) |
 | Ordering | By identifier, then ID | By `created_at DESC` or `identifier ASC` | By GitHub API order |
 
 ### Memory Client
@@ -101,24 +104,26 @@ The GitHub client (`github.NewClient`) interfaces with GitHub Issues via the RES
 - **State mapping**: Maps Orchestra states to GitHub's `open`/`closed` binary. States like `done`, `closed`, `completed` map to GitHub `closed`.
 - **Identifier format**: `{repo}-{number}` (e.g. `orchestra-42`).
 - **Delete**: Implemented as closing the issue (GitHub does not support true deletion).
-- **Limitations**: `SearchIssues` and `CreateIssue` are not yet implemented. `FetchIssuesByIDs` makes individual API calls per issue.
+- **Limitations**: `SearchIssues` and `CreateIssue` currently return explicit "not implemented" errors. `FetchIssuesByIDs` makes individual API calls per issue.
 
 ### Issue Lifecycle
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Todo: Created
-    Todo --> InProgress: Agent claims
-    InProgress --> InReview: Work complete
-    InReview --> Done: Approved
-    InProgress --> Todo: Blocked
-    InProgress --> Cancelled: Abandoned
-    Todo --> Cancelled: Removed
+    [*] --> Backlog: Created
+    Backlog --> Todo: Ready for dispatch
+    Todo --> InProgress: Planning run succeeds
+    InProgress --> Review: Execution run succeeds
+    Review --> Todo: Re-plan with feedback
+    Review --> InProgress: Re-execute with feedback
+    Review --> Done: Close task
+    Todo --> Backlog: Stop and reset
+    InProgress --> Backlog: Stop and reset
+    Review --> Backlog: Stop and reset
     Done --> [*]
-    Cancelled --> [*]
 ```
 
-States are configurable via `ORCHESTRA_ACTIVE_STATES` and `ORCHESTRA_TERMINAL_STATES`. Default active states are `Todo` and `In Progress`. Default terminal states are `Done`, `Cancelled`, `Canceled`, `Closed`, and `Duplicate`.
+At the API layer, valid transitions are currently `Backlog -> Todo`, `Todo -> In Progress|Backlog`, `In Progress -> Review|Backlog`, and `Review -> Done|Todo|In Progress|Backlog`. Review-to-Todo and Review-to-In Progress require `feedback`. States are configurable via `ORCHESTRA_ACTIVE_STATES` and `ORCHESTRA_TERMINAL_STATES`. Default active states are `Todo` and `In Progress`. Default terminal states are `Done`, `Cancelled`, `Canceled`, `Closed`, and `Duplicate`.
 
 ### Query Filtering
 

@@ -165,7 +165,7 @@ A GitHub Issues-backed tracker that maps Orchestra operations to the GitHub REST
 - Maps internal states to GitHub `open`/`closed` states
 - Uses `repo-number` format for identifiers (e.g. `orchestra-123`)
 - `DeleteIssue` closes the issue rather than deleting (GitHub does not support true deletion)
-- `SearchIssues` and `CreateIssue` are not yet implemented
+- `SearchIssues` and `CreateIssue` currently return explicit "not implemented" errors
 
 ---
 
@@ -219,6 +219,9 @@ The `tracker.Issue` struct represents a work item across all backends:
 | `Provider` | string | Agent provider preference |
 | `DisabledTools` | []string | Tools disabled for this issue |
 | `BaseSHA` | string | Git base commit SHA |
+| `Feedback` | string | Review feedback persisted on the issue |
+| `PRURL` | string | Linked pull request URL |
+| `Plan` | string | Stored markdown plan shared across phases |
 
 ---
 

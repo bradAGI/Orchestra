@@ -31,20 +31,20 @@ flowchart LR
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `ORCHESTRA_AGENT_PROVIDER` | string | `CODEX` | Default agent provider (`CODEX`, `CLAUDE`, `OPENCODE`, `GEMINI`) |
-| `ORCHESTRA_AGENT_MAX_TURNS` | int | `10` | Maximum conversation turns per agent run |
+| `ORCHESTRA_AGENT_MAX_TURNS` | int | `25` | Maximum conversation turns per agent run |
 | `ORCHESTRA_AGENT_COMMAND_CODEX` | string | `codex exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox --json {{prompt}}` | Custom Codex command template |
 | `ORCHESTRA_AGENT_COMMAND_CLAUDE` | string | `claude -p {{prompt}} --output-format stream-json --verbose --dangerously-skip-permissions` | Custom Claude command template |
-| `ORCHESTRA_AGENT_COMMAND_OPENCODE` | string | `opencode run {{prompt}} --format json` | Custom OpenCode command template |
+| `ORCHESTRA_AGENT_COMMAND_OPENCODE` | string | `opencode -p {{prompt}} -f json` | Custom OpenCode command template |
 | `ORCHESTRA_AGENT_COMMAND_GEMINI` | string | `gemini -p {{prompt}} --output-format stream-json --approval-mode yolo` | Custom Gemini command template |
 | `ORCHESTRA_AGENT_COMMAND_UNSANDBOX` | string | _(none)_ | Custom Unsandbox agent command template |
-| `ORCHESTRA_MAX_CONCURRENT` | int | `16` | Maximum concurrent agent runs |
+| `ORCHESTRA_MAX_CONCURRENT` | int | `6` | Maximum concurrent agent runs |
 | `ORCHESTRA_MAX_CONCURRENT_BY_STATE` | string | _(none)_ | Per-state concurrency limits (format: `State1:N,State2:M`) |
 
 ### Tracker
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `ORCHESTRA_TRACKER_TYPE` | string | `memory` | Issue tracker backend: `memory`, `sqlite`, or `github` |
+| `ORCHESTRA_TRACKER_TYPE` | string | _(unset)_ | Issue tracker backend: `sqlite` is used for the default local runtime; `github` enables GitHub-backed issues; `memory` remains available for tests or explicit fallback |
 | `ORCHESTRA_TRACKER_ENDPOINT` | string | _(none)_ | Tracker endpoint (e.g., `owner/repo` for GitHub) |
 | `ORCHESTRA_TRACKER_TOKEN` | string | _(none)_ | Authentication token for the tracker |
 | `ORCHESTRA_TRACKER_WORKER_ASSIGNEE_IDS` | CSV | _(none)_ | Comma-separated assignee IDs for worker filtering |
@@ -56,6 +56,7 @@ flowchart LR
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `ORCHESTRA_WORKSPACE_ROOT` | string | `~/.orchestra/workspaces` | Root directory for agent workspaces |
+| `ORCHESTRA_WORKTREE_ROOT` | string | same as `ORCHESTRA_WORKSPACE_ROOT` | Root directory for per-issue git worktrees |
 | `ORCHESTRA_PROJECT_ROOTS` | CSV | _(none)_ | Comma-separated list of project root directories |
 | `ORCHESTRA_WORKSPACE_AFTER_CREATE` | string | _(none)_ | Shell command to run after workspace creation |
 | `ORCHESTRA_WORKSPACE_BEFORE_REMOVE` | string | _(none)_ | Shell command to run before workspace removal |
@@ -68,6 +69,15 @@ flowchart LR
 |----------|------|---------|-------------|
 | `ORCHESTRA_GITHUB_CLIENT_ID` | string | _(none)_ | GitHub OAuth app client ID |
 | `ORCHESTRA_GITHUB_CLIENT_SECRET` | string | _(none)_ | GitHub OAuth app client secret |
+
+### External Analytics
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `ORCHESTRA_ANTHROPIC_ADMIN_KEY` | string | _(none)_ | Anthropic Admin API key used for organization-level analytics sync |
+| `ORCHESTRA_OPENAI_ADMIN_KEY` | string | _(none)_ | OpenAI organization admin key used for analytics sync |
+| `ORCHESTRA_ANALYTICS_SYNC_INTERVAL` | duration | `1h` | Interval between external analytics reconciliation runs |
+| `ORCHESTRA_ANALYTICS_EXTERNAL_ENABLED` | bool | `false` | Enables external analytics ingestion from provider admin APIs |
 
 ### MCP Servers
 
@@ -163,6 +173,7 @@ The resolved configuration is held in `config.Config` (defined in `types.go`):
 | `AgentProvider` | `string` | `ORCHESTRA_AGENT_PROVIDER` |
 | `AgentCommands` | `map[string]string` | Per-agent command env vars |
 | `AgentMaxTurns` | `int` | `ORCHESTRA_AGENT_MAX_TURNS` |
+| `WorktreeRoot` | `string` | `ORCHESTRA_WORKTREE_ROOT` |
 | `TrackerType` | `string` | `ORCHESTRA_TRACKER_TYPE` |
 | `TrackerEndpoint` | `string` | `ORCHESTRA_TRACKER_ENDPOINT` |
 | `TrackerToken` | `string` | `ORCHESTRA_TRACKER_TOKEN` |
@@ -183,17 +194,21 @@ The resolved configuration is held in `config.Config` (defined in `types.go`):
 | `STTWhisperModelPath` | `string` | `ORCHESTRA_STT_WHISPER_MODEL` |
 | `STTWhisperThreads` | `int` | `ORCHESTRA_STT_WHISPER_THREADS` |
 | `STTWhisperLanguage` | `string` | `ORCHESTRA_STT_WHISPER_LANGUAGE` |
+| `AnthropicAdminKey` | `string` | `ORCHESTRA_ANTHROPIC_ADMIN_KEY` |
+| `OpenAIAdminKey` | `string` | `ORCHESTRA_OPENAI_ADMIN_KEY` |
+| `AnalyticsSyncInterval` | `time.Duration` | `ORCHESTRA_ANALYTICS_SYNC_INTERVAL` |
+| `AnalyticsExternalEnabled` | `bool` | `ORCHESTRA_ANALYTICS_EXTERNAL_ENABLED` |
 
 ## 7.1.4 Example Configurations
 
-### Minimal (in-memory, single agent)
+### Minimal (local SQLite-backed runtime)
 
 ```bash
 export ORCHESTRA_WORKSPACE_ROOT=~/projects/my-repo
 ./orchestrad
 ```
 
-Uses all defaults: Codex provider, memory tracker, port 4010.
+Uses the local defaults: Codex provider, SQLite-backed issue persistence, workspace/worktree roots under `~/.orchestra`, and port 4010.
 
 ### GitHub Issues + Claude
 

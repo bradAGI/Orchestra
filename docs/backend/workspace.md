@@ -6,7 +6,7 @@
 > - `apps/backend/internal/workspace/path_guard.go`
 > - `apps/backend/internal/workspace/migration.go`
 
-The workspace package manages per-issue working directories where agents execute tasks. It handles directory provisioning, lifecycle hooks, artifact listing, git diff retrieval, path safety validation, and workspace migration between root directories.
+The workspace package manages both per-issue working directories and git worktrees used for isolated execution. It handles directory provisioning, lifecycle hooks, artifact listing, git diff retrieval, path safety validation, worktree lifecycle, and workspace migration between root directories.
 
 ---
 
@@ -21,7 +21,7 @@ type Service struct {
 }
 ```
 
-All workspaces are created as subdirectories of `Root`, named by a sanitized combination of issue identifier and provider.
+For issue-scoped workspaces, directories are created as subdirectories of `Root`, named by a sanitized combination of issue identifier and provider. The same `Service` type also manages deterministic git worktree paths under the configured worktree root.
 
 ---
 
@@ -73,7 +73,7 @@ Four hook points are available throughout the workspace lifecycle:
 | `AfterCreate` | After a new workspace directory is created | Error propagated to caller |
 | `BeforeRemove` | Before a workspace is deleted | Warning logged, removal continues |
 | `BeforeRun` | Before an agent run starts in the workspace | Error propagated to caller |
-| `AfterRun` | After an agent run completes | Error propagated to caller |
+| `AfterRun` | After an agent run completes | Failure logged/swallowed so post-run hooks never block a successful run |
 
 ### Hook Execution
 
@@ -87,7 +87,7 @@ type HookResult struct {
 }
 ```
 
-If a hook exceeds its timeout, it returns a `"workspace hook timeout"` error. The `BeforeRemove` hook is special: its failure is logged as a warning but does not prevent workspace removal.
+If a hook exceeds its timeout, it returns a `"workspace hook timeout"` error. The `BeforeRemove` hook is special: its failure is logged as a warning but does not prevent workspace removal. `AfterRun` is also best-effort: failures are swallowed so post-run scripting cannot turn a successful agent run into a failed pipeline.
 
 ---
 
@@ -102,6 +102,26 @@ If a hook exceeds its timeout, it returns a `"workspace hook timeout"` error. Th
 | `ListArtifacts(id, provider)` | Returns relative paths of all workspace files |
 | `GetArtifactContent(id, provider, relPath)` | Reads a file within the workspace |
 | `GetDiff(id, provider)` | Returns `git diff HEAD` output from workspace |
+
+## Git Worktrees
+
+The same service also manages per-project git worktrees used by the issue execution pipeline.
+
+| Method | Description |
+|--------|-------------|
+| `WorktreePath(projectID, branchName)` | Deterministic worktree path under the worktree root |
+| `EnsureWorktree(projectRoot, projectID, branchName, hooks)` | Creates or reuses a worktree and captures the base SHA |
+| `RemoveWorktree(projectRoot, wtPath, hooks)` | Removes a worktree after running `BeforeRemove` |
+| `CleanupWorktree(projectRoot, projectID, branchName)` | Removes the worktree, prunes stale refs, and best-effort deletes the branch |
+| `PruneWorktrees(projectRoot)` | Runs `git worktree prune` for the project repository |
+
+### Worktree Path Format
+
+```text
+<worktree_root>/<project_id>/<branch_name>
+```
+
+This is the path used by the API and desktop surfaces when they refer to per-issue worktrees.
 
 ### Artifact Listing
 
@@ -179,6 +199,6 @@ Each workspace can contain an `.orchestra` marker file at its root. This file is
 
 ## Cross-References
 
-- [3.6 Configuration & Environment](config.md) -- `ORCHESTRA_WORKSPACE_ROOT` and hook environment variables (`ORCHESTRA_WORKSPACE_AFTER_CREATE`, etc.)
+- [3.6 Configuration & Environment](config.md) -- `ORCHESTRA_WORKSPACE_ROOT`, `ORCHESTRA_WORKTREE_ROOT`, and hook environment variables (`ORCHESTRA_WORKSPACE_AFTER_CREATE`, etc.)
 - [3.8 Tool System](tools.md) -- Agents execute within provisioned workspaces
 - [3.5 Database Layer](database.md) -- Issues reference workspaces via `branch_name` and workspace state

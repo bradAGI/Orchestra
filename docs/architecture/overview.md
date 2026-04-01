@@ -2,7 +2,7 @@
 
 > **Source files:** `apps/backend/cmd/orchestrad/`, `apps/backend/internal/`, `apps/desktop/`, `apps/tui/`
 
-Orchestra follows a classic client-server architecture with a single Go backend serving multiple frontends. The backend owns all orchestration logic -- dispatching issues to agents, tracking state, and broadcasting events -- while frontends are thin consumers that render state and accept user input.
+Orchestra follows a client-server architecture with a single Go backend serving multiple frontends. The backend owns orchestration logic, issue state, execution dispatch, telemetry, and event broadcasting, while frontends render state and issue commands through the API.
 
 ---
 
@@ -120,8 +120,12 @@ sequenceDiagram
 
     User->>Desktop: Create issue
     Desktop->>API: POST /api/v1/issues
-    API->>Orchestrator: Dispatch(issue)
+    API->>Orchestrator: Create issue in Backlog
     Orchestrator->>Tracker: Store issue
+    API-->>Desktop: Issue created
+    User->>Desktop: Move Backlog issue to Todo
+    Desktop->>API: PATCH /api/v1/issues/{id} {state:"Todo"}
+    API->>Orchestrator: Update issue state
     Orchestrator->>AgentRegistry: Claim & run
     AgentRegistry->>Agent: Execute (Claude/Gemini/...)
     Agent-->>AgentRegistry: Stream progress
@@ -144,7 +148,7 @@ sequenceDiagram
 
 | Layer | Technology | Rationale |
 |-------|-----------|-----------|
-| Backend language | **Go 1.22+** | Fast compilation, strong concurrency primitives, single binary deployment |
+| Backend language | **Go 1.25+** | Fast compilation, strong concurrency primitives, single binary deployment |
 | HTTP router | **Chi** (`go-chi/chi/v5`) | Lightweight, idiomatic middleware chain, URL parameters |
 | Logging | **zerolog** (`rs/zerolog`) | Zero-allocation structured JSON logging |
 | CORS | **go-chi/cors** | Chi-native CORS middleware |

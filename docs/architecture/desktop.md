@@ -167,7 +167,7 @@ flowchart TD
 |-------|------|-------------|
 | **Main process** | `electron/main.cjs` | Window management, native integrations, keyboard shortcuts, external opening |
 | **Preload script** | `electron/preload.cjs` | Exposes a safe subset of Node.js APIs to the renderer via `contextBridge` |
-| **Renderer process** | `src/main.tsx` | React app running in a Chromium sandbox with access only to the preload API |
+| **Renderer process** | `src/main.tsx` | React app running in a Chromium sandbox with access only to the `window.orchestraDesktop` preload API |
 
 ---
 
