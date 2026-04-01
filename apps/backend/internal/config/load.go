@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -225,6 +226,15 @@ func Load() (Config, error) {
 	trackerWorkerAssigneeIDs := parseStateList(trackerWorkerAssigneeIDsRaw)
 	projectRoots := parseStateList(projectRootsRaw)
 	mcpServers := parseMCPServers(mcpServersRaw)
+
+	// Merge with Claude Code MCP servers
+	claudeCodeServers := readClaudeCodeMCPServers()
+	for name, command := range claudeCodeServers {
+		// Environment variable servers take precedence over Claude Code
+		if _, exists := mcpServers[name]; !exists {
+			mcpServers[name] = command
+		}
+	}
 	telemetryProviders := parseStateList(telemetryProvidersRaw)
 	if len(telemetryProviders) == 0 {
 		telemetryProviders = []string{"CLAUDE", "CODEX", "GEMINI", "OPENCODE"}
@@ -312,6 +322,58 @@ func parseMCPServers(raw string) map[string]string {
 			out[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
 		}
 	}
+	return out
+}
+
+// claudeCodeSettings represents the Claude Code settings.json structure
+type claudeCodeSettings struct {
+	MCPServers map[string]struct {
+		Command string   `json:"command"`
+		Args    []string `json:"args,omitempty"`
+		Env     map[string]string `json:"env,omitempty"`
+	} `json:"mcpServers,omitempty"`
+}
+
+// readClaudeCodeMCPServers attempts to read MCP servers from Claude Code configuration
+func readClaudeCodeMCPServers() map[string]string {
+	out := make(map[string]string)
+
+	// Try standard Claude Code config locations
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return out
+	}
+
+	configPaths := []string{
+		filepath.Join(home, ".claude", "settings.json"),     // Claude Code CLI
+	}
+
+	var configData []byte
+	for _, path := range configPaths {
+		if data, err := os.ReadFile(path); err == nil {
+			configData = data
+			break
+		}
+	}
+
+	if len(configData) == 0 {
+		return out
+	}
+
+	var config claudeCodeSettings
+	if err := json.Unmarshal(configData, &config); err != nil {
+		return out
+	}
+
+	// Convert Claude Code format to Orchestra format
+	for name, server := range config.MCPServers {
+		command := server.Command
+		if len(server.Args) > 0 {
+			command += " " + strings.Join(server.Args, " ")
+		}
+		out[name] = command
+	}
+
 	return out
 }
 

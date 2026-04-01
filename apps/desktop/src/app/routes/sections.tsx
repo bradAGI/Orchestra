@@ -42,7 +42,7 @@ export const sidebarItems: SidebarItem[] = [
   {
     id: 'CONSOLE',
     label: 'Terminals',
-    description: 'Live agent sessions and shells',
+    description: 'Coding harnesses and development shells',
     icon: Terminal,
   },
   {

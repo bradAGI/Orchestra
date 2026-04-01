@@ -80,7 +80,7 @@ export function HooksPanel({ hooks, onSave, loading, saving, provider }: HooksPa
 
       {/* Add new hook */}
       <div className="shrink-0 flex items-center gap-2 border-t border-border/20 pt-3">
-        <CustomDropdown className="w-[150px]" value={newEvent} options={events.map(e => ({ label: e, value: e }))} onChange={setNewEvent} placeholder="Event" />
+        <CustomDropdown className="w-[150px]" direction="up" value={newEvent} options={events.map(e => ({ label: e, value: e }))} onChange={setNewEvent} placeholder="Event" />
         <input className="h-8 flex-1 rounded-lg border border-border bg-background px-3 text-xs font-mono focus:ring-2 focus:ring-primary/20 outline-none" value={newCommand} onChange={e => setNewCommand(e.target.value)} placeholder="Command" />
         <input className="h-8 w-[100px] rounded-lg border border-border bg-background px-3 text-xs font-mono focus:ring-2 focus:ring-primary/20 outline-none" value={newMatcher} onChange={e => setNewMatcher(e.target.value)} placeholder="Matcher" />
         <Button size="sm" variant="outline" className="h-8 text-[9px] font-bold uppercase" disabled={!newEvent || !newCommand.trim()} onClick={handleAdd}>

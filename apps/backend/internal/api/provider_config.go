@@ -1180,6 +1180,43 @@ func (s *Server) PostClaudeInstructions(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// DeleteClaudeInstructions removes the CLAUDE.md for the given scope.
+func (s *Server) DeleteClaudeInstructions(w http.ResponseWriter, r *http.Request) {
+	scope := r.URL.Query().Get("scope")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "home_dir", "cannot determine home directory")
+		return
+	}
+
+	var candidates []string
+	switch scope {
+	case "project":
+		root, err := s.resolveProjectRoot(r)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", err.Error())
+			return
+		}
+		candidates = []string{
+			filepath.Join(root, "CLAUDE.md"),
+			filepath.Join(root, ".claude", "CLAUDE.md"),
+		}
+	default:
+		candidates = []string{
+			filepath.Join(home, ".claude", "CLAUDE.md"),
+		}
+	}
+
+	for _, path := range candidates {
+		if err := os.Remove(path); err == nil {
+			writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+			return
+		}
+	}
+
+	writeJSONError(w, http.StatusNotFound, "not_found", "CLAUDE.md not found")
+}
+
 // claudeFileEntry is a single discovered file for rules/skills/subagents.
 type claudeFileEntry struct {
 	Name    string `json:"name"`
@@ -1190,7 +1227,7 @@ type claudeFileEntry struct {
 // listClaudeDir lists all .md files in a directory, returning their name, content, and path.
 // It follows symlinks to resolve directories and files correctly.
 func listClaudeDir(dir string) []claudeFileEntry {
-	var entries []claudeFileEntry
+	entries := make([]claudeFileEntry, 0)
 	dirEntries, err := os.ReadDir(dir)
 	if err != nil {
 		return entries
@@ -1244,6 +1281,58 @@ func listClaudeDir(dir string) []claudeFileEntry {
 		}
 		name := strings.TrimSuffix(de.Name(), filepath.Ext(de.Name()))
 		entries = append(entries, claudeFileEntry{Name: name, Content: string(data), Path: fullPath})
+	}
+	return entries
+}
+
+// listClaudeAgentsDir lists only agent definitions — directories containing AGENT.md
+// or a .md file. Skips loose .md files at the top level (like README.md, CLAUDE.md)
+// which are not agent definitions.
+func listClaudeAgentsDir(dir string) []claudeFileEntry {
+	entries := make([]claudeFileEntry, 0)
+	dirEntries, err := os.ReadDir(dir)
+	if err != nil {
+		return entries
+	}
+	for _, de := range dirEntries {
+		fullPath := filepath.Join(dir, de.Name())
+
+		isDir := de.IsDir()
+		if de.Type()&os.ModeSymlink != 0 {
+			if resolved, err := os.Stat(fullPath); err == nil {
+				isDir = resolved.IsDir()
+			} else {
+				continue
+			}
+		}
+
+		if !isDir {
+			continue // skip loose files — only directories are agents
+		}
+
+		// Check for AGENT.md inside the directory
+		agentPath := filepath.Join(fullPath, "AGENT.md")
+		if data, err := os.ReadFile(agentPath); err == nil {
+			entries = append(entries, claudeFileEntry{Name: de.Name(), Content: string(data), Path: agentPath})
+			continue
+		}
+		// Fallback: first .md file inside the directory
+		subEntries, _ := os.ReadDir(fullPath)
+		for _, sub := range subEntries {
+			subPath := filepath.Join(fullPath, sub.Name())
+			subIsDir := sub.IsDir()
+			if sub.Type()&os.ModeSymlink != 0 {
+				if resolved, err := os.Stat(subPath); err == nil {
+					subIsDir = resolved.IsDir()
+				}
+			}
+			if !subIsDir && strings.HasSuffix(strings.ToLower(sub.Name()), ".md") {
+				if data, err := os.ReadFile(subPath); err == nil {
+					entries = append(entries, claudeFileEntry{Name: de.Name(), Content: string(data), Path: subPath})
+					break
+				}
+			}
+		}
 	}
 	return entries
 }
@@ -1406,7 +1495,7 @@ func (s *Server) PostClaudeSkill(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "path": path})
 }
 
-// DeleteClaudeSkill deletes a skill .md file.
+// DeleteClaudeSkill deletes a skill .md file or directory.
 func (s *Server) DeleteClaudeSkill(w http.ResponseWriter, r *http.Request) {
 	scope := r.URL.Query().Get("scope")
 	home, _ := os.UserHomeDir()
@@ -1425,11 +1514,23 @@ func (s *Server) DeleteClaudeSkill(w http.ResponseWriter, r *http.Request) {
 		dir = filepath.Join(home, ".claude", "skills")
 	}
 
+	// First try as directory (for skills stored in directory format)
+	dirPath := filepath.Join(dir, filepath.Base(name))
+	if info, err := os.Stat(dirPath); err == nil && info.IsDir() {
+		if err := os.RemoveAll(dirPath); err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "delete_failed", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		return
+	}
+
+	// Fallback to .md file format
 	if !strings.HasSuffix(name, ".md") {
 		name += ".md"
 	}
-	path := filepath.Join(dir, filepath.Base(name))
-	if err := os.Remove(path); err != nil {
+	filePath := filepath.Join(dir, filepath.Base(name))
+	if err := os.Remove(filePath); err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "delete_failed", err.Error())
 		return
 	}
@@ -1454,7 +1555,7 @@ func (s *Server) GetClaudeSubAgents(w http.ResponseWriter, r *http.Request) {
 		dir = filepath.Join(home, ".claude", "agents")
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"items": listClaudeDir(dir), "dir": dir})
+	writeJSON(w, http.StatusOK, map[string]any{"items": listClaudeAgentsDir(dir), "dir": dir})
 }
 
 // PostClaudeSubAgent creates or updates a sub-agent .md file.
