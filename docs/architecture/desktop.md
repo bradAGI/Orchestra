@@ -67,7 +67,7 @@ graph TD
 | `src/components/ui/` | Shared primitives | dialogs, tooltips, skeletons, buttons |
 | `src/hooks/` | App-level state hooks | backend config, notifications, issue lookup, migration |
 | `src/lib/` | API client and runtime synchronization | `orchestra-client`, `runtime-sync`, `runtime-store` |
-| `src/types/` | TypeScript types | shared frontend interfaces |
+| `src/types/` | Global browser/Electron type declarations | `global.d.ts` for the preload bridge and window typing |
 | `src/widgets/` | Larger reusable feature modules | agents, git, issue-detail, kanban, running |
 
 ---
@@ -160,7 +160,7 @@ flowchart TD
     RENDERER["Renderer Process<br/><small>src/main.tsx</small><br/>React app, sandboxed"]
 
     MAIN -- "contextBridge API" --> PRELOAD
-    PRELOAD -- "window.api" --> RENDERER
+    PRELOAD -- "window.orchestraDesktop" --> RENDERER
 ```
 
 | Layer | File | Capabilities |
