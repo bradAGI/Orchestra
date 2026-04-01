@@ -45,7 +45,7 @@ The `Service` struct holds all orchestrator state under a `sync.RWMutex` for saf
 | `agentRegistry` | `*agents.Registry` | Multi-agent runner registry |
 | `agentCommands` | `map[string]string` | Provider-to-command mapping |
 | `agentProvider` | `string` | Default provider (e.g. `CODEX`) |
-| `activeStates` | `[]string` | States eligible for dispatch (default: `["in progress"]`) |
+| `activeStates` | `[]string` | States eligible for dispatch (default: `["todo", "in progress"]`) |
 | `terminalStates` | `[]string` | States that end processing (default: `["done", "cancelled", ...]`) |
 | `maxConcurrent` | `int` | Global concurrency cap (default: `4`) |
 | `maxByState` | `map[string]int` | Per-state concurrency limits |

@@ -161,7 +161,7 @@ Extends the list-item fields with runtime data, workspace paths, and session log
 | `logs` | object | yes | Session log references grouped under `codex_session_logs` for backward-compatible clients |
 | `recent_events` | array | yes | Recent lifecycle events |
 | `last_error` | string/null | no | Most recent error message |
-| `tracked` | object | no | Tracked state metadata |
+| `tracked` | object | no | Compatibility object for tracked-state metadata; currently returned as an empty object |
 | `history` | any | no | Full event history |
 
 ---
