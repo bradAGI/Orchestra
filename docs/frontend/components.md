@@ -8,7 +8,7 @@
 > - `apps/desktop/src/components/app-shell/types.ts` -- Shared UI types
 > - `apps/desktop/src/components/ui/*` -- Radix UI primitives
 
-The Orchestra desktop frontend is a single-page React application rendered inside an Electron shell. The component hierarchy follows a **shell + section** pattern: a persistent app shell (sidebar, top bar) wraps a content area that swaps between discrete section views based on a `SectionID` enum.
+The Orchestra desktop frontend is a single-page React application rendered inside an Electron shell. The component hierarchy follows a **shell + section** pattern: a persistent app shell (sidebar, top bar) wraps a content area that swaps between discrete section views based on a `SectionID` string-literal union plus helper metadata in `sections.tsx`.
 
 ---
 
@@ -65,11 +65,11 @@ The `App.tsx` component is the root orchestrator. It:
 
 ### Component Groups
 
-#### Dashboard (`components/dashboard/`)
+#### Dashboard Helpers (`components/dashboard/`)
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| `DashboardOverview` | `DashboardOverview.tsx` | Operations hub with metric cards, active projects grid, runtime events |
+| `DashboardOverview` | `DashboardOverview.tsx` | Shared overview surface and metric summary used by shell-level panels |
 | `MetricCard` | `DashboardOverview.tsx` | Reusable stat card (active agents, throughput, project load) |
 
 #### Tasks (`widgets/kanban/`, `widgets/issue-detail/`, `components/tasks/`)
