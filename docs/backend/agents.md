@@ -2,7 +2,7 @@
 
 > **Source files:** `apps/backend/internal/agents/types.go`, `apps/backend/internal/agents/registry.go`, `apps/backend/internal/agents/command_runner.go`, `apps/backend/internal/agents/claude_runner.go`, `apps/backend/internal/agents/codex_appserver.go`, `apps/backend/internal/agents/opencode_runner.go`, `apps/backend/internal/agents/gemini_runner.go`, `apps/backend/internal/agents/unsandbox_runner.go`, `apps/backend/internal/agents/config.go`
 
-The agent system provides a unified interface for dispatching work to multiple machine learning coding agents. Each agent provider (Claude, Codex, OpenCode, Gemini, Unsandbox) has a runner implementation that translates the common `TurnRequest` into provider-specific CLI invocations, parses streaming output into normalized events, and returns a `TurnResult`.
+The agent system provides a unified interface for dispatching work to multiple machine learning coding agents. The core provider surface is Claude, Codex, OpenCode, and Gemini. The registry also supports an `UNSANDBOX` provider key, which is defined by the remote runner implementation and dispatches turns through unsandbox.com containers.
 
 ### Provider Constants
 
@@ -12,7 +12,6 @@ graph LR
     P --> CLAUDE
     P --> OPENCODE
     P --> GEMINI
-    P --> UNSANDBOX
 ```
 
 | Constant | Value | Description |
@@ -21,9 +20,14 @@ graph LR
 | `ProviderClaude` | `"CLAUDE"` | Anthropic Claude Code CLI |
 | `ProviderOpenCode` | `"OPENCODE"` | OpenCode CLI agent |
 | `ProviderGemini` | `"GEMINI"` | Google Gemini CLI agent |
-| `ProviderUnsandbox` | `"UNSANDBOX"` | Remote container execution via unsandbox.com |
 
 `NormalizeProvider(s string)` uppercases and trims a provider string for backward compatibility.
+
+The remote Unsandbox runner also exposes:
+
+| Constant | Declared In | Value | Description |
+|---|---|---|---|
+| `ProviderUnsandbox` | `unsandbox_runner.go` | `"UNSANDBOX"` | Remote container execution via unsandbox.com |
 
 ### Core Types
 
@@ -107,7 +111,8 @@ graph TD
 
 `SetCommand` performs intelligent runner selection:
 - If the provider is `CODEX` and the command contains `app-server`, it creates a `CodexAppServerRunner` (JSON-RPC protocol).
-- `CLAUDE` -> `ClaudeRunner`, `OPENCODE` -> `OpenCodeRunner`, `GEMINI` -> `GeminiRunner`, `UNSANDBOX` -> `UnsandboxRunner`.
+- `CLAUDE` -> `ClaudeRunner`, `OPENCODE` -> `OpenCodeRunner`, `GEMINI` -> `GeminiRunner`.
+- `UNSANDBOX` -> `UnsandboxRunner` when the Unsandbox client can be initialized from environment configuration.
 - Unknown providers get a generic `CommandRunner` with optional terminal manager.
 
 ### CommandRunner (Base Implementation)

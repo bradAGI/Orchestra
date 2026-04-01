@@ -196,12 +196,15 @@ sequenceDiagram
     participant API as orchestrad
     participant Agent as ML Agent
 
-    Note over API: Issue created via POST /api/v1/issues
-    API-->>UI: snapshot (issue in TRACKED state)
+    Note over API: Issue created or updated into BACKLOG
+    API-->>UI: snapshot (issue visible in BACKLOG)
 
-    Note over API: Orchestrator picks up issue
+    Note over API: User or workflow moves issue to TODO
+    API-->>UI: snapshot (issue eligible for dispatch)
+
+    Note over API: Orchestrator dispatches issue and advances to IN_PROGRESS
     API-->>UI: RUN_STARTED
-    API-->>UI: snapshot (issue in RUNNING state)
+    API-->>UI: snapshot (issue in IN_PROGRESS state)
 
     loop Agent turns
         Agent->>API: Turn output / events
@@ -212,7 +215,7 @@ sequenceDiagram
     alt Success
         Agent->>API: Exit code 0
         API-->>UI: RUN_SUCCEEDED
-        API-->>UI: snapshot (issue returns to TRACKED/IDLE)
+        API-->>UI: snapshot (issue advances to REVIEW)
     else Failure
         Agent->>API: Exit code != 0
         API-->>UI: RUN_FAILED
