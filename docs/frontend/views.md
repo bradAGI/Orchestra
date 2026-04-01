@@ -158,7 +158,7 @@ For each provider, the dashboard manages:
 
 - **Model config** (`fetchProviderModel` / `updateProviderModel`) -- model name, effort level, temperature
 - **Permissions** (`fetchProviderPermissions` / `updateProviderPermissions`) -- approval mode, allow/deny/ask tool lists, sandbox config
-- **MCP Servers** (`fetchProviderMCPServers` / `addProviderMCPServer` / `deleteProviderMCPServer`) -- per-provider MCP server registration
+- **MCP Servers** (`fetchProviderMCPServers` / `addProviderMCPServer` / `updateProviderMCPServer` / `toggleProviderMCPServer` / `deleteProviderMCPServer`) -- per-provider MCP server registration and enablement control
 - **Hooks** (`fetchProviderHooks` / `updateProviderHooks`) -- lifecycle hooks (event matchers, commands, timeouts)
 - **Config files** (`fetchAgentConfigs` / `updateAgentConfigByPath`) -- raw configuration file editor with markdown preview
 

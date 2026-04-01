@@ -179,16 +179,18 @@ Converts any error to a user-friendly display string.
 | `deleteClaudeInstructions` | DELETE | `/api/v1/agents/claude/instructions` | `void` |
 | `fetchClaudeRules` | GET | `/api/v1/agents/claude/rules` | `ClaudeFileListResponse` |
 | `updateClaudeRule` | POST | `/api/v1/agents/claude/rules` | `void` |
-| `deleteClaudeRule` | DELETE | `/api/v1/agents/claude/rules/:name` | `void` |
+| `deleteClaudeRule` | DELETE | `/api/v1/agents/claude/rules/{name}` | `void` |
 | `fetchClaudeSkills` | GET | `/api/v1/agents/claude/skills` | `ClaudeFileListResponse` |
 | `updateClaudeSkill` | POST | `/api/v1/agents/claude/skills` | `void` |
-| `deleteClaudeSkill` | DELETE | `/api/v1/agents/claude/skills/:name` | `void` |
+| `deleteClaudeSkill` | DELETE | `/api/v1/agents/claude/skills/{name}` | `void` |
 | `fetchClaudeSubAgents` | GET | `/api/v1/agents/claude/subagents` | `ClaudeFileListResponse` |
 | `updateClaudeSubAgent` | POST | `/api/v1/agents/claude/subagents` | `void` |
-| `deleteClaudeSubAgent` | DELETE | `/api/v1/agents/claude/subagents/:name` | `void` |
-| `fetchProviderMCPServers` | GET | `/api/v1/agents/:provider/mcp` | `ProviderMCPServer[]` |
-| `addProviderMCPServer` | POST | `/api/v1/agents/:provider/mcp` | `void` |
-| `deleteProviderMCPServer` | DELETE | `/api/v1/agents/:provider/mcp/:name` | `void` |
+| `deleteClaudeSubAgent` | DELETE | `/api/v1/agents/claude/subagents/{name}` | `void` |
+| `fetchProviderMCPServers` | GET | `/api/v1/agents/{provider}/mcp?project_id=` | `ProviderMCPServer[]` |
+| `addProviderMCPServer` | POST | `/api/v1/agents/{provider}/mcp` | `void` |
+| `updateProviderMCPServer` | PUT | `/api/v1/agents/{provider}/mcp/{name}` | `void` |
+| `toggleProviderMCPServer` | PATCH | `/api/v1/agents/{provider}/mcp/{name}` | `void` |
+| `deleteProviderMCPServer` | DELETE | `/api/v1/agents/{provider}/mcp/{name}` | `void` |
 
 #### MCP (Model Context Protocol)
 
