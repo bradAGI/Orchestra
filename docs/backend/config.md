@@ -60,10 +60,10 @@ For each configuration field, `Load()` follows this precedence:
 | `ORCHESTRA_WORKSPACE_BEFORE_REMOVE` | string | *(empty)* | Shell hook run before workspace removal |
 | `ORCHESTRA_WORKSPACE_BEFORE_RUN` | string | *(empty)* | Shell hook run before each agent run |
 | `ORCHESTRA_WORKSPACE_AFTER_RUN` | string | *(empty)* | Shell hook run after each agent run |
-| `ORCHESTRA_PROJECT_ROOTS` | CSV | *(empty)* | Allowed project root directories |
+| `ORCHESTRA_PROJECT_ROOTS` | CSV | *(empty)* | Additional project root directories used for project discovery and telemetry matching |
 | `ORCHESTRA_GITHUB_CLIENT_ID` | string | *(empty)* | GitHub OAuth client ID |
 | `ORCHESTRA_GITHUB_CLIENT_SECRET` | string | *(empty)* | GitHub OAuth client secret |
-| `ORCHESTRA_MCP_SERVERS` | CSV | *(empty)* | MCP server definitions (format: `name=command,name=command`) |
+| `ORCHESTRA_MCP_SERVERS` | CSV | *(empty)* | MCP server definitions (format: `name=command,name=command`). These are merged with Claude Code MCP server definitions discovered from local Claude config when names do not collide |
 | `ORCHESTRA_TELEMETRY_PROVIDERS` | CSV | `CLAUDE,CODEX,GEMINI,OPENCODE` | Telemetry providers to watch |
 | `ORCHESTRA_TELEMETRY_RETENTION_DAYS` | int | `7` | Days to retain telemetry events before pruning |
 | `ORCHESTRA_TELEMETRY_STORE_RAW_PAYLOAD` | bool | `false` | Whether to persist raw event payloads |
