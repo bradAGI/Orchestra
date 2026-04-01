@@ -164,7 +164,8 @@ A GitHub Issues-backed tracker that maps Orchestra operations to the GitHub REST
 
 - Maps internal states to GitHub `open`/`closed` states
 - Uses `repo-number` format for identifiers (e.g. `orchestra-123`)
-- `DeleteIssue` closes the issue rather than deleting (GitHub does not support true deletion)
+- `UpdateIssue` patches the GitHub issue and then re-fetches the canonical issue payload
+- `DeleteIssue` closes the issue rather than deleting (GitHub does not support true deletion) and cleans up related local database rows when a local warehouse DB is attached
 - `SearchIssues` and `CreateIssue` currently return explicit "not implemented" errors
 
 ---
