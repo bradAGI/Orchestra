@@ -50,7 +50,7 @@ function WidgetInner({ onOpenSettings }: { onOpenSettings?: () => void }) {
           }`}
           title="Orchestra Agent (Ctrl+.)"
         >
-          <AgentIcon className="h-7 w-7" />
+          <AgentIcon className="h-12 w-12" />
           {watchMode.unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white">
               {watchMode.unreadCount > 9 ? '9+' : watchMode.unreadCount}

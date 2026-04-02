@@ -6,6 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Orchestra — a multi-agent orchestration platform that dispatches coding agents (Claude, Codex, OpenCode, Gemini) to resolve issues from project trackers. Go backend + Electron/React desktop app + Bubble Tea TUI.
 
+**Key Features:**
+- **Multi-agent orchestration**: Dispatches work to different coding agents based on provider availability and workload
+- **Embedded Agent Widget**: Floating chat interface with 40+ tools, multi-provider LLM support, voice input via Whisper
+- **Real-time monitoring**: SSE streaming of agent execution events and status updates
+- **Git worktree isolation**: Each issue runs in isolated git worktree to prevent conflicts
+- **Issue tracker integration**: GitHub, SQLite, and memory backends for issue management
+
 ## Build & Run Commands
 
 ### Backend (`apps/backend/`)
@@ -31,6 +38,31 @@ cd apps/desktop && npm run lint         # eslint
 ```bash
 make dash       # run TUI
 make build      # build TUI binary
+make install    # install to /usr/local/bin/orchestra-dash
+```
+
+### Desktop Development Scripts
+```bash
+cd apps/desktop && npm run dev:linux    # dev server with --no-sandbox for Linux
+cd apps/desktop && npm run typecheck    # TypeScript type checking
+cd apps/desktop && npm run lint         # ESLint
+cd apps/desktop && npm run lint:fix     # ESLint with auto-fix
+cd apps/desktop && npm run preview      # preview production build
+cd apps/desktop && npm run dist:desktop # build distributable packages
+```
+
+### Testing Commands
+```bash
+# Backend
+cd apps/backend && go test -coverprofile=coverage.out ./...  # tests with coverage
+cd apps/backend && go test -race ./...                       # race detection
+
+# Desktop
+cd apps/desktop && npx vitest run --reporter=verbose         # verbose test output
+cd apps/desktop && npm run test:smoke-renderer               # renderer smoke test
+cd apps/desktop && npm run smoke:ops:go                      # operations smoke tests (requires backend)
+cd apps/desktop && npm run parity:verify                     # API parity verification
+cd apps/desktop && npm run release:gate                      # full release readiness check
 ```
 
 ### Running the backend
@@ -105,6 +137,16 @@ State management: React hooks + SSE-driven server state, no Redux/Zustand.
 
 SQLite at `{workspace_root}/.orchestra/warehouse.db`. Foreign keys enforced via `_pragma=foreign_keys(1)` in DSN. Delete cascades require `PRAGMA defer_foreign_keys = ON` before the transaction. `sessions.issue_id` was added via ALTER TABLE (no FK constraint) — must be NULLed manually on issue delete.
 
+## Agent Configuration
+
+The desktop app includes an Agents Dashboard for configuring coding agents:
+- **Claude Config**: Edits real `settings.json`, `CLAUDE.md`, rules, skills, and sub-agents
+- **Provider Settings**: Configure API keys, models, and behavior for different agent providers
+- **Skills Management**: Add, edit, and organize agent skills and capabilities
+- **Sub-agent Configuration**: Set up hierarchical agent relationships
+
+Access via the Agents tab in the desktop app. Configuration changes are persisted to the appropriate files in the workspace.
+
 ## Gotchas
 
 - Multiple `orchestrad` processes can accumulate — check with `ps aux | grep orchestrad`
@@ -112,3 +154,4 @@ SQLite at `{workspace_root}/.orchestra/warehouse.db`. Foreign keys enforced via 
 - No `main.go` in `apps/backend/` root — entry point is `cmd/orchestrad/main.go`
 - `UpdateIssue` uses a column whitelist to prevent SQL injection
 - CI sets `GOWORK=off` so backend tests don't depend on the workspace file
+- Frontend dev server expects backend at `127.0.0.1:4010` in development — ensure backend is running with correct host/port
