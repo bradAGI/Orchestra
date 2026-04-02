@@ -46,7 +46,7 @@ expect-cli -m "Navigate to task board. Click Create Task. Fill in title 'Test Ta
 
 **expect-cli:**
 ```bash
-expect-cli -m "Find the test task in Backlog. Click it to open inspector. Click 'Move to Todo'. Verify state changes. Wait 30s and check if orchestrator picks it up (task may auto-advance to InProgress)." -y
+expect-cli -m "Find the test task in Backlog. Click it to open inspector. Click 'Move to Todo'. Verify state changes. Wait 30s and check if orchestrator picks it up (task may auto-advance to In Progress)." -y
 ```
 
 ---
@@ -93,21 +93,21 @@ expect-cli -m "Check the issue Session tab while the run is active. If a related
 
 ---
 
-## Step 5: Auto-Advance to InProgress
+## Step 5: Auto-Advance to In Progress
 
 **Action:** Wait for the planning agent to finish and exit.
 
 **Verify:**
-- [ ] State automatically advances from **Todo** to **InProgress** after the planning run succeeds
+- [ ] State automatically advances from **Todo** to **In Progress** after the planning run succeeds
 - [ ] No manual intervention required
 - [ ] Title and description become **read-only**
 - [ ] Plan from Todo phase is preserved in Plan tab
 
 ---
 
-## Step 6: Verify Execution Phase (InProgress)
+## Step 6: Verify Execution Phase (In Progress)
 
-**Action:** Open the Issue Inspector during InProgress.
+**Action:** Open the Issue Inspector during In Progress.
 
 ### Plan Tab
 - [ ] Shows the plan from the Todo phase
@@ -123,11 +123,11 @@ expect-cli -m "Check the issue Session tab while the run is active. If a related
 - [ ] File list accurate, diff content correct
 
 ### Title & Description
-- [ ] **Read-only** — not editable in InProgress
+- [ ] **Read-only** — not editable in In Progress
 
 **expect-cli:**
 ```bash
-expect-cli -m "Open the test task inspector. Verify state is InProgress. Check Plan tab still has checkboxes. Check Session tab shows live agent execution. Check Changes tab shows files being modified. Verify title is not editable." -y
+expect-cli -m "Open the test task inspector. Verify state is In Progress. Check Plan tab still has checkboxes. Check Session tab shows live agent execution. Check Changes tab shows files being modified. Verify title is not editable." -y
 ```
 
 ---
@@ -137,7 +137,7 @@ expect-cli -m "Open the test task inspector. Verify state is InProgress. Check P
 **Action:** Wait for the execution agent to finish and exit.
 
 **Verify:**
-- [ ] State automatically advances from **InProgress** to **Review**
+- [ ] State automatically advances from **In Progress** to **Review**
 - [ ] No manual intervention required
 - [ ] Agent process has exited cleanly
 
@@ -183,7 +183,7 @@ expect-cli -m "Open the test task inspector in Review state. Verify three button
 
 ### Re-execute path
 - [ ] Select "Re-execute", enter feedback, submit
-- [ ] Issue moves back to **InProgress**
+- [ ] Issue moves back to **In Progress**
 - [ ] Agent re-runs with feedback appended to prompt
 - [ ] After agent finishes, issue returns to **Review**
 
@@ -191,11 +191,11 @@ expect-cli -m "Open the test task inspector in Review state. Verify three button
 - [ ] Select "Re-plan", enter feedback, submit
 - [ ] Issue moves back to **Todo**
 - [ ] Agent re-plans from scratch with feedback context
-- [ ] After planning, auto-advances to InProgress, then Review
+- [ ] After planning, auto-advances to In Progress, then Review
 
 **expect-cli:**
 ```bash
-expect-cli -m "Open the test task in Review. Click Request Changes. Verify feedback dialog opens with Re-execute and Re-plan options. Enter feedback text 'Add error handling for edge cases'. Select Re-execute. Submit. Verify issue moves to InProgress." -y
+expect-cli -m "Open the test task in Review. Click Request Changes. Verify feedback dialog opens with Re-execute and Re-plan options. Enter feedback text 'Add error handling for edge cases'. Select Re-execute. Submit. Verify issue moves to In Progress." -y
 ```
 
 ---
@@ -257,7 +257,7 @@ expect-cli -m "Open the test task in Review (with PR created). Click Close. Veri
 - [ ] User can retry by moving back to Todo
 
 ### Agent Fails During Execution
-- [ ] If agent errors out during InProgress, should NOT advance to Review
+- [ ] If agent errors out during In Progress, should NOT advance to Review
 - [ ] Error visible in Session tab
 - [ ] Changes tab shows partial changes (if any)
 
@@ -281,7 +281,7 @@ expect-cli -m "Open the test task in Review (with PR created). Click Close. Veri
 
 ### Feedback Loop
 - [ ] Empty feedback text → validation prevents submit
-- [ ] Re-plan sends to Todo, Re-execute sends to InProgress
+- [ ] Re-plan sends to Todo, Re-execute sends to In Progress
 - [ ] Feedback text included in agent prompt on re-dispatch
 
 ---
@@ -306,7 +306,7 @@ GitHub Issues / Manual Create / Embedded Agent
         ├── Create PR → PR on GitHub → Done
         │
         ├── Request Changes → feedback dialog
-        │   ├── Re-execute → InProgress (with feedback)
+        │   ├── Re-execute → In Progress (with feedback)
         │   └── Re-plan → Todo (with feedback)
         │
         └── Close → Done (abandon + cleanup)
