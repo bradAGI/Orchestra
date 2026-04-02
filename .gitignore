@@ -7,3 +7,22 @@ apps/tui/tui
 apps/backend/orchestrad
 .worktrees/
 apps/backend/orchestrd
+apps/tui/orchestra-dash
+
+# Additional security patterns
+orchestrd-*
+**/test_*_persistence*
+**/*test*persistence*
+*.tmp
+.env
+.env.local
+*.key
+**/config.local.*
+
+# IDE files
+.vscode/settings.json
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

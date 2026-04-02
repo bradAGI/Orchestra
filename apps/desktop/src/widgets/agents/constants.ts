@@ -1,4 +1,4 @@
-import { Settings2, FileText, Zap, Plug, Scale, Sparkles, Bot } from 'lucide-react'
+import { Settings2, FileText, Zap, Plug, Scale, Sparkles, Bot, ScrollText, TerminalSquare, Shield } from 'lucide-react'
 import type { Provider, CategoryDef } from './types'
 
 export const PROVIDERS: { id: Provider; label: string; description: string }[] = [
@@ -8,7 +8,7 @@ export const PROVIDERS: { id: Provider; label: string; description: string }[] =
   { id: 'opencode', label: 'OpenCode', description: 'Community-driven — flexible and extensible' },
 ]
 
-export const CATEGORIES: CategoryDef[] = [
+export const CLAUDE_CATEGORIES: CategoryDef[] = [
   { id: 'settings', label: 'Settings', icon: Settings2, pinned: true },
   { id: 'instructions', label: 'Instructions', icon: FileText, pinned: true },
   { id: 'agents', label: 'Sub-agents', icon: Bot },
@@ -18,14 +18,29 @@ export const CATEGORIES: CategoryDef[] = [
   { id: 'rules', label: 'Rules', icon: Scale },
 ]
 
-// Legacy categories for non-Claude providers (still use emoji)
-export const LEGACY_CATEGORIES: CategoryDef[] = [
-  { id: 'instructions', label: 'Instructions', icon: '📝', pinned: true },
-  { id: 'skills', label: 'Skills', icon: '⚡' },
-  { id: 'hooks', label: 'Hooks', icon: '🪝' },
-  { id: 'mcp', label: 'MCP Servers', icon: '🔌' },
-  { id: 'rules', label: 'Rules', icon: '📏' },
-  { id: 'agents', label: 'Sub-agents', icon: '🤖' },
+export const CODEX_CATEGORIES: CategoryDef[] = [
+  { id: 'config', label: 'Config', icon: Settings2, pinned: true },
+  { id: 'instructions', label: 'Instructions', icon: ScrollText, pinned: true },
+  { id: 'agents', label: 'Sub-agents', icon: Bot },
+  { id: 'skills', label: 'Skills', icon: Sparkles },
+  { id: 'mcp', label: 'MCP Servers', icon: Plug },
+]
+
+export const GEMINI_CATEGORIES: CategoryDef[] = [
+  { id: 'settings', label: 'Settings', icon: Settings2, pinned: true },
+  { id: 'context', label: 'Context', icon: ScrollText, pinned: true },
+  { id: 'commands', label: 'Commands', icon: TerminalSquare },
+  { id: 'mcp', label: 'MCP Servers', icon: Plug },
+]
+
+export const OPENCODE_CATEGORIES: CategoryDef[] = [
+  { id: 'config', label: 'Config', icon: Settings2, pinned: true },
+  { id: 'instructions', label: 'Instructions', icon: FileText, pinned: true },
+  { id: 'agents', label: 'Agents', icon: Bot },
+  { id: 'commands', label: 'Commands', icon: TerminalSquare },
+  { id: 'skills', label: 'Skills', icon: Sparkles },
+  { id: 'mcp', label: 'MCP Servers', icon: Plug },
+  { id: 'permissions', label: 'Permissions', icon: Shield },
 ]
 
 export const MODELS_BY_PROVIDER: Record<Provider, { value: string; label: string }[]> = {

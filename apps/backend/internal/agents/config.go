@@ -21,45 +21,56 @@ const (
 // AgentConfig represents a single agent configuration file discovered on disk,
 // including its content, filesystem path, category (core vs. skill), and scope.
 type AgentConfig struct {
-	Name     string      `json:"name"`     // e.g. "claude", "gemini", "workspace.json"
-	Content  string      `json:"content"`  // File content
-	Path     string      `json:"path"`     // Full absolute path
-	Category string      `json:"category"` // "CORE" or "SKILL"
-	Scope    ConfigScope `json:"scope"`    // "GLOBAL" or "PROJECT"
+	Name         string      `json:"name"`                    // e.g. "claude", "gemini", "workspace.json"
+	Content      string      `json:"content"`                 // File content
+	Path         string      `json:"path"`                    // Full absolute path
+	Category     string      `json:"category"`                // "CORE" or "SKILL"
+	Scope        ConfigScope `json:"scope"`                   // "GLOBAL" or "PROJECT"
+	Provider     string      `json:"provider,omitempty"`      // e.g. "codex", "gemini"
+	ResourceType string      `json:"resource_type,omitempty"` // e.g. "config", "instructions", "context"
+	Variant      string      `json:"variant,omitempty"`       // e.g. "override", "stack"
+	Priority     int         `json:"priority,omitempty"`      // Lower renders earlier in UI
+	Origin       string      `json:"origin,omitempty"`        // e.g. "global", "project", "workspace"
+	Depth        int         `json:"depth,omitempty"`         // Relative directory depth from the base root
 }
 
 // AgentMeta defines the filesystem layout for each supported agent, mapping agent
 // names to their global config paths, project-local config paths, config format,
 // and skill/sub-agent discovery directories.
 var AgentMeta = map[string]struct {
-	GlobalPaths []string
-	LocalPaths  []string
-	Format      string // "json" or "toml"
-	SkillPaths  []string
+	GlobalPaths      []string
+	LocalPaths       []string
+	Format           string // "json" or "toml"
+	GlobalSkillPaths []string
+	LocalSkillPaths  []string
 }{
 	"claude": {
-		GlobalPaths: []string{".claude/settings.json", ".claude.json"},
-		LocalPaths:  []string{".claude/settings.json", ".claude/settings.local.json"},
-		Format:      "json",
-		SkillPaths:  []string{".claude/agents"}, // Claude sub-agents
+		GlobalPaths:      []string{".claude/settings.json", ".claude.json"},
+		LocalPaths:       []string{".claude/settings.json", ".claude/settings.local.json"},
+		Format:           "json",
+		GlobalSkillPaths: []string{".claude/agents"},
+		LocalSkillPaths:  []string{".claude/agents"},
 	},
 	"codex": {
-		GlobalPaths: []string{".codex/config.toml"},
-		LocalPaths:  []string{".codex/config.toml", "AGENTS.md"},
-		Format:      "toml",
-		SkillPaths:  []string{".codex/skills"},
+		GlobalPaths:      []string{".codex/config.toml", ".codex/AGENTS.md", ".codex/AGENTS.override.md"},
+		LocalPaths:       []string{".codex/config.toml", "AGENTS.md", "AGENTS.override.md"},
+		Format:           "toml",
+		GlobalSkillPaths: []string{".codex/agents", ".agents/skills"},
+		LocalSkillPaths:  []string{".codex/agents", ".agents/skills"},
 	},
 	"gemini": {
-		GlobalPaths: []string{".gemini/settings.json"},
-		LocalPaths:  []string{".gemini/settings.json"},
-		Format:      "json",
-		SkillPaths:  []string{".gemini/agents", ".gemini/skills"},
+		GlobalPaths:      []string{".gemini/settings.json", ".gemini/GEMINI.md"},
+		LocalPaths:       []string{".gemini/settings.json", "GEMINI.md"},
+		Format:           "json",
+		GlobalSkillPaths: []string{".gemini/commands"},
+		LocalSkillPaths:  []string{".gemini/commands"},
 	},
 	"opencode": {
-		GlobalPaths: []string{".config/opencode/opencode.json"},
-		LocalPaths:  []string{"opencode.json"},
-		Format:      "json",
-		SkillPaths:  []string{".config/opencode/agents", ".config/opencode/skills", ".config/opencode/tools"},
+		GlobalPaths:      []string{".config/opencode/opencode.json"},
+		LocalPaths:       []string{"opencode.json"},
+		Format:           "json",
+		GlobalSkillPaths: []string{".config/opencode/agents", ".config/opencode/skills", ".config/opencode/command"},
+		LocalSkillPaths:  []string{".opencode/agents", ".opencode/skills", ".opencode/command"},
 	},
 }
 
@@ -103,11 +114,16 @@ func ListAgentConfigs(workspaceRoot string, projectRoot string) ([]AgentConfig, 
 		path := filepath.Join(orchAgentsDir, name)
 		content := readOrCreate(path)
 		configs = append(configs, AgentConfig{
-			Name:     "Orchestra: " + name,
-			Content:  content,
-			Path:     path,
-			Category: "CORE",
-			Scope:    ScopeGlobal,
+			Name:         "Orchestra: " + name,
+			Content:      content,
+			Path:         path,
+			Category:     "CORE",
+			Scope:        ScopeGlobal,
+			Provider:     "orchestra",
+			ResourceType: "config",
+			Priority:     100,
+			Origin:       "workspace",
+			Depth:        classifyResourceDepth(workspaceRoot, path),
 		})
 	}
 
@@ -121,11 +137,17 @@ func ListAgentConfigs(workspaceRoot string, projectRoot string) ([]AgentConfig, 
 					fullPath := resolvePath(globalPath)
 					if content, err := os.ReadFile(fullPath); err == nil {
 						configs = append(configs, AgentConfig{
-							Name:     fmt.Sprintf("%s (Global)", agentName),
-							Content:  string(content),
-							Path:     fullPath,
-							Category: "CORE",
-							Scope:    ScopeGlobal,
+							Name:         fmt.Sprintf("%s (Global)", agentName),
+							Content:      string(content),
+							Path:         fullPath,
+							Category:     "CORE",
+							Scope:        ScopeGlobal,
+							Provider:     agentName,
+							ResourceType: classifyCoreResourceType(agentName, fullPath),
+							Variant:      classifyResourceVariant(agentName, fullPath),
+							Priority:     classifyResourcePriority(agentName, fullPath, ScopeGlobal),
+							Origin:       classifyResourceOrigin(ScopeGlobal),
+							Depth:        classifyResourceDepth(home, fullPath),
 						})
 						foundGlobal = true
 					}
@@ -137,11 +159,17 @@ func ListAgentConfigs(workspaceRoot string, projectRoot string) ([]AgentConfig, 
 				path := filepath.Join(home, relPath)
 				if content, err := os.ReadFile(path); err == nil {
 					configs = append(configs, AgentConfig{
-						Name:     fmt.Sprintf("%s (Global)", agentName),
-						Content:  string(content),
-						Path:     path,
-						Category: "CORE",
-						Scope:    ScopeGlobal,
+						Name:         fmt.Sprintf("%s (Global)", agentName),
+						Content:      string(content),
+						Path:         path,
+						Category:     "CORE",
+						Scope:        ScopeGlobal,
+						Provider:     agentName,
+						ResourceType: classifyCoreResourceType(agentName, path),
+						Variant:      classifyResourceVariant(agentName, path),
+						Priority:     classifyResourcePriority(agentName, path, ScopeGlobal),
+						Origin:       classifyResourceOrigin(ScopeGlobal),
+						Depth:        classifyResourceDepth(home, path),
 					})
 					break
 				}
@@ -154,37 +182,43 @@ func ListAgentConfigs(workspaceRoot string, projectRoot string) ([]AgentConfig, 
 				path := filepath.Join(projectRoot, relPath)
 				if content, err := os.ReadFile(path); err == nil {
 					configs = append(configs, AgentConfig{
-						Name:     fmt.Sprintf("%s (Project)", agentName),
-						Content:  string(content),
-						Path:     path,
-						Category: "CORE",
-						Scope:    ScopeProject,
+						Name:         fmt.Sprintf("%s (Project)", agentName),
+						Content:      string(content),
+						Path:         path,
+						Category:     "CORE",
+						Scope:        ScopeProject,
+						Provider:     agentName,
+						ResourceType: classifyCoreResourceType(agentName, path),
+						Variant:      classifyResourceVariant(agentName, path),
+						Priority:     classifyResourcePriority(agentName, path, ScopeProject),
+						Origin:       classifyResourceOrigin(ScopeProject),
+						Depth:        classifyResourceDepth(projectRoot, path),
 					})
 				}
 			}
 		}
 
 		// Deep Discovery (Skills/Agents/Tools)
-		for _, relSubDir := range meta.SkillPaths {
-			// Check Global Subdir
+		for _, relSubDir := range meta.GlobalSkillPaths {
 			globalSubDir := filepath.Join(home, relSubDir)
-			configs = append(configs, discoverFilesInDir(globalSubDir, agentName, "SKILL", ScopeGlobal)...)
+			configs = append(configs, discoverFilesInDir(globalSubDir, home, agentName, "SKILL", ScopeGlobal, classifySubdirResourceType(agentName, relSubDir), "global")...)
+		}
 
-			// Check Project Subdir
+		for _, relSubDir := range meta.LocalSkillPaths {
 			if projectRoot != "" {
 				projectSubDir := filepath.Join(projectRoot, relSubDir)
-				configs = append(configs, discoverFilesInDir(projectSubDir, agentName, "SKILL", ScopeProject)...)
+				configs = append(configs, discoverFilesInDir(projectSubDir, projectRoot, agentName, "SKILL", ScopeProject, classifySubdirResourceType(agentName, relSubDir), "project")...)
 			}
 		}
 	}
 
 	// 3. Skills in .codex/skills (Legacy/Internal)
-	configs = append(configs, discoverFilesInDir(filepath.Join(workspaceRoot, ".codex", "skills"), "Orchestra", "SKILL", ScopeGlobal)...)
+	configs = append(configs, discoverFilesInDir(filepath.Join(workspaceRoot, ".codex", "skills"), workspaceRoot, "Orchestra", "SKILL", ScopeGlobal, "skills", "workspace")...)
 
 	return configs, nil
 }
 
-func discoverFilesInDir(dir string, prefix string, category string, scope ConfigScope) []AgentConfig {
+func discoverFilesInDir(dir string, baseRoot string, prefix string, category string, scope ConfigScope, resourceType string, origin string) []AgentConfig {
 	var configs []AgentConfig
 	_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
@@ -200,16 +234,164 @@ func discoverFilesInDir(dir string, prefix string, category string, scope Config
 		if err == nil {
 			rel, _ := filepath.Rel(dir, path)
 			configs = append(configs, AgentConfig{
-				Name:     fmt.Sprintf("%s: %s", prefix, rel),
-				Content:  string(bytes),
-				Path:     path,
-				Category: category,
-				Scope:    scope,
+				Name:         fmt.Sprintf("%s: %s", prefix, rel),
+				Content:      string(bytes),
+				Path:         path,
+				Category:     category,
+				Scope:        scope,
+				Provider:     strings.ToLower(prefix),
+				ResourceType: resourceType,
+				Variant:      classifyResourceVariant(strings.ToLower(prefix), path),
+				Priority:     classifyResourcePriority(strings.ToLower(prefix), path, scope),
+				Origin:       origin,
+				Depth:        classifyResourceDepth(baseRoot, path),
 			})
 		}
 		return nil
 	})
 	return configs
+}
+
+func classifyCoreResourceType(provider string, path string) string {
+	lowerPath := strings.ToLower(path)
+	base := filepath.Base(lowerPath)
+	switch provider {
+	case "codex":
+		if base == "config.toml" {
+			return "config"
+		}
+		if base == "agents.md" || base == "agents.override.md" {
+			return "instructions"
+		}
+	case "gemini":
+		if base == "settings.json" {
+			return "settings"
+		}
+		if base == "gemini.md" {
+			return "context"
+		}
+	case "opencode":
+		if base == "opencode.json" || base == "opencode.jsonc" {
+			return "config"
+		}
+	case "claude":
+		if base == "settings.json" || base == ".claude.json" {
+			return "settings"
+		}
+	}
+	return "config"
+}
+
+func classifySubdirResourceType(provider string, relSubDir string) string {
+	lower := strings.ToLower(relSubDir)
+	switch provider {
+	case "codex":
+		if strings.Contains(lower, "/agents") {
+			return "agents"
+		}
+		if strings.Contains(lower, "/skills") {
+			return "skills"
+		}
+	case "gemini":
+		if strings.Contains(lower, "/commands") {
+			return "commands"
+		}
+	case "opencode":
+		if strings.Contains(lower, "/agents") {
+			return "agents"
+		}
+		if strings.Contains(lower, "/skills") {
+			return "skills"
+		}
+		if strings.Contains(lower, "/command") {
+			return "commands"
+		}
+	}
+	return "skills"
+}
+
+func classifyResourceVariant(provider string, path string) string {
+	lowerPath := strings.ToLower(path)
+	base := filepath.Base(lowerPath)
+	switch provider {
+	case "codex":
+		if base == "agents.override.md" {
+			return "override"
+		}
+		if base == "agents.md" {
+			return "stack"
+		}
+	case "gemini":
+		if base == "gemini.md" {
+			return "context"
+		}
+	}
+	return ""
+}
+
+func classifyResourcePriority(provider string, path string, scope ConfigScope) int {
+	lowerPath := strings.ToLower(path)
+	base := filepath.Base(lowerPath)
+	isGlobal := scope == ScopeGlobal
+	switch provider {
+	case "codex":
+		switch base {
+		case "config.toml":
+			if isGlobal {
+				return 5
+			}
+			return 15
+		case "agents.md":
+			if isGlobal {
+				return 20
+			}
+			return 30
+		case "agents.override.md":
+			if isGlobal {
+				return 40
+			}
+			return 50
+		}
+	case "gemini":
+		switch base {
+		case "settings.json":
+			if isGlobal {
+				return 5
+			}
+			return 15
+		case "gemini.md":
+			if isGlobal {
+				return 20
+			}
+			return 30
+		}
+	}
+	if isGlobal {
+		return 80
+	}
+	return 90
+}
+
+func classifyResourceOrigin(scope ConfigScope) string {
+	if scope == ScopeGlobal {
+		return "global"
+	}
+	return "project"
+}
+
+func classifyResourceDepth(baseRoot string, path string) int {
+	if baseRoot == "" {
+		return 0
+	}
+	rel, err := filepath.Rel(baseRoot, path)
+	if err != nil {
+		return 0
+	}
+	dir := filepath.Dir(rel)
+	if dir == "." || dir == "" {
+		return 0
+	}
+	return strings.Count(filepath.ToSlash(dir), "/") + 1
 }
 
 // UpdateConfigByPath writes content to the given absolute path, creating any

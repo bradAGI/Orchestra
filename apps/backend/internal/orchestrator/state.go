@@ -473,75 +473,154 @@ func (s *Service) UpdateConfigByPath(path string, content string) error {
 // specified provider and scope, returning the full path to the created file.
 func (s *Service) CreateAgentResource(provider, resourceType, name, scope, projectID string) (string, error) {
 	home, _ := os.UserHomeDir()
-	var baseDir string
+	var rootDir string
 
 	// 1. Resolve Base Directory
 	if scope == "project" && projectID != "" {
 		if p, err := s.db.GetProjectByID(context.Background(), projectID); err == nil {
-			baseDir = p.RootPath
+			rootDir = p.RootPath
 		} else {
 			return "", fmt.Errorf("project not found: %w", err)
 		}
 	} else {
-		baseDir = home
+		rootDir = home
 	}
 
-	// 2. Resolve Sub-directory based on agent metadata
-	meta, ok := agents.AgentMeta[provider]
-	if !ok {
-		// Fallback for internal orchestra files
-		if provider == "Orchestra" {
-			if resourceType == "skill" {
-				baseDir = filepath.Join(s.workspaceRoot, ".codex", "skills")
-			} else {
-				baseDir = filepath.Join(s.workspaceRoot, ".orchestra", "agents")
-			}
-		} else {
-			return "", fmt.Errorf("unknown provider: %s", provider)
-		}
-	} else {
-		// Use first skill path as default for new skills
-		if len(meta.SkillPaths) > 0 {
-			if scope == "project" {
-				// For project scope, we use relative paths if they don't start with .config
-				rel := meta.SkillPaths[0]
-				if strings.HasPrefix(rel, ".config") {
-					// Hack: OpenCode uses .config in home but usually .opencode in projects
-					baseDir = filepath.Join(baseDir, ".opencode", "skills")
-				} else {
-					baseDir = filepath.Join(baseDir, rel)
-				}
-			} else {
-				baseDir = filepath.Join(home, meta.SkillPaths[0])
-			}
-		}
+	fullPath, content, err := buildAgentResource(rootDir, provider, resourceType, name, scope)
+	if err != nil {
+		return "", err
 	}
-
-	// 3. Ensure extension
-	ext := ".json"
-	if resourceType == "skill" {
-		ext = ".md"
-	}
-	if !strings.HasSuffix(name, ext) {
-		name += ext
-	}
-
-	fullPath := filepath.Join(baseDir, name)
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
 		return "", err
 	}
-
-	// 4. Initial Content
-	content := "{}"
-	if resourceType == "skill" {
-		content = "---\nname: " + strings.TrimSuffix(name, ".md") + "\ndescription: New agent skill\n---\n\n# New Skill\n"
-	}
-
 	if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
 		return "", err
 	}
 
 	return fullPath, nil
+}
+
+func buildAgentResource(rootDir, provider, resourceType, name, scope string) (string, string, error) {
+	slug := sanitizeAgentResourceName(name)
+	switch provider {
+	case "codex":
+		return buildCodexResource(rootDir, resourceType, slug, scope)
+	case "gemini":
+		return buildGeminiResource(rootDir, resourceType, slug, scope)
+	case "opencode":
+		return buildOpenCodeResource(rootDir, resourceType, slug, scope)
+	case "claude":
+		return buildClaudeResource(rootDir, resourceType, slug, scope)
+	case "Orchestra":
+		if resourceType == "skill" {
+			return filepath.Join(rootDir, ".codex", "skills", slug+".md"), "---\nname: "+slug+"\ndescription: New agent skill\n---\n\n# "+humanizeAgentResourceName(slug)+"\n", nil
+		}
+		return filepath.Join(rootDir, ".orchestra", "agents", slug+".json"), "{}", nil
+	default:
+		return "", "", fmt.Errorf("unknown provider: %s", provider)
+	}
+}
+
+func buildClaudeResource(rootDir, resourceType, slug, scope string) (string, string, error) {
+	switch resourceType {
+	case "agents":
+		return filepath.Join(rootDir, ".claude", "agents", slug, "AGENT.md"), fmt.Sprintf("---\nname: %s\ndescription: Describe what this agent does\nmodel: sonnet\ntools: Read, Grep, Glob, Bash\npermissionMode: default\nmaxTurns: 50\n---\n\nYou are a specialized agent. Describe your role and instructions here.\n", slug), nil
+	case "skills", "skill":
+		return filepath.Join(rootDir, ".claude", "skills", slug+".md"), fmt.Sprintf("---\nname: %s\ndescription: Describe what this skill does\ntrigger: manual\n---\n\n# %s\n\nSkill instructions go here.\n", slug, humanizeAgentResourceName(slug)), nil
+	case "rules", "rule":
+		return filepath.Join(rootDir, ".claude", "rules", slug+".md"), fmt.Sprintf("---\npaths:\n  - \"src/**/*.ts\"\n  - \"src/**/*.tsx\"\n---\n\n# %s\n\nDescribe the rule here.\n", humanizeAgentResourceName(slug)), nil
+	default:
+		return "", "", fmt.Errorf("unsupported Claude resource type: %s", resourceType)
+	}
+}
+
+func buildCodexResource(rootDir, resourceType, slug, scope string) (string, string, error) {
+	switch resourceType {
+	case "config":
+		return filepath.Join(rootDir, ".codex", "config.toml"), "# Codex configuration\n", nil
+	case "instructions":
+		if scope == "project" {
+			return filepath.Join(rootDir, "AGENTS.md"), "# Project Instructions\n", nil
+		}
+		return filepath.Join(rootDir, ".codex", "AGENTS.md"), "# Global Instructions\n", nil
+	case "agents":
+		return filepath.Join(rootDir, ".codex", "agents", slug+".toml"), fmt.Sprintf("name = \"%s\"\ndescription = \"Describe what this sub-agent does\"\nmodel = \"gpt-5.3-codex\"\n", slug), nil
+	case "skills", "skill":
+		return filepath.Join(rootDir, ".agents", "skills", slug, "SKILL.md"), fmt.Sprintf("---\nname: %s\ndescription: Describe what this skill does\n---\n\n# %s\n\nSkill instructions go here.\n", slug, humanizeAgentResourceName(slug)), nil
+	default:
+		return "", "", fmt.Errorf("unsupported Codex resource type: %s", resourceType)
+	}
+}
+
+func buildGeminiResource(rootDir, resourceType, slug, scope string) (string, string, error) {
+	switch resourceType {
+	case "settings":
+		return filepath.Join(rootDir, ".gemini", "settings.json"), "{\n  \"mcpServers\": {}\n}\n", nil
+	case "context":
+		if scope == "project" {
+			return filepath.Join(rootDir, "GEMINI.md"), "# Project Context\n", nil
+		}
+		return filepath.Join(rootDir, ".gemini", "GEMINI.md"), "# Global Context\n", nil
+	case "commands":
+		return filepath.Join(rootDir, ".gemini", "commands", slug+".toml"), fmt.Sprintf("description = \"%s\"\nprompt = \"Describe the task this command should run\"\n", humanizeAgentResourceName(slug)), nil
+	default:
+		return "", "", fmt.Errorf("unsupported Gemini resource type: %s", resourceType)
+	}
+}
+
+func buildOpenCodeResource(rootDir, resourceType, slug, scope string) (string, string, error) {
+	switch resourceType {
+	case "config":
+		base := "opencode.json"
+		if scope != "project" {
+			base = filepath.Join(".config", "opencode", "opencode.json")
+		}
+		return filepath.Join(rootDir, base), "{\n  \"$schema\": \"https://opencode.ai/config.json\"\n}\n", nil
+	case "agents":
+		dir := ".opencode/agents"
+		if scope != "project" {
+			dir = ".config/opencode/agents"
+		}
+		return filepath.Join(rootDir, dir, slug+".md"), fmt.Sprintf("---\ndescription: Describe what this agent does\nmode: subagent\n---\n\nYou are %s. Describe your role and instructions here.\n", humanizeAgentResourceName(slug)), nil
+	case "commands":
+		dir := ".opencode/command"
+		if scope != "project" {
+			dir = ".config/opencode/command"
+		}
+		return filepath.Join(rootDir, dir, slug+".md"), fmt.Sprintf("---\ndescription: Describe what this command does\nagent: build\n---\n\nRun %s.\n", humanizeAgentResourceName(slug)), nil
+	case "skills", "skill":
+		dir := ".opencode/skills"
+		if scope != "project" {
+			dir = ".config/opencode/skills"
+		}
+		return filepath.Join(rootDir, dir, slug, "SKILL.md"), fmt.Sprintf("# %s\n\nDescribe what this skill does.\n", humanizeAgentResourceName(slug)), nil
+	default:
+		return "", "", fmt.Errorf("unsupported OpenCode resource type: %s", resourceType)
+	}
+}
+
+func sanitizeAgentResourceName(name string) string {
+	slug := strings.TrimSpace(strings.ToLower(name))
+	slug = strings.ReplaceAll(slug, " ", "-")
+	slug = strings.ReplaceAll(slug, ":", "-")
+	if slug == "" {
+		return "new-resource"
+	}
+	return slug
+}
+
+func humanizeAgentResourceName(name string) string {
+	parts := strings.FieldsFunc(name, func(r rune) bool { return r == '-' || r == '_' })
+	for i, part := range parts {
+		if part == "" {
+			continue
+		}
+		parts[i] = strings.ToUpper(part[:1]) + part[1:]
+	}
+	if len(parts) == 0 {
+		return "New Resource"
+	}
+	return strings.Join(parts, " ")
 }
 
 // SetStateSets configures which issue states are considered active (dispatchable)

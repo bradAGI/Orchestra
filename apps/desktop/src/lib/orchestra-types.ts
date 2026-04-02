@@ -235,6 +235,12 @@ export type AgentConfig = {
   path: string
   category: 'CORE' | 'SKILL'
   scope: 'GLOBAL' | 'PROJECT'
+  provider?: string
+  resource_type?: string
+  variant?: string
+  priority?: number
+  origin?: string
+  depth?: number
 }
 
 /** A documentation file or folder in the docs tree. */

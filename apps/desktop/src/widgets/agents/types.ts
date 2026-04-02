@@ -3,7 +3,18 @@ import type { AgentConfig } from '@/lib/orchestra-types'
 import type { ProviderPermissions, ProviderModelConfig, ProviderHook } from '@/lib/orchestra-client'
 
 export type Provider = 'claude' | 'codex' | 'gemini' | 'opencode'
-export type CategoryId = 'settings' | 'instructions' | 'agents' | 'skills' | 'hooks' | 'mcp' | 'rules'
+export type CategoryId =
+  | 'settings'
+  | 'config'
+  | 'instructions'
+  | 'context'
+  | 'agents'
+  | 'skills'
+  | 'hooks'
+  | 'mcp'
+  | 'rules'
+  | 'commands'
+  | 'permissions'
 export type Scope = 'GLOBAL' | 'PROJECT'
 
 export interface CategoryDef {

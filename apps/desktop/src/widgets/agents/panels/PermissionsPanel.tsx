@@ -4,14 +4,16 @@ import { Save, Loader2, RotateCcw, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { ProviderPermissions } from '@/lib/orchestra-client'
 import { APPROVAL_MODES } from '../constants'
+import type { Provider } from '../types'
 
 interface PermissionsPanelProps {
   permissions: ProviderPermissions
   saving: string | null
   onSave: (perms: ProviderPermissions) => Promise<void>
+  provider: Provider
 }
 
-export function PermissionsPanel({ permissions, saving, onSave }: PermissionsPanelProps) {
+export function PermissionsPanel({ permissions, saving, onSave, provider }: PermissionsPanelProps) {
   const [mode, setMode] = useState(permissions.approval_mode)
   const [allow, setAllow] = useState<string[]>(permissions.allow)
   const [deny, setDeny] = useState<string[]>(permissions.deny)
@@ -97,7 +99,7 @@ export function PermissionsPanel({ permissions, saving, onSave }: PermissionsPan
       <div className="flex items-center justify-between shrink-0">
         <div>
           <h3 className="text-sm font-bold">Permissions</h3>
-          <p className="text-[10px] text-muted-foreground/50 mt-0.5">Control which tools Claude can use</p>
+          <p className="text-[10px] text-muted-foreground/50 mt-0.5">Control which tools this provider can use</p>
         </div>
         {isDirty && (
           <div className="flex items-center gap-2">
@@ -120,7 +122,7 @@ export function PermissionsPanel({ permissions, saving, onSave }: PermissionsPan
           onChange={e => setMode(e.target.value)}
           className="px-2 py-1.5 rounded-md bg-muted/10 border border-border/30 text-xs focus:outline-none focus:border-primary/30"
         >
-          {APPROVAL_MODES.claude.map(m => (
+          {(APPROVAL_MODES[provider] ?? APPROVAL_MODES.claude).map(m => (
             <option key={m.value} value={m.value}>{m.label}</option>
           ))}
         </select>

@@ -116,7 +116,7 @@ async function startManagedBackend() {
   const workspaceRoot = path.join(app.getPath('userData'), 'workspaces')
   await fs.mkdir(workspaceRoot, { recursive: true })
 
-  const child = spawn(backendBin, [], {
+  const child = spawn(backendBin, ['start'], {
     cwd: path.dirname(backendBin),
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {

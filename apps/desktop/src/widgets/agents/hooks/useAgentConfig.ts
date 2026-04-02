@@ -8,7 +8,7 @@ import type {
 } from '@/lib/orchestra-client'
 import {
   fetchAgentConfigs, updateAgentConfigByPath, createAgentResource,
-  fetchProjects, fetchMCPTools, fetchMCPServers, createMCPServer, deleteMCPServer,
+  fetchProjects, fetchMCPTools, fetchMCPServers, deleteMCPServer,
   fetchProviderMCPServers, addProviderMCPServer, updateProviderMCPServer, toggleProviderMCPServer, deleteProviderMCPServer,
   fetchProviderPermissions, updateProviderPermissions,
   fetchProviderModel, updateProviderModel,
@@ -111,11 +111,15 @@ export function useAgentConfig(
       const p = provider.toLowerCase()
       const nameMatch = c.name.toLowerCase().includes(p)
       const cat = c.category as string
+      const path = c.path.toLowerCase()
       switch (category) {
+        case 'config': return cat === 'CORE' && nameMatch
         case 'instructions': return cat === 'CORE' && nameMatch
-        case 'skills': return cat === 'SKILL' && !c.path.includes('/agents/') && nameMatch
+        case 'context': return cat === 'CORE' && nameMatch
+        case 'skills': return cat === 'SKILL' && !path.includes('/commands/') && (!path.includes('/agents/') || path.includes('/agents/skills/')) && nameMatch
+        case 'commands': return path.includes('/commands/') && nameMatch
         case 'rules': return cat === 'RULE' && nameMatch
-        case 'agents': return c.path.includes('/agents/') && nameMatch
+        case 'agents': return path.includes('/agents/') && !path.includes('/agents/skills/') && nameMatch
         default: return false
       }
     })
@@ -123,12 +127,16 @@ export function useAgentConfig(
 
   const categoryCounts = useMemo((): Record<CategoryId, number> => ({
     settings: 0,
+    config: configsByCategory('config').length,
     instructions: configsByCategory('instructions').length,
+    context: configsByCategory('context').length,
     agents: configsByCategory('agents').length,
     skills: configsByCategory('skills').length,
     hooks: hooks.length,
     mcp: providerMcpServers.length + orchestraMcpServers.length,
     rules: configsByCategory('rules').length,
+    commands: configsByCategory('commands').length,
+    permissions: 1,
   }), [configsByCategory, hooks, providerMcpServers, orchestraMcpServers])
 
   const reload = useCallback(async () => {
