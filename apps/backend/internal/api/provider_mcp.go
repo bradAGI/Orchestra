@@ -959,15 +959,17 @@ const (
 )
 
 // detectMCPType dynamically determines MCP type by checking configuration sources
+// Priority: .claude.json takes precedence over settings.json
 func detectMCPType(home, mcpName string) MCPType {
+	// Check if it's configured in .claude.json mcpServers FIRST
+	// This takes precedence over settings.json for MCPs that appear in both
+	if isInClaudeConfig(home, mcpName) {
+		return MCPTypeConfigured
+	}
+
 	// Check if it's plugin-based by looking for matching enabledPlugins entry
 	if findPluginName(home, mcpName) != "" {
 		return MCPTypePlugin
-	}
-
-	// Check if it's configured in .claude.json mcpServers
-	if isInClaudeConfig(home, mcpName) {
-		return MCPTypeConfigured
 	}
 
 	// If it's available but not in either config, it's system-level
