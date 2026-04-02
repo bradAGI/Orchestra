@@ -122,6 +122,7 @@ func NewRouterWithPubSub(
 	protected.Post("/api/v1/agents/claude/settings", server.PostClaudeSettings)
 	protected.Get("/api/v1/agents/claude/instructions", server.GetClaudeInstructions)
 	protected.Post("/api/v1/agents/claude/instructions", server.PostClaudeInstructions)
+	protected.Delete("/api/v1/agents/claude/instructions", server.DeleteClaudeInstructions)
 	protected.Get("/api/v1/agents/claude/rules", server.GetClaudeRules)
 	protected.Post("/api/v1/agents/claude/rules", server.PostClaudeRule)
 	protected.Delete("/api/v1/agents/claude/rules/{name}", server.DeleteClaudeRule)
@@ -134,6 +135,8 @@ func NewRouterWithPubSub(
 
 	protected.Get("/api/v1/agents/{provider}/mcp", server.GetProviderMCPServers)
 	protected.Post("/api/v1/agents/{provider}/mcp", server.AddProviderMCPServer)
+	protected.Put("/api/v1/agents/{provider}/mcp/{name}", server.UpdateProviderMCPServer)
+	protected.Patch("/api/v1/agents/{provider}/mcp/{name}", server.ToggleProviderMCPServer)
 	protected.Delete("/api/v1/agents/{provider}/mcp/{name}", server.DeleteProviderMCPServer)
 	protected.Get("/api/v1/agents/{provider}/permissions", server.GetProviderPermissions)
 	protected.Post("/api/v1/agents/{provider}/permissions", server.PostProviderPermissions)

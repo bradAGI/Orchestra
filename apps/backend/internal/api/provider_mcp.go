@@ -703,3 +703,370 @@ func deleteGeminiMCP(home, name string) error {
 	cfg["mcpServers"] = mcpServers
 	return writeGeminiConfig(home, cfg)
 }
+
+// UpdateProviderMCPServer handles PUT /api/v1/agents/{provider}/mcp/{name} by updating an MCP server
+func (s *Server) UpdateProviderMCPServer(w http.ResponseWriter, r *http.Request) {
+	provider := chi.URLParam(r, "provider")
+	name := chi.URLParam(r, "name")
+	provider = strings.ToLower(provider)
+
+	var req ProviderMCPServer
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "Invalid JSON")
+		return
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "home_dir", "cannot determine home directory")
+		return
+	}
+
+	switch provider {
+	case "claude":
+		err = updateClaudeMCP(homeDir, name, req)
+	case "codex":
+		err = updateCodexMCP(homeDir, name, req)
+	case "opencode":
+		err = updateOpenCodeMCP(homeDir, name, req)
+	case "gemini":
+		err = updateGeminiMCP(homeDir, name, req)
+	default:
+		writeJSONError(w, http.StatusBadRequest, "unknown_provider", fmt.Sprintf("unknown provider: %s", provider))
+		return
+	}
+
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "update_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// ToggleProviderMCPServer handles PATCH /api/v1/agents/{provider}/mcp/{name} by toggling enabled status
+func (s *Server) ToggleProviderMCPServer(w http.ResponseWriter, r *http.Request) {
+	provider := chi.URLParam(r, "provider")
+	name := chi.URLParam(r, "name")
+	provider = strings.ToLower(provider)
+
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_json", "Invalid JSON")
+		return
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "home_dir", "cannot determine home directory")
+		return
+	}
+
+	switch provider {
+	case "claude":
+		err = toggleClaudeMCP(homeDir, name, req.Enabled)
+	case "codex":
+		err = toggleCodexMCP(homeDir, name, req.Enabled)
+	case "opencode":
+		err = toggleOpenCodeMCP(homeDir, name, req.Enabled)
+	case "gemini":
+		err = toggleGeminiMCP(homeDir, name, req.Enabled)
+	default:
+		writeJSONError(w, http.StatusBadRequest, "unknown_provider", fmt.Sprintf("unknown provider: %s", provider))
+		return
+	}
+
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "toggle_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":  "ok",
+		"enabled": req.Enabled,
+	})
+}
+
+// updateClaudeMCP updates an MCP server in Claude's config
+func updateClaudeMCP(home, name string, server ProviderMCPServer) error {
+	cfg, err := readClaudeConfig(home)
+	if err != nil {
+		return err
+	}
+
+	mcpServers, ok := cfg["mcpServers"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("mcp server %s not found", name)
+	}
+
+	if _, exists := mcpServers[name]; !exists {
+		return fmt.Errorf("mcp server %s not found", name)
+	}
+
+	// Create updated server entry
+	entry := map[string]any{
+		"command": server.Command,
+		"enabled": server.Enabled,
+	}
+
+	if len(server.Args) > 0 {
+		entry["args"] = server.Args
+	}
+	if server.URL != "" {
+		entry["url"] = server.URL
+	}
+	if len(server.Env) > 0 {
+		entry["env"] = server.Env
+	}
+	if server.Type != "" {
+		entry["type"] = server.Type
+	}
+
+	// Update with new name if different
+	if server.Name != "" && server.Name != name {
+		delete(mcpServers, name)
+		mcpServers[server.Name] = entry
+	} else {
+		mcpServers[name] = entry
+	}
+
+	cfg["mcpServers"] = mcpServers
+	return writeClaudeConfig(home, cfg)
+}
+
+// toggleClaudeMCP toggles the enabled status of a Claude MCP server
+func toggleClaudeMCP(home, name string, enabled bool) error {
+	cfg, err := readClaudeConfig(home)
+	if err != nil {
+		return err
+	}
+
+	mcpServers, ok := cfg["mcpServers"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("mcp server %s not found", name)
+	}
+
+	server, exists := mcpServers[name]
+	if !exists {
+		return fmt.Errorf("mcp server %s not found", name)
+	}
+
+	serverMap, ok := server.(map[string]any)
+	if !ok {
+		return fmt.Errorf("invalid server format for %s", name)
+	}
+
+	serverMap["enabled"] = enabled
+	mcpServers[name] = serverMap
+	cfg["mcpServers"] = mcpServers
+	return writeClaudeConfig(home, cfg)
+}
+
+// updateCodexMCP updates an MCP server in Codex's config
+func updateCodexMCP(home, name string, server ProviderMCPServer) error {
+	cfg, err := readCodexConfig(home)
+	if err != nil {
+		return err
+	}
+
+	mcpServers, ok := cfg["mcp_servers"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("mcp server %s not found", name)
+	}
+
+	if _, exists := mcpServers[name]; !exists {
+		return fmt.Errorf("mcp server %s not found", name)
+	}
+
+	// Create updated server entry
+	entry := map[string]any{
+		"command": server.Command,
+		"enabled": server.Enabled,
+	}
+
+	if len(server.Args) > 0 {
+		entry["args"] = server.Args
+	}
+	if len(server.Env) > 0 {
+		entry["env"] = server.Env
+	}
+
+	// Update with new name if different
+	if server.Name != "" && server.Name != name {
+		delete(mcpServers, name)
+		mcpServers[server.Name] = entry
+	} else {
+		mcpServers[name] = entry
+	}
+
+	cfg["mcp_servers"] = mcpServers
+	return writeCodexConfig(home, cfg)
+}
+
+// toggleCodexMCP toggles the enabled status of a Codex MCP server
+func toggleCodexMCP(home, name string, enabled bool) error {
+	cfg, err := readCodexConfig(home)
+	if err != nil {
+		return err
+	}
+
+	mcpServers, ok := cfg["mcp_servers"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("mcp server %s not found", name)
+	}
+
+	server, exists := mcpServers[name]
+	if !exists {
+		return fmt.Errorf("mcp server %s not found", name)
+	}
+
+	serverMap, ok := server.(map[string]any)
+	if !ok {
+		return fmt.Errorf("invalid server format for %s", name)
+	}
+
+	serverMap["enabled"] = enabled
+	mcpServers[name] = serverMap
+	cfg["mcp_servers"] = mcpServers
+	return writeCodexConfig(home, cfg)
+}
+
+// updateOpenCodeMCP updates an MCP server in OpenCode's config
+func updateOpenCodeMCP(home, name string, server ProviderMCPServer) error {
+	cfg, err := readOpenCodeConfig(home)
+	if err != nil {
+		return err
+	}
+
+	mcp, ok := cfg["mcp"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("mcp server %s not found", name)
+	}
+
+	if _, exists := mcp[name]; !exists {
+		return fmt.Errorf("mcp server %s not found", name)
+	}
+
+	// Create updated server entry
+	entry := map[string]any{
+		"command": server.Command,
+		"enabled": server.Enabled,
+	}
+
+	if len(server.Args) > 0 {
+		entry["args"] = server.Args
+	}
+	if len(server.Env) > 0 {
+		entry["env"] = server.Env
+	}
+
+	// Update with new name if different
+	if server.Name != "" && server.Name != name {
+		delete(mcp, name)
+		mcp[server.Name] = entry
+	} else {
+		mcp[name] = entry
+	}
+
+	cfg["mcp"] = mcp
+	return writeOpenCodeConfig(home, cfg)
+}
+
+// toggleOpenCodeMCP toggles the enabled status of an OpenCode MCP server
+func toggleOpenCodeMCP(home, name string, enabled bool) error {
+	cfg, err := readOpenCodeConfig(home)
+	if err != nil {
+		return err
+	}
+
+	mcp, ok := cfg["mcp"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("mcp server %s not found", name)
+	}
+
+	server, exists := mcp[name]
+	if !exists {
+		return fmt.Errorf("mcp server %s not found", name)
+	}
+
+	serverMap, ok := server.(map[string]any)
+	if !ok {
+		return fmt.Errorf("invalid server format for %s", name)
+	}
+
+	serverMap["enabled"] = enabled
+	mcp[name] = serverMap
+	cfg["mcp"] = mcp
+	return writeOpenCodeConfig(home, cfg)
+}
+
+// updateGeminiMCP updates an MCP server in Gemini's config
+func updateGeminiMCP(home, name string, server ProviderMCPServer) error {
+	cfg, err := readGeminiConfig(home)
+	if err != nil {
+		return err
+	}
+
+	mcpServers, ok := cfg["mcpServers"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("mcp server %s not found", name)
+	}
+
+	if _, exists := mcpServers[name]; !exists {
+		return fmt.Errorf("mcp server %s not found", name)
+	}
+
+	// Create updated server entry
+	entry := map[string]any{
+		"command": server.Command,
+		"enabled": server.Enabled,
+	}
+
+	if len(server.Args) > 0 {
+		entry["args"] = server.Args
+	}
+	if len(server.Env) > 0 {
+		entry["env"] = server.Env
+	}
+
+	// Update with new name if different
+	if server.Name != "" && server.Name != name {
+		delete(mcpServers, name)
+		mcpServers[server.Name] = entry
+	} else {
+		mcpServers[name] = entry
+	}
+
+	cfg["mcpServers"] = mcpServers
+	return writeGeminiConfig(home, cfg)
+}
+
+// toggleGeminiMCP toggles the enabled status of a Gemini MCP server
+func toggleGeminiMCP(home, name string, enabled bool) error {
+	cfg, err := readGeminiConfig(home)
+	if err != nil {
+		return err
+	}
+
+	mcpServers, ok := cfg["mcpServers"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("mcp server %s not found", name)
+	}
+
+	server, exists := mcpServers[name]
+	if !exists {
+		return fmt.Errorf("mcp server %s not found", name)
+	}
+
+	serverMap, ok := server.(map[string]any)
+	if !ok {
+		return fmt.Errorf("invalid server format for %s", name)
+	}
+
+	serverMap["enabled"] = enabled
+	mcpServers[name] = serverMap
+	cfg["mcpServers"] = mcpServers
+	return writeGeminiConfig(home, cfg)
+}
