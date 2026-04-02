@@ -100,7 +100,7 @@ Key behaviors:
 
 The GitHub client (`github.NewClient`) interfaces with GitHub Issues via the REST API v3:
 
-- **Authentication**: Bearer token via `Authorization: token {token}` header.
+- **Authentication**: GitHub token authentication via `Authorization: token {token}` header.
 - **State mapping**: Maps Orchestra states to GitHub's `open`/`closed` binary. States like `done`, `closed`, `completed` map to GitHub `closed`.
 - **Identifier format**: `{repo}-{number}` (e.g. `orchestra-42`).
 - **Delete**: Implemented as closing the issue (GitHub does not support true deletion).

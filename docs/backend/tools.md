@@ -162,6 +162,7 @@ An in-memory tracker used for tests and fallback scenarios. It keeps issue state
 
 A GitHub Issues-backed tracker that maps Orchestra operations to the GitHub REST API:
 
+- Uses GitHub token authentication via `Authorization: token {token}`
 - Maps internal states to GitHub `open`/`closed` states
 - Uses `repo-number` format for identifiers (e.g. `orchestra-123`)
 - `UpdateIssue` patches the GitHub issue and then re-fetches the canonical issue payload
