@@ -332,6 +332,7 @@ type claudeCodeSettings struct {
 		Args    []string `json:"args,omitempty"`
 		Env     map[string]string `json:"env,omitempty"`
 	} `json:"mcpServers,omitempty"`
+	EnabledPlugins map[string]bool `json:"enabledPlugins,omitempty"`
 }
 
 // readClaudeCodeMCPServers attempts to read MCP servers from Claude Code configuration
@@ -372,6 +373,80 @@ func readClaudeCodeMCPServers() map[string]string {
 			command += " " + strings.Join(server.Args, " ")
 		}
 		out[name] = command
+	}
+
+	// Read from enabled plugins
+	cacheDir := filepath.Join(home, ".claude", "plugins", "cache")
+	pluginsDir := filepath.Join(home, ".claude", "plugins", "marketplaces")
+
+	for pluginName, enabled := range config.EnabledPlugins {
+		if !enabled {
+			continue
+		}
+
+		// Parse plugin name format: "plugin-name@marketplace-name"
+		parts := strings.Split(pluginName, "@")
+		if len(parts) != 2 {
+			continue
+		}
+		plugin, marketplace := parts[0], parts[1]
+
+		// Try cache directory first (latest versions)
+		cachePath := filepath.Join(cacheDir, marketplace, plugin, "latest", ".mcp.json")
+		if mcpData, err := os.ReadFile(cachePath); err == nil {
+			var mcpConfig map[string]struct {
+				Command string   `json:"command"`
+				Args    []string `json:"args"`
+			}
+			if json.Unmarshal(mcpData, &mcpConfig) == nil {
+				for serverName, server := range mcpConfig {
+					command := server.Command
+					if len(server.Args) > 0 {
+						command += " " + strings.Join(server.Args, " ")
+					}
+					out[serverName] = command
+				}
+				continue // Found in cache, skip other locations
+			}
+		}
+
+		// Try marketplace directory as fallback
+		pluginPath := filepath.Join(pluginsDir, marketplace, "external_plugins", plugin, ".claude-plugin", "plugin.json")
+		if pluginData, err := os.ReadFile(pluginPath); err == nil {
+			var pluginConfig struct {
+				MCPServers map[string]struct {
+					Command string   `json:"command"`
+					Args    []string `json:"args"`
+				} `json:"mcpServers,omitempty"`
+			}
+			if json.Unmarshal(pluginData, &pluginConfig) == nil {
+				for serverName, server := range pluginConfig.MCPServers {
+					command := server.Command
+					if len(server.Args) > 0 {
+						command += " " + strings.Join(server.Args, " ")
+					}
+					out[serverName] = command
+				}
+			}
+		}
+
+		// Also try reading .mcp.json directly from marketplace
+		mcpPath := filepath.Join(pluginsDir, marketplace, ".mcp.json")
+		if mcpData, err := os.ReadFile(mcpPath); err == nil {
+			var mcpConfig map[string]struct {
+				Command string   `json:"command"`
+				Args    []string `json:"args"`
+			}
+			if json.Unmarshal(mcpData, &mcpConfig) == nil {
+				for serverName, server := range mcpConfig {
+					command := server.Command
+					if len(server.Args) > 0 {
+						command += " " + strings.Join(server.Args, " ")
+					}
+					out[serverName] = command
+				}
+			}
+		}
 	}
 
 	return out
