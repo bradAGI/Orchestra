@@ -49,7 +49,7 @@ flowchart LR
 | `ORCHESTRA_TRACKER_TOKEN` | string | _(none)_ | Authentication token for the tracker |
 | `ORCHESTRA_TRACKER_WORKER_ASSIGNEE_IDS` | CSV | _(none)_ | Comma-separated assignee IDs for worker filtering |
 | `ORCHESTRA_ACTIVE_STATES` | CSV | `Todo, In Progress` | Comma-separated list of states considered active |
-| `ORCHESTRA_TERMINAL_STATES` | CSV | `Done, Cancelled, Canceled, Closed, Duplicate` | Comma-separated list of terminal states |
+| `ORCHESTRA⚠ /home/traves/.codex/skills/using-openlens/SKILL.md: invalid YAML: mapping values are not allowed in this context at line 2 column 66_TERMINAL_STATES` | CSV | `Done, Cancelled, Canceled, Closed, Duplicate` | Comma-separated list of terminal states |
 
 ### Workspace
 
