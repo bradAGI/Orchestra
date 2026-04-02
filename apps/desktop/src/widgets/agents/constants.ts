@@ -1,4 +1,4 @@
-import { Settings2, FileText, Shield, Zap, Plug, Scale, Sparkles, Bot } from 'lucide-react'
+import { Settings2, FileText, Zap, Plug, Scale, Sparkles, Bot } from 'lucide-react'
 import type { Provider, CategoryDef } from './types'
 
 export const PROVIDERS: { id: Provider; label: string; description: string }[] = [
@@ -11,12 +11,11 @@ export const PROVIDERS: { id: Provider; label: string; description: string }[] =
 export const CATEGORIES: CategoryDef[] = [
   { id: 'settings', label: 'Settings', icon: Settings2, pinned: true },
   { id: 'instructions', label: 'Instructions', icon: FileText, pinned: true },
-  { id: 'permissions', label: 'Permissions', icon: Shield },
+  { id: 'agents', label: 'Sub-agents', icon: Bot },
+  { id: 'skills', label: 'Skills', icon: Sparkles },
   { id: 'hooks', label: 'Hooks', icon: Zap },
   { id: 'mcp', label: 'MCP Servers', icon: Plug },
   { id: 'rules', label: 'Rules', icon: Scale },
-  { id: 'skills', label: 'Skills', icon: Sparkles },
-  { id: 'agents', label: 'Sub-agents', icon: Bot },
 ]
 
 // Legacy categories for non-Claude providers (still use emoji)

@@ -1,72 +1,60 @@
 // apps/desktop/src/widgets/agents/ProviderHeader.tsx
-import type { ProviderPermissions, ProviderModelConfig } from '@/lib/orchestra-client'
 import type { Project } from '@/lib/orchestra-types'
+import { getAgentIcon } from '@/components/app-shell/shared/controls'
 import { CustomDropdown } from '@/components/app-shell/shared/controls'
 import { Folder } from 'lucide-react'
-import { MODELS_BY_PROVIDER, EFFORT_LEVELS } from './constants'
+import { AppTooltip } from '@/components/ui/tooltip-wrapper'
+import { PROVIDERS } from './constants'
 import type { Provider, Scope } from './types'
 
 interface ProviderHeaderProps {
   provider: Provider
-  modelConfig: ProviderModelConfig
-  permissions: ProviderPermissions
+  onProviderChange: (provider: Provider) => void
   scope: Scope
   projectId: string
   projects: Project[]
-  onModelChange: (model: ProviderModelConfig) => void
-  onPermissionsChange: (perms: ProviderPermissions) => void
   onScopeChange: (scope: Scope, projectId: string) => void
 }
 
 export function ProviderHeader({
-  provider, modelConfig, permissions, scope, projectId, projects,
-  onModelChange, onPermissionsChange, onScopeChange,
+  provider, onProviderChange,
+  scope, projectId, projects, onScopeChange,
 }: ProviderHeaderProps) {
-  const models = MODELS_BY_PROVIDER[provider] ?? []
-  const efforts = EFFORT_LEVELS[provider] ?? []
-
   const scopeOptions = [
     { label: 'Global', value: 'GLOBAL', icon: <Folder size={10} className="text-muted-foreground/50" /> },
     ...projects.map(p => ({ label: p.name, value: p.id, icon: <Folder size={10} className="text-primary/60" /> })),
   ]
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2 border-b border-border/20 bg-card/20">
-      <div className="flex items-center gap-2 flex-1 min-w-0">
-        <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40 shrink-0">Model</label>
-        <CustomDropdown
-          className="min-w-[140px]"
-          value={modelConfig.model}
-          options={models}
-          onChange={(val) => onModelChange({ ...modelConfig, model: val })}
-          placeholder="Select model"
-        />
-
-        {efforts.length > 0 && (
-          <>
-            <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40 shrink-0 ml-2">Effort</label>
-            <div className="flex items-center gap-0.5">
-              {efforts.map((level) => (
-                <button
-                  key={level}
-                  type="button"
-                  onClick={() => onModelChange({ ...modelConfig, effort: level })}
-                  className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase transition-all ${
-                    modelConfig.effort === level
-                      ? 'bg-primary/15 text-primary border border-primary/30'
-                      : 'text-muted-foreground/40 hover:text-foreground hover:bg-muted/30 border border-transparent'
-                  }`}
-                >
-                  {level}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-
-
+    <div className="flex items-center gap-3 px-3 py-1.5 border-b border-border/20 bg-card/20">
+      {/* Provider tabs */}
+      <div className="flex items-center gap-1">
+        {PROVIDERS.map(({ id, label, description }) => {
+          const isSelected = provider === id
+          return (
+            <AppTooltip key={id} content={<div className="flex flex-col gap-0.5"><span>{label}</span><span className="text-[8px] font-bold text-muted-foreground/70 normal-case tracking-normal">{description}</span></div>} side="bottom">
+              <button
+                type="button"
+                onClick={() => onProviderChange(id)}
+                className={`relative flex items-center justify-center w-8 h-8 rounded-lg transition-all ${
+                  isSelected
+                    ? 'bg-primary/15 border border-primary/30'
+                    : 'border border-transparent hover:bg-muted/30 hover:border-border/20'
+                }`}
+                aria-label={label}
+                aria-pressed={isSelected}
+              >
+                {getAgentIcon(id, 18)}
+              </button>
+            </AppTooltip>
+          )
+        })}
       </div>
 
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Scope dropdown */}
       <CustomDropdown
         className="min-w-[130px] shrink-0"
         value={scope === 'GLOBAL' ? 'GLOBAL' : projectId}
