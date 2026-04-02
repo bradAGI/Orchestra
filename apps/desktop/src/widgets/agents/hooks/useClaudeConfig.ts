@@ -9,7 +9,7 @@ import type {
 } from '@/lib/orchestra-client'
 import {
   fetchClaudeSettings, updateClaudeSettings,
-  fetchClaudeInstructions, updateClaudeInstructions,
+  fetchClaudeInstructions, updateClaudeInstructions, deleteClaudeInstructions,
   fetchClaudeRules, updateClaudeRule, deleteClaudeRule,
   fetchClaudeSkills, updateClaudeSkill, deleteClaudeSkill,
   fetchClaudeSubAgents, updateClaudeSubAgent, deleteClaudeSubAgent,
@@ -17,7 +17,7 @@ import {
   fetchProviderPermissions, updateProviderPermissions,
   fetchProviderModel, updateProviderModel,
   fetchProviderHooks, updateProviderHooks,
-  fetchProviderMCPServers, addProviderMCPServer, deleteProviderMCPServer,
+  fetchProviderMCPServers, addProviderMCPServer, updateProviderMCPServer, toggleProviderMCPServer, deleteProviderMCPServer,
   fetchMCPServers, fetchMCPTools,
 } from '@/lib/orchestra-client'
 import type { Scope } from '../types'
@@ -55,6 +55,7 @@ export interface ClaudeConfigState {
   // Mutations
   saveSettings: (settings: Record<string, unknown>) => Promise<void>
   saveInstructions: (content: string) => Promise<void>
+  deleteInstructions: () => Promise<void>
   saveRule: (name: string, content: string) => Promise<void>
   removeRule: (name: string) => Promise<void>
   saveSkill: (name: string, content: string) => Promise<void>
@@ -65,6 +66,8 @@ export interface ClaudeConfigState {
   saveModel: (model: ProviderModelConfig) => Promise<void>
   saveHooks: (hooks: ProviderHook[]) => Promise<void>
   addMCPServer: (name: string, command: string) => Promise<void>
+  updateMCPServer: (name: string, server: Partial<ProviderMCPServer>) => Promise<void>
+  toggleMCPServer: (name: string, enabled: boolean) => Promise<void>
   deleteMCPServer: (name: string) => Promise<void>
   deleteOrchestraMCPServer: (name: string) => Promise<void>
   reload: () => Promise<void>
@@ -191,6 +194,17 @@ export function useClaudeConfig(
     finally { setSaving(null) }
   }, [backendConfig, scopeStr, projId, instructionsPath])
 
+  const deleteInstructions = useCallback(async () => {
+    if (!backendConfig) return
+    setSaving('instructions')
+    try {
+      await deleteClaudeInstructions(backendConfig, scopeStr, projId)
+      setInstructions('')
+      setInstructionsExists(false)
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    finally { setSaving(null) }
+  }, [backendConfig, scopeStr, projId])
+
   const saveRule = useCallback(async (name: string, content: string) => {
     if (!backendConfig) return
     setSaving(name)
@@ -303,6 +317,27 @@ export function useClaudeConfig(
     finally { setSaving(null) }
   }, [backendConfig, reload])
 
+  const updateMCP = useCallback(async (name: string, server: Partial<ProviderMCPServer>) => {
+    if (!backendConfig) return
+    setSaving('mcp')
+    try {
+      await updateProviderMCPServer(backendConfig, 'claude', name, server)
+      await reload()
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    finally { setSaving(null) }
+  }, [backendConfig, reload])
+
+  const toggleMCP = useCallback(async (name: string, enabled: boolean) => {
+    if (!backendConfig) return
+    setSaving('mcp')
+    try {
+      await toggleProviderMCPServer(backendConfig, 'claude', name, enabled)
+      // Update local state immediately for better UX
+      setProviderMcpServers(prev => prev.map(s => s.name === name ? { ...s, enabled } : s))
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    finally { setSaving(null) }
+  }, [backendConfig])
+
   const deleteMCP = useCallback(async (name: string) => {
     if (!backendConfig) return
     setSaving('mcp')
@@ -334,12 +369,14 @@ export function useClaudeConfig(
     permissions, modelConfig, hooks,
     providerMcpServers, orchestraMcpServers, mcpTools,
     loading, error, saving,
-    saveSettings, saveInstructions,
+    saveSettings, saveInstructions, deleteInstructions,
     saveRule, removeRule,
     saveSkill, removeSkill,
     saveSubAgent, removeSubAgent,
     savePermissions, saveModel, saveHooks,
     addMCPServer: addMCP,
+    updateMCPServer: updateMCP,
+    toggleMCPServer: toggleMCP,
     deleteMCPServer: deleteMCP,
     deleteOrchestraMCPServer: deleteOrchMCP,
     reload, setError,

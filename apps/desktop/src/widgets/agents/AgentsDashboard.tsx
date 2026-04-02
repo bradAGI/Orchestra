@@ -3,7 +3,6 @@ import { useState, useMemo } from 'react'
 import { AlertCircle } from 'lucide-react'
 import type { BackendConfig, SnapshotPayload } from '@/lib/orchestra-types'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ProviderTabs } from './ProviderTabs'
 import { ProviderHeader } from './ProviderHeader'
 import { CategoryList } from './CategoryList'
 import { SettingsPanel } from './panels/SettingsPanel'
@@ -13,11 +12,10 @@ import { HooksPanel } from './panels/HooksPanel'
 import { MCPPanel } from './panels/MCPPanel'
 import { RulesPanel } from './panels/RulesPanel'
 import { SubAgentsPanel } from './panels/SubAgentsPanel'
-import { PermissionsPanel } from './panels/PermissionsPanel'
 import { useClaudeConfig } from './hooks/useClaudeConfig'
 import { useAgentConfig } from './hooks/useAgentConfig'
 import { CATEGORIES, LEGACY_CATEGORIES } from './constants'
-import type { Provider, CategoryId, Scope, PanelProps } from './types'
+import type { Provider, CategoryId, Scope } from './types'
 
 interface AgentsDashboardProps {
   config: BackendConfig | null
@@ -57,7 +55,6 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
     return {
       settings: 1,
       instructions: claude.instructionsExists ? 1 : 0,
-      permissions: (claude.permissions.allow.length + claude.permissions.deny.length + claude.permissions.ask.length),
       hooks: claude.hooks.length,
       mcp: claude.providerMcpServers.length + claude.orchestraMcpServers.length,
       rules: claude.rules.length,
@@ -74,99 +71,11 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
 
   const categoryCounts = isClaude ? claudeCounts : legacyCounts
 
-  // Items for the category sidebar (file-list categories)
-  const claudeItemsForCategory = useMemo(() => {
-    if (!isClaude || !category) return []
-    switch (category) {
-      case 'rules': return claude.rules
-      case 'skills': return claude.skills
-      case 'agents': return claude.subagents
-      default: return []
-    }
-  }, [isClaude, category, claude.rules, claude.skills, claude.subagents])
-
-  const legacyItemsForCategory = useMemo(() => {
-    if (isClaude || !category) return []
-    const legacyState = legacy as ReturnType<typeof useAgentConfig>
-    return legacyState.configsByCategory(category).map(c => ({
-      name: c.name.split('/').pop() ?? c.name,
-      path: c.path,
-    }))
-  }, [isClaude, category, legacy])
-
-  const itemsForCategory = isClaude ? claudeItemsForCategory : legacyItemsForCategory
 
   const handleSelectCategory = (id: CategoryId) => {
     setCategory(id)
-    if (isClaude) {
-      // Auto-select first item for list-based categories
-      if (['rules', 'skills', 'agents'].includes(id)) {
-        const items = id === 'rules' ? claude.rules : id === 'skills' ? claude.skills : claude.subagents
-        setSelectedItem(items.length > 0 ? items[0].name : null)
-      } else {
-        setSelectedItem(null)
-      }
-    } else {
-      const legacyState = legacy as ReturnType<typeof useAgentConfig>
-      const items = legacyState.configsByCategory(id)
-      if (['instructions', 'skills', 'rules', 'agents'].includes(id) && items.length > 0) {
-        setSelectedItem(items[0].path)
-      } else {
-        setSelectedItem(null)
-      }
-    }
+    setSelectedItem(null)
   }
-
-  const handleAddNew = () => {
-    if (!category) return
-    if (isClaude) {
-      const name = window.prompt(`New ${category} name:`)
-      if (!name?.trim()) return
-      switch (category) {
-        case 'rules': claude.saveRule(name.trim(), ''); break
-        case 'skills': claude.saveSkill(name.trim(), ''); break
-        case 'agents': claude.saveSubAgent(name.trim(), ''); break
-      }
-    } else {
-      const typeMap: Record<string, string> = {
-        instructions: 'CORE', skills: 'SKILL', hooks: '', mcp: '', rules: 'RULE', agents: 'AGENT',
-      }
-      const type = typeMap[category] ?? ''
-      if (!type) return
-      const name = window.prompt(`New ${category} name:`)
-      if (name?.trim()) {
-        (legacy as ReturnType<typeof useAgentConfig>).createResource(type, name.trim())
-      }
-    }
-  }
-
-  // Legacy panel props for non-Claude providers
-  const legacyPanelProps: PanelProps | null = !isClaude ? {
-    items: (legacy as ReturnType<typeof useAgentConfig>).configsByCategory(category ?? 'instructions'),
-    selectedItem,
-    onSelectItem: setSelectedItem,
-    onSave: (legacy as ReturnType<typeof useAgentConfig>).saveConfig,
-    onDelete: async (path) => {
-      const name = path.split('/').pop() ?? path
-      if (window.confirm(`Delete "${name}"? This will remove the file from disk.`)) {
-        await (legacy as ReturnType<typeof useAgentConfig>).deleteConfig(path)
-      }
-    },
-    onCreate: async (name) => {
-      const typeMap: Record<string, string> = {
-        instructions: 'CORE', skills: 'SKILL', rules: 'RULE', agents: 'AGENT',
-      }
-      const type = category ? (typeMap[category] ?? '') : ''
-      if (type) await (legacy as ReturnType<typeof useAgentConfig>).createResource(type, name)
-    },
-    loading: legacy.loading,
-    saving: legacy.saving,
-    provider,
-  } : null
-
-  const showAddNew = isClaude
-    ? ['rules', 'skills', 'agents'].includes(category ?? '')
-    : ['instructions', 'skills', 'rules', 'agents'].includes(category ?? '')
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -178,45 +87,29 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
         </div>
       )}
 
-      <div className="flex flex-1 min-h-0">
-        {/* Column 1: Provider tabs */}
-        <ProviderTabs
-          selected={provider}
-          onSelect={(p) => {
+      <div className="flex flex-col flex-1 min-h-0">
+        {/* Header bar: provider tabs + scope */}
+        <ProviderHeader
+          provider={provider}
+          onProviderChange={(p) => {
             setProvider(p)
             setCategory(p === 'claude' ? 'settings' : 'instructions')
             setSelectedItem(null)
           }}
-          configuredSet={new Set<Provider>(['claude'])}
+          scope={scope}
+          projectId={projectId}
+          projects={isClaude ? claude.projects : (legacy as ReturnType<typeof useAgentConfig>).projects}
+          onScopeChange={(s, pid) => { setScope(s); setProjectId(pid) }}
         />
 
-        {/* Column 2+3 wrapper */}
-        <div className="flex flex-col flex-1 min-w-0">
-          {/* Header bar */}
-          <ProviderHeader
-            provider={provider}
-            modelConfig={isClaude ? claude.modelConfig : (legacy as ReturnType<typeof useAgentConfig>).modelConfig}
-            permissions={isClaude ? claude.permissions : (legacy as ReturnType<typeof useAgentConfig>).permissions}
-            scope={scope}
-            projectId={projectId}
-            projects={isClaude ? claude.projects : (legacy as ReturnType<typeof useAgentConfig>).projects}
-            onModelChange={(m) => isClaude ? claude.saveModel(m) : (legacy as ReturnType<typeof useAgentConfig>).saveModel(m)}
-            onPermissionsChange={(p) => isClaude ? claude.savePermissions(p) : (legacy as ReturnType<typeof useAgentConfig>).savePermissions(p)}
-            onScopeChange={(s, pid) => { setScope(s); setProjectId(pid) }}
-          />
-
-          {/* Main content: category list + detail panel */}
-          <div className="flex flex-1 min-h-0">
+        {/* Main content: category list + detail panel */}
+        <div className="flex flex-1 min-h-0">
             {/* Column 2: Category list */}
             <CategoryList
               categories={categories}
               selectedCategory={category}
-              selectedItem={selectedItem}
               categoryCounts={categoryCounts}
-              itemsForCategory={itemsForCategory}
               onSelectCategory={handleSelectCategory}
-              onSelectItem={setSelectedItem}
-              onAddNew={showAddNew ? handleAddNew : undefined}
             />
 
             {/* Column 3: Detail panel */}
@@ -241,13 +134,7 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                       exists={claude.instructionsExists}
                       saving={claude.saving}
                       onSave={claude.saveInstructions}
-                    />
-                  )}
-                  {category === 'permissions' && (
-                    <PermissionsPanel
-                      permissions={claude.permissions}
-                      saving={claude.saving}
-                      onSave={claude.savePermissions}
+                      onDelete={claude.deleteInstructions}
                     />
                   )}
                   {category === 'hooks' && (
@@ -258,6 +145,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                       providerServers={claude.providerMcpServers}
                       orchestraServers={claude.orchestraMcpServers}
                       onAddProvider={claude.addMCPServer}
+                      onUpdateProvider={claude.updateMCPServer}
+                      onToggleProvider={claude.toggleMCPServer}
                       onDeleteProvider={claude.deleteMCPServer}
                       onDeleteOrchestra={claude.deleteOrchestraMCPServer}
                       loading={claude.loading}
@@ -292,10 +181,10 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                 </>
               ) : (
                 <>
-                  {category === 'instructions' && legacyPanelProps && <InstructionsPanel content="" path="" exists={false} saving={null} onSave={async () => {}} />}
-                  {category === 'skills' && legacyPanelProps && <SkillsPanel items={[]} saving={null} onSave={async () => {}} onDelete={async () => {}} />}
+                  {category === 'instructions' && <InstructionsPanel content="" path="" exists={false} saving={null} onSave={async () => {}} />}
+                  {category === 'skills' && <SkillsPanel items={[]} saving={null} onSave={async () => {}} onDelete={async () => {}} />}
                   {category === 'hooks' && <HooksPanel hooks={(legacy as ReturnType<typeof useAgentConfig>).hooks} onSave={(legacy as ReturnType<typeof useAgentConfig>).saveHooks} loading={legacy.loading} saving={legacy.saving} provider={provider} />}
-                  {category === 'mcp' && <MCPPanel providerServers={(legacy as ReturnType<typeof useAgentConfig>).providerMcpServers} orchestraServers={(legacy as ReturnType<typeof useAgentConfig>).orchestraMcpServers} onAddProvider={(legacy as ReturnType<typeof useAgentConfig>).addMCPServer} onDeleteProvider={(legacy as ReturnType<typeof useAgentConfig>).deleteMCPServer} onDeleteOrchestra={(legacy as ReturnType<typeof useAgentConfig>).deleteOrchestraMCPServer} loading={legacy.loading} saving={legacy.saving} provider={provider} />}
+                  {category === 'mcp' && <MCPPanel providerServers={(legacy as ReturnType<typeof useAgentConfig>).providerMcpServers} orchestraServers={(legacy as ReturnType<typeof useAgentConfig>).orchestraMcpServers} onAddProvider={(legacy as ReturnType<typeof useAgentConfig>).addMCPServer} onUpdateProvider={(legacy as ReturnType<typeof useAgentConfig>).updateMCPServer} onToggleProvider={(legacy as ReturnType<typeof useAgentConfig>).toggleMCPServer} onDeleteProvider={(legacy as ReturnType<typeof useAgentConfig>).deleteMCPServer} onDeleteOrchestra={(legacy as ReturnType<typeof useAgentConfig>).deleteOrchestraMCPServer} loading={legacy.loading} saving={legacy.saving} provider={provider} />}
                   {category === 'rules' && <RulesPanel items={[]} saving={null} onSave={async () => {}} onDelete={async () => {}} />}
                   {category === 'agents' && <SubAgentsPanel items={[]} saving={null} onSave={async () => {}} onDelete={async () => {}} />}
                   {!category && (
@@ -309,6 +198,5 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
           </div>
         </div>
       </div>
-    </div>
   )
 }

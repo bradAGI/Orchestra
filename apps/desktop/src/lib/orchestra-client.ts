@@ -1279,6 +1279,22 @@ export async function addProviderMCPServer(config: BackendConfig, provider: stri
  * @param provider - Provider name.
  * @param name - Name of the MCP server to remove.
  */
+export async function updateProviderMCPServer(config: BackendConfig, provider: string, name: string, server: Partial<ProviderMCPServer>): Promise<void> {
+    await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/mcp/${encodeURIComponent(name)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(server),
+    })
+}
+
+export async function toggleProviderMCPServer(config: BackendConfig, provider: string, name: string, enabled: boolean): Promise<void> {
+    await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/mcp/${encodeURIComponent(name)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+    })
+}
+
 export async function deleteProviderMCPServer(config: BackendConfig, provider: string, name: string): Promise<void> {
     await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/mcp/${encodeURIComponent(name)}`, { method: 'DELETE' })
 }
@@ -1441,6 +1457,12 @@ export async function updateClaudeInstructions(config: BackendConfig, scope: str
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ content, path }),
   })
+}
+
+export async function deleteClaudeInstructions(config: BackendConfig, scope: string, projectId?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/claude/instructions?${params}`, { method: 'DELETE' })
 }
 
 export async function fetchClaudeRules(config: BackendConfig, scope: string, projectId?: string): Promise<ClaudeFileListResponse> {
