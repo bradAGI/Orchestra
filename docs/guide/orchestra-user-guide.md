@@ -163,7 +163,7 @@ The Git tab supports working-tree review, branch operations, stash/conflict hand
 | **Agents** | Global agent configurations |
 | **Analytics** | Token usage and session archives |
 | **Sandbox** | Remote code execution |
-| **Settings** | Backend profiles, integrations, notifications, shortcuts, and migration controls |
+| **Settings** | Backend profiles, integrations, notifications, and shortcuts |
 | **Documentation** | User and engineering guides |
 
 ---

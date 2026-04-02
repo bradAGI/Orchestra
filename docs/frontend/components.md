@@ -24,7 +24,7 @@ All navigation is driven by the `SectionID` type defined in `apps/desktop/src/ap
 | `AGENTS` | Agents | Compute | Global agent configurations |
 | `WAREHOUSE` | Analytics | Analytics | Token usage and session archives |
 | `SANDBOX` | Sandbox | Compute | Remote code execution via unsandbox |
-| `SETTINGS` | Settings | System | Backend profiles, integrations, notifications, shortcuts, and migration controls |
+| `SETTINGS` | Settings | System | Backend profiles, integrations, notifications, and shortcuts |
 | `DOCS` | Documentation | Knowledge | User and engineering guides |
 
 The `getSectionVisibility()` function returns a `SectionVisibility` record mapping each section to a boolean, used by `App.tsx` to conditionally render the appropriate view component.
