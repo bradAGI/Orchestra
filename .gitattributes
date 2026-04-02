@@ -8,33 +8,30 @@
 # 🚫 FORCE THESE PATTERNS TO NEVER BE TRACKED
 # ------------------------------------------------------------------------------
 
-# Orchestra-specific binaries - NEVER track these
-orchestrd* -filter
-orchestra-dash* -filter
-apps/backend/orchestrd* -filter
-apps/tui/orchestra* -filter
+# Orchestra-specific binaries - Mark as binary to prevent diff attempts
+orchestrd* binary
+orchestra-dash* binary
+apps/backend/orchestrd* binary
+apps/tui/orchestra* binary
 
-# General executables - NEVER track these
-*.exe -filter
-*.bin -filter
-*.dll -filter
-*.so -filter
-*.dylib -filter
-*.a -filter
-*.o -filter
+# General executables - Mark as binary
+*.exe binary
+*.bin binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.a binary
+*.o binary
 
-# Database files - NEVER track these
-*.db -filter
-*.sqlite* -filter
-warehouse.db* -filter
+# Database files - Mark as binary
+*.db binary
+*.sqlite* binary
+warehouse.db* binary
 
-# Sensitive config files - NEVER track these
-.env* -filter
-*.key -filter
-*.pem -filter
-*secret* -filter
-*credential* -filter
-*password* -filter
+# Sensitive config files - These should never be tracked
+.env* text
+*.key text
+*.pem text
 
 # ------------------------------------------------------------------------------
 # 📝 FORCE TEXT HANDLING FOR CODE FILES
@@ -74,8 +71,8 @@ Makefile text eol=lf
 # ------------------------------------------------------------------------------
 # 📋 PROTECTION SUMMARY
 # ------------------------------------------------------------------------------
-# The -filter attribute prevents these files from being stored in git
-# even if someone explicitly tries to add them with git add -f
+# Binary markings ensure Git doesn't try to diff these file types
+# and handles them appropriately if they somehow get tracked.
 #
-# This provides an additional safety net beyond .gitignore!
+# Primary protection comes from .gitignore and pre-commit hook!
 # ==============================================================================
