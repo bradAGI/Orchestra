@@ -7,6 +7,21 @@ Backend endpoints for managing LLM provider API keys used by the embedded agent 
 
 ---
 
+## Request Flow
+
+```mermaid
+flowchart LR
+    Settings["Settings > Integrations"] --> Client["orchestra-client helpers"]
+    Client --> Get["GET /api/v1/config/agent-providers"]
+    Client --> Post["POST /api/v1/config/agent-providers"]
+    Get --> API["agent_providers.go"]
+    Post --> API
+    API --> Store["~/.orchestra/agent-providers.json"]
+    Store --> API
+    API --> Client
+    Client --> Renderer["Embedded agent provider config in renderer memory"]
+```
+
 ## Endpoints
 
 ### GET /api/v1/config/agent-providers

@@ -9,6 +9,28 @@
 
 The embedded agent is a floating chat widget built into the Orchestra desktop app. It acts as an in-app assistant that can navigate the UI, call Orchestra APIs, render rich UI inline via json-render, and connect to MCP servers for extensible tooling. All inference runs client-side in the renderer using AI SDK `streamText()` — there is no server-side chat endpoint.
 
+```mermaid
+flowchart LR
+    User["User"] --> Panel["EmbeddedAgentWidget / EmbeddedAgentPanel"]
+    Panel --> Provider["EmbeddedAgentProvider"]
+    Provider --> Chat["useEmbeddedChat"]
+    Provider --> Watch["useWatchMode"]
+    Provider --> Scheduler["useScheduler"]
+    Chat --> SDK["AI SDK streamText()"]
+    SDK --> Model["Selected LLM Provider"]
+    SDK --> Tools["Tool Registry"]
+    Tools --> API["Orchestra REST API"]
+    Tools --> Nav["App Navigation"]
+    Tools --> MCP["MCP Bridge"]
+    Tools --> UI["render_ui"]
+    UI --> Json["JsonRenderBlock"]
+    Watch --> SSE["Orchestrator SSE"]
+    Scheduler --> Panel
+    Json --> Panel
+    API --> Panel
+    Nav --> Panel
+```
+
 ---
 
 ## Module Structure
@@ -71,6 +93,28 @@ The widget communicates with the rest of the app through `onNavigate`, the Orche
 ---
 
 ## Data Flow
+
+```mermaid
+flowchart TD
+    Input["User input: text or voice"] --> Voice{"Voice input?"}
+    Voice -->|Yes| STT["Backend STT when healthy, otherwise local Whisper"]
+    Voice -->|No| Chat["useEmbeddedChat"]
+    STT --> Chat
+    Chat --> Provider["createProvider(providerId, apiKey)"]
+    Provider --> Stream["streamText({ model, system, messages, tools, experimental_activeTools })"]
+    Stream --> Text["Progressive text stream"]
+    Stream --> Calls["Tool calls"]
+    Text --> Bubble["MessageBubble markdown render"]
+    Calls --> ToolKinds["Orchestra API, navigation, render_ui, meta-tools"]
+    ToolKinds --> Results["Tool results"]
+    Results --> Loop["Fed back to model up to maxSteps: 10"]
+    Loop --> Stream
+    Results --> Render{"json_render result?"}
+    Render -->|Yes| Json["Attach jsonRenderSpec"]
+    Json --> Bubble
+    Render -->|No| Bubble
+    Bubble --> Persist["Persist conversation in localStorage"]
+```
 
 ```
 User input (text or voice via backend-or-local Whisper)

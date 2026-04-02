@@ -4,6 +4,27 @@
 
 ---
 
+## Component Map
+
+```mermaid
+flowchart TD
+    Widget["EmbeddedAgentWidget"] --> Panel["EmbeddedAgentPanel"]
+    Widget --> Provider["EmbeddedAgentProvider"]
+    Provider --> ChatHooks["useEmbeddedChat / useProviderConfig / useWatchMode / useScheduler / useContextSuggestions"]
+    Panel --> Header["Panel header"]
+    Panel --> List["MessageList"]
+    Panel --> Input["ChatInput"]
+    Input --> Voice["VoiceInput"]
+    List --> Bubble["MessageBubble"]
+    Bubble --> Tool["ToolFeedback"]
+    Bubble --> Json["JsonRenderBlock"]
+    Panel --> Notify["WatchNotifications"]
+    Panel --> Schedule["SchedulePanel"]
+    Panel --> Suggestions["ContextSuggestions"]
+    Settings["SettingsCard"] --> Config["EmbeddedAgentConfigForm"]
+    Config --> Model["ModelSearchDropdown"]
+```
+
 ## Root Components
 
 ### EmbeddedAgentWidget

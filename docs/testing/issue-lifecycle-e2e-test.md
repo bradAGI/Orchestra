@@ -2,6 +2,24 @@
 
 > Run this test to verify the full issue pipeline: creation, planning, execution, review, PR creation, feedback loop, and cleanup.
 
+```mermaid
+flowchart LR
+    Create["Create task"] --> Backlog["Backlog"]
+    Backlog --> Todo["Todo"]
+    Todo --> Plan["Planning run"]
+    Plan --> InProgress["In Progress"]
+    InProgress --> Execute["Execution run"]
+    Execute --> Review["Review"]
+    Review --> ReExec["Request Changes: Re-execute"]
+    ReExec --> InProgress
+    Review --> RePlan["Request Changes: Re-plan"]
+    RePlan --> Todo
+    Review --> PR["Create PR"]
+    PR --> Done["Done"]
+    Review --> Close["Close"]
+    Close --> Done
+```
+
 ## Prerequisites
 
 - Backend running (`orchestrad` built and started)

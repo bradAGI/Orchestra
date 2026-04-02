@@ -8,6 +8,19 @@ Orchestra combines task orchestration, local project management, Git/GitHub work
 
 The current desktop workflow centers on a five-state board. Tasks still move through the same broad lifecycle, but the desktop now combines manual drag transitions with backend-enforced rules and automatic state changes after agent execution.
 
+```mermaid
+flowchart LR
+    Backlog["Backlog"] -->|drag when task is complete enough| Todo["Todo"]
+    Todo -->|planning run succeeds| InProgress["In Progress"]
+    InProgress -->|execution completes| Review["Review"]
+    Review -->|Create PR or Close| Done["Done"]
+    Review -->|Request Changes without PR| Todo
+    Review -->|Request Changes with PR| InProgress
+    Todo -->|Stop & Reset| Backlog
+    InProgress -->|Stop & Reset| Backlog
+    Review -->|Stop & Reset| Backlog
+```
+
 ```
 BACKLOG → TODO → IN PROGRESS → REVIEW → DONE
 ```
@@ -123,6 +136,20 @@ The stop/reset flow is available from active states. It:
 ---
 
 ## Drag Rules
+
+```mermaid
+stateDiagram-v2
+    [*] --> Backlog
+    Backlog --> Todo: Drag with required fields
+    Todo --> InProgress: Planning succeeds
+    InProgress --> Review: Execution completes
+    Review --> Done: Create PR or Close
+    Review --> Todo: Request Changes without PR
+    Review --> InProgress: Request Changes with PR
+    Todo --> Backlog: Stop & Reset
+    InProgress --> Backlog: Stop & Reset
+    Review --> Backlog: Stop & Reset
+```
 
 | Transition | Allowed? | Gate |
 |------------|----------|------|
