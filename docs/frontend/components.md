@@ -115,7 +115,7 @@ Supported providers: `claude`, `codex`, `gemini`, `opencode`, and optional unsan
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| `SettingsCard` | `SettingsCard.tsx` | Backend URL config, API token, workspace migration controls |
+| `SettingsCard` | `SettingsCard.tsx` | Settings shell for backend profiles, integrations, notifications, and shortcuts |
 
 #### Terminal / Console (`components/terminal/`)
 
