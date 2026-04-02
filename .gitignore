@@ -284,6 +284,28 @@ $RECYCLE.BIN/
 .terraform/
 
 # ==============================================================================
+# 📋 DOCUMENTATION IMAGE EXCEPTIONS
+# ==============================================================================
+
+# Documentation images are ALLOWED in specific directories:
+# - apps/desktop/public/ (UI screenshots and assets)
+# - docs/ (documentation assets)
+# - assets/ (project assets)
+!apps/desktop/public/*.png
+!apps/desktop/public/*.jpg
+!apps/desktop/public/*.svg
+!apps/desktop/public/*.gif
+!apps/desktop/public/*.ico
+!docs/**/*.png
+!docs/**/*.jpg
+!docs/**/*.svg
+!docs/**/*.gif
+!assets/**/*.png
+!assets/**/*.jpg
+!assets/**/*.svg
+!assets/**/*.gif
+
+# ==============================================================================
 # 📋 END OF COMPREHENSIVE PROTECTION
 # ==============================================================================
 #
@@ -293,6 +315,7 @@ $RECYCLE.BIN/
 # - All development artifacts blocked
 # - All platform-specific files blocked
 # - All large media files blocked
+# - Documentation images ALLOWED in specific directories
 #
 # ✅ This should prevent ANY accidental binary or sensitive commits!
 # ==============================================================================
