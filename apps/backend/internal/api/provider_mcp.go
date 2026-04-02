@@ -311,95 +311,34 @@ func readClaudeMCP(home string) []ProviderMCPServer {
 		}
 
 		// Determine enabled status based on MCP type
-		enabled := true // Default for standalone MCPs present in .claude.json
+		enabled := true // Default for configured MCPs present in .claude.json
 
-		if isPluginBasedMCP(name) {
+		mcpType := detectMCPType(home, name)
+		if mcpType == MCPTypePlugin {
 			// For plugin-based MCPs, check enabledPlugins in settings.json
-			pluginName := mapMCPToPluginName(name)
+			pluginName := findPluginName(home, name)
 			if pluginEnabled, found := enabledPlugins[pluginName]; found {
 				enabled = pluginEnabled
 			} else {
 				enabled = false // Plugin not in enabledPlugins = disabled
 			}
 		}
-		// For standalone MCPs, being present in .claude.json means enabled
+		// For configured MCPs, being present in .claude.json means enabled
+		// For system MCPs found here, they're always enabled
 
 		servers = append(servers, ProviderMCPServer{Name: name, Command: cmd, Args: args, URL: url, Env: env, Type: typ, Enabled: enabled})
 	}
 
-	// Add known disabled standalone MCPs (removed from .claude.json but should show as disabled)
-	allKnownStandaloneMCPs := []string{"claude-in-chrome"}
-	for _, mcpName := range allKnownStandaloneMCPs {
-		// Skip if already present in mcpServers (means it's enabled)
-		if _, exists := mcpServers[mcpName]; exists {
-			continue
-		}
+	// Note: We no longer need to hardcode known MCPs - the schema-driven approach
+	// dynamically discovers MCP types from actual configuration sources
 
-		// Skip if it's actually a plugin-based MCP
-		if isPluginBasedMCP(mcpName) {
-			continue
-		}
-
-		// Add as disabled standalone MCP
-		defaultConfig := getDefaultMCPConfig(mcpName)
-		if defaultConfig != nil {
-			cmd, _ := defaultConfig["command"].(string)
-			typ, _ := defaultConfig["type"].(string)
-			servers = append(servers, ProviderMCPServer{
-				Name:    mcpName,
-				Command: cmd,
-				Type:    typ,
-				Enabled: false,
-			})
-		}
-	}
-
-	// Add built-in MCPs (always enabled and always present)
-	allBuiltinMCPs := []string{"gmail"}
-	for _, mcpName := range allBuiltinMCPs {
-		// Skip if already added from mcpServers
-		found := false
-		for _, existing := range servers {
-			if existing.Name == mcpName {
-				found = true
-				break
-			}
-		}
-		if found {
-			continue
-		}
-
-		// Add built-in MCP as always enabled
-		servers = append(servers, ProviderMCPServer{
-			Name:    mcpName,
-			Command: "npx -y @claude-ai/mcp-server-gmail@latest",
-			Type:    "stdio",
-			Enabled: true, // Built-in MCPs are always enabled
-		})
-	}
+	// System MCPs are discovered dynamically - if an MCP is available but not in
+	// either configuration source, it will be detected as MCPTypeSystem automatically
 
 	return servers
 }
 
-// mapMCPToPluginName converts MCP server name to enabledPlugins key format
-func mapMCPToPluginName(mcpName string) string {
-	// Map known MCP servers to their enabledPlugins format
-	switch mcpName {
-	case "chrome-devtools-mcp":
-		return "chrome-devtools-mcp@claude-plugins-official"
-	case "claude-in-chrome":
-		return "claude-in-chrome@claude-ai"
-	case "gmail":
-		return "gmail@claude-ai"
-	case "gopls-lsp":
-		return "gopls-lsp@claude-plugins-official"
-	case "superpowers":
-		return "superpowers@claude-plugins-official"
-	default:
-		// Fallback: try the name as-is first, then with @claude-plugins-official
-		return mcpName + "@claude-plugins-official"
-	}
-}
+// No longer needed - findPluginName dynamically discovers plugin names
 
 func addClaudeMCP(home, name, command string, args []string) error {
 	cfg, err := readClaudeConfig(home)
@@ -940,21 +879,19 @@ func updateClaudeMCP(home, name string, server ProviderMCPServer) error {
 	return writeClaudeConfig(home, cfg)
 }
 
-// toggleClaudeMCP toggles the enabled status of a Claude MCP server
+// toggleClaudeMCP toggles the enabled status of a Claude MCP server using schema-driven detection
 func toggleClaudeMCP(home, name string, enabled bool) error {
-	// Check if this is a built-in MCP that cannot be disabled
-	if isBuiltinMCP(name) {
-		if !enabled {
-			return fmt.Errorf("MCP server '%s' is built-in and cannot be disabled", name)
-		}
-		// Built-in MCPs are always enabled, so enabling them is a no-op
-		return nil
-	}
+	// Dynamically detect MCP type from configuration sources
+	mcpType := detectMCPType(home, name)
 
-	// Check if this is a plugin-based MCP
-	if isPluginBasedMCP(name) {
-		pluginName := mapMCPToPluginName(name)
-		// Update new settings.json format for plugin-based MCPs
+	switch mcpType {
+	case MCPTypePlugin:
+		// Handle plugin-based MCPs via settings.json enabledPlugins
+		pluginName := findPluginName(home, name)
+		if pluginName == "" {
+			return fmt.Errorf("plugin name not found for MCP: %s", name)
+		}
+
 		settingsCfg, err := readClaudeSettings(home)
 		if err != nil {
 			settingsCfg = map[string]any{}
@@ -969,78 +906,114 @@ func toggleClaudeMCP(home, name string, enabled bool) error {
 
 		// Update plugin enabled status
 		enabledPlugins[pluginName] = enabled
-
-		// Write back to settings.json
 		return writeClaudeSettings(home, settingsCfg)
+
+	case MCPTypeConfigured:
+		// Handle configured MCPs by removing/adding from .claude.json
+		cfg, err := readClaudeConfig(home)
+		if err != nil {
+			return err
+		}
+
+		mcpServers, ok := cfg["mcpServers"].(map[string]any)
+		if !ok {
+			mcpServers = map[string]any{}
+			cfg["mcpServers"] = mcpServers
+		}
+
+		if enabled {
+			// Re-add the MCP server if it was removed
+			if _, exists := mcpServers[name]; !exists {
+				// Try to restore from a known default or return error
+				return fmt.Errorf("cannot enable MCP '%s': no configuration available. Please add it manually first", name)
+			}
+		} else {
+			// Completely remove the MCP server to disable it
+			delete(mcpServers, name)
+		}
+
+		cfg["mcpServers"] = mcpServers
+		return writeClaudeConfig(home, cfg)
+
+	case MCPTypeSystem:
+		// System MCPs cannot be disabled
+		if !enabled {
+			return fmt.Errorf("MCP server '%s' is system-level and cannot be disabled", name)
+		}
+		// Enabling system MCPs is a no-op (they're always enabled)
+		return nil
+
+	default:
+		return fmt.Errorf("unknown MCP type for server: %s", name)
+	}
+}
+
+// MCPType represents the type of MCP configuration
+type MCPType int
+
+const (
+	MCPTypeUnknown MCPType = iota
+	MCPTypePlugin      // Managed via settings.json enabledPlugins
+	MCPTypeConfigured  // Managed via .claude.json mcpServers
+	MCPTypeSystem      // Built-in, always available, immutable
+)
+
+// detectMCPType dynamically determines MCP type by checking configuration sources
+func detectMCPType(home, mcpName string) MCPType {
+	// Check if it's plugin-based by looking for matching enabledPlugins entry
+	if findPluginName(home, mcpName) != "" {
+		return MCPTypePlugin
 	}
 
-	// Handle standalone MCPs - remove/add from .claude.json entirely
+	// Check if it's configured in .claude.json mcpServers
+	if isInClaudeConfig(home, mcpName) {
+		return MCPTypeConfigured
+	}
+
+	// If it's available but not in either config, it's system-level
+	return MCPTypeSystem
+}
+
+// findPluginName searches settings.json enabledPlugins for MCP name matches
+func findPluginName(home, mcpName string) string {
+	settingsCfg, err := readClaudeSettings(home)
+	if err != nil {
+		return ""
+	}
+
+	enabledPlugins, ok := settingsCfg["enabledPlugins"].(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	// Look for plugin names containing the MCP name
+	for pluginName := range enabledPlugins {
+		if strings.Contains(pluginName, mcpName) {
+			return pluginName
+		}
+	}
+
+	return ""
+}
+
+// isInClaudeConfig checks if MCP exists in .claude.json mcpServers
+func isInClaudeConfig(home, mcpName string) bool {
 	cfg, err := readClaudeConfig(home)
 	if err != nil {
-		return err
+		return false
 	}
 
 	mcpServers, ok := cfg["mcpServers"].(map[string]any)
 	if !ok {
-		mcpServers = map[string]any{}
-		cfg["mcpServers"] = mcpServers
+		return false
 	}
 
-	if enabled {
-		// Re-add the MCP server if it was removed
-		if _, exists := mcpServers[name]; !exists {
-			// Restore default configuration for known MCPs
-			defaultConfig := getDefaultMCPConfig(name)
-			if defaultConfig != nil {
-				mcpServers[name] = defaultConfig
-			} else {
-				return fmt.Errorf("unknown MCP server: %s", name)
-			}
-		}
-	} else {
-		// Completely remove the MCP server to disable it
-		delete(mcpServers, name)
-	}
-
-	cfg["mcpServers"] = mcpServers
-	return writeClaudeConfig(home, cfg)
+	_, exists := mcpServers[mcpName]
+	return exists
 }
 
-// isPluginBasedMCP determines if an MCP is plugin-based or standalone
-func isPluginBasedMCP(mcpName string) bool {
-	// Only chrome-devtools-mcp is actually plugin-based
-	// gmail and claude-in-chrome are standalone MCPs defined in .claude.json
-	pluginBasedMCPs := []string{"chrome-devtools-mcp"}
-	for _, plugin := range pluginBasedMCPs {
-		if plugin == mcpName {
-			return true
-		}
-	}
-	return false
-}
-
-// getDefaultMCPConfig returns the default configuration for known standalone MCPs
-func getDefaultMCPConfig(mcpName string) map[string]any {
-	defaults := map[string]map[string]any{
-		"claude-in-chrome": {
-			"command": "npx -y @claude-ai/claude-in-chrome@latest",
-			"type":    "stdio",
-		},
-		// Note: gmail is a built-in MCP and chrome-devtools-mcp is plugin-based
-	}
-	return defaults[mcpName]
-}
-
-// isBuiltinMCP determines if an MCP is built-in and cannot be disabled
-func isBuiltinMCP(mcpName string) bool {
-	builtinMCPs := []string{"gmail"}
-	for _, builtin := range builtinMCPs {
-		if builtin == mcpName {
-			return true
-		}
-	}
-	return false
-}
+// Removed hardcoded configuration functions - schema-driven approach
+// dynamically discovers MCP types from actual configuration sources
 
 // updateCodexMCP updates an MCP server in Codex's config
 func updateCodexMCP(home, name string, server ProviderMCPServer) error {
