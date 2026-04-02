@@ -112,13 +112,13 @@ The GitHub client (`github.NewClient`) interfaces with GitHub Issues via the RES
 stateDiagram-v2
     [*] --> Backlog: Created
     Backlog --> Todo: Ready for dispatch
-    Todo --> InProgress: Planning run succeeds
-    InProgress --> Review: Execution run succeeds
+    Todo --> "In Progress": Planning run succeeds
+    "In Progress" --> Review: Execution run succeeds
     Review --> Todo: Re-plan with feedback
-    Review --> InProgress: Re-execute with feedback
+    Review --> "In Progress": Re-execute with feedback
     Review --> Done: Close task
     Todo --> Backlog: Stop and reset
-    InProgress --> Backlog: Stop and reset
+    "In Progress" --> Backlog: Stop and reset
     Review --> Backlog: Stop and reset
     Done --> [*]
 ```
