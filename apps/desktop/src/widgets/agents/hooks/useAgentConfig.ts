@@ -9,7 +9,7 @@ import type {
 import {
   fetchAgentConfigs, updateAgentConfigByPath, createAgentResource,
   fetchProjects, fetchMCPTools, fetchMCPServers, createMCPServer, deleteMCPServer,
-  fetchProviderMCPServers, addProviderMCPServer, deleteProviderMCPServer,
+  fetchProviderMCPServers, addProviderMCPServer, updateProviderMCPServer, toggleProviderMCPServer, deleteProviderMCPServer,
   fetchProviderPermissions, updateProviderPermissions,
   fetchProviderModel, updateProviderModel,
   fetchProviderHooks, updateProviderHooks,
@@ -40,6 +40,8 @@ export interface AgentConfigState {
   saveModel: (model: ProviderModelConfig) => Promise<void>
   saveHooks: (hooks: ProviderHook[]) => Promise<void>
   addMCPServer: (name: string, command: string) => Promise<void>
+  updateMCPServer: (name: string, server: Partial<ProviderMCPServer>) => Promise<void>
+  toggleMCPServer: (name: string, enabled: boolean) => Promise<void>
   deleteMCPServer: (name: string) => Promise<void>
   deleteOrchestraMCPServer: (name: string) => Promise<void>
 
@@ -122,12 +124,11 @@ export function useAgentConfig(
   const categoryCounts = useMemo((): Record<CategoryId, number> => ({
     settings: 0,
     instructions: configsByCategory('instructions').length,
-    permissions: 0,
+    agents: configsByCategory('agents').length,
     skills: configsByCategory('skills').length,
     hooks: hooks.length,
     mcp: providerMcpServers.length + orchestraMcpServers.length,
     rules: configsByCategory('rules').length,
-    agents: configsByCategory('agents').length,
   }), [configsByCategory, hooks, providerMcpServers, orchestraMcpServers])
 
   const reload = useCallback(async () => {
@@ -250,6 +251,35 @@ export function useAgentConfig(
     }
   }, [backendConfig, provider, reloadMcp])
 
+  const updateMCP = useCallback(async (name: string, server: Partial<ProviderMCPServer>) => {
+    if (!backendConfig) return
+    setSaving('mcp')
+    try {
+      await updateProviderMCPServer(backendConfig, provider, name, server)
+      await reloadMcp()
+      setError('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update MCP server')
+    } finally {
+      setSaving(null)
+    }
+  }, [backendConfig, provider, reloadMcp])
+
+  const toggleMCP = useCallback(async (name: string, enabled: boolean) => {
+    if (!backendConfig) return
+    setSaving('mcp')
+    try {
+      await toggleProviderMCPServer(backendConfig, provider, name, enabled)
+      // Update local state immediately for better UX
+      setProviderMcpServers(prev => prev.map(s => s.name === name ? { ...s, enabled } : s))
+      setError('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to toggle MCP server')
+    } finally {
+      setSaving(null)
+    }
+  }, [backendConfig, provider])
+
   const deleteMCP = useCallback(async (name: string) => {
     if (!backendConfig) return
     try {
@@ -278,8 +308,8 @@ export function useAgentConfig(
     loading, error, saving,
     saveConfig, deleteConfig, createResource,
     savePermissions, saveModel, saveHooks,
-    addMCPServer: addMCP, deleteMCPServer: deleteMCP,
-    deleteOrchestraMCPServer: deleteOrchMCP,
+    addMCPServer: addMCP, updateMCPServer: updateMCP, toggleMCPServer: toggleMCP,
+    deleteMCPServer: deleteMCP, deleteOrchestraMCPServer: deleteOrchMCP,
     configsByCategory, categoryCounts, setError,
   }
 }

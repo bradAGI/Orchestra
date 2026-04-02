@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Save, Loader2, RotateCcw, Code, Settings2, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { CustomDropdown } from '@/components/app-shell/shared/controls'
 
 interface SettingsPanelProps {
   settings: Record<string, unknown>
@@ -31,8 +32,6 @@ const PERMISSION_MODE_OPTIONS = [
   { value: 'bypassPermissions', label: 'Bypass Permissions' },
 ]
 
-const selectClasses =
-  'h-8 bg-muted/10 rounded-lg border border-border/30 px-3 text-[11px] text-foreground focus:outline-none focus:border-primary/30 transition-colors appearance-none cursor-pointer'
 const toggleTrackClasses = (on: boolean) =>
   `relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-border/30 transition-colors ${on ? 'bg-primary' : 'bg-muted/20'}`
 const toggleThumbClasses = (on: boolean) =>
@@ -95,8 +94,14 @@ export function SettingsPanel({ settings, settingsPath, settingsExists, saving, 
 
   const removePlugin = useCallback((plugin: string) => {
     setLocal(prev => {
-      const plugins = Array.isArray(prev.enabledPlugins) ? (prev.enabledPlugins as string[]).filter(p => p !== plugin) : []
-      return { ...prev, enabledPlugins: plugins }
+      const raw = prev.enabledPlugins
+      if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+        const obj = { ...(raw as Record<string, unknown>) }
+        delete obj[plugin]
+        return { ...prev, enabledPlugins: Object.keys(obj).length > 0 ? obj : undefined }
+      }
+      const arr = Array.isArray(raw) ? (raw as string[]).filter(p => p !== plugin) : []
+      return { ...prev, enabledPlugins: arr.length > 0 ? arr : undefined }
     })
   }, [])
 
@@ -144,7 +149,13 @@ export function SettingsPanel({ settings, settingsPath, settingsExists, saving, 
     return <div className="p-6 space-y-3"><Skeleton className="h-6 w-48" /><Skeleton className="h-[300px] w-full" /></div>
   }
 
-  const plugins = Array.isArray(local.enabledPlugins) ? (local.enabledPlugins as string[]) : []
+  // Normalize enabledPlugins — can be object {name: true} or array
+  const rawPlugins = local.enabledPlugins
+  const plugins: string[] = Array.isArray(rawPlugins)
+    ? (rawPlugins as string[])
+    : (typeof rawPlugins === 'object' && rawPlugins !== null)
+      ? Object.entries(rawPlugins as Record<string, unknown>).filter(([, v]) => v === true).map(([k]) => k)
+      : []
 
   return (
     <div className="flex flex-col h-full p-4 gap-3">
@@ -208,30 +219,25 @@ export function SettingsPanel({ settings, settingsPath, settingsExists, saving, 
             {/* Model */}
             <div className="flex items-center justify-between gap-4">
               <label className="text-[11px] text-foreground/70 shrink-0">Model</label>
-              <select
+              <CustomDropdown
+                className="w-56"
                 value={(local.model as string) ?? ''}
-                onChange={(e) => updateField('model', e.target.value || undefined)}
-                className={selectClasses + ' w-56'}
-              >
-                <option value="">Default</option>
-                {MODEL_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
+                options={[{ label: 'Default', value: '' }, ...MODEL_OPTIONS]}
+                onChange={(val) => updateField('model', val || undefined)}
+                placeholder="Select model"
+              />
             </div>
 
             {/* Permission Mode */}
             <div className="flex items-center justify-between gap-4">
               <label className="text-[11px] text-foreground/70 shrink-0">Permission Mode</label>
-              <select
+              <CustomDropdown
+                className="w-56"
                 value={(local.permissionMode as string) ?? 'default'}
-                onChange={(e) => updateField('permissionMode', e.target.value === 'default' ? undefined : e.target.value)}
-                className={selectClasses + ' w-56'}
-              >
-                {PERMISSION_MODE_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
+                options={PERMISSION_MODE_OPTIONS}
+                onChange={(val) => updateField('permissionMode', val === 'default' ? undefined : val)}
+                placeholder="Permission mode"
+              />
             </div>
 
             {/* Always Thinking */}
@@ -283,6 +289,9 @@ export function SettingsPanel({ settings, settingsPath, settingsExists, saving, 
               </div>
             )}
           </section>
+
+          {/* Permissions */}
+          <PermissionsSection local={local} updateField={updateField} />
 
           {/* Environment Variables */}
           <section className="space-y-3">
@@ -344,5 +353,89 @@ export function SettingsPanel({ settings, settingsPath, settingsExists, saving, 
         </div>
       )}
     </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Inline Permissions Section                                         */
+/* ------------------------------------------------------------------ */
+
+function PermissionsSection({ local, updateField }: { local: Record<string, unknown>; updateField: (key: string, value: unknown) => void }) {
+  const [newAllow, setNewAllow] = useState('')
+  const [newDeny, setNewDeny] = useState('')
+  const [newAsk, setNewAsk] = useState('')
+
+  const permsObj = (typeof local.permissions === 'object' && local.permissions !== null && !Array.isArray(local.permissions))
+    ? local.permissions as Record<string, unknown>
+    : {}
+  const allow = Array.isArray(permsObj.allow) ? (permsObj.allow as string[]) : []
+  const deny = Array.isArray(permsObj.deny) ? (permsObj.deny as string[]) : []
+  const ask = Array.isArray(permsObj.ask) ? (permsObj.ask as string[]) : []
+
+  const update = (field: string, list: string[]) => {
+    updateField('permissions', { ...permsObj, [field]: list })
+  }
+
+  const addTo = (field: string, list: string[], value: string, clear: () => void) => {
+    const v = value.trim()
+    if (v && !list.includes(v)) {
+      update(field, [...list, v])
+      clear()
+    }
+  }
+
+  const removeFrom = (field: string, list: string[], index: number) => {
+    update(field, list.filter((_, i) => i !== index))
+  }
+
+  const renderList = (
+    label: string,
+    description: string,
+    field: string,
+    items: string[],
+    newValue: string,
+    setNewValue: (v: string) => void,
+  ) => (
+    <div>
+      <h5 className="text-[11px] font-semibold mb-0.5">{label}</h5>
+      <p className="text-[10px] text-muted-foreground/40 mb-2">{description}</p>
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {items.map((item, i) => (
+          <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted/30 border border-border/30 text-[11px] font-mono">
+            {item}
+            <button onClick={() => removeFrom(field, items, i)} className="text-muted-foreground/40 hover:text-red-400">
+              <X size={10} />
+            </button>
+          </span>
+        ))}
+        {items.length === 0 && <span className="text-[10px] text-muted-foreground/30 italic">None</span>}
+      </div>
+      <div className="flex gap-1.5">
+        <input
+          value={newValue}
+          onChange={e => setNewValue(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && addTo(field, items, newValue, () => setNewValue(''))}
+          placeholder="e.g. Bash(npm run build)"
+          className="flex-1 px-2 py-1 rounded-md bg-muted/10 border border-border/30 text-[11px] font-mono focus:outline-none focus:border-primary/30"
+        />
+        <button
+          onClick={() => addTo(field, items, newValue, () => setNewValue(''))}
+          className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground/40 hover:text-foreground hover:bg-muted/30 transition-all"
+        >
+          <Plus size={10} />
+        </button>
+      </div>
+    </div>
+  )
+
+  return (
+    <section className="space-y-3">
+      <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Permissions</h4>
+      <div className="space-y-4">
+        {renderList('Allow', 'Auto-approved without prompting', 'allow', allow, newAllow, setNewAllow)}
+        {renderList('Deny', 'Always blocked (takes precedence)', 'deny', deny, newDeny, setNewDeny)}
+        {renderList('Ask', 'Always prompt for confirmation', 'ask', ask, newAsk, setNewAsk)}
+      </div>
+    </section>
   )
 }
