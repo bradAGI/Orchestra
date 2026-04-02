@@ -66,7 +66,7 @@ export const sidebarItems: SidebarItem[] = [
   {
     id: 'SETTINGS',
     label: 'Settings',
-    description: 'Backend and migration controls',
+    description: 'Backend profiles, integrations, notifications, and shortcuts',
     icon: Settings2,
   },
   {
