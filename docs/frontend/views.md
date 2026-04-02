@@ -27,7 +27,7 @@ The sidebar currently exposes these top-level sections:
 | `AGENTS` | Agents | Global agent/provider configuration |
 | `WAREHOUSE` | Analytics | Usage analytics and session inspection |
 | `SANDBOX` | Sandbox | Remote execution via unsandbox |
-| `SETTINGS` | Settings | Backend profiles, notifications, migrations, integrations |
+| `SETTINGS` | Settings | Backend profiles, integrations, notifications, shortcuts, and migration controls |
 | `DOCS` | Documentation | In-app docs browser |
 
 ---
