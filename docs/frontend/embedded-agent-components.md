@@ -145,7 +145,7 @@ Located in `apps/desktop/src/components/settings/SettingsCard.tsx`:
 
 ### EmbeddedAgentConfigForm
 
-Rendered under Settings > Integrations tab.
+Helper component defined inside `SettingsCard.tsx`, rendered under Settings > Integrations tab.
 
 - Provider dropdown (OpenRouter, Claude, OpenAI, Gemini)
 - API key input with save and test connection actions
@@ -155,7 +155,7 @@ Rendered under Settings > Integrations tab.
 
 ### ModelSearchDropdown
 
-Searchable model selector populated from provider APIs.
+Helper component defined inside `SettingsCard.tsx`, used for the searchable model selector populated from provider APIs.
 
 - Text filter narrows the model list as you type
 - Shows loading state while models are being fetched
