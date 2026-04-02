@@ -52,8 +52,8 @@ For each configuration field, `Load()` follows this precedence:
 | `ORCHESTRA_TRACKER_ENDPOINT` | string | *(empty)* | Tracker-specific endpoint, such as `owner/repo` for GitHub |
 | `ORCHESTRA_TRACKER_TOKEN` | string | *(empty)* | Authentication token for external tracker |
 | `ORCHESTRA_TRACKER_WORKER_ASSIGNEE_IDS` | CSV | *(empty)* | Comma-separated assignee IDs that represent worker agents |
-| `ORCHESTRA_ACTIVE_STATES` | CSV | `Todo,In Progress` | Issue states considered actionable |
-| `ORCHESTRA_TERMINAL_STATES` | CSV | `Done,Cancelled,Canceled,Closed,Duplicate` | Issue states considered terminal |
+| `ORCHESTRA_ACTIVE_STATES` | CSV | `Todo, In Progress` | Issue states considered actionable |
+| `ORCHESTRA_TERMINAL_STATES` | CSV | `Done, Cancelled, Canceled, Closed, Duplicate` | Issue states considered terminal |
 | `ORCHESTRA_MAX_CONCURRENT` | int | `6` | Global maximum concurrent agent runs |
 | `ORCHESTRA_MAX_CONCURRENT_BY_STATE` | CSV | *(empty)* | Per-state concurrency limits (format: `state:limit,state:limit`) |
 | `ORCHESTRA_WORKSPACE_AFTER_CREATE` | string | *(empty)* | Shell hook run after workspace creation |

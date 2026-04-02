@@ -48,8 +48,8 @@ flowchart LR
 | `ORCHESTRA_TRACKER_ENDPOINT` | string | _(none)_ | Tracker endpoint (e.g., `owner/repo` for GitHub) |
 | `ORCHESTRA_TRACKER_TOKEN` | string | _(none)_ | Authentication token for the tracker |
 | `ORCHESTRA_TRACKER_WORKER_ASSIGNEE_IDS` | CSV | _(none)_ | Comma-separated assignee IDs for worker filtering |
-| `ORCHESTRA_ACTIVE_STATES` | CSV | `Todo,In Progress` | Comma-separated list of states considered active |
-| `ORCHESTRA_TERMINAL_STATES` | CSV | `Done,Cancelled,Canceled,Closed,Duplicate` | Comma-separated list of terminal states |
+| `ORCHESTRA_ACTIVE_STATES` | CSV | `Todo, In Progress` | Comma-separated list of states considered active |
+| `ORCHESTRA_TERMINAL_STATES` | CSV | `Done, Cancelled, Canceled, Closed, Duplicate` | Comma-separated list of terminal states |
 
 ### Workspace
 
