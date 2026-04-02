@@ -202,9 +202,9 @@ sequenceDiagram
     Note over API: User or workflow moves issue to TODO
     API-->>UI: snapshot (issue eligible for dispatch)
 
-    Note over API: Orchestrator dispatches issue and advances to IN_PROGRESS
+    Note over API: Orchestrator dispatches issue and advances to In Progress
     API-->>UI: RUN_STARTED
-    API-->>UI: snapshot (issue in IN_PROGRESS state)
+    API-->>UI: snapshot (issue in In Progress state)
 
     loop Agent turns
         Agent->>API: Turn output / events
@@ -215,7 +215,7 @@ sequenceDiagram
     alt Success
         Agent->>API: Exit code 0
         API-->>UI: RUN_SUCCEEDED
-        API-->>UI: snapshot (issue advances to REVIEW)
+        API-->>UI: snapshot (issue advances to Review)
     else Failure
         Agent->>API: Exit code != 0
         API-->>UI: RUN_FAILED
