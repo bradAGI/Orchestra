@@ -98,7 +98,7 @@ event: RUN_STARTED
 data: {"type":"RUN_STARTED","timestamp":"2026-03-17T12:00:00Z","data":{...}}
 
 event: snapshot
-data: {"running":[...],"retrying":[...],"totals":{...}}
+data: {"generated_at":"2026-03-17T12:00:00Z","counts":{"running":1,"retrying":0},"running":[...],"retrying":[...],"codex_totals":{...},"rate_limits":null}
 ```
 
 The API server sends two things on each event:
