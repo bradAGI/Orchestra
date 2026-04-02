@@ -142,8 +142,8 @@ tracker:
   endpoint: "myorg/myrepo"
   token: "ghp_xxxxxxxxxxxx"
   worker_assignee_ids: "bot-1,bot-2"
-  active_states: "Todo,In Progress"
-  terminal_states: "Done,Cancelled,Closed"
+  active_states: "Todo, In Progress"
+  terminal_states: "Done, Cancelled, Closed"
 
 github:
   client_id: "Iv1.xxxxxxxxxx"
