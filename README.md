@@ -34,6 +34,10 @@ Orchestra connects your local projects and GitHub to AI coding agents (Claude Co
 - Progress tracking from "To Do" to "Done"
 - Integration with GitHub project boards
 
+<p align="center">
+  <img src="apps/desktop/public/Tasks.png" alt="Orchestra Tasks Interface" width="800" />
+</p>
+
 
 **Multi-Agent Orchestration**
 - Deploy Claude, Codex, OpenCode, and Gemini agents simultaneously
