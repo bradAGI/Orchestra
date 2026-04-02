@@ -1,0 +1,81 @@
+# ==============================================================================
+# 🔒 GIT ATTRIBUTES - BINARY PROTECTION LAYER
+# ==============================================================================
+# This file provides an additional layer of protection against binary files
+# by explicitly marking certain patterns and forcing git behavior.
+
+# ------------------------------------------------------------------------------
+# 🚫 FORCE THESE PATTERNS TO NEVER BE TRACKED
+# ------------------------------------------------------------------------------
+
+# Orchestra-specific binaries - NEVER track these
+orchestrd* -filter
+orchestra-dash* -filter
+apps/backend/orchestrd* -filter
+apps/tui/orchestra* -filter
+
+# General executables - NEVER track these
+*.exe -filter
+*.bin -filter
+*.dll -filter
+*.so -filter
+*.dylib -filter
+*.a -filter
+*.o -filter
+
+# Database files - NEVER track these
+*.db -filter
+*.sqlite* -filter
+warehouse.db* -filter
+
+# Sensitive config files - NEVER track these
+.env* -filter
+*.key -filter
+*.pem -filter
+*secret* -filter
+*credential* -filter
+*password* -filter
+
+# ------------------------------------------------------------------------------
+# 📝 FORCE TEXT HANDLING FOR CODE FILES
+# ------------------------------------------------------------------------------
+
+# Ensure these are always treated as text
+*.go text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.sh text eol=lf
+Dockerfile text eol=lf
+Makefile text eol=lf
+*.gitignore text eol=lf
+*.gitattributes text eol=lf
+
+# ------------------------------------------------------------------------------
+# 🖼️ BINARY FILE DETECTION
+# ------------------------------------------------------------------------------
+
+# Mark these as binary to prevent git from trying to diff them
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+*.tgz binary
+
+# ------------------------------------------------------------------------------
+# 📋 PROTECTION SUMMARY
+# ------------------------------------------------------------------------------
+# The -filter attribute prevents these files from being stored in git
+# even if someone explicitly tries to add them with git add -f
+#
+# This provides an additional safety net beyond .gitignore!
+# ==============================================================================

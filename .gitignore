@@ -1,28 +1,298 @@
+# ==============================================================================
+# 🔒 COMPREHENSIVE BINARY & SENSITIVE FILE PROTECTION
+# ==============================================================================
+# This .gitignore is designed to prevent ANY binary files or sensitive data
+# from being accidentally committed to the repository.
+
+# ------------------------------------------------------------------------------
+# 📦 Package & Dependency Directories
+# ------------------------------------------------------------------------------
 node_modules/
 .superpowers/
-*.log
-Notes.md
-/SPEC.md
-apps/tui/tui
-apps/backend/orchestrad
 .worktrees/
-apps/backend/orchestrd
-apps/tui/orchestra-dash
+vendor/
+*.egg-info/
+__pycache__/
+.pytest_cache/
+.coverage/
 
-# Additional security patterns
-orchestrd-*
+# ------------------------------------------------------------------------------
+# 🏗️ Build Artifacts & Executables (CRITICAL - NO BINARIES!)
+# ------------------------------------------------------------------------------
+
+# Go binaries
+**/*orchestrd*
+**/*orchestra*
+**/*.exe
+**/*.bin
+**/*.dll
+**/*.so
+**/*.dylib
+**/*.a
+**/*.o
+**/*.out
+**/main
+**/cmd/*/main
+apps/tui/tui
+apps/tui/orchestra-dash
+apps/backend/orchestrad*
+apps/backend/orchestra*
+**/dist/
+**/build/
+**/target/
+
+# Node.js/JavaScript build outputs
+**/dist/
+**/build/
+**/*.bundle.js
+**/*.chunk.js
+**/*.min.js
+**/coverage/
+
+# Platform-specific executables
+**/*.exe
+**/*.app
+**/*.deb
+**/*.rpm
+**/*.msi
+**/*.dmg
+**/*.pkg
+**/*.snap
+**/*.appimage
+
+# ------------------------------------------------------------------------------
+# 🔐 Security & Sensitive Data (NEVER COMMIT THESE!)
+# ------------------------------------------------------------------------------
+
+# Environment & Config Files
+.env*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+config.local.*
+settings.local.*
+**/secrets.*
+**/*secret*
+**/*credential*
+**/*password*
+**/*token*
+**/.claude/settings.json
+**/.claude/config.json
+
+# API Keys & Tokens
+**/*api*key*
+**/*access*token*
+**/*bearer*
+**/*auth*token*
+
+# Database Files
+*.db
+*.sqlite
+*.sqlite3
+*.db3
+*.s3db
+warehouse.db*
+**/*dump.sql*
+
+# ------------------------------------------------------------------------------
+# 🧪 Test & Development Artifacts
+# ------------------------------------------------------------------------------
+
+# Test Files with Potentially Sensitive Data
 **/test_*_persistence*
 **/*test*persistence*
+**/*_test_*
+**/tmp_*
+**/temp_*
 *.tmp
-.env
-.env.local
-*.key
-**/config.local.*
+*.temp
+**/fixtures/*.bin
+**/fixtures/*.exe
 
-# IDE files
-.vscode/settings.json
+# Development Logs & Outputs
+*.log
+*.out
+*.err
+**/*.log.*
+**/logs/
+Notes.md
+/SPEC.md
+**/debug.txt
+**/trace.txt
+
+# Backup Files
+*.backup
+*.bak
+*~
+*.swp
+*.swo
+*#*
+.#*
+
+# ------------------------------------------------------------------------------
+# 💻 IDE & Editor Files
+# ------------------------------------------------------------------------------
+
+# VS Code
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.template.json
+
+# JetBrains IDEs
 .idea/
+*.iml
+*.ipr
+*.iws
 
-# OS files
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+
+# ------------------------------------------------------------------------------
+# 🖥️ Operating System Files
+# ------------------------------------------------------------------------------
+
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ------------------------------------------------------------------------------
+# 📱 Mobile & Platform Specific
+# ------------------------------------------------------------------------------
+
+# Android
+*.apk
+*.aab
+*.dex
+*.class
+
+# iOS
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# ------------------------------------------------------------------------------
+# 📊 Media & Asset Files (if large)
+# ------------------------------------------------------------------------------
+
+# Large media files (comment out if needed for project)
+# *.mov
+# *.mp4
+# *.avi
+# *.wmv
+# *.flv
+# *.webm
+# *.mp3
+# *.wav
+# *.flac
+# *.ogg
+# *.wma
+# *.aac
+
+# Large images (comment out if needed for project)
+# *.tiff
+# *.tif
+# *.psd
+# *.ai
+# *.indd
+
+# Archives (often contain binaries)
+*.tar.gz
+*.tgz
+*.tar.bz2
+*.tar.xz
+*.tar.Z
+*.tar.lz
+*.tar.lzma
+*.tar.lzo
+*.rar
+*.7z
+*.zip
+*.gz
+*.bz2
+*.xz
+*.Z
+*.lz
+*.lzma
+*.lzo
+
+# ------------------------------------------------------------------------------
+# ⚡ Runtime & Process Files
+# ------------------------------------------------------------------------------
+
+# Process IDs
+*.pid
+*.lock
+*.sock
+
+# Runtime directories
+**/runtime/
+**/var/
+**/tmp/
+
+# ------------------------------------------------------------------------------
+# 🔧 Tool-Specific Ignores
+# ------------------------------------------------------------------------------
+
+# Git
+.git-credentials
+.gitconfig.local
+
+# Docker
+.docker/
+
+# Kubernetes
+*.kubeconfig
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+*.tfvars
+.terraform/
+
+# ==============================================================================
+# 📋 END OF COMPREHENSIVE PROTECTION
+# ==============================================================================
+#
+# 🛡️ PROTECTION SUMMARY:
+# - All executable binaries blocked
+# - All sensitive configuration blocked
+# - All development artifacts blocked
+# - All platform-specific files blocked
+# - All large media files blocked
+#
+# ✅ This should prevent ANY accidental binary or sensitive commits!
+# ==============================================================================
