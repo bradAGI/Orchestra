@@ -1081,7 +1081,17 @@ func (s *Server) PostClaudeSettings(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, "mkdir_failed", err.Error())
 		return
 	}
-	data, err := json.MarshalIndent(body.Settings, "", "  ")
+
+	// Merge with existing settings instead of replacing
+	existing := make(map[string]any)
+	if raw, err := os.ReadFile(settingsPath); err == nil {
+		_ = json.Unmarshal(raw, &existing)
+	}
+	for k, v := range body.Settings {
+		existing[k] = v
+	}
+
+	data, err := json.MarshalIndent(existing, "", "  ")
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "marshal_failed", err.Error())
 		return

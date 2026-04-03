@@ -329,16 +329,38 @@ func readClaudeMCP(home string) []ProviderMCPServer {
 		servers = append(servers, ProviderMCPServer{Name: name, Command: cmd, Args: args, URL: url, Env: env, Type: typ, Enabled: enabled})
 	}
 
-	// Note: We no longer need to hardcode known MCPs - the schema-driven approach
-	// dynamically discovers MCP types from actual configuration sources
+	// Include plugin-based MCPs from settings.json that aren't in .claude.json
+	// These are managed entirely through enabledPlugins and have no mcpServers entry
+	// Claude Code's plugin system handles execution - we just need name + enabled state
+	for pluginKey, enabled := range enabledPlugins {
+		// Extract short name from plugin key (e.g. "gmail@claude-ai" → "gmail")
+		mcpName := pluginKey
+		if idx := strings.Index(pluginKey, "@"); idx > 0 {
+			mcpName = pluginKey[:idx]
+		}
 
-	// System MCPs are discovered dynamically - if an MCP is available but not in
-	// either configuration source, it will be detected as MCPTypeSystem automatically
+		// Skip if already added from .claude.json
+		alreadyAdded := false
+		for _, s := range servers {
+			if s.Name == mcpName {
+				alreadyAdded = true
+				break
+			}
+		}
+		if alreadyAdded {
+			continue
+		}
+
+		servers = append(servers, ProviderMCPServer{
+			Name:    mcpName,
+			Command: "", // Plugin-managed by Claude Code, no explicit command needed
+			Type:    "plugin",
+			Enabled: enabled,
+		})
+	}
 
 	return servers
 }
-
-// No longer needed - findPluginName dynamically discovers plugin names
 
 func addClaudeMCP(home, name, command string, args []string) error {
 	cfg, err := readClaudeConfig(home)
