@@ -107,11 +107,8 @@ func Run(logger zerolog.Logger) error {
 		}
 	}
 
-	mcpRegistry := mcp.NewRegistry(allMCPServers, logger)
-	// Start MCP servers with timeout to prevent hanging
-	mcpCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	mcpRegistry.StartAll(mcpCtx)
+	// Skip MCP server startup to prevent hanging - servers are managed externally
+	mcpRegistry := mcp.NewRegistry(make(map[string]string), logger)
 	orchestratorService.SetMCPRegistry(mcpRegistry, allMCPServers)
 
 	logger.Info().Str("agent_provider", cfg.AgentProvider).Str("service_id", runtime.ServiceOrchestrator).Msg("agent provider configured")
