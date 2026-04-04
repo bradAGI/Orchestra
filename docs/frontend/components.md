@@ -94,9 +94,15 @@ The `App.tsx` component is the root orchestrator. It:
 |-----------|------|---------|
 | `AgentsDashboard` | `components/agents/AgentsDashboard.tsx` | Entry point that re-exports the provider configuration workspace from `widgets/agents/` |
 | `CategoryList` | `widgets/agents/CategoryList.tsx` | Provider category rail used to switch between settings panels |
-| `ProviderHeader` | `widgets/agents/ProviderHeader.tsx` | Provider summary header with connection and model context |
+| `ProviderHeader` | `widgets/agents/ProviderHeader.tsx` | Provider and scope switcher for global vs project-backed config |
 
-Supported providers: `claude`, `codex`, `gemini`, `opencode`, and optional unsandbox-backed tools surfaced through settings/integrations.
+The agent workspace is provider-native rather than generic. Each provider has its own categories, hooks, and structured panels that map directly to the provider's real config files. The older shared non-Claude config panel and generic non-Claude hook path have been removed.
+
+Supported providers:
+- `claude`: settings, instructions, hooks, rules, skills, sub-agents
+- `codex`: config, approvals, models, environment, profiles, instructions, sub-agents, skills, hooks, MCP, rules
+- `gemini`: settings, models, permissions, context, commands, MCP
+- `opencode`: config, models, instructions, agents, commands, skills, permissions, MCP
 
 #### Analytics (`components/analytics/`)
 

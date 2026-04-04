@@ -1,4 +1,4 @@
-import { access, copyFile, mkdir, chmod } from 'node:fs/promises'
+import { access, copyFile, mkdir, chmod, stat } from 'node:fs/promises'
 import path from 'node:path'
 
 function backendBinaryName() {
@@ -23,15 +23,27 @@ async function resolveSourceBinary() {
   const override = process.env.ORCHESTRA_BACKEND_BIN
   const candidates = [
     override,
-    path.resolve('resources', 'backend', backendTargetKey(), binaryName),
     path.resolve('..', 'backend', binaryName),
     path.resolve('..', 'backend', 'dist', 'orchestra', binaryName),
+    path.resolve('resources', 'backend', backendTargetKey(), binaryName),
   ].filter(Boolean)
 
+  let newestCandidate = ''
+  let newestMtime = -1
+
   for (const candidate of candidates) {
-    if (await exists(candidate)) {
-      return candidate
+    if (!(await exists(candidate))) {
+      continue
     }
+    const metadata = await stat(candidate)
+    if (metadata.mtimeMs >= newestMtime) {
+      newestCandidate = candidate
+      newestMtime = metadata.mtimeMs
+    }
+  }
+
+  if (newestCandidate) {
+    return newestCandidate
   }
 
   throw new Error(

@@ -1,8 +1,8 @@
 // apps/desktop/src/widgets/agents/AgentsDashboard.tsx
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { AlertCircle } from 'lucide-react'
 import type { BackendConfig, SnapshotPayload } from '@/lib/orchestra-types'
-import type { AgentConfig } from '@/lib/orchestra-types'
+import type { ProviderFileEntry } from '@/lib/orchestra-client'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ProviderHeader } from './ProviderHeader'
 import { CategoryList } from './CategoryList'
@@ -13,11 +13,31 @@ import { HooksPanel } from './panels/HooksPanel'
 import { MCPPanel } from './panels/MCPPanel'
 import { RulesPanel } from './panels/RulesPanel'
 import { SubAgentsPanel } from './panels/SubAgentsPanel'
-import { FileResourcePanel, type FileResourceItem } from './panels/FileResourcePanel'
-import { ProviderConfigPanel } from './panels/ProviderConfigPanel'
+import type { FileResourceItem } from './panels/FileResourcePanel'
 import { PermissionsPanel } from './panels/PermissionsPanel'
+import { CodexInstructionsPanel } from './panels/CodexInstructionsPanel'
+import { CodexConfigPanel } from './panels/CodexConfigPanel'
+import { CodexApprovalsPanel } from './panels/CodexApprovalsPanel'
+import { CodexModelPanel } from './panels/CodexModelPanel'
+import { CodexEnvironmentPanel } from './panels/CodexEnvironmentPanel'
+import { CodexProfilesPanel } from './panels/CodexProfilesPanel'
+import { CodexSubAgentsPanel } from './panels/CodexSubAgentsPanel'
+import { CodexSkillsPanel } from './panels/CodexSkillsPanel'
+import { CodexRulesPanel } from './panels/CodexRulesPanel'
+import { GeminiContextPanel } from './panels/GeminiContextPanel'
+import { GeminiSettingsPanel } from './panels/GeminiSettingsPanel'
+import { GeminiCommandsPanel } from './panels/GeminiCommandsPanel'
+import { GeminiModelPanel } from './panels/GeminiModelPanel'
+import { GeminiPermissionsPanel } from './panels/GeminiPermissionsPanel'
+import { OpenCodeConfigPanel } from './panels/OpenCodeConfigPanel'
+import { OpenCodeInstructionsPanel } from './panels/OpenCodeInstructionsPanel'
+import { OpenCodeAgentsPanel } from './panels/OpenCodeAgentsPanel'
+import { OpenCodeCommandsPanel } from './panels/OpenCodeCommandsPanel'
+import { OpenCodeSkillsPanel } from './panels/OpenCodeSkillsPanel'
+import { OpenCodeModelPanel } from './panels/OpenCodeModelPanel'
+import { OpenCodePermissionsPanel } from './panels/OpenCodePermissionsPanel'
 import { useClaudeConfig } from './hooks/useClaudeConfig'
-import { useAgentConfig } from './hooks/useAgentConfig'
+import { useCodexConfig, useGeminiConfig, useOpenCodeConfig } from './hooks/useProviderDomainConfig'
 import { CLAUDE_CATEGORIES, CODEX_CATEGORIES, GEMINI_CATEGORIES, OPENCODE_CATEGORIES } from './constants'
 import type { Provider, CategoryId, Scope } from './types'
 
@@ -41,15 +61,28 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
     projectId || undefined,
   )
 
-  // Other providers use legacy hook
-  const legacy = useAgentConfig(
-    !isClaude ? config : null,
-    provider,
+  const codex = useCodexConfig(
+    provider === 'codex' ? config : null,
+    scope,
+    projectId || undefined,
+  )
+  const gemini = useGeminiConfig(
+    provider === 'gemini' ? config : null,
+    scope,
+    projectId || undefined,
+  )
+  const opencode = useOpenCodeConfig(
+    provider === 'opencode' ? config : null,
     scope,
     projectId || undefined,
   )
 
-  const state = isClaude ? claude : legacy
+  const domainState = provider === 'codex'
+    ? codex
+    : provider === 'gemini'
+      ? gemini
+      : opencode
+  const state = isClaude ? claude : domainState
 
   const categories = useMemo(() => {
     switch (provider) {
@@ -65,6 +98,12 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
         return CLAUDE_CATEGORIES
     }
   }, [provider])
+
+  useEffect(() => {
+    if (!categories.some(item => item.id === category)) {
+      setCategory(categories[0]?.id ?? 'config')
+    }
+  }, [categories, category])
 
   // Category counts for Claude
   const claudeCounts = useMemo((): Record<string, number> => {
@@ -83,55 +122,47 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
   // Legacy category counts
   const legacyCounts = useMemo((): Record<string, number> => {
     if (isClaude) return {}
-    const legacyState = legacy as ReturnType<typeof useAgentConfig>
-    const items = legacyState.configs.filter(configItem => configItem.name.toLowerCase().startsWith(provider))
-
-    const codexConfig = items.filter(configItem => configItem.resource_type === 'config')
-    const codexInstructions = items.filter(configItem => configItem.resource_type === 'instructions')
-    const codexAgents = items.filter(configItem => configItem.resource_type === 'agents')
-    const codexSkills = items.filter(configItem => configItem.resource_type === 'skills')
-
-    const geminiSettings = items.filter(configItem => configItem.resource_type === 'settings')
-    const geminiContext = items.filter(configItem => configItem.resource_type === 'context')
-    const geminiCommands = items.filter(configItem => configItem.resource_type === 'commands')
-
-    const openCodeConfig = items.filter(configItem => configItem.resource_type === 'config')
-    const openCodeAgents = items.filter(configItem => configItem.resource_type === 'agents')
-    const openCodeCommands = items.filter(configItem => configItem.resource_type === 'commands')
-    const openCodeSkills = items.filter(configItem => configItem.resource_type === 'skills')
 
     if (provider === 'codex') {
       return {
-        config: codexConfig.length,
-        instructions: codexInstructions.length,
-        agents: codexAgents.length,
-        skills: codexSkills.length,
-        mcp: legacyState.providerMcpServers.length + legacyState.orchestraMcpServers.length,
+        config: codex.config.length,
+        approvals: 1,
+        models: 1,
+        environment: codex.config.length > 0 ? 1 : 0,
+        profiles: codex.config.length > 0 ? 1 : 0,
+        instructions: codex.instructions.length,
+        agents: codex.subagents.length,
+        skills: codex.skills.length,
+        hooks: codex.hooks.length,
+        mcp: codex.providerMcpServers.length + codex.orchestraMcpServers.length,
+        rules: codex.rules.length,
       }
     }
 
     if (provider === 'gemini') {
       return {
-        settings: geminiSettings.length,
-        context: geminiContext.length,
-        commands: geminiCommands.length,
-        mcp: legacyState.providerMcpServers.length + legacyState.orchestraMcpServers.length,
+        settings: gemini.settings.length,
+        models: 1,
+        permissions: 1,
+        context: gemini.context.length,
+        commands: gemini.commands.length,
+        mcp: gemini.providerMcpServers.length + gemini.orchestraMcpServers.length,
       }
     }
 
     return {
-      config: openCodeConfig.length,
-      instructions: openCodeConfig.length,
-      agents: openCodeAgents.length,
-      commands: openCodeCommands.length,
-      skills: openCodeSkills.length,
-      mcp: legacyState.providerMcpServers.length + legacyState.orchestraMcpServers.length,
+      config: opencode.config.length,
+      models: 1,
+      instructions: opencode.config.length,
+      agents: opencode.agents.length,
+      commands: opencode.commands.length,
+      skills: opencode.skills.length,
+      mcp: opencode.providerMcpServers.length + opencode.orchestraMcpServers.length,
       permissions: 1,
     }
-  }, [isClaude, legacy, provider])
+  }, [isClaude, provider, codex, gemini, opencode])
 
   const categoryCounts = isClaude ? claudeCounts : legacyCounts
-  const legacyState = legacy as ReturnType<typeof useAgentConfig>
 
   const providerItems = useMemo(() => {
     if (isClaude) {
@@ -142,50 +173,34 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
         agents: [] as FileResourceItem[],
         skills: [] as FileResourceItem[],
         commands: [] as FileResourceItem[],
+        rules: [] as FileResourceItem[],
       }
     }
 
-    const items = legacyState.configs.filter(configItem => configItem.name.toLowerCase().startsWith(provider))
-    const toResourceItems = (configs: AgentConfig[]): FileResourceItem[] => configs.map(configItem => ({
-      key: configItem.path,
-      name: buildResourceName(provider, configItem),
-      path: configItem.path,
-      content: configItem.content,
-      badge: buildResourceBadge(provider, configItem),
-      priority: configItem.priority,
-      origin: configItem.origin,
-      depth: configItem.depth,
-    }))
-
     return {
-      config: toResourceItems(items.filter(configItem => {
-        if (provider === 'codex') return configItem.resource_type === 'config'
-        if (provider === 'gemini') return configItem.resource_type === 'settings'
-        return configItem.resource_type === 'config'
-      })),
-      instructions: toResourceItems(items.filter(configItem => {
-        if (provider === 'codex') return configItem.resource_type === 'instructions'
-        if (provider === 'opencode') return configItem.resource_type === 'config'
-        return false
-      })).sort(compareStackItems),
-      context: toResourceItems(items.filter(configItem => configItem.resource_type === 'context')).sort(compareStackItems),
-      agents: toResourceItems(items.filter(configItem => {
-        if (provider === 'codex') return configItem.resource_type === 'agents'
-        if (provider === 'opencode') return configItem.resource_type === 'agents'
-        return false
-      })),
-      skills: toResourceItems(items.filter(configItem => {
-        if (provider === 'codex') return configItem.resource_type === 'skills'
-        if (provider === 'opencode') return configItem.resource_type === 'skills'
-        return false
-      })),
-      commands: toResourceItems(items.filter(configItem => {
-        if (provider === 'gemini') return configItem.resource_type === 'commands'
-        if (provider === 'opencode') return configItem.resource_type === 'commands'
-        return false
-      })),
+      config: provider === 'codex'
+        ? toResourceItems(provider, codex.config)
+        : provider === 'gemini'
+          ? toResourceItems(provider, gemini.settings)
+          : toResourceItems(provider, opencode.config),
+      instructions: provider === 'codex'
+        ? toResourceItems(provider, codex.instructions).sort(compareStackItems)
+        : toResourceItems(provider, opencode.config),
+      context: toResourceItems(provider, gemini.context).sort(compareStackItems),
+      agents: provider === 'codex'
+        ? toResourceItems(provider, codex.subagents)
+        : toResourceItems(provider, opencode.agents),
+      skills: provider === 'codex'
+        ? toResourceItems(provider, codex.skills)
+        : toResourceItems(provider, opencode.skills),
+      commands: provider === 'gemini'
+        ? toResourceItems(provider, gemini.commands)
+        : toResourceItems(provider, opencode.commands),
+      rules: provider === 'codex'
+        ? toResourceItems(provider, codex.rules)
+        : [] as FileResourceItem[],
     }
-  }, [isClaude, legacyState.configs, provider])
+  }, [isClaude, provider, codex, gemini, opencode])
 
   const handleSelectCategory = (id: CategoryId) => {
     setCategory(id)
@@ -217,7 +232,7 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
           }}
           scope={scope}
           projectId={projectId}
-          projects={isClaude ? claude.projects : legacyState.projects}
+          projects={isClaude ? claude.projects : domainState.projects}
           onScopeChange={(s, pid) => { setScope(s); setProjectId(pid) }}
         />
 
@@ -300,127 +315,192 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                 </>
               ) : (
                 <>
-                  {category === 'config' && (
-                    <ProviderConfigPanel
-                      provider={provider}
-                      title={provider === 'opencode' ? 'OpenCode Config' : 'Provider Config'}
-                      subtitle={provider === 'codex' ? 'config.toml files' : 'Primary configuration files'}
-                      emptyTitle="No config found"
-                      emptyDescription="This provider does not have a discovered configuration file for the selected scope."
+                  {category === 'config' && provider === 'opencode' && (
+                    <OpenCodeConfigPanel
                       items={providerItems.config}
-                      saving={legacy.saving}
-                      onSave={legacyState.saveConfig}
-                      onCreate={() => legacyState.createResource(provider === 'gemini' ? 'settings' : 'config', 'config')}
-                      createLabel={provider === 'gemini' ? 'Create Settings' : 'Create Config'}
-                      createDescription="Create the primary configuration file for this provider in the selected scope."
+                      saving={domainState.saving}
+                      onSave={opencode.saveConfigResource}
+                      onCreate={opencode.createConfigResource}
+                    />
+                  )}
+                  {category === 'config' && provider === 'codex' && (
+                    <CodexConfigPanel
+                      items={providerItems.config}
+                      saving={domainState.saving}
+                      onSave={codex.saveConfigFile}
+                      onCreate={codex.createConfigFile}
+                    />
+                  )}
+                  {category === 'approvals' && provider === 'codex' && (
+                    <CodexApprovalsPanel
+                      permissions={codex.permissions}
+                      saving={codex.saving}
+                      onSave={codex.savePermissions}
+                    />
+                  )}
+                  {category === 'models' && provider === 'codex' && (
+                    <CodexModelPanel
+                      modelConfig={codex.modelConfig}
+                      configContent={codex.config[0]?.content ?? ''}
+                      saving={codex.saving}
+                      onSave={codex.saveModel}
+                      onSaveConfig={(content) => codex.saveConfigFile(codex.config[0]?.path ?? '', content)}
+                    />
+                  )}
+                  {category === 'environment' && provider === 'codex' && (
+                    <CodexEnvironmentPanel
+                      items={codex.config}
+                      saving={codex.saving}
+                      onSave={codex.saveConfigFile}
+                    />
+                  )}
+                  {category === 'profiles' && provider === 'codex' && (
+                    <CodexProfilesPanel
+                      items={codex.config}
+                      saving={codex.saving}
+                      onSave={codex.saveConfigFile}
                     />
                   )}
                   {category === 'settings' && (
                     provider === 'gemini' ? (
-                      <ProviderConfigPanel
-                        provider={provider}
-                        title="Gemini Settings"
-                        subtitle="settings.json files"
-                        emptyTitle="No settings found"
-                        emptyDescription="Gemini uses settings.json for global and project configuration."
+                      <GeminiSettingsPanel
                         items={providerItems.config}
-                        saving={legacy.saving}
-                        onSave={legacyState.saveConfig}
-                        onCreate={() => legacyState.createResource('settings', 'settings')}
-                        createLabel="Create Settings"
-                        createDescription="Create Gemini settings.json for the selected scope."
+                        saving={domainState.saving}
+                        onSave={gemini.saveSettingsFile}
+                        onCreate={gemini.createSettingsResource}
                       />
                     ) : null
                   )}
-                  {category === 'instructions' && (
-                    <FileResourcePanel
-                      title={provider === 'codex' ? 'Instruction Stack' : 'Instructions'}
-                      subtitle={provider === 'codex' ? 'AGENTS.md and override files' : 'Instructions are configured in opencode.json'}
-                      emptyTitle={provider === 'codex' ? 'No instruction files found' : 'No instruction config found'}
-                      emptyDescription={
-                        provider === 'codex'
-                          ? 'Codex instructions come from AGENTS.md files at global and project scope.'
-                          : 'OpenCode instructions are configured through opencode.json and applied from config.'
-                      }
-                      infoTitle={provider === 'codex' ? 'Instruction Stack' : 'Config-backed Instructions'}
-                      infoDescription={
-                        provider === 'codex'
-                          ? 'Codex reads AGENTS.md files as a stack. More specific project files and override files take precedence over broader instructions.'
-                          : 'OpenCode instructions are configured in opencode.json. Edit the config file directly in this panel.'
-                      }
-                      items={providerItems.instructions}
-                      saving={legacy.saving}
-                      onSave={legacyState.saveConfig}
-                      onCreate={() => legacyState.createResource('instructions', 'instructions')}
-                      createLabel={provider === 'codex' ? 'Create Instructions' : 'Create Instructions Config'}
-                      createDescription={
-                        provider === 'codex'
-                          ? 'Create the default AGENTS.md file for the selected scope.'
-                          : 'Create the base OpenCode config file used to hold instruction settings.'
-                      }
+                  {category === 'models' && provider === 'gemini' && (
+                    <GeminiModelPanel
+                      modelConfig={gemini.modelConfig}
+                      settingsContent={gemini.settings[0]?.content ?? ''}
+                      saving={gemini.saving}
+                      onSave={gemini.saveModel}
                     />
+                  )}
+                  {category === 'models' && provider === 'opencode' && (
+                    <OpenCodeModelPanel
+                      modelConfig={opencode.modelConfig}
+                      configContent={opencode.config[0]?.content ?? ''}
+                      saving={opencode.saving}
+                      onSave={opencode.saveModel}
+                    />
+                  )}
+                  {category === 'instructions' && (
+                    provider === 'codex' ? (
+                      <CodexInstructionsPanel
+                        items={providerItems.instructions}
+                        saving={domainState.saving}
+                        onSave={codex.saveInstructionFile}
+                        onCreate={codex.createInstructionFile}
+                      />
+                    ) : (
+                      <OpenCodeInstructionsPanel
+                        items={providerItems.instructions}
+                        saving={domainState.saving}
+                        onSave={opencode.saveConfigResource}
+                        onCreate={() => opencode.createConfigResource()}
+                      />
+                    )
                   )}
                   {category === 'context' && (
-                    <FileResourcePanel
-                      title="Context Files"
-                      subtitle="GEMINI.md context discovery"
-                      emptyTitle="No context files found"
-                      emptyDescription="Gemini loads workspace context from GEMINI.md files."
-                      infoTitle="Context Layers"
-                      infoDescription="Gemini loads context from global and workspace files. More specific workspace files should be treated as closer context than global files."
+                    <GeminiContextPanel
                       items={providerItems.context}
-                      saving={legacy.saving}
-                      onSave={legacyState.saveConfig}
-                      onCreate={() => legacyState.createResource('context', 'context')}
-                      createLabel="Create Context"
-                      createDescription="Create a GEMINI.md context file for the selected scope."
+                      saving={domainState.saving}
+                      onSave={gemini.saveContextFile}
+                      onCreate={gemini.createContextResource}
                     />
                   )}
-                  {category === 'skills' && (
-                    <FileResourcePanel
-                      title="Skills"
-                      subtitle={provider === 'codex' ? '.agents/skills/' : 'Provider skill files'}
-                      emptyTitle="No skills found"
-                      emptyDescription="No editable skills were discovered for this provider in the selected scope."
+                  {category === 'skills' && provider === 'opencode' && (
+                    <OpenCodeSkillsPanel
                       items={providerItems.skills}
-                      saving={legacy.saving}
-                      onSave={legacyState.saveConfig}
-                      onCreate={(name) => legacyState.createResource('skills', name)}
-                      createLabel="Add Skill"
-                      createDescription="Create a new skill resource for this provider in the selected scope."
+                      saving={domainState.saving}
+                      onSave={opencode.saveSkillFile}
+                      onDelete={opencode.deleteSkillResource}
+                      onCreate={opencode.createSkillResourceFile}
                     />
                   )}
-                  {category === 'commands' && (
-                    <FileResourcePanel
-                      title="Commands"
-                      subtitle="Provider command definitions"
-                      emptyTitle="No commands found"
-                      emptyDescription="No command definitions were discovered for this provider in the selected scope."
+                  {category === 'skills' && provider === 'codex' && (
+                    <CodexSkillsPanel
+                      items={codex.skills}
+                      configContent={codex.config[0]?.content ?? ''}
+                      configPath={codex.config[0]?.path ?? ''}
+                      saving={domainState.saving}
+                      onSave={codex.saveSkillFile}
+                      onDelete={codex.deleteSkillFile}
+                      onCreate={codex.createSkillResource}
+                      onSaveConfig={codex.saveConfigFile}
+                    />
+                  )}
+                  {category === 'commands' && provider === 'opencode' && (
+                    <OpenCodeCommandsPanel
                       items={providerItems.commands}
-                      saving={legacy.saving}
-                      onSave={legacyState.saveConfig}
-                      onCreate={(name) => legacyState.createResource('commands', name)}
-                      createLabel="Add Command"
-                      createDescription="Create a new command for this provider in the selected scope."
+                      saving={domainState.saving}
+                      onSave={opencode.saveCommandFile}
+                      onDelete={opencode.deleteCommandResource}
+                      onCreate={opencode.createCommandResource}
                     />
                   )}
-                  {category === 'agents' && (
-                    <FileResourcePanel
-                      title={provider === 'codex' ? 'Sub-agents' : 'Agents'}
-                      subtitle="Provider agent definitions"
-                      emptyTitle="No agents found"
-                      emptyDescription="No agent definitions were discovered for this provider in the selected scope."
+                  {category === 'commands' && provider === 'gemini' && (
+                    <GeminiCommandsPanel
+                      items={providerItems.commands}
+                      saving={domainState.saving}
+                      onSave={gemini.saveCommandFile}
+                      onDelete={gemini.deleteCommandFile}
+                      onCreate={gemini.createCommandResource}
+                    />
+                  )}
+                  {category === 'agents' && provider === 'opencode' && (
+                    <OpenCodeAgentsPanel
                       items={providerItems.agents}
-                      saving={legacy.saving}
-                      onSave={legacyState.saveConfig}
-                      onCreate={(name) => legacyState.createResource('agents', name)}
-                      createLabel={provider === 'codex' ? 'Add Sub-agent' : 'Add Agent'}
-                      createDescription="Create a new provider-specific agent definition in the selected scope."
+                      saving={domainState.saving}
+                      onSave={opencode.saveAgentFile}
+                      onDelete={opencode.deleteAgentFile}
+                      onCreate={opencode.createAgentResourceFile}
                     />
                   )}
-                  {category === 'hooks' && <HooksPanel hooks={legacyState.hooks} onSave={legacyState.saveHooks} loading={legacy.loading} saving={legacy.saving} provider={provider} />}
-                  {category === 'mcp' && <MCPPanel providerServers={legacyState.providerMcpServers} orchestraServers={legacyState.orchestraMcpServers} onAddProvider={legacyState.addMCPServer} onUpdateProvider={legacyState.updateMCPServer} onToggleProvider={legacyState.toggleMCPServer} onDeleteProvider={legacyState.deleteMCPServer} onDeleteOrchestra={legacyState.deleteOrchestraMCPServer} loading={legacy.loading} saving={legacy.saving} provider={provider} />}
-                  {category === 'permissions' && <PermissionsPanel permissions={legacyState.permissions} saving={legacy.saving} onSave={legacyState.savePermissions} provider={provider} />}
+                  {category === 'agents' && provider === 'codex' && (
+                    <CodexSubAgentsPanel
+                      items={codex.subagents}
+                      configContent={codex.config[0]?.content ?? ''}
+                      configPath={codex.config[0]?.path ?? ''}
+                      saving={domainState.saving}
+                      onSave={codex.saveSubagentFile}
+                      onDelete={codex.deleteSubagentFile}
+                      onCreate={codex.createSubagentFile}
+                      onSaveConfig={codex.saveConfigFile}
+                    />
+                  )}
+                  {category === 'hooks' && <HooksPanel hooks={domainState.hooks} onSave={domainState.saveHooks} loading={domainState.loading} saving={domainState.saving} provider={provider} />}
+                  {category === 'rules' && provider === 'codex' && (
+                    <CodexRulesPanel
+                      items={codex.rules}
+                      saving={codex.saving}
+                      onSave={codex.saveRuleFile}
+                      onDelete={codex.deleteRuleFile}
+                    />
+                  )}
+                  {category === 'mcp' && <MCPPanel providerServers={domainState.providerMcpServers} orchestraServers={domainState.orchestraMcpServers} onAddProvider={domainState.addMCPServer} onUpdateProvider={domainState.updateMCPServer} onToggleProvider={domainState.toggleMCPServer} onDeleteProvider={domainState.deleteMCPServer} onDeleteOrchestra={domainState.deleteOrchestraMCPServer} loading={domainState.loading} saving={domainState.saving} provider={provider} />}
+                  {category === 'permissions' && provider === 'gemini' && (
+                    <GeminiPermissionsPanel
+                      settingsPath={gemini.settings[0]?.path ?? ''}
+                      settingsContent={gemini.settings[0]?.content ?? ''}
+                      saving={gemini.saving}
+                      onSave={gemini.saveSettingsFile}
+                    />
+                  )}
+                  {category === 'permissions' && provider === 'opencode' && (
+                    <OpenCodePermissionsPanel
+                      configPath={opencode.config[0]?.path ?? ''}
+                      configContent={opencode.config[0]?.content ?? ''}
+                      saving={opencode.saving}
+                      onSave={opencode.saveConfigResource}
+                    />
+                  )}
+                  {category === 'permissions' && provider !== 'gemini' && provider !== 'opencode' && (
+                    <PermissionsPanel permissions={domainState.permissions} saving={domainState.saving} onSave={domainState.savePermissions} provider={provider} />
+                  )}
                   {!category && (
                     <div className="flex items-center justify-center h-full text-muted-foreground/20">
                       <p className="text-sm font-bold uppercase tracking-widest">Select a category</p>
@@ -435,62 +515,45 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
   )
 }
 
-function buildResourceBadge(provider: Provider, configItem: AgentConfig): string {
-  const originBadge = configItem.origin === 'workspace'
-    ? 'Workspace'
-    : configItem.scope === 'GLOBAL'
-      ? 'Global'
-      : 'Project'
-
-  if (provider === 'codex') {
-    if (configItem.variant === 'override') return `${originBadge} Override`
-    if (configItem.variant === 'stack') return `${originBadge} Stack`
-  }
-
-  if (provider === 'gemini' && configItem.resource_type === 'context') {
-    return `${originBadge} Context`
-  }
-
-  return originBadge
+function toResourceItems(provider: Provider, entries: ProviderFileEntry[]): FileResourceItem[] {
+  return entries.map((entry) => ({
+    key: entry.path,
+    name: buildResourceName(provider, entry),
+    path: entry.path,
+    content: entry.content,
+  }))
 }
 
-function buildResourceName(provider: Provider, configItem: AgentConfig): string {
-  const path = configItem.path
+function buildResourceName(provider: Provider, entry: ProviderFileEntry): string {
+  const path = entry.path
   const parts = path.split('/')
   const base = parts[parts.length - 1] ?? path
   const parent = parts[parts.length - 2] ?? ''
 
   if (provider === 'codex') {
-    if (configItem.resource_type === 'config') return 'config.toml'
-    if (configItem.variant === 'override') return 'AGENTS.override.md'
-    if (configItem.resource_type === 'instructions') return 'AGENTS.md'
-    if (configItem.resource_type === 'agents') return base
-    if (configItem.resource_type === 'skills') return parent || base
+    if (base === 'SKILL.md') return parent || base
+    return base
   }
 
   if (provider === 'gemini') {
-    if (configItem.resource_type === 'settings') return 'settings.json'
-    if (configItem.resource_type === 'context') return 'GEMINI.md'
-    if (configItem.resource_type === 'commands') return base
+    return base
   }
 
   if (provider === 'opencode') {
-    if (configItem.resource_type === 'config') return base
-    if (configItem.resource_type === 'agents' || configItem.resource_type === 'commands') return base
-    if (configItem.resource_type === 'skills') return parent || base
+    if (base === 'SKILL.md') return parent || base
+    return base
   }
 
   return base
 }
 
 function compareStackItems(a: FileResourceItem, b: FileResourceItem): number {
-  return stackWeight(a) - stackWeight(b)
-    || (a.depth ?? 0) - (b.depth ?? 0)
-    || a.path.localeCompare(b.path)
+  return stackWeight(a) - stackWeight(b) || a.path.localeCompare(b.path)
 }
 
 function stackWeight(item: FileResourceItem): number {
-  return typeof item.priority === 'number'
-    ? item.priority
-    : ((item.badge?.toLowerCase().includes('global') ?? false) ? 80 : 90)
+  const lowerPath = item.path.toLowerCase()
+  if (lowerPath.endsWith('agents.md')) return 10
+  if (lowerPath.endsWith('agents.override.md')) return 20
+  return 30
 }

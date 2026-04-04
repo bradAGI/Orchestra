@@ -6,6 +6,10 @@ export type Provider = 'claude' | 'codex' | 'gemini' | 'opencode'
 export type CategoryId =
   | 'settings'
   | 'config'
+  | 'approvals'
+  | 'models'
+  | 'environment'
+  | 'profiles'
   | 'instructions'
   | 'context'
   | 'agents'
@@ -24,7 +28,7 @@ export interface CategoryDef {
   pinned?: boolean
 }
 
-// Legacy PanelProps for non-Claude providers
+// Shared panel contract used by file-backed resource editors.
 export interface PanelProps {
   items: AgentConfig[]
   selectedItem: string | null

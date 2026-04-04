@@ -513,7 +513,7 @@ func buildAgentResource(rootDir, provider, resourceType, name, scope string) (st
 		return buildClaudeResource(rootDir, resourceType, slug, scope)
 	case "Orchestra":
 		if resourceType == "skill" {
-			return filepath.Join(rootDir, ".codex", "skills", slug+".md"), "---\nname: "+slug+"\ndescription: New agent skill\n---\n\n# "+humanizeAgentResourceName(slug)+"\n", nil
+			return filepath.Join(rootDir, ".codex", "skills", slug+".md"), "---\nname: " + slug + "\ndescription: New agent skill\n---\n\n# " + humanizeAgentResourceName(slug) + "\n", nil
 		}
 		return filepath.Join(rootDir, ".orchestra", "agents", slug+".json"), "{}", nil
 	default:
@@ -544,7 +544,7 @@ func buildCodexResource(rootDir, resourceType, slug, scope string) (string, stri
 		}
 		return filepath.Join(rootDir, ".codex", "AGENTS.md"), "# Global Instructions\n", nil
 	case "agents":
-		return filepath.Join(rootDir, ".codex", "agents", slug+".toml"), fmt.Sprintf("name = \"%s\"\ndescription = \"Describe what this sub-agent does\"\nmodel = \"gpt-5.3-codex\"\n", slug), nil
+		return filepath.Join(rootDir, ".codex", "agents", slug+".md"), fmt.Sprintf("---\nname: %s\ndescription: Describe what this sub-agent does\nmodel: gpt-5.3-codex\n---\n\nYou are %s. Describe your role and instructions here.\n", slug, humanizeAgentResourceName(slug)), nil
 	case "skills", "skill":
 		return filepath.Join(rootDir, ".agents", "skills", slug, "SKILL.md"), fmt.Sprintf("---\nname: %s\ndescription: Describe what this skill does\n---\n\n# %s\n\nSkill instructions go here.\n", slug, humanizeAgentResourceName(slug)), nil
 	default:
@@ -562,7 +562,7 @@ func buildGeminiResource(rootDir, resourceType, slug, scope string) (string, str
 		}
 		return filepath.Join(rootDir, ".gemini", "GEMINI.md"), "# Global Context\n", nil
 	case "commands":
-		return filepath.Join(rootDir, ".gemini", "commands", slug+".toml"), fmt.Sprintf("description = \"%s\"\nprompt = \"Describe the task this command should run\"\n", humanizeAgentResourceName(slug)), nil
+		return filepath.Join(rootDir, ".gemini", "commands", slug+".md"), fmt.Sprintf("---\ndescription: %s\n---\n\nDescribe the task this command should run.\n", humanizeAgentResourceName(slug)), nil
 	default:
 		return "", "", fmt.Errorf("unsupported Gemini resource type: %s", resourceType)
 	}
@@ -571,7 +571,7 @@ func buildGeminiResource(rootDir, resourceType, slug, scope string) (string, str
 func buildOpenCodeResource(rootDir, resourceType, slug, scope string) (string, string, error) {
 	switch resourceType {
 	case "config":
-		base := "opencode.json"
+		base := filepath.Join(".opencode", "opencode.json")
 		if scope != "project" {
 			base = filepath.Join(".config", "opencode", "opencode.json")
 		}
@@ -583,9 +583,9 @@ func buildOpenCodeResource(rootDir, resourceType, slug, scope string) (string, s
 		}
 		return filepath.Join(rootDir, dir, slug+".md"), fmt.Sprintf("---\ndescription: Describe what this agent does\nmode: subagent\n---\n\nYou are %s. Describe your role and instructions here.\n", humanizeAgentResourceName(slug)), nil
 	case "commands":
-		dir := ".opencode/command"
+		dir := ".opencode/commands"
 		if scope != "project" {
-			dir = ".config/opencode/command"
+			dir = ".config/opencode/commands"
 		}
 		return filepath.Join(rootDir, dir, slug+".md"), fmt.Sprintf("---\ndescription: Describe what this command does\nagent: build\n---\n\nRun %s.\n", humanizeAgentResourceName(slug)), nil
 	case "skills", "skill":

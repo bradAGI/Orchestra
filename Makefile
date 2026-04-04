@@ -1,7 +1,10 @@
 
-.PHONY: dash build install desktop
+.PHONY: backend dash build install desktop
 
-dash:
+backend:
+	@cd apps/backend && GOCACHE=/tmp/go-build-cache go build -o orchestrad ./cmd/orchestrad
+
+dash: backend
 	@cd apps/tui && go run .
 
 build:

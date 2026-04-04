@@ -32,7 +32,7 @@ func initialModel(noStart bool) *model {
 		noStart:    noStart,
 		backend: &Service{
 			Name: "Orchestra Backend",
-			Cmd:  "./apps/backend/orchestrd start",
+			Cmd:  "./apps/backend/orchestrad start",
 			Cwd:  "../..",
 			Env:  []string{"ORCHESTRA_SERVER_PORT=4010", "ORCHESTRA_SERVER_HOST=0.0.0.0", "ORCHESTRA_WORKSPACE_ROOT=/tmp/orchestra", "ORCHESTRA_API_TOKEN=dev-token"},
 		},

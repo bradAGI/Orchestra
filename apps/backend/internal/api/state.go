@@ -1124,11 +1124,11 @@ func (s *Server) PostIssueStop(w http.ResponseWriter, r *http.Request) {
 
 	// Reset state to Backlog and clear feedback, plan, branch, base_sha
 	issue, err := s.orchestrator.UpdateIssue(r.Context(), identifier, map[string]any{
-		"state":      "Backlog",
-		"feedback":   "",
-		"plan":       "",
+		"state":       "Backlog",
+		"feedback":    "",
+		"plan":        "",
 		"branch_name": "",
-		"base_sha":   "",
+		"base_sha":    "",
 	})
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "update_failed", "failed to reset issue")
@@ -1195,9 +1195,17 @@ func (s *Server) GetAgents(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-// GetAgentConfigs handles GET /api/v1/config/agents/items by listing all
-// discovered agent configuration files, optionally filtered by project_id.
+func markLegacyAgentConfigRoute(w http.ResponseWriter) {
+	w.Header().Set("Deprecation", "true")
+	w.Header().Set("Sunset", "Wed, 31 Dec 2026 23:59:59 GMT")
+	w.Header().Set("Link", `</api/v1/agents>; rel="successor-version"`)
+}
+
+// GetAgentConfigs handles the legacy generic config-item listing route
+// GET /api/v1/config/agents/items. Provider-native agent configuration should
+// prefer /api/v1/agents/{provider}/... routes instead.
 func (s *Server) GetAgentConfigs(w http.ResponseWriter, r *http.Request) {
+	markLegacyAgentConfigRoute(w)
 	projectID := r.URL.Query().Get("project_id")
 	configs, err := s.orchestrator.ListAgentConfigs(projectID)
 	if err != nil {
@@ -1210,9 +1218,11 @@ func (s *Server) GetAgentConfigs(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// PostAgentConfigNew handles POST /api/v1/config/agents/new by creating a new
-// agent configuration resource (core config, skill, or MCP server definition).
+// PostAgentConfigNew handles the legacy generic creation route
+// POST /api/v1/config/agents/new. Provider-native agent configuration should
+// prefer /api/v1/agents/{provider}/... routes instead.
 func (s *Server) PostAgentConfigNew(w http.ResponseWriter, r *http.Request) {
+	markLegacyAgentConfigRoute(w)
 	var body struct {
 		Provider string `json:"provider"`
 		Type     string `json:"type"` // "core", "skill", "mcp"
@@ -1235,9 +1245,11 @@ func (s *Server) PostAgentConfigNew(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]string{"path": path})
 }
 
-// PostAgentConfigUpdate handles POST /api/v1/config/agents/items by updating
-// the content of an existing agent configuration file at the specified path.
+// PostAgentConfigUpdate handles the legacy generic config-item update route
+// POST /api/v1/config/agents/items. Provider-native agent configuration should
+// prefer /api/v1/agents/{provider}/... routes instead.
 func (s *Server) PostAgentConfigUpdate(w http.ResponseWriter, r *http.Request) {
+	markLegacyAgentConfigRoute(w)
 	var body struct {
 		Path    string `json:"path"`
 		Content string `json:"content"`

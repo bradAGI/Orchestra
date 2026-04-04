@@ -62,11 +62,26 @@ func (s *Server) GetProviderPermissions(w http.ResponseWriter, r *http.Request) 
 	case "claude":
 		perms = readClaudePermissions(homeDir)
 	case "codex":
-		perms = readCodexPermissions(homeDir)
+		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
+		if scopeErr != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", scopeErr.Error())
+			return
+		}
+		perms = readCodexPermissions(homeDir, projectRoot, scope)
 	case "gemini":
-		perms = readGeminiPermissions(homeDir)
+		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
+		if scopeErr != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", scopeErr.Error())
+			return
+		}
+		perms = readGeminiPermissions(homeDir, projectRoot, scope)
 	case "opencode":
-		perms = readOpenCodePermissions(homeDir)
+		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
+		if scopeErr != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", scopeErr.Error())
+			return
+		}
+		perms = readOpenCodePermissions(homeDir, projectRoot, scope)
 	default:
 		writeJSONError(w, http.StatusBadRequest, "unknown_provider", fmt.Sprintf("unknown provider: %s", provider))
 		return
@@ -128,11 +143,26 @@ func (s *Server) PostProviderPermissions(w http.ResponseWriter, r *http.Request)
 	case "claude":
 		err = writeClaudePermissions(homeDir, perms)
 	case "codex":
-		err = writeCodexPermissions(homeDir, perms)
+		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
+		if scopeErr != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", scopeErr.Error())
+			return
+		}
+		err = writeCodexPermissions(homeDir, projectRoot, scope, perms)
 	case "gemini":
-		err = writeGeminiPermissions(homeDir, perms)
+		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
+		if scopeErr != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", scopeErr.Error())
+			return
+		}
+		err = writeGeminiPermissions(homeDir, projectRoot, scope, perms)
 	case "opencode":
-		err = writeOpenCodePermissions(homeDir, perms)
+		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
+		if scopeErr != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", scopeErr.Error())
+			return
+		}
+		err = writeOpenCodePermissions(homeDir, projectRoot, scope, perms)
 	default:
 		writeJSONError(w, http.StatusBadRequest, "unknown_provider", fmt.Sprintf("unknown provider: %s", provider))
 		return
@@ -166,11 +196,26 @@ func (s *Server) GetProviderModel(w http.ResponseWriter, r *http.Request) {
 	case "claude":
 		model = readClaudeModel(homeDir)
 	case "codex":
-		model = readCodexModel(homeDir)
+		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
+		if scopeErr != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", scopeErr.Error())
+			return
+		}
+		model = readCodexModel(homeDir, projectRoot, scope)
 	case "gemini":
-		model = readGeminiModel(homeDir)
+		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
+		if scopeErr != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", scopeErr.Error())
+			return
+		}
+		model = readGeminiModel(homeDir, projectRoot, scope)
 	case "opencode":
-		model = readOpenCodeModel(homeDir)
+		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
+		if scopeErr != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", scopeErr.Error())
+			return
+		}
+		model = readOpenCodeModel(homeDir, projectRoot, scope)
 	default:
 		writeJSONError(w, http.StatusBadRequest, "unknown_provider", fmt.Sprintf("unknown provider: %s", provider))
 		return
@@ -198,11 +243,26 @@ func (s *Server) PostProviderModel(w http.ResponseWriter, r *http.Request) {
 	case "claude":
 		err = writeClaudeModel(homeDir, model)
 	case "codex":
-		err = writeCodexModel(homeDir, model)
+		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
+		if scopeErr != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", scopeErr.Error())
+			return
+		}
+		err = writeCodexModel(homeDir, projectRoot, scope, model)
 	case "gemini":
-		err = writeGeminiModel(homeDir, model)
+		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
+		if scopeErr != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", scopeErr.Error())
+			return
+		}
+		err = writeGeminiModel(homeDir, projectRoot, scope, model)
 	case "opencode":
-		err = writeOpenCodeModel(homeDir, model)
+		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
+		if scopeErr != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", scopeErr.Error())
+			return
+		}
+		err = writeOpenCodeModel(homeDir, projectRoot, scope, model)
 	default:
 		writeJSONError(w, http.StatusBadRequest, "unknown_provider", fmt.Sprintf("unknown provider: %s", provider))
 		return
@@ -236,9 +296,19 @@ func (s *Server) GetProviderHooks(w http.ResponseWriter, r *http.Request) {
 	case "claude":
 		hooks = readClaudeHooks(homeDir)
 	case "codex":
-		hooks = readCodexHooks(homeDir)
+		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
+		if scopeErr != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", scopeErr.Error())
+			return
+		}
+		hooks = readCodexHooks(homeDir, projectRoot, scope)
 	case "gemini":
-		hooks = readGeminiHooks(homeDir)
+		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
+		if scopeErr != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", scopeErr.Error())
+			return
+		}
+		hooks = readGeminiHooks(homeDir, projectRoot, scope)
 	case "opencode":
 		hooks = []ProviderHook{} // plugin-based, no hooks
 	default:
@@ -272,9 +342,19 @@ func (s *Server) PostProviderHooks(w http.ResponseWriter, r *http.Request) {
 	case "claude":
 		err = writeClaudeHooks(homeDir, hooks)
 	case "codex":
-		err = writeCodexHooks(homeDir, hooks)
+		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
+		if scopeErr != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", scopeErr.Error())
+			return
+		}
+		err = writeCodexHooks(homeDir, projectRoot, scope, hooks)
 	case "gemini":
-		err = writeGeminiHooks(homeDir, hooks)
+		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
+		if scopeErr != nil {
+			writeJSONError(w, http.StatusBadRequest, "project", scopeErr.Error())
+			return
+		}
+		err = writeGeminiHooks(homeDir, projectRoot, scope, hooks)
 	case "opencode":
 		// No-op for opencode (plugin-based)
 		err = nil
@@ -513,8 +593,15 @@ func writeClaudeHooks(home string, hooks []ProviderHook) error {
 /*  Codex: ~/.codex/config.toml                                        */
 /* ================================================================== */
 
-func readCodexConfig(home string) (map[string]any, error) {
-	data, err := os.ReadFile(codexConfigPath(home))
+func scopedCodexConfigPath(home, projectRoot, scope string) string {
+	if scope == "project" && projectRoot != "" {
+		return filepath.Join(projectRoot, ".codex", "config.toml")
+	}
+	return codexConfigPath(home)
+}
+
+func readScopedCodexConfig(home, projectRoot, scope string) (map[string]any, error) {
+	data, err := os.ReadFile(scopedCodexConfigPath(home, projectRoot, scope))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return map[string]any{}, nil
@@ -528,8 +615,12 @@ func readCodexConfig(home string) (map[string]any, error) {
 	return cfg, nil
 }
 
-func writeCodexConfig(home string, cfg map[string]any) error {
-	path := codexConfigPath(home)
+func readCodexConfig(home string) (map[string]any, error) {
+	return readScopedCodexConfig(home, "", "global")
+}
+
+func writeScopedCodexConfig(home, projectRoot, scope string, cfg map[string]any) error {
+	path := scopedCodexConfigPath(home, projectRoot, scope)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
@@ -540,9 +631,13 @@ func writeCodexConfig(home string, cfg map[string]any) error {
 	return os.WriteFile(path, data, 0644)
 }
 
+func writeCodexConfig(home string, cfg map[string]any) error {
+	return writeScopedCodexConfig(home, "", "global", cfg)
+}
+
 // Permissions: config.toml → approval_policy, sandbox_mode
-func readCodexPermissions(home string) ProviderPermissions {
-	cfg, err := readCodexConfig(home)
+func readCodexPermissions(home, projectRoot, scope string) ProviderPermissions {
+	cfg, err := readScopedCodexConfig(home, projectRoot, scope)
 	if err != nil {
 		return ProviderPermissions{ApprovalMode: "on-request", Allow: []string{}, Deny: []string{}, Ask: []string{}}
 	}
@@ -556,8 +651,8 @@ func readCodexPermissions(home string) ProviderPermissions {
 	return ProviderPermissions{ApprovalMode: mode, Allow: []string{}, Deny: []string{}, Ask: []string{}, Sandbox: sandbox}
 }
 
-func writeCodexPermissions(home string, perms ProviderPermissions) error {
-	cfg, err := readCodexConfig(home)
+func writeCodexPermissions(home, projectRoot, scope string, perms ProviderPermissions) error {
+	cfg, err := readScopedCodexConfig(home, projectRoot, scope)
 	if err != nil {
 		cfg = map[string]any{}
 	}
@@ -565,12 +660,12 @@ func writeCodexPermissions(home string, perms ProviderPermissions) error {
 	if perms.Sandbox != "" {
 		cfg["sandbox_mode"] = perms.Sandbox
 	}
-	return writeCodexConfig(home, cfg)
+	return writeScopedCodexConfig(home, projectRoot, scope, cfg)
 }
 
 // Model: config.toml → model, model_reasoning_effort
-func readCodexModel(home string) ProviderModelConfig {
-	cfg, err := readCodexConfig(home)
+func readCodexModel(home, projectRoot, scope string) ProviderModelConfig {
+	cfg, err := readScopedCodexConfig(home, projectRoot, scope)
 	if err != nil {
 		return ProviderModelConfig{}
 	}
@@ -579,8 +674,8 @@ func readCodexModel(home string) ProviderModelConfig {
 	return ProviderModelConfig{Model: model, Effort: effort}
 }
 
-func writeCodexModel(home string, model ProviderModelConfig) error {
-	cfg, err := readCodexConfig(home)
+func writeCodexModel(home, projectRoot, scope string, model ProviderModelConfig) error {
+	cfg, err := readScopedCodexConfig(home, projectRoot, scope)
 	if err != nil {
 		cfg = map[string]any{}
 	}
@@ -590,47 +685,39 @@ func writeCodexModel(home string, model ProviderModelConfig) error {
 	if model.Effort != "" {
 		cfg["model_reasoning_effort"] = model.Effort
 	}
-	return writeCodexConfig(home, cfg)
+	return writeScopedCodexConfig(home, projectRoot, scope, cfg)
 }
 
-// Hooks: config.toml → notify (array of strings)
-func readCodexHooks(home string) []ProviderHook {
-	cfg, err := readCodexConfig(home)
+func codexHooksPath(home, projectRoot, scope string) string {
+	if scope == "project" && projectRoot != "" {
+		return filepath.Join(projectRoot, ".codex", "hooks.json")
+	}
+	return filepath.Join(home, ".codex", "hooks.json")
+}
+
+// Hooks: hooks.json in ~/.codex or <project>/.codex
+func readCodexHooks(home, projectRoot, scope string) []ProviderHook {
+	data, err := os.ReadFile(codexHooksPath(home, projectRoot, scope))
 	if err != nil {
 		return nil
 	}
-	// notify is an array like ["command", "arg1", "arg2"]
-	if notify, ok := cfg["notify"].([]any); ok {
-		var parts []string
-		for _, n := range notify {
-			if s, ok := n.(string); ok {
-				parts = append(parts, s)
-			}
-		}
-		if len(parts) > 0 {
-			return []ProviderHook{{Event: "notify", Command: strings.Join(parts, " ")}}
-		}
-	}
-	// Also handle legacy string value
-	if notify, ok := cfg["notify"].(string); ok && notify != "" {
-		return []ProviderHook{{Event: "notify", Command: notify}}
+	var hooks []ProviderHook
+	if err := json.Unmarshal(data, &hooks); err == nil {
+		return hooks
 	}
 	return nil
 }
 
-func writeCodexHooks(home string, hooks []ProviderHook) error {
-	cfg, err := readCodexConfig(home)
+func writeCodexHooks(home, projectRoot, scope string, hooks []ProviderHook) error {
+	path := codexHooksPath(home, projectRoot, scope)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(hooks, "", "  ")
 	if err != nil {
-		cfg = map[string]any{}
+		return err
 	}
-	for _, h := range hooks {
-		if h.Event == "notify" {
-			// Store as array of strings
-			parts := strings.Fields(h.Command)
-			cfg["notify"] = parts
-		}
-	}
-	return writeCodexConfig(home, cfg)
+	return os.WriteFile(path, data, 0644)
 }
 
 /* ================================================================== */
@@ -639,8 +726,8 @@ func writeCodexHooks(home string, hooks []ProviderHook) error {
 
 // Permissions: settings.json → tools.allowed
 // Gemini manages approvals via tools.allowed and the --yolo flag, not a config setting.
-func readGeminiPermissions(home string) ProviderPermissions {
-	cfg, err := readGeminiConfig(home)
+func readGeminiPermissions(home, projectRoot, scope string) ProviderPermissions {
+	cfg, err := readScopedGeminiConfig(home, projectRoot, scope)
 	if err != nil {
 		return ProviderPermissions{ApprovalMode: "interactive", Allow: []string{}, Deny: []string{}, Ask: []string{}}
 	}
@@ -653,8 +740,8 @@ func readGeminiPermissions(home string) ProviderPermissions {
 	return ProviderPermissions{ApprovalMode: "interactive", Allow: allow, Deny: []string{}, Ask: []string{}}
 }
 
-func writeGeminiPermissions(home string, perms ProviderPermissions) error {
-	cfg, err := readGeminiConfig(home)
+func writeGeminiPermissions(home, projectRoot, scope string, perms ProviderPermissions) error {
+	cfg, err := readScopedGeminiConfig(home, projectRoot, scope)
 	if err != nil {
 		return err
 	}
@@ -666,12 +753,12 @@ func writeGeminiPermissions(home string, perms ProviderPermissions) error {
 	tools["allowed"] = perms.Allow
 	cfg["tools"] = tools
 
-	return writeGeminiConfig(home, cfg)
+	return writeScopedGeminiConfig(home, projectRoot, scope, cfg)
 }
 
 // Model: settings.json → model.name, model.inlineThinkingMode
-func readGeminiModel(home string) ProviderModelConfig {
-	cfg, err := readGeminiConfig(home)
+func readGeminiModel(home, projectRoot, scope string) ProviderModelConfig {
+	cfg, err := readScopedGeminiConfig(home, projectRoot, scope)
 	if err != nil {
 		return ProviderModelConfig{}
 	}
@@ -684,8 +771,8 @@ func readGeminiModel(home string) ProviderModelConfig {
 	return ProviderModelConfig{Model: name, Effort: thinking}
 }
 
-func writeGeminiModel(home string, model ProviderModelConfig) error {
-	cfg, err := readGeminiConfig(home)
+func writeGeminiModel(home, projectRoot, scope string, model ProviderModelConfig) error {
+	cfg, err := readScopedGeminiConfig(home, projectRoot, scope)
 	if err != nil {
 		return err
 	}
@@ -704,13 +791,13 @@ func writeGeminiModel(home string, model ProviderModelConfig) error {
 		delete(modelObj, "inlineThinkingMode")
 	}
 	cfg["model"] = modelObj
-	return writeGeminiConfig(home, cfg)
+	return writeScopedGeminiConfig(home, projectRoot, scope, cfg)
 }
 
 // Hooks: settings.json → hooks { <event>: [ { matcher: "...", hooks: [ { type, command, timeout } ] } ] }
 // Gemini hooks use the same nested matcher-group structure as Claude.
-func readGeminiHooks(home string) []ProviderHook {
-	cfg, err := readGeminiConfig(home)
+func readGeminiHooks(home, projectRoot, scope string) []ProviderHook {
+	cfg, err := readScopedGeminiConfig(home, projectRoot, scope)
 	if err != nil {
 		return nil
 	}
@@ -758,8 +845,8 @@ func readGeminiHooks(home string) []ProviderHook {
 	return hooks
 }
 
-func writeGeminiHooks(home string, hooks []ProviderHook) error {
-	cfg, err := readGeminiConfig(home)
+func writeGeminiHooks(home, projectRoot, scope string, hooks []ProviderHook) error {
+	cfg, err := readScopedGeminiConfig(home, projectRoot, scope)
 	if err != nil {
 		return err
 	}
@@ -824,7 +911,7 @@ func writeGeminiHooks(home string, hooks []ProviderHook) error {
 		hooksObj[event] = arr
 	}
 	cfg["hooks"] = hooksObj
-	return writeGeminiConfig(home, cfg)
+	return writeScopedGeminiConfig(home, projectRoot, scope, cfg)
 }
 
 /* ================================================================== */
@@ -833,8 +920,8 @@ func writeGeminiHooks(home string, hooks []ProviderHook) error {
 
 // Permissions: opencode.json → permission { "bash": "allow", "edit": "deny", ... }
 // Can also be a flat string like "allow", or nested like { "bash": { "git *": "allow" } }
-func readOpenCodePermissions(home string) ProviderPermissions {
-	cfg, err := readOpenCodeConfig(home)
+func readOpenCodePermissions(home, projectRoot, scope string) ProviderPermissions {
+	cfg, err := readScopedOpenCodeConfig(home, projectRoot, scope)
 	if err != nil {
 		return ProviderPermissions{ApprovalMode: "interactive", Allow: []string{}, Deny: []string{}, Ask: []string{}}
 	}
@@ -889,8 +976,8 @@ func readOpenCodePermissions(home string) ProviderPermissions {
 	return ProviderPermissions{ApprovalMode: "interactive", Allow: allow, Deny: deny, Ask: ask}
 }
 
-func writeOpenCodePermissions(home string, perms ProviderPermissions) error {
-	cfg, err := readOpenCodeConfig(home)
+func writeOpenCodePermissions(home, projectRoot, scope string, perms ProviderPermissions) error {
+	cfg, err := readScopedOpenCodeConfig(home, projectRoot, scope)
 	if err != nil {
 		return err
 	}
@@ -952,12 +1039,12 @@ func writeOpenCodePermissions(home string, perms ProviderPermissions) error {
 	}
 
 	cfg["permission"] = permObj
-	return writeOpenCodeConfig(home, cfg)
+	return writeScopedOpenCodeConfig(home, projectRoot, scope, cfg)
 }
 
 // Model: opencode.json → model, small_model
-func readOpenCodeModel(home string) ProviderModelConfig {
-	cfg, err := readOpenCodeConfig(home)
+func readOpenCodeModel(home, projectRoot, scope string) ProviderModelConfig {
+	cfg, err := readScopedOpenCodeConfig(home, projectRoot, scope)
 	if err != nil {
 		return ProviderModelConfig{}
 	}
@@ -967,8 +1054,8 @@ func readOpenCodeModel(home string) ProviderModelConfig {
 	return ProviderModelConfig{Model: model, Effort: smallModel}
 }
 
-func writeOpenCodeModel(home string, model ProviderModelConfig) error {
-	cfg, err := readOpenCodeConfig(home)
+func writeOpenCodeModel(home, projectRoot, scope string, model ProviderModelConfig) error {
+	cfg, err := readScopedOpenCodeConfig(home, projectRoot, scope)
 	if err != nil {
 		return err
 	}
@@ -982,7 +1069,88 @@ func writeOpenCodeModel(home string, model ProviderModelConfig) error {
 	} else {
 		delete(cfg, "small_model")
 	}
-	return writeOpenCodeConfig(home, cfg)
+	return writeScopedOpenCodeConfig(home, projectRoot, scope, cfg)
+}
+
+func readScopedGeminiConfig(home, projectRoot, scope string) (map[string]any, error) {
+	path := filepath.Join(home, ".gemini", "settings.json")
+	if scope == "project" && projectRoot != "" {
+		path = filepath.Join(projectRoot, ".gemini", "settings.json")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return map[string]any{}, nil
+		}
+		return nil, err
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+func writeScopedGeminiConfig(home, projectRoot, scope string, cfg map[string]any) error {
+	path := filepath.Join(home, ".gemini", "settings.json")
+	if scope == "project" && projectRoot != "" {
+		path = filepath.Join(projectRoot, ".gemini", "settings.json")
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o644)
+}
+
+func readScopedOpenCodeConfig(home, projectRoot, scope string) (map[string]any, error) {
+	paths := openCodeConfigPaths(home, projectRoot, scope)
+	if scope == "project" && projectRoot != "" {
+		paths = []string{
+			filepath.Join(projectRoot, ".opencode", "opencode.json"),
+			filepath.Join(projectRoot, ".opencode", "opencode.jsonc"),
+			filepath.Join(projectRoot, "opencode.json"),
+			filepath.Join(projectRoot, "opencode.jsonc"),
+		}
+	} else {
+		paths = []string{
+			filepath.Join(home, ".config", "opencode", "opencode.json"),
+			filepath.Join(home, ".config", "opencode", "opencode.jsonc"),
+		}
+	}
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, err
+		}
+		var cfg map[string]any
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			return nil, err
+		}
+		return cfg, nil
+	}
+	return map[string]any{}, nil
+}
+
+func writeScopedOpenCodeConfig(home, projectRoot, scope string, cfg map[string]any) error {
+	path := filepath.Join(home, ".config", "opencode", "opencode.json")
+	if scope == "project" && projectRoot != "" {
+		path = filepath.Join(projectRoot, ".opencode", "opencode.json")
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o644)
 }
 
 /* ================================================================== */

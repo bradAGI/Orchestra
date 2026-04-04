@@ -143,26 +143,32 @@ The project view also handles:
 **Component:** `AgentsDashboard`
 **Section:** `AGENTS`
 
-Provides a per-provider configuration interface for the supported agent providers. The `components/agents/AgentsDashboard.tsx` entry point now re-exports the widget implementation from `src/widgets/agents/`.
+Provides a provider-native configuration interface for the supported agent CLIs. The `components/agents/AgentsDashboard.tsx` entry point re-exports the widget implementation from `src/widgets/agents/`.
 
 | Provider | Description |
 |----------|-------------|
 | `claude` | Anthropic's Claude Code -- deep reasoning and careful analysis |
 | `codex` | OpenAI's Codex -- fast iteration and broad knowledge |
 | `gemini` | Google's Gemini CLI -- multimodal and context-aware |
-| `opencode` | OpenCode -- JSON-formatted agent sessions |
+| `opencode` | OpenCode -- provider-configured JSON and markdown resources |
 
-The current agent dashboard is organized into provider-oriented categories and panels rather than a single flat form.
+The current agent dashboard is organized into provider-oriented categories and panels rather than a single flat form. Each provider is treated as its own domain and maps to the provider's real config files and resource layouts.
 
-For each provider, the dashboard manages:
+Current provider domains:
 
-- **Model config** (`fetchProviderModel` / `updateProviderModel`) -- model name, effort level, temperature
-- **Permissions** (`fetchProviderPermissions` / `updateProviderPermissions`) -- approval mode, allow/deny/ask tool lists, sandbox config
-- **MCP Servers** (`fetchProviderMCPServers` / `addProviderMCPServer` / `updateProviderMCPServer` / `toggleProviderMCPServer` / `deleteProviderMCPServer`) -- per-provider MCP server registration and enablement control
-- **Hooks** (`fetchProviderHooks` / `updateProviderHooks`) -- lifecycle hooks (event matchers, commands, timeouts)
-- **Config files** (`fetchAgentConfigs` / `updateAgentConfigByPath`) -- raw configuration file editor with markdown preview
+- `claude`: dedicated settings, instructions, hooks, rules, skills, and sub-agent panels backed by Claude-specific routes.
+- `codex`: dedicated panels for config, approvals, models/providers, environment, profiles, instructions, sub-agents, skills, hooks, MCP, and rules.
+- `gemini`: dedicated panels for settings, models, permissions, context, commands, and MCP, backed by `settings.json`, `GEMINI.md`, and command files.
+- `opencode`: dedicated panels for config, models, instructions, permissions, agents, commands, skills, and MCP, backed by merged `opencode.json` config plus markdown resources.
 
-Claude also has dedicated panels for settings, instructions, rules, skills, and sub-agents, backed by the Claude-specific backend routes.
+Shared normalized APIs still exist for cross-provider concerns:
+
+- **Model config** (`fetchProviderModel` / `updateProviderModel`)
+- **Permissions** (`fetchProviderPermissions` / `updateProviderPermissions`)
+- **MCP Servers** (`fetchProviderMCPServers` / `addProviderMCPServer` / `updateProviderMCPServer` / `toggleProviderMCPServer` / `deleteProviderMCPServer`)
+- **Hooks** (`fetchProviderHooks` / `updateProviderHooks`)
+
+But the dashboard no longer treats Codex, Gemini, and OpenCode as one generic file editor with light provider labels, and the last shared non-Claude config panel has been removed.
 
 ---
 

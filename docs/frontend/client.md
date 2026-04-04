@@ -158,9 +158,11 @@ Converts any error to a user-friendly display string.
 | `fetchAgentConfig` | GET | `/api/v1/config/agents` | `{ commands, agent_provider, max_turns }` |
 | `updateAgentConfig` | POST | `/api/v1/config/agents` | `void` |
 | `patchAgentConfig` | PATCH | `/api/v1/config/agents` | `{ commands, agent_provider, max_turns }` |
-| `fetchAgentConfigs` | GET | `/api/v1/config/agents/items` | `AgentConfig[]` |
-| `updateAgentConfigByPath` | POST | `/api/v1/config/agents/items` | `void` |
-| `createAgentResource` | POST | `/api/v1/config/agents/new` | `{ path }` |
+
+Notes:
+- `/api/v1/config/agents` is still used for top-level runtime/app agent settings in `App.tsx`.
+- `/api/v1/config/agents/items` and `/api/v1/config/agents/new` remain legacy generic config-item backend routes, but the desktop client no longer uses them for the `Agents` workspace.
+- The `Agents` workspace now prefers provider-native endpoints for Codex, Gemini, OpenCode, and Claude.
 
 #### Provider-Level Configuration
 

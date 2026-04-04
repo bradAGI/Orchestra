@@ -1,4 +1,4 @@
-import { Settings2, FileText, Zap, Plug, Scale, Sparkles, Bot, ScrollText, TerminalSquare, Shield } from 'lucide-react'
+import { Settings2, FileText, Zap, Plug, Scale, Sparkles, Bot, ScrollText, TerminalSquare, Shield, Cpu, FolderTree } from 'lucide-react'
 import type { Provider, CategoryDef } from './types'
 
 export const PROVIDERS: { id: Provider; label: string; description: string }[] = [
@@ -20,14 +20,22 @@ export const CLAUDE_CATEGORIES: CategoryDef[] = [
 
 export const CODEX_CATEGORIES: CategoryDef[] = [
   { id: 'config', label: 'Config', icon: Settings2, pinned: true },
+  { id: 'approvals', label: 'Approvals & Sandbox', icon: Shield, pinned: true },
+  { id: 'models', label: 'Models & Providers', icon: Cpu, pinned: true },
+  { id: 'environment', label: 'Environment', icon: TerminalSquare },
+  { id: 'profiles', label: 'Profiles', icon: FolderTree },
   { id: 'instructions', label: 'Instructions', icon: ScrollText, pinned: true },
   { id: 'agents', label: 'Sub-agents', icon: Bot },
   { id: 'skills', label: 'Skills', icon: Sparkles },
+  { id: 'hooks', label: 'Hooks', icon: Zap },
   { id: 'mcp', label: 'MCP Servers', icon: Plug },
+  { id: 'rules', label: 'Rules', icon: Scale },
 ]
 
 export const GEMINI_CATEGORIES: CategoryDef[] = [
   { id: 'settings', label: 'Settings', icon: Settings2, pinned: true },
+  { id: 'models', label: 'Models', icon: Cpu, pinned: true },
+  { id: 'permissions', label: 'Permissions', icon: Shield, pinned: true },
   { id: 'context', label: 'Context', icon: ScrollText, pinned: true },
   { id: 'commands', label: 'Commands', icon: TerminalSquare },
   { id: 'mcp', label: 'MCP Servers', icon: Plug },
@@ -35,6 +43,7 @@ export const GEMINI_CATEGORIES: CategoryDef[] = [
 
 export const OPENCODE_CATEGORIES: CategoryDef[] = [
   { id: 'config', label: 'Config', icon: Settings2, pinned: true },
+  { id: 'models', label: 'Models', icon: Cpu, pinned: true },
   { id: 'instructions', label: 'Instructions', icon: FileText, pinned: true },
   { id: 'agents', label: 'Agents', icon: Bot },
   { id: 'commands', label: 'Commands', icon: TerminalSquare },
@@ -91,7 +100,7 @@ export const MODELS_BY_PROVIDER: Record<Provider, { value: string; label: string
 
 export const HOOK_EVENTS_BY_PROVIDER: Record<Provider, string[]> = {
   claude: ['SessionStart', 'SessionEnd', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PermissionRequest', 'Notification', 'Stop', 'SubagentStop', 'PreCompact'],
-  codex: ['notify'],
+  codex: [],
   gemini: ['SessionStart', 'SessionEnd', 'BeforeAgent', 'AfterAgent', 'BeforeModel', 'AfterModel', 'BeforeToolSelection'],
   opencode: [],
 }

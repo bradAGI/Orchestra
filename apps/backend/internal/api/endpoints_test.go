@@ -395,6 +395,42 @@ func TestGetAgentConfigItems(t *testing.T) {
 	if rec.Code != http.StatusOK && rec.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 200 or 500, got %d", rec.Code)
 	}
+	if got := rec.Header().Get("Deprecation"); got != "true" {
+		t.Fatalf("expected Deprecation header on legacy route, got %q", got)
+	}
+	if got := rec.Header().Get("Sunset"); got == "" {
+		t.Fatalf("expected Sunset header on legacy route")
+	}
+}
+
+func TestPostAgentConfigNewRejectsInvalidJSONAndMarksDeprecated(t *testing.T) {
+	router := newTestRouter(t)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/config/agents/new", strings.NewReader("{bad"))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+	if got := rec.Header().Get("Deprecation"); got != "true" {
+		t.Fatalf("expected Deprecation header on legacy route, got %q", got)
+	}
+}
+
+func TestPostAgentConfigUpdateRejectsInvalidJSONAndMarksDeprecated(t *testing.T) {
+	router := newTestRouter(t)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/config/agents/items", strings.NewReader("{bad"))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+	if got := rec.Header().Get("Deprecation"); got != "true" {
+		t.Fatalf("expected Deprecation header on legacy route, got %q", got)
+	}
 }
 
 // ---------------------------------------------------------------------------

@@ -42,8 +42,8 @@ func TestBuildAgentResourceProviderSpecificPaths(t *testing.T) {
 			resourceType: "agents",
 			resourceName: "Code Reviewer",
 			scope:        "project",
-			wantPath:     filepath.Join(rootDir, ".codex", "agents", "code-reviewer.toml"),
-			wantContains: []string{"name = \"code-reviewer\"", "model = \"gpt-5.3-codex\""},
+			wantPath:     filepath.Join(rootDir, ".codex", "agents", "code-reviewer.md"),
+			wantContains: []string{"name: code-reviewer", "model: gpt-5.3-codex"},
 		},
 		{
 			name:         "codex skill",
@@ -78,8 +78,8 @@ func TestBuildAgentResourceProviderSpecificPaths(t *testing.T) {
 			resourceType: "commands",
 			resourceName: "Daily Summary",
 			scope:        "project",
-			wantPath:     filepath.Join(rootDir, ".gemini", "commands", "daily-summary.toml"),
-			wantContains: []string{"description = \"Daily Summary\"", "prompt = \"Describe the task this command should run\""},
+			wantPath:     filepath.Join(rootDir, ".gemini", "commands", "daily-summary.md"),
+			wantContains: []string{"description: Daily Summary", "Describe the task this command should run."},
 		},
 		{
 			name:         "opencode global config",
@@ -105,7 +105,7 @@ func TestBuildAgentResourceProviderSpecificPaths(t *testing.T) {
 			resourceType: "commands",
 			resourceName: "Ship It",
 			scope:        "global",
-			wantPath:     filepath.Join(rootDir, ".config", "opencode", "command", "ship-it.md"),
+			wantPath:     filepath.Join(rootDir, ".config", "opencode", "commands", "ship-it.md"),
 			wantContains: []string{"agent: build", "Run Ship It."},
 		},
 		{

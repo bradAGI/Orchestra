@@ -54,6 +54,7 @@ type Service struct {
 	mu      sync.Mutex
 	cancel  context.CancelFunc
 	cmd     *exec.Cmd
+	done    chan struct{}
 	onEvent func()
 }
 
@@ -71,11 +72,24 @@ func (s *Service) Start(onEvent func()) {
 	s.onEvent = onEvent
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
+	s.done = make(chan struct{})
 
 	go s.run(ctx)
 }
 
 func (s *Service) run(ctx context.Context) {
+	defer func() {
+		s.mu.Lock()
+		done := s.done
+		s.done = nil
+		s.cmd = nil
+		s.cancel = nil
+		s.mu.Unlock()
+		if done != nil {
+			close(done)
+		}
+	}()
+
 	cmd := exec.CommandContext(ctx, "bash", "-c", s.Cmd)
 	cmd.Dir = s.Cwd
 	cmd.Env = os.Environ()
@@ -140,20 +154,35 @@ func (s *Service) run(ctx context.Context) {
 // after a grace period.
 func (s *Service) Stop() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	done := s.done
+	cmd := s.cmd
+	cancel := s.cancel
 	if s.cancel != nil {
-		s.cancel()
+		cancel()
 	}
-	if s.cmd != nil && s.cmd.Process != nil {
+	if cmd != nil && cmd.Process != nil {
 		// Send SIGTERM first for graceful shutdown (releases port)
-		_ = syscall.Kill(-s.cmd.Process.Pid, syscall.SIGTERM)
-		// Give process a moment to exit, then force kill
-		go func(pid int) {
-			time.Sleep(2 * time.Second)
-			_ = syscall.Kill(-pid, syscall.SIGKILL)
-		}(s.cmd.Process.Pid)
+		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
 	}
 	s.Status = StatusStopped
 	s.Logs = append(s.Logs, fmt.Sprintf(">>> %s stopped", s.Name))
 	s.onEvent()
+	s.mu.Unlock()
+
+	if done == nil {
+		return
+	}
+
+	select {
+	case <-done:
+		return
+	case <-time.After(2 * time.Second):
+		if cmd != nil && cmd.Process != nil {
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		}
+		select {
+		case <-done:
+		case <-time.After(1 * time.Second):
+		}
+	}
 }

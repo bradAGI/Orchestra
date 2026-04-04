@@ -22,6 +22,7 @@ export function HooksPanel({ hooks, onSave, loading, saving, provider }: HooksPa
   const [newCommand, setNewCommand] = useState('')
   const [newMatcher, setNewMatcher] = useState('')
   const events = HOOK_EVENTS_BY_PROVIDER[provider] ?? []
+  const allowCustomEvents = provider === 'codex'
 
   // Sync from parent when hooks change (e.g. after save + reload)
   useEffect(() => { setLocalHooks(hooks) }, [hooks])
@@ -30,7 +31,7 @@ export function HooksPanel({ hooks, onSave, loading, saving, provider }: HooksPa
     return <div className="p-6 space-y-3"><Skeleton className="h-6 w-48" /><Skeleton className="h-[200px] w-full" /></div>
   }
 
-  if (events.length === 0) {
+  if (events.length === 0 && !allowCustomEvents) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground/20">
         <p className="text-sm font-bold uppercase tracking-widest">{provider} does not support hooks</p>
@@ -80,7 +81,16 @@ export function HooksPanel({ hooks, onSave, loading, saving, provider }: HooksPa
 
       {/* Add new hook */}
       <div className="shrink-0 flex items-center gap-2 border-t border-border/20 pt-3">
-        <CustomDropdown className="w-[150px]" direction="up" value={newEvent} options={events.map(e => ({ label: e, value: e }))} onChange={setNewEvent} placeholder="Event" />
+        {allowCustomEvents ? (
+          <input
+            className="h-8 w-[150px] rounded-lg border border-border bg-background px-3 text-xs font-mono focus:ring-2 focus:ring-primary/20 outline-none"
+            value={newEvent}
+            onChange={e => setNewEvent(e.target.value)}
+            placeholder="Event"
+          />
+        ) : (
+          <CustomDropdown className="w-[150px]" direction="up" value={newEvent} options={events.map(e => ({ label: e, value: e }))} onChange={setNewEvent} placeholder="Event" />
+        )}
         <input className="h-8 flex-1 rounded-lg border border-border bg-background px-3 text-xs font-mono focus:ring-2 focus:ring-primary/20 outline-none" value={newCommand} onChange={e => setNewCommand(e.target.value)} placeholder="Command" />
         <input className="h-8 w-[100px] rounded-lg border border-border bg-background px-3 text-xs font-mono focus:ring-2 focus:ring-primary/20 outline-none" value={newMatcher} onChange={e => setNewMatcher(e.target.value)} placeholder="Matcher" />
         <Button size="sm" variant="outline" className="h-8 text-[9px] font-bold uppercase" disabled={!newEvent || !newCommand.trim()} onClick={handleAdd}>

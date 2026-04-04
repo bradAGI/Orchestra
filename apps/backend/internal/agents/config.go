@@ -66,11 +66,11 @@ var AgentMeta = map[string]struct {
 		LocalSkillPaths:  []string{".gemini/commands"},
 	},
 	"opencode": {
-		GlobalPaths:      []string{".config/opencode/opencode.json"},
-		LocalPaths:       []string{"opencode.json"},
+		GlobalPaths:      []string{".config/opencode/opencode.json", ".config/opencode/opencode.jsonc"},
+		LocalPaths:       []string{".opencode/opencode.json", ".opencode/opencode.jsonc", "opencode.json", "opencode.jsonc"},
 		Format:           "json",
-		GlobalSkillPaths: []string{".config/opencode/agents", ".config/opencode/skills", ".config/opencode/command"},
-		LocalSkillPaths:  []string{".opencode/agents", ".opencode/skills", ".opencode/command"},
+		GlobalSkillPaths: []string{".config/opencode/agents", ".config/opencode/skills", ".config/opencode/command", ".config/opencode/commands"},
+		LocalSkillPaths:  []string{".opencode/agents", ".opencode/skills", ".opencode/command", ".opencode/commands"},
 	},
 }
 

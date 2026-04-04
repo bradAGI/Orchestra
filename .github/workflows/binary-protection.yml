@@ -23,79 +23,13 @@ jobs:
       with:
         fetch-depth: 0  # Full history to check all files
 
-    - name: 🔍 Scan for Orchestra Binaries
+    - name: Make binary protection script executable
       run: |
-        echo "🔍 Orchestra Binary Protection: Scanning repository..."
+        chmod +x scripts/check-binary-protection.sh
 
-        # Critical Orchestra binary patterns
-        ORCHESTRA_BINARIES=(
-          "orchestrd"
-          "orchestra-dash"
-          "apps/backend/orchestrd*"
-          "apps/tui/orchestra*"
-        )
-
-        FOUND_BINARIES=()
-
-        # Check for Orchestra binaries
-        for pattern in "${ORCHESTRA_BINARIES[@]}"; do
-          if find . -name "$pattern" -type f | grep -v ".git" | grep -q .; then
-            FOUND_BINARIES+=($(find . -name "$pattern" -type f | grep -v ".git"))
-          fi
-        done
-
-        if [ ${#FOUND_BINARIES[@]} -gt 0 ]; then
-          echo "🚫 =============================================="
-          echo "🚫 CRITICAL: ORCHESTRA BINARIES DETECTED!"
-          echo "🚫 =============================================="
-          echo ""
-          echo "The following Orchestra binaries were found:"
-          for file in "${FOUND_BINARIES[@]}"; do
-            echo "  ❌ $file"
-          done
-          echo ""
-          echo "🔧 These should be in .gitignore, not committed!"
-          echo "🚫 =============================================="
-          exit 1
-        fi
-
-        echo "✅ No Orchestra binaries found"
-
-    - name: 🔍 Scan for Generic Binaries
+    - name: 🔍 Scan for blocked binaries and sensitive files
       run: |
-        echo "🔍 Scanning for generic binary files..."
-
-        # Generic binary patterns to check
-        BINARY_EXTENSIONS=(
-          "*.exe"
-          "*.bin"
-          "*.dll"
-          "*.so"
-          "*.dylib"
-          "*.a"
-          "*.o"
-        )
-
-        FOUND_GENERICS=()
-
-        # Check for generic binaries (excluding node_modules)
-        for pattern in "${BINARY_EXTENSIONS[@]}"; do
-          if find . -name "$pattern" -type f -not -path "./node_modules/*" -not -path "./.git/*" | grep -q .; then
-            FOUND_GENERICS+=($(find . -name "$pattern" -type f -not -path "./node_modules/*" -not -path "./.git/*"))
-          fi
-        done
-
-        if [ ${#FOUND_GENERICS[@]} -gt 0 ]; then
-          echo "⚠️  Generic binary files detected:"
-          for file in "${FOUND_GENERICS[@]}"; do
-            echo "  📁 $file"
-          done
-          echo ""
-          echo "💡 Verify these should be committed or add to .gitignore"
-          # Don't fail on generic binaries, just warn
-        else
-          echo "✅ No generic binaries found"
-        fi
+        ./scripts/check-binary-protection.sh --repo
 
     - name: 🔍 Check for Large Files
       run: |

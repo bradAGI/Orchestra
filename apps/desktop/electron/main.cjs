@@ -16,6 +16,29 @@ function backendTargetKey() {
   return `${process.platform}-${process.arch}`
 }
 
+function newestExistingPath(candidates) {
+  let newest = ''
+  let newestMtime = -1
+
+  for (const candidate of candidates) {
+    if (!candidate || !fsSync.existsSync(candidate)) {
+      continue
+    }
+    try {
+      const stats = fsSync.statSync(candidate)
+      const mtime = stats.mtimeMs || 0
+      if (mtime >= newestMtime) {
+        newest = candidate
+        newestMtime = mtime
+      }
+    } catch {
+      // Ignore unreadable candidates and continue evaluating other paths.
+    }
+  }
+
+  return newest
+}
+
 function resolveManagedBackendBinaryPath() {
   const overridePath = process.env.ORCHESTRA_BACKEND_BIN
   if (overridePath && fsSync.existsSync(overridePath)) {
@@ -27,13 +50,16 @@ function resolveManagedBackendBinaryPath() {
 
   const packagedPath = path.join(process.resourcesPath, 'backend', targetKey, binaryName)
   const devCandidates = [
-    path.join(__dirname, '..', 'resources', 'backend', targetKey, binaryName),
     path.join(__dirname, '..', '..', 'backend', binaryName),
     path.join(__dirname, '..', '..', 'backend', 'dist', 'orchestra', binaryName),
+    path.join(__dirname, '..', 'resources', 'backend', targetKey, binaryName),
   ]
 
-  const candidates = app.isPackaged ? [packagedPath] : [packagedPath, ...devCandidates]
-  return candidates.find((candidate) => fsSync.existsSync(candidate)) || ''
+  if (app.isPackaged) {
+    return fsSync.existsSync(packagedPath) ? packagedPath : ''
+  }
+
+  return newestExistingPath(devCandidates)
 }
 
 function wait(ms) {
@@ -109,6 +135,7 @@ async function startManagedBackend() {
     console.warn('Managed backend disabled: orchestrad binary not found in development mode')
     return null
   }
+  console.log(`[orchestra-desktop] selected backend binary: ${backendBin}`)
 
   const preferredPort = Number.parseInt(process.env.ORCHESTRA_SERVER_PORT || '4010', 10)
   const port = Number.isFinite(preferredPort) && preferredPort > 0 ? await findAvailablePort(preferredPort) : await findAvailablePort(4010)

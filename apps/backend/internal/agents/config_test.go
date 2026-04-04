@@ -24,7 +24,7 @@ func TestListAgentConfigsClassifiesProviderResources(t *testing.T) {
 
 	mustWriteFile(t, filepath.Join(home, ".config", "opencode", "opencode.json"), "{\n  \"$schema\": \"https://opencode.ai/config.json\"\n}\n")
 	mustWriteFile(t, filepath.Join(projectRoot, ".opencode", "agents", "planner.md"), "---\nmode: subagent\n---\n")
-	mustWriteFile(t, filepath.Join(projectRoot, ".opencode", "command", "ship.md"), "---\nagent: build\n---\n")
+	mustWriteFile(t, filepath.Join(projectRoot, ".opencode", "commands", "ship.md"), "---\nagent: build\n---\n")
 	mustWriteFile(t, filepath.Join(projectRoot, ".opencode", "skills", "release", "SKILL.md"), "# Release\n")
 
 	configs, err := ListAgentConfigs(workspaceRoot, projectRoot)
@@ -143,7 +143,7 @@ func TestListAgentConfigsClassifiesProviderResources(t *testing.T) {
 		}
 	})
 
-	assertConfigMatch(t, configs, filepath.Join(projectRoot, ".opencode", "command", "ship.md"), func(cfg AgentConfig) {
+	assertConfigMatch(t, configs, filepath.Join(projectRoot, ".opencode", "commands", "ship.md"), func(cfg AgentConfig) {
 		if cfg.ResourceType != "commands" {
 			t.Fatalf("expected opencode command resource, got %q", cfg.ResourceType)
 		}

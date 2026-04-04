@@ -147,17 +147,22 @@ GitHub issue, PR, and review operations scoped to a project with a connected rep
 
 ### Agents and Agent Configuration
 
-Manage agent providers and their configuration files.
+Manage runtime agent settings plus legacy generic config-item operations.
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/v1/agents` | List active agents and their runtime status |
-| `GET` | `/api/v1/config/agents` | Get the active agent configuration |
-| `PATCH` | `/api/v1/config/agents` | Patch agent configuration fields |
-| `POST` | `/api/v1/config/agents` | Replace agent configuration |
-| `GET` | `/api/v1/config/agents/items` | List all agent config items (CORE + SKILL, GLOBAL + PROJECT) |
-| `POST` | `/api/v1/config/agents/new` | Create a new agent config file |
-| `POST` | `/api/v1/config/agents/items` | Update agent config items by path |
+| `GET` | `/api/v1/config/agents` | Get the active runtime agent configuration used by the app shell |
+| `PATCH` | `/api/v1/config/agents` | Patch runtime agent configuration fields |
+| `POST` | `/api/v1/config/agents` | Replace runtime agent configuration |
+| `GET` | `/api/v1/config/agents/items` | Legacy generic config-item listing API |
+| `POST` | `/api/v1/config/agents/new` | Legacy generic config-item creation API |
+| `POST` | `/api/v1/config/agents/items` | Legacy generic config-item update API |
+
+Legacy config-item routes now emit deprecation metadata in HTTP response headers:
+- `Deprecation: true`
+- `Sunset: Wed, 31 Dec 2026 23:59:59 GMT`
+- `Link: </api/v1/agents>; rel="successor-version"`
 
 ### Per-Provider Configuration
 
@@ -177,9 +182,9 @@ Each provider (`codex`, `claude`, `opencode`, `gemini`) exposes sub-routes for g
 | `GET` | `/api/v1/agents/{provider}/hooks` | Get provider lifecycle hooks |
 | `POST` | `/api/v1/agents/{provider}/hooks` | Update provider lifecycle hooks |
 
-### Claude-Specific Configuration
+### Provider-Native Configuration
 
-Claude exposes additional native-config management routes beyond the provider-generic endpoints.
+Claude, Codex, Gemini, and OpenCode all expose native-config management routes beyond the shared normalized endpoints. The exact route surface varies by provider resource type.
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -197,6 +202,37 @@ Claude exposes additional native-config management routes beyond the provider-ge
 | `GET` | `/api/v1/agents/claude/subagents` | List Claude sub-agents |
 | `POST` | `/api/v1/agents/claude/subagents` | Add or update a Claude sub-agent |
 | `DELETE` | `/api/v1/agents/claude/subagents/{name}` | Delete a Claude sub-agent |
+| `GET` | `/api/v1/agents/codex/config` | Get Codex `config.toml` resources |
+| `POST` | `/api/v1/agents/codex/config` | Update Codex `config.toml` |
+| `GET` | `/api/v1/agents/codex/instructions` | Get Codex instruction documents |
+| `POST` | `/api/v1/agents/codex/instructions` | Add or update Codex instructions |
+| `GET` | `/api/v1/agents/codex/subagents` | List Codex sub-agent TOML files |
+| `POST` | `/api/v1/agents/codex/subagents` | Add or update a Codex sub-agent |
+| `DELETE` | `/api/v1/agents/codex/subagents/{name}` | Delete a Codex sub-agent |
+| `GET` | `/api/v1/agents/codex/skills` | List Codex skills |
+| `POST` | `/api/v1/agents/codex/skills` | Add or update a Codex skill |
+| `DELETE` | `/api/v1/agents/codex/skills/{name}` | Delete a Codex skill |
+| `GET` | `/api/v1/agents/codex/rules` | List Codex rules |
+| `POST` | `/api/v1/agents/codex/rules` | Add or update a Codex rule |
+| `DELETE` | `/api/v1/agents/codex/rules/{name}` | Delete a Codex rule |
+| `GET` | `/api/v1/agents/gemini/settings` | Get Gemini `settings.json` |
+| `POST` | `/api/v1/agents/gemini/settings` | Update Gemini `settings.json` |
+| `GET` | `/api/v1/agents/gemini/context` | Get Gemini context documents |
+| `POST` | `/api/v1/agents/gemini/context` | Add or update Gemini context |
+| `GET` | `/api/v1/agents/gemini/commands` | List Gemini command files |
+| `POST` | `/api/v1/agents/gemini/commands` | Add or update a Gemini command |
+| `DELETE` | `/api/v1/agents/gemini/commands/{name}` | Delete a Gemini command |
+| `GET` | `/api/v1/agents/opencode/config` | Get OpenCode config resources |
+| `POST` | `/api/v1/agents/opencode/config` | Update OpenCode config |
+| `GET` | `/api/v1/agents/opencode/agents` | List OpenCode agents |
+| `POST` | `/api/v1/agents/opencode/agents` | Add or update an OpenCode agent |
+| `DELETE` | `/api/v1/agents/opencode/agents/{name}` | Delete an OpenCode agent |
+| `GET` | `/api/v1/agents/opencode/commands` | List OpenCode commands |
+| `POST` | `/api/v1/agents/opencode/commands` | Add or update an OpenCode command |
+| `DELETE` | `/api/v1/agents/opencode/commands/{name}` | Delete an OpenCode command |
+| `GET` | `/api/v1/agents/opencode/skills` | List OpenCode skills |
+| `POST` | `/api/v1/agents/opencode/skills` | Add or update an OpenCode skill |
+| `DELETE` | `/api/v1/agents/opencode/skills/{name}` | Delete an OpenCode skill |
 
 ---
 

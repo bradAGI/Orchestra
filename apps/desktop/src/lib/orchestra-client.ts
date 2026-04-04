@@ -915,46 +915,6 @@ export async function updateAgentConfig(config: BackendConfig, payload: { comman
   })
 }
 /**
- * Fetches agent configuration files (CLAUDE.md, skills, etc.), optionally filtered by project.
- * @param config - Backend connection configuration.
- * @param projectID - Optional project ID to scope the query.
- * @returns Array of agent configuration records.
- */
-export async function fetchAgentConfigs(config: BackendConfig, projectID?: string): Promise<AgentConfig[]> {
-  const url = projectID ? `/api/v1/config/agents/items?project_id=${encodeURIComponent(projectID)}` : '/api/v1/config/agents/items'
-  const data = await requestJSON<{ configs: AgentConfig[] }>(config, url)
-  return data.configs || []
-}
-
-/**
- * Updates the content of a specific agent configuration file by its filesystem path.
- * @param config - Backend connection configuration.
- * @param path - Absolute path to the configuration file.
- * @param content - New file content to write.
- */
-export async function updateAgentConfigByPath(config: BackendConfig, path: string, content: string): Promise<void> {
-  await requestJSON<void>(config, '/api/v1/config/agents/items', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path, content }),
-  })
-}
-
-/**
- * Creates a new agent resource file (skill, hook, etc.) on disk.
- * @param config - Backend connection configuration.
- * @param payload - Resource creation fields (provider, type, name, scope, optional project ID).
- * @returns The filesystem path of the newly created resource.
- */
-export async function createAgentResource(config: BackendConfig, payload: { provider: string, type: string, name: string, scope: string, project_id?: string }): Promise<{ path: string }> {
-  return requestJSON<{ path: string }>(config, '/api/v1/config/agents/new', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-}
-
-/**
  * Fetches the documentation tree structure.
  * @param config - Backend connection configuration.
  * @returns Array of doc tree items (files and folders).
@@ -1247,6 +1207,38 @@ export type ProviderMCPServer = {
     enabled: boolean
 }
 
+export type ProviderFileEntry = {
+  name: string
+  content: string
+  path: string
+}
+
+export type CodexBundleResponse = {
+  config: ProviderFileEntry[]
+  instructions: ProviderFileEntry[]
+  subagents: ProviderFileEntry[]
+  skills: ProviderFileEntry[]
+  rules: ProviderFileEntry[]
+}
+
+export type GeminiBundleResponse = {
+  settings: ProviderFileEntry[]
+  context: ProviderFileEntry[]
+  commands: ProviderFileEntry[]
+}
+
+export type OpenCodeBundleResponse = {
+  config: ProviderFileEntry[]
+  agents: ProviderFileEntry[]
+  commands: ProviderFileEntry[]
+  skills: ProviderFileEntry[]
+}
+
+export type ProviderFileListResponse = {
+  items: ProviderFileEntry[]
+  dir: string
+}
+
 /**
  * Fetches MCP servers configured for a specific provider.
  * @param config - Backend connection configuration.
@@ -1299,6 +1291,314 @@ export async function deleteProviderMCPServer(config: BackendConfig, provider: s
     await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/mcp/${encodeURIComponent(name)}`, { method: 'DELETE' })
 }
 
+export async function fetchCodexBundle(config: BackendConfig, scope: string, projectId?: string): Promise<CodexBundleResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON<CodexBundleResponse>(config, `/api/v1/agents/codex/bundle?${params}`)
+}
+
+export async function fetchGeminiBundle(config: BackendConfig, scope: string, projectId?: string): Promise<GeminiBundleResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON<GeminiBundleResponse>(config, `/api/v1/agents/gemini/bundle?${params}`)
+}
+
+export async function fetchOpenCodeBundle(config: BackendConfig, scope: string, projectId?: string): Promise<OpenCodeBundleResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON<OpenCodeBundleResponse>(config, `/api/v1/agents/opencode/bundle?${params}`)
+}
+
+export async function saveProviderBundleFile(config: BackendConfig, path: string, content: string): Promise<void> {
+  await requestJSON(config, '/api/v1/agents/bundle/file', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, content }),
+  })
+}
+
+export async function fetchCodexConfigFiles(config: BackendConfig, scope: string, projectId?: string): Promise<ProviderFileListResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON(config, `/api/v1/agents/codex/config?${params}`)
+}
+
+export async function saveCodexConfigFile(config: BackendConfig, scope: string, content: string, projectId?: string, path?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/codex/config?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content, path }),
+  })
+}
+
+export async function createCodexConfigFile(config: BackendConfig, scope: string, projectId?: string): Promise<void> {
+  await saveCodexConfigFile(config, scope, 'model = "gpt-5.3-codex"\n', projectId)
+}
+
+export async function fetchCodexInstructionFiles(config: BackendConfig, scope: string, projectId?: string): Promise<ProviderFileListResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON(config, `/api/v1/agents/codex/instructions?${params}`)
+}
+
+export async function saveCodexInstructionFile(config: BackendConfig, scope: string, content: string, projectId?: string, path?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/codex/instructions?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content, path }),
+  })
+}
+
+export async function createCodexInstructionFile(config: BackendConfig, scope: string, projectId?: string): Promise<void> {
+  const defaultContent = scope === 'project' ? '# Project Instructions\n' : '# Global Instructions\n'
+  await saveCodexInstructionFile(config, scope, defaultContent, projectId)
+}
+
+export async function fetchCodexSubAgents(config: BackendConfig, scope: string, projectId?: string): Promise<ProviderFileListResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON(config, `/api/v1/agents/codex/subagents?${params}`)
+}
+
+export async function saveCodexSubAgent(config: BackendConfig, scope: string, name: string, content: string, projectId?: string, path?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/codex/subagents?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, content, path }),
+  })
+}
+
+export async function createCodexSubAgent(config: BackendConfig, scope: string, name: string, projectId?: string): Promise<void> {
+  const slug = name.trim().toLowerCase().replace(/\s+/g, '-')
+  await saveCodexSubAgent(config, scope, slug, `name = "${slug}"\ndescription = "Describe what this subagent does"\nmodel = "gpt-5.3-codex"\n\nprompt = """\nYou are ${name.trim() || slug}. Describe your role and instructions here.\n"""\n`, projectId)
+}
+
+export async function deleteCodexSubAgent(config: BackendConfig, scope: string, name: string, projectId?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/codex/subagents/${encodeURIComponent(name)}?${params}`, { method: 'DELETE' })
+}
+
+export async function fetchCodexSkills(config: BackendConfig, scope: string, projectId?: string): Promise<ProviderFileListResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON(config, `/api/v1/agents/codex/skills?${params}`)
+}
+
+export async function saveCodexSkill(config: BackendConfig, scope: string, name: string, content: string, projectId?: string, path?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/codex/skills?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, content, path }),
+  })
+}
+
+export async function createCodexSkill(config: BackendConfig, scope: string, name: string, projectId?: string): Promise<void> {
+  const slug = name.trim().toLowerCase().replace(/\s+/g, '-')
+  await saveCodexSkill(config, scope, slug, `---\nname: ${slug}\ndescription: Describe what this skill does\n---\n\n# ${name.trim() || slug}\n\nSkill instructions go here.\n`, projectId)
+}
+
+export async function deleteCodexSkill(config: BackendConfig, scope: string, name: string, projectId?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/codex/skills/${encodeURIComponent(name)}?${params}`, { method: 'DELETE' })
+}
+
+export async function fetchCodexRules(config: BackendConfig, scope: string, projectId?: string): Promise<ProviderFileListResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON(config, `/api/v1/agents/codex/rules?${params}`)
+}
+
+export async function saveCodexRule(config: BackendConfig, scope: string, name: string, content: string, projectId?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/codex/rules?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, content }),
+  })
+}
+
+export async function deleteCodexRule(config: BackendConfig, scope: string, name: string, projectId?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/codex/rules/${encodeURIComponent(name)}?${params}`, { method: 'DELETE' })
+}
+
+export async function fetchGeminiSettingsFiles(config: BackendConfig, scope: string, projectId?: string): Promise<ProviderFileListResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON(config, `/api/v1/agents/gemini/settings?${params}`)
+}
+
+export async function saveGeminiSettingsFile(config: BackendConfig, scope: string, content: string, projectId?: string, path?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/gemini/settings?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content, path }),
+  })
+}
+
+export async function createGeminiSettingsFile(config: BackendConfig, scope: string, projectId?: string): Promise<void> {
+  await saveGeminiSettingsFile(config, scope, '{\n  "mcpServers": {}\n}\n', projectId)
+}
+
+export async function fetchGeminiContextFiles(config: BackendConfig, scope: string, projectId?: string): Promise<ProviderFileListResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON(config, `/api/v1/agents/gemini/context?${params}`)
+}
+
+export async function saveGeminiContextFile(config: BackendConfig, scope: string, content: string, projectId?: string, path?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/gemini/context?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content, path }),
+  })
+}
+
+export async function createGeminiContextFile(config: BackendConfig, scope: string, projectId?: string): Promise<void> {
+  const defaultContent = scope === 'project' ? '# Project Context\n' : '# Global Context\n'
+  await saveGeminiContextFile(config, scope, defaultContent, projectId)
+}
+
+export async function fetchGeminiCommands(config: BackendConfig, scope: string, projectId?: string): Promise<ProviderFileListResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON(config, `/api/v1/agents/gemini/commands?${params}`)
+}
+
+export async function saveGeminiCommand(config: BackendConfig, scope: string, name: string, content: string, projectId?: string, path?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/gemini/commands?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, content, path }),
+  })
+}
+
+export async function createGeminiCommand(config: BackendConfig, scope: string, name: string, projectId?: string): Promise<void> {
+  await saveGeminiCommand(config, scope, name, `description = "${name}"\nprompt = """\nDescribe the task this command should run.\n"""\n`, projectId)
+}
+
+export async function deleteGeminiCommand(config: BackendConfig, scope: string, name: string, projectId?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/gemini/commands/${encodeURIComponent(name)}?${params}`, { method: 'DELETE' })
+}
+
+export async function fetchOpenCodeConfigFiles(config: BackendConfig, scope: string, projectId?: string): Promise<ProviderFileListResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON(config, `/api/v1/agents/opencode/config?${params}`)
+}
+
+export async function saveOpenCodeConfigFile(config: BackendConfig, scope: string, content: string, projectId?: string, path?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/opencode/config?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content, path }),
+  })
+}
+
+export async function createOpenCodeConfigFile(config: BackendConfig, scope: string, projectId?: string): Promise<void> {
+  await saveOpenCodeConfigFile(config, scope, '{\n  "$schema": "https://opencode.ai/config.json"\n}\n', projectId)
+}
+
+export async function fetchOpenCodeAgentsFiles(config: BackendConfig, scope: string, projectId?: string): Promise<ProviderFileListResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON(config, `/api/v1/agents/opencode/agents?${params}`)
+}
+
+export async function saveOpenCodeAgentFile(config: BackendConfig, scope: string, name: string, content: string, projectId?: string, path?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/opencode/agents?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, content, path }),
+  })
+}
+
+export async function createOpenCodeAgentFile(config: BackendConfig, scope: string, name: string, projectId?: string): Promise<void> {
+  await saveOpenCodeAgentFile(config, scope, name, `---\ndescription: Describe what this agent does\nmode: subagent\n---\n\nYou are ${name}. Describe your role and instructions here.\n`, projectId)
+}
+
+export async function deleteOpenCodeAgentFile(config: BackendConfig, scope: string, name: string, projectId?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/opencode/agents/${encodeURIComponent(name)}?${params}`, { method: 'DELETE' })
+}
+
+export async function fetchOpenCodeCommandsFiles(config: BackendConfig, scope: string, projectId?: string): Promise<ProviderFileListResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON(config, `/api/v1/agents/opencode/commands?${params}`)
+}
+
+export async function saveOpenCodeCommandFile(config: BackendConfig, scope: string, name: string, content: string, projectId?: string, path?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/opencode/commands?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, content, path }),
+  })
+}
+
+export async function createOpenCodeCommandFile(config: BackendConfig, scope: string, name: string, projectId?: string): Promise<void> {
+  await saveOpenCodeCommandFile(config, scope, name, `---\ndescription: Describe what this command does\nagent: build\n---\n\nRun ${name}.\n`, projectId)
+}
+
+export async function deleteOpenCodeCommandFile(config: BackendConfig, scope: string, name: string, projectId?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/opencode/commands/${encodeURIComponent(name)}?${params}`, { method: 'DELETE' })
+}
+
+export async function fetchOpenCodeSkillsFiles(config: BackendConfig, scope: string, projectId?: string): Promise<ProviderFileListResponse> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  return requestJSON(config, `/api/v1/agents/opencode/skills?${params}`)
+}
+
+export async function saveOpenCodeSkillFile(config: BackendConfig, scope: string, name: string, content: string, projectId?: string, path?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/opencode/skills?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, content, path }),
+  })
+}
+
+export async function createOpenCodeSkillFile(config: BackendConfig, scope: string, name: string, projectId?: string): Promise<void> {
+  await saveOpenCodeSkillFile(config, scope, name, `# ${name}\n\nDescribe what this skill does.\n`, projectId)
+}
+
+export async function deleteOpenCodeSkillFile(config: BackendConfig, scope: string, name: string, projectId?: string): Promise<void> {
+  const params = new URLSearchParams({ scope })
+  if (projectId) params.set('project_id', projectId)
+  await requestJSON(config, `/api/v1/agents/opencode/skills/${encodeURIComponent(name)}?${params}`, { method: 'DELETE' })
+}
+
 /** Permission and tool access configuration for a provider. */
 export type ProviderPermissions = {
     approval_mode: string
@@ -1333,9 +1633,12 @@ export type ProviderHook = {
  * @param projectId - Optional project ID for project-scoped permissions.
  * @returns The provider's permission settings.
  */
-export async function fetchProviderPermissions(config: BackendConfig, provider: string, projectId?: string): Promise<ProviderPermissions> {
-    const params = projectId ? `?project_id=${encodeURIComponent(projectId)}` : ''
-    return requestJSON<ProviderPermissions>(config, `/api/v1/agents/${encodeURIComponent(provider)}/permissions${params}`)
+export async function fetchProviderPermissions(config: BackendConfig, provider: string, projectId?: string, scope?: string): Promise<ProviderPermissions> {
+    const params = new URLSearchParams()
+    if (projectId) params.set('project_id', projectId)
+    if (scope) params.set('scope', scope)
+    const query = params.toString()
+    return requestJSON<ProviderPermissions>(config, `/api/v1/agents/${encodeURIComponent(provider)}/permissions${query ? `?${query}` : ''}`)
 }
 
 /**
@@ -1344,8 +1647,12 @@ export async function fetchProviderPermissions(config: BackendConfig, provider: 
  * @param provider - Provider name.
  * @param perms - The full permissions object to set.
  */
-export async function updateProviderPermissions(config: BackendConfig, provider: string, perms: ProviderPermissions): Promise<void> {
-    await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/permissions`, {
+export async function updateProviderPermissions(config: BackendConfig, provider: string, perms: ProviderPermissions, projectId?: string, scope?: string): Promise<void> {
+    const params = new URLSearchParams()
+    if (projectId) params.set('project_id', projectId)
+    if (scope) params.set('scope', scope)
+    const query = params.toString()
+    await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/permissions${query ? `?${query}` : ''}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(perms),
@@ -1358,8 +1665,12 @@ export async function updateProviderPermissions(config: BackendConfig, provider:
  * @param provider - Provider name.
  * @returns The provider's model settings (model name, effort, temperature).
  */
-export async function fetchProviderModel(config: BackendConfig, provider: string): Promise<ProviderModelConfig> {
-    return requestJSON<ProviderModelConfig>(config, `/api/v1/agents/${encodeURIComponent(provider)}/model`)
+export async function fetchProviderModel(config: BackendConfig, provider: string, projectId?: string, scope?: string): Promise<ProviderModelConfig> {
+    const params = new URLSearchParams()
+    if (projectId) params.set('project_id', projectId)
+    if (scope) params.set('scope', scope)
+    const query = params.toString()
+    return requestJSON<ProviderModelConfig>(config, `/api/v1/agents/${encodeURIComponent(provider)}/model${query ? `?${query}` : ''}`)
 }
 
 /**
@@ -1368,8 +1679,12 @@ export async function fetchProviderModel(config: BackendConfig, provider: string
  * @param provider - Provider name.
  * @param model - The model configuration to set.
  */
-export async function updateProviderModel(config: BackendConfig, provider: string, model: ProviderModelConfig): Promise<void> {
-    await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/model`, {
+export async function updateProviderModel(config: BackendConfig, provider: string, model: ProviderModelConfig, projectId?: string, scope?: string): Promise<void> {
+    const params = new URLSearchParams()
+    if (projectId) params.set('project_id', projectId)
+    if (scope) params.set('scope', scope)
+    const query = params.toString()
+    await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/model${query ? `?${query}` : ''}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(model),
@@ -1382,8 +1697,12 @@ export async function updateProviderModel(config: BackendConfig, provider: strin
  * @param provider - Provider name.
  * @returns Array of hook definitions.
  */
-export async function fetchProviderHooks(config: BackendConfig, provider: string): Promise<ProviderHook[]> {
-    return requestJSON<ProviderHook[]>(config, `/api/v1/agents/${encodeURIComponent(provider)}/hooks`)
+export async function fetchProviderHooks(config: BackendConfig, provider: string, scope?: string, projectId?: string): Promise<ProviderHook[]> {
+    const params = new URLSearchParams()
+    if (scope) params.set('scope', scope)
+    if (projectId) params.set('project_id', projectId)
+    const query = params.toString()
+    return requestJSON<ProviderHook[]>(config, `/api/v1/agents/${encodeURIComponent(provider)}/hooks${query ? `?${query}` : ''}`)
 }
 
 /**
@@ -1392,8 +1711,12 @@ export async function fetchProviderHooks(config: BackendConfig, provider: string
  * @param provider - Provider name.
  * @param hooks - The full array of hooks to set.
  */
-export async function updateProviderHooks(config: BackendConfig, provider: string, hooks: ProviderHook[]): Promise<void> {
-    await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/hooks`, {
+export async function updateProviderHooks(config: BackendConfig, provider: string, hooks: ProviderHook[], scope?: string, projectId?: string): Promise<void> {
+    const params = new URLSearchParams()
+    if (scope) params.set('scope', scope)
+    if (projectId) params.set('project_id', projectId)
+    const query = params.toString()
+    await requestJSON(config, `/api/v1/agents/${encodeURIComponent(provider)}/hooks${query ? `?${query}` : ''}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(hooks),

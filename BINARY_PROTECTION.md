@@ -22,6 +22,7 @@ Our repository has **4 layers** of protection against binary file commits:
 - Runs automatically before every `git commit`
 - Provides helpful error messages and solutions
 - **Cannot be bypassed** without deliberate action
+- Delegates to the tracked `scripts/check-binary-protection.sh` classifier
 
 ### 4. 🤖 CI/CD Protection (GitHub Actions)
 - Final safety net in continuous integration
@@ -113,14 +114,10 @@ If you need to add new protection patterns:
 
 1. **Update .gitignore:** Add new patterns
 2. **Update .gitattributes:** Add `-filter` for critical files
-3. **Update pre-commit hook:** Add to the pattern arrays
+3. **Update the tracked classifier:** Edit `scripts/check-binary-protection.sh`
 4. **Test locally:**
    ```bash
-   # Try committing a test binary
-   echo "test" > test.exe
-   git add test.exe
-   git commit -m "test"  # Should be blocked
-   rm test.exe
+   ./scripts/check-binary-protection.sh --repo
    ```
 
 ## 🆘 Emergency Override (Use Sparingly!)
@@ -144,11 +141,11 @@ git commit --no-verify -m "Emergency commit"
 # Verify .gitignore has key patterns
 grep -E "(orchestrd|\*.exe|\.env)" .gitignore
 
-# Check if pre-commit hook is executable
+# Check if the local hook is executable
 ls -la .git/hooks/pre-commit
 
-# Test the hook manually
-.git/hooks/pre-commit
+# Test the tracked classifier manually
+./scripts/check-binary-protection.sh --repo
 ```
 
 ### Update Protection System
