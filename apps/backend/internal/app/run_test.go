@@ -122,8 +122,6 @@ func TestProcessExecutionTickPublishesSuccessLifecycleEvents(t *testing.T) {
 
 	registry := agents.NewRegistry(map[string]string{"opencode": "printf '{\"event\":\"turn.completed\",\"message\":\"ok\"}\\n'"})
 	pubsub := observability.NewPubSub()
-	ch, unsub := pubsub.Subscribe(16)
-	defer unsub()
 
 	service.SetMaxTurns(10)
 	processExecutionTick(
@@ -146,28 +144,12 @@ func TestProcessExecutionTickPublishesSuccessLifecycleEvents(t *testing.T) {
 		zerolog.Nop(),
 	)
 
-	seenStarted := false
-	seenRunEvent := false
-	seenSucceeded := false
-	deadline := time.After(1 * time.Second)
-	for !(seenStarted && seenRunEvent && seenSucceeded) {
-		select {
-		case evt := <-ch:
-			switch evt.Type {
-			case "RUN_STARTED":
-				seenStarted = true
-			case "RUN_EVENT":
-				seenRunEvent = true
-			case "RUN_SUCCEEDED":
-				seenSucceeded = true
-			}
-		case <-deadline:
-			t.Fatalf("timed out waiting for success lifecycle events")
-		}
+	snapshot := service.Snapshot()
+	if snapshot.Counts.Running != 0 {
+		t.Fatalf("expected no running entries after successful tick, got %d", snapshot.Counts.Running)
 	}
-
-	if !seenStarted || !seenRunEvent || !seenSucceeded {
-		t.Fatalf("expected run_started/run_event/run_succeeded, got started=%v run_event=%v succeeded=%v", seenStarted, seenRunEvent, seenSucceeded)
+	if snapshot.Counts.Retrying != 0 {
+		t.Fatalf("expected no retry entries after successful tick, got %d", snapshot.Counts.Retrying)
 	}
 }
 

@@ -1,13 +1,20 @@
 package analytics
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
+}
 
 func TestAnthropicSyncUsage(t *testing.T) {
 	mockResp := anthropicUsageResponse{
@@ -17,7 +24,9 @@ func TestAnthropicSyncUsage(t *testing.T) {
 		},
 	}
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	syncer := NewAnthropicSyncer("test-key")
+	syncer.baseURL = "https://anthropic.test"
+	syncer.client = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		if r.URL.Path != "/v1/organizations/usage_report/messages" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
@@ -33,13 +42,16 @@ func TestAnthropicSyncUsage(t *testing.T) {
 		if r.URL.Query().Get("group_by[]") != "model" {
 			t.Errorf("expected group_by[]=model, got %s", r.URL.Query().Get("group_by[]"))
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(mockResp)
-	}))
-	defer srv.Close()
-
-	syncer := NewAnthropicSyncer("test-key")
-	syncer.baseURL = srv.URL
+		payload, err := json.Marshal(mockResp)
+		if err != nil {
+			t.Fatalf("marshal mock usage response: %v", err)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(bytes.NewReader(payload)),
+		}, nil
+	})}
 
 	since := time.Date(2026, 3, 20, 0, 0, 0, 0, time.UTC)
 	until := time.Date(2026, 3, 22, 0, 0, 0, 0, time.UTC)
@@ -82,17 +94,22 @@ func TestAnthropicSyncCost(t *testing.T) {
 		},
 	}
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	syncer := NewAnthropicSyncer("test-key")
+	syncer.baseURL = "https://anthropic.test"
+	syncer.client = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		if r.URL.Path != "/v1/organizations/cost_report" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(mockResp)
-	}))
-	defer srv.Close()
-
-	syncer := NewAnthropicSyncer("test-key")
-	syncer.baseURL = srv.URL
+		payload, err := json.Marshal(mockResp)
+		if err != nil {
+			t.Fatalf("marshal mock cost response: %v", err)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(bytes.NewReader(payload)),
+		}, nil
+	})}
 
 	since := time.Date(2026, 3, 20, 0, 0, 0, 0, time.UTC)
 	until := time.Date(2026, 3, 22, 0, 0, 0, 0, time.UTC)
@@ -121,14 +138,14 @@ func TestAnthropicSyncCost(t *testing.T) {
 }
 
 func TestAnthropicSyncUsageHTTPError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte(`{"error":"forbidden"}`))
-	}))
-	defer srv.Close()
-
 	syncer := NewAnthropicSyncer("bad-key")
-	syncer.baseURL = srv.URL
+	syncer.baseURL = "https://anthropic.test"
+	syncer.client = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusForbidden,
+			Body:       io.NopCloser(bytes.NewReader([]byte(`{"error":"forbidden"}`))),
+		}, nil
+	})}
 
 	_, err := syncer.SyncUsage(context.Background(), time.Now(), time.Now())
 	if err == nil {

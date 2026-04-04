@@ -98,33 +98,31 @@ describe('GitTab', () => {
     expect(screen.queryByText('Unstaged')).toBeFalsy()
   })
 
-  it('switches to GitHub tab when clicked', async () => {
+  it('switches to PRs tab when clicked', async () => {
     render(<GitTab project={mockProject} config={mockConfig} />)
-    const githubTab = await screen.findByText('GitHub')
-    fireEvent.click(githubTab)
+    const prsTab = await screen.findByText('PRs')
+    fireEvent.click(prsTab)
     // With no github_owner, should show the "not connected" message
     expect(await screen.findByText('No GitHub repository connected')).toBeTruthy()
   })
 
   it('shows "No GitHub repository connected" when project has no github_owner', async () => {
     render(<GitTab project={mockProject} config={mockConfig} />)
-    const githubTab = await screen.findByText('GitHub')
-    fireEvent.click(githubTab)
+    const prsTab = await screen.findByText('PRs')
+    fireEvent.click(prsTab)
     expect(await screen.findByText('No GitHub repository connected')).toBeTruthy()
-    // Should not show the create button since github_token is empty
-    expect(screen.queryByText('Create GitHub Repository')).toBeFalsy()
   })
 
-  it('shows "Create GitHub Repository" button when token exists but no repo', async () => {
+  it('still shows the disconnected message when token exists but no repo', async () => {
     const projectWithToken = {
       ...mockProject,
       github_token: 'ghp_testtoken123',
     }
     render(<GitTab project={projectWithToken} config={mockConfig} />)
-    const githubTab = await screen.findByText('GitHub')
-    fireEvent.click(githubTab)
+    const prsTab = await screen.findByText('PRs')
+    fireEvent.click(prsTab)
     expect(await screen.findByText('No GitHub repository connected')).toBeTruthy()
-    expect(await screen.findByText('Create GitHub Repository')).toBeTruthy()
+    expect(screen.queryByText('Create GitHub Repository')).toBeFalsy()
   })
 
   it('renders ConflictBanner when conflicts exist', async () => {

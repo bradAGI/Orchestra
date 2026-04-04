@@ -6,6 +6,7 @@ import type { BackendConfig, IssueCreatePayload } from '@/lib/orchestra-client'
 import type { Project } from '@/lib/orchestra-types'
 
 vi.mock('@/lib/whisper-client', () => ({
+  setWhisperBackendConfig: vi.fn(),
   getWhisperClient: () => ({
     recording: false,
     startRecording: vi.fn(),
@@ -24,8 +25,8 @@ const config: BackendConfig = {
 }
 
 const projects: Project[] = [
-  { id: 'proj-1', name: 'Alpha', path: '/tmp/alpha' } as Project,
-  { id: 'proj-2', name: 'Beta', path: '/tmp/beta' } as Project,
+  { id: 'proj-1', name: 'Alpha', root_path: '/tmp/alpha', remote_url: '' } as Project,
+  { id: 'proj-2', name: 'Beta', root_path: '/tmp/beta', remote_url: '' } as Project,
 ]
 
 function renderDialog(overrides?: {

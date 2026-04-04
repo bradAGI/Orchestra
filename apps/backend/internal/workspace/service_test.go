@@ -84,8 +84,8 @@ func TestEnsureWorktree_ReusesExisting(t *testing.T) {
 	if created2 {
 		t.Fatal("expected second call to reuse, got created=true")
 	}
-	if baseSHA2 != "" {
-		t.Fatalf("expected empty baseSHA on reuse, got %q", baseSHA2)
+	if baseSHA2 == "" {
+		t.Fatal("expected merge-base SHA on reuse")
 	}
 	expected := filepath.Join(root, "proj1", "feature-b")
 	if wtPath2 != expected {

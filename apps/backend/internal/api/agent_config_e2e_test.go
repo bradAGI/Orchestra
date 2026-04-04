@@ -16,67 +16,42 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// testServer creates a test HTTP server with the full API router.
-func testServer(t *testing.T) (*httptest.Server, func()) {
+// testServer creates a test router with the full API surface.
+func testServer(t *testing.T) (http.Handler, func()) {
 	t.Helper()
 	logger := zerolog.New(os.Stderr).Level(zerolog.Disabled)
 	cfg := &config.Config{WorkspaceRoot: t.TempDir()}
 	svc := orchestrator.NewService()
 	handler := api.NewRouter(logger, svc, cfg)
-	ts := httptest.NewServer(handler)
-	return ts, func() { ts.Close() }
+	return handler, func() {}
 }
 
-// request is a helper to make HTTP requests to the test server.
-func request(t *testing.T, ts *httptest.Server, method, path string, body string) (int, map[string]any) {
+// request is a helper to make HTTP requests to the test router.
+func request(t *testing.T, handler http.Handler, method, path string, body string) (int, map[string]any) {
 	t.Helper()
-	var reader *strings.Reader
-	if body != "" {
-		reader = strings.NewReader(body)
-	} else {
-		reader = strings.NewReader("")
-	}
-	req, err := http.NewRequest(method, ts.URL+path, reader)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
 	var result map[string]any
-	_ = json.NewDecoder(resp.Body).Decode(&result)
-	return resp.StatusCode, result
+	_ = json.NewDecoder(rec.Body).Decode(&result)
+	return rec.Code, result
 }
 
 // requestArray is like request but decodes a JSON array.
-func requestArray(t *testing.T, ts *httptest.Server, method, path string, body string) (int, []map[string]any) {
+func requestArray(t *testing.T, handler http.Handler, method, path string, body string) (int, []map[string]any) {
 	t.Helper()
-	var reader *strings.Reader
-	if body != "" {
-		reader = strings.NewReader(body)
-	} else {
-		reader = strings.NewReader("")
-	}
-	req, err := http.NewRequest(method, ts.URL+path, reader)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
 	var result []map[string]any
-	_ = json.NewDecoder(resp.Body).Decode(&result)
-	return resp.StatusCode, result
+	_ = json.NewDecoder(rec.Body).Decode(&result)
+	return rec.Code, result
 }
 
 // TestAgentConfigSettingsMerge verifies that POST settings merges rather than replaces.
@@ -337,8 +312,8 @@ func TestAgentConfigMCPPluginDetection(t *testing.T) {
 	os.MkdirAll(settingsDir, 0755)
 	settings := map[string]any{
 		"enabledPlugins": map[string]any{
-			"gmail@claude-ai":                          true,
-			"superpowers@claude-plugins-official":       true,
+			"gmail@claude-ai":                             true,
+			"superpowers@claude-plugins-official":         true,
 			"chrome-devtools-mcp@claude-plugins-official": false,
 		},
 	}

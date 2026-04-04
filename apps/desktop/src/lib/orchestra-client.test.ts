@@ -320,7 +320,8 @@ describe('requestText via fetchIssueLogs', () => {
 
     expect(result).toBe(logContent)
     expect(fetchMock).toHaveBeenCalledOnce()
-    const url = String(fetchMock.mock.calls[0]?.[0])
+    const firstCall = fetchMock.mock.calls[0] as unknown as [unknown, ...unknown[]] | undefined
+    const url = String(firstCall?.[0])
     expect(url).toContain('/api/v1/issues/OPS-42/logs')
   })
 

@@ -88,7 +88,7 @@ export function SettingsCard({
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (initialTab) setActiveTab(initialTab)
+    if (initialTab) setActiveTab(initialTab === 'agents' ? 'backend' : initialTab)
   }, [initialTab])
 
   const tabs = [

@@ -1307,6 +1307,10 @@ func (s *Server) GetMCPTools(w http.ResponseWriter, r *http.Request) {
 // GetMCPServers handles GET /api/v1/mcp/servers by listing all registered
 // MCP server entries from the database.
 func (s *Server) GetMCPServers(w http.ResponseWriter, r *http.Request) {
+	if s.db == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"servers": []any{}})
+		return
+	}
 	servers, err := s.db.ListMCPServers(r.Context())
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "db_failed", "database operation failed")
@@ -1324,6 +1328,10 @@ func (s *Server) PostMCPServer(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSONError(w, http.StatusBadRequest, "invalid_json", "failed to decode request body")
+		return
+	}
+	if s.db == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "db_unavailable", "database not configured")
 		return
 	}
 
@@ -1353,6 +1361,10 @@ func (s *Server) PostMCPServer(w http.ResponseWriter, r *http.Request) {
 // server entry and rebuilding the MCP registry from the remaining database
 // entries and static configuration.
 func (s *Server) DeleteMCPServer(w http.ResponseWriter, r *http.Request) {
+	if s.db == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "db_unavailable", "database not configured")
+		return
+	}
 	id := chi.URLParam(r, "id")
 	if err := s.db.DeleteMCPServer(r.Context(), id); err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "db_failed", "database operation failed")

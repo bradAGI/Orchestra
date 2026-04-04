@@ -4,7 +4,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { FeedbackDialog } from './FeedbackDialog'
 
 function getSubmitButton() {
-  return screen.getByRole('button', { name: /send to re-execute/i })
+  return screen.getByRole('button', { name: /send feedback/i })
 }
 
 describe('FeedbackDialog', () => {
@@ -33,31 +33,23 @@ describe('FeedbackDialog', () => {
     expect((btn as HTMLButtonElement).disabled).toBe(false)
   })
 
-  it('calls onSubmit with feedback text and default target state (In Progress)', async () => {
+  it('calls onSubmit with trimmed feedback text', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
     render(<FeedbackDialog onSubmit={onSubmit} onCancel={vi.fn()} />)
     await user.type(screen.getByPlaceholderText('What needs to change?'), 'Fix the tests')
     await user.click(getSubmitButton())
-    expect(onSubmit).toHaveBeenCalledWith('Fix the tests', 'In Progress')
+    expect(onSubmit).toHaveBeenCalledWith('Fix the tests')
   })
 
-  it('calls onSubmit with Todo target state when Re-plan is selected', async () => {
-    const user = userEvent.setup()
-    const onSubmit = vi.fn()
-    render(<FeedbackDialog onSubmit={onSubmit} onCancel={vi.fn()} />)
-    await user.type(screen.getByPlaceholderText('What needs to change?'), 'Rethink approach')
-    await user.click(screen.getByText('Re-plan'))
-    await user.click(screen.getByRole('button', { name: /send to re-plan/i }))
-    expect(onSubmit).toHaveBeenCalledWith('Rethink approach', 'Todo')
+  it('shows Update PR button copy when hasPR is true', () => {
+    render(<FeedbackDialog onSubmit={vi.fn()} onCancel={vi.fn()} hasPR />)
+    expect(screen.getByRole('button', { name: /update pr/i })).toBeTruthy()
   })
 
-  it('changes submit button text based on selected action', async () => {
-    const user = userEvent.setup()
+  it('renders replanning copy when hasPR is false', () => {
     render(<FeedbackDialog onSubmit={vi.fn()} onCancel={vi.fn()} />)
-    expect(screen.getByRole('button', { name: /send to re-execute/i })).toBeTruthy()
-    await user.click(screen.getByText('Re-plan'))
-    expect(screen.getByRole('button', { name: /send to re-plan/i })).toBeTruthy()
+    expect(screen.getByText(/re-plan with your feedback/i)).toBeTruthy()
   })
 
   it('calls onCancel when Cancel clicked', async () => {

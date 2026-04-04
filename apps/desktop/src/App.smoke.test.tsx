@@ -510,7 +510,7 @@ describe('App smoke render', () => {
           state: 'Review',
           assignee_id: 'agent-codex',
           priority: 1,
-          project_id: '',
+          project_id: 'proj-1',
         },
       ]
       const fetchMock = setupFetch(defaultSnapshot(), {
@@ -545,10 +545,10 @@ describe('App smoke render', () => {
         expect(screen.getByText(/Issue Inspector/i)).toBeTruthy()
       })
 
-      // The issue is in Review state — click the Approve workflow button
+      // The issue is in Review state — close the task from the review actions
       const dialog = screen.getByRole('dialog')
-      const approveBtn = within(dialog).getByText('Approve')
-      fireEvent.click(approveBtn)
+      const closeBtn = within(dialog).getByRole('button', { name: /close/i })
+      fireEvent.click(closeBtn)
 
       await waitFor(() => {
         expect(fetchMock.mock.calls.some(
@@ -877,7 +877,8 @@ describe('App smoke render', () => {
       fireEvent.click(await screen.findByTestId('sidebar-nav-SETTINGS'))
 
       // Trigger dropdown
-      const dropdownTrigger = await screen.findByRole('button', { name: /Profile/i })
+      const activeProfileLabel = await screen.findByText('Active Profile')
+      const dropdownTrigger = within(activeProfileLabel.closest('label') as HTMLElement).getAllByRole('button')[0]
       fireEvent.click(dropdownTrigger)
 
       // Select option
@@ -915,7 +916,8 @@ describe('App smoke render', () => {
 
       fireEvent.click(screen.getByTestId('sidebar-nav-SETTINGS'))
 
-      const dropdownTrigger = await screen.findByRole('button', { name: /Profile/i })
+      const activeProfileLabel = await screen.findByText('Active Profile')
+      const dropdownTrigger = within(activeProfileLabel.closest('label') as HTMLElement).getAllByRole('button')[0]
       fireEvent.click(dropdownTrigger)
 
       await waitFor(async () => {
@@ -949,7 +951,8 @@ describe('App smoke render', () => {
       await screen.findByText(/Connection Profiles/i)
 
       // switch profile first
-      const dropdownTrigger = await screen.findByRole('button', { name: /Profile/i })
+      const activeProfileLabel = await screen.findByText('Active Profile')
+      const dropdownTrigger = within(activeProfileLabel.closest('label') as HTMLElement).getAllByRole('button')[0]
       fireEvent.click(dropdownTrigger)
 
       await waitFor(async () => {

@@ -1,10 +1,11 @@
 package analytics
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -19,7 +20,9 @@ func TestOpenAISyncUsage(t *testing.T) {
 		},
 	}
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	syncer := NewOpenAISyncer("test-key")
+	syncer.baseURL = "https://openai.test"
+	syncer.client = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		if r.URL.Path != "/v1/organization/usage/completions" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
@@ -32,13 +35,16 @@ func TestOpenAISyncUsage(t *testing.T) {
 		if r.URL.Query().Get("group_by[]") != "model" {
 			t.Errorf("expected group_by[]=model, got %s", r.URL.Query().Get("group_by[]"))
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(mockResp)
-	}))
-	defer srv.Close()
-
-	syncer := NewOpenAISyncer("test-key")
-	syncer.baseURL = srv.URL
+		payload, err := json.Marshal(mockResp)
+		if err != nil {
+			t.Fatalf("marshal mock usage response: %v", err)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(bytes.NewReader(payload)),
+		}, nil
+	})}
 
 	since := time.Date(2026, 3, 20, 0, 0, 0, 0, time.UTC)
 	until := time.Date(2026, 3, 22, 0, 0, 0, 0, time.UTC)
@@ -85,17 +91,22 @@ func TestOpenAISyncCost(t *testing.T) {
 		},
 	}
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	syncer := NewOpenAISyncer("test-key")
+	syncer.baseURL = "https://openai.test"
+	syncer.client = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		if r.URL.Path != "/v1/organization/costs" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(mockResp)
-	}))
-	defer srv.Close()
-
-	syncer := NewOpenAISyncer("test-key")
-	syncer.baseURL = srv.URL
+		payload, err := json.Marshal(mockResp)
+		if err != nil {
+			t.Fatalf("marshal mock cost response: %v", err)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(bytes.NewReader(payload)),
+		}, nil
+	})}
 
 	since := time.Date(2026, 3, 20, 0, 0, 0, 0, time.UTC)
 	until := time.Date(2026, 3, 22, 0, 0, 0, 0, time.UTC)
@@ -122,14 +133,14 @@ func TestOpenAISyncCost(t *testing.T) {
 }
 
 func TestOpenAISyncUsageHTTPError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"error":"unauthorized"}`))
-	}))
-	defer srv.Close()
-
 	syncer := NewOpenAISyncer("bad-key")
-	syncer.baseURL = srv.URL
+	syncer.baseURL = "https://openai.test"
+	syncer.client = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusUnauthorized,
+			Body:       io.NopCloser(bytes.NewReader([]byte(`{"error":"unauthorized"}`))),
+		}, nil
+	})}
 
 	_, err := syncer.SyncUsage(context.Background(), time.Now(), time.Now())
 	if err == nil {

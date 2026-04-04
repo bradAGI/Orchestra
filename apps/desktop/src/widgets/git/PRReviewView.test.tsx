@@ -26,7 +26,7 @@ vi.mock('./DiffViewer', () => ({
   ),
 }))
 
-const config: BackendConfig = { baseUrl: 'http://localhost:4010', token: 'dev-token' }
+const config: BackendConfig = { baseUrl: 'http://localhost:4010', apiToken: 'dev-token' }
 
 function makePR(overrides: Partial<GitHubPR> = {}): GitHubPR {
   return {

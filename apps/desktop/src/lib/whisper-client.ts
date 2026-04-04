@@ -50,8 +50,12 @@ function createSmartWhisperClient(onStatus?: StatusCallback): WhisperClient {
   let isRecording = false
   let useBackend = false
   let backendChecked = false
+  const canUseWorker = typeof Worker !== 'undefined'
 
   function ensureWorker(): Worker {
+    if (!canUseWorker) {
+      throw new Error('Web Worker is not available in this environment')
+    }
     if (worker) return worker
     worker = new Worker(
       new URL('./whisper.worker.ts', import.meta.url),
@@ -77,6 +81,7 @@ function createSmartWhisperClient(onStatus?: StatusCallback): WhisperClient {
     // Kick off backend check
     void checkBackend()
     // Also warm up the local worker pipeline
+    if (!canUseWorker) return
     const w = ensureWorker()
     w.postMessage({ type: 'preload' })
   }

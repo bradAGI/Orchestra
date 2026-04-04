@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // testDB creates a temporary SQLite database with schema and budget/daily_metrics tables.
@@ -151,7 +152,7 @@ func TestGetBudgetUtilization(t *testing.T) {
 	})
 
 	// Insert daily_metrics for current month
-	today := "2026-03-27"
+	today := time.Now().UTC().Format("2006-01-02")
 	_, err := d.ExecContext(ctx,
 		`INSERT INTO daily_metrics (date, project_id, provider, model, cost_cents) VALUES (?, '', 'claude', 'claude-opus-4-6', 1500)`,
 		today,
