@@ -28,6 +28,7 @@ func Load() (Config, error) {
 		"CODEX":    "codex exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox --json {{prompt}}",
 		"GEMINI":   "gemini -p {{prompt}} --output-format stream-json --approval-mode yolo",
 		"OPENCODE": "opencode -p {{prompt}} -f json",
+		"8GENT":    "8gent run --yes --output-format stream-json {{prompt}}",
 	}
 
 	host := getenvOrEmpty("ORCHESTRA_SERVER_HOST")
@@ -45,6 +46,7 @@ func Load() (Config, error) {
 	agentCommandOpenCode := getenvOrEmpty("ORCHESTRA_AGENT_COMMAND_OPENCODE")
 	agentCommandGemini := getenvOrEmpty("ORCHESTRA_AGENT_COMMAND_GEMINI")
 	agentCommandUnsandbox := getenvOrEmpty("ORCHESTRA_AGENT_COMMAND_UNSANDBOX")
+	agentCommand8gent := getenvOrEmpty("ORCHESTRA_AGENT_COMMAND_8GENT")
 	trackerType := getenvOrEmpty("ORCHESTRA_TRACKER_TYPE")
 	trackerEndpoint := getenvOrEmpty("ORCHESTRA_TRACKER_ENDPOINT")
 	trackerToken := getenvOrEmpty("ORCHESTRA_TRACKER_TOKEN")
@@ -173,6 +175,9 @@ func Load() (Config, error) {
 	if value := strings.TrimSpace(workflowOverrides.AgentCommandGemini); value != "" {
 		agentCommands["GEMINI"] = value
 	}
+	if value := strings.TrimSpace(workflowOverrides.AgentCommand8gent); value != "" {
+		agentCommands["8GENT"] = value
+	}
 
 	if value := strings.TrimSpace(agentCommandCodex); value != "" {
 		agentCommands["CODEX"] = value
@@ -188,6 +193,9 @@ func Load() (Config, error) {
 	}
 	if value := strings.TrimSpace(agentCommandUnsandbox); value != "" {
 		agentCommands["UNSANDBOX"] = value
+	}
+	if value := strings.TrimSpace(agentCommand8gent); value != "" {
+		agentCommands["8GENT"] = value
 	}
 
 	port, err := strconv.Atoi(strings.TrimSpace(portRaw))
@@ -462,6 +470,7 @@ type workflowConfigOverrides struct {
 	AgentCommandClaude       string
 	AgentCommandOpenCode     string
 	AgentCommandGemini       string
+	AgentCommand8gent        string
 	AgentMaxTurns            string
 	TrackerType              string
 	TrackerEndpoint          string
@@ -519,6 +528,9 @@ func loadWorkflowOverrides(path string) workflowConfigOverrides {
 		),
 		AgentCommandGemini: firstStringValue(
 			lookupNested(doc.Config, []string{"agent", "commands", "gemini"}),
+		),
+		AgentCommand8gent: firstStringValue(
+			lookupNested(doc.Config, []string{"agent", "commands", "8gent"}),
 		),
 		AgentMaxTurns: firstStringValue(
 			lookupNested(doc.Config, []string{"agent", "max_turns"}),
