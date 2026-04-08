@@ -2,7 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import type { AgentConfig } from '@/lib/orchestra-types'
 import type { ProviderPermissions, ProviderModelConfig, ProviderHook } from '@/lib/orchestra-client'
 
-export type Provider = 'claude' | 'codex' | 'gemini' | 'opencode'
+export type Provider = 'claude' | 'codex' | 'gemini' | 'opencode' | '8gent'
 export type CategoryId =
   | 'settings'
   | 'config'

@@ -38,7 +38,7 @@ import { OpenCodeModelPanel } from './panels/OpenCodeModelPanel'
 import { OpenCodePermissionsPanel } from './panels/OpenCodePermissionsPanel'
 import { useClaudeConfig } from './hooks/useClaudeConfig'
 import { useCodexConfig, useGeminiConfig, useOpenCodeConfig } from './hooks/useProviderDomainConfig'
-import { CLAUDE_CATEGORIES, CODEX_CATEGORIES, GEMINI_CATEGORIES, OPENCODE_CATEGORIES } from './constants'
+import { CLAUDE_CATEGORIES, CODEX_CATEGORIES, GEMINI_CATEGORIES, OPENCODE_CATEGORIES, EIGHTGENT_CATEGORIES } from './constants'
 import type { Provider, CategoryId, Scope } from './types'
 
 interface AgentsDashboardProps {
@@ -53,10 +53,12 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
   const [projectId, setProjectId] = useState('')
 
   const isClaude = provider === 'claude'
+  const is8gent = provider === '8gent'
+  const isClaudeOrEightgent = isClaude || is8gent
 
-  // Claude uses dedicated hook
+  // Claude and 8gent share the same config structure (CLAUDE.md, .claude/settings.json, hooks)
   const claude = useClaudeConfig(
-    isClaude ? config : null,
+    isClaudeOrEightgent ? config : null,
     scope,
     projectId || undefined,
   )
@@ -82,7 +84,7 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
     : provider === 'gemini'
       ? gemini
       : opencode
-  const state = isClaude ? claude : domainState
+  const state = isClaudeOrEightgent ? claude : domainState
 
   const categories = useMemo(() => {
     switch (provider) {
@@ -94,6 +96,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
         return GEMINI_CATEGORIES
       case 'opencode':
         return OPENCODE_CATEGORIES
+      case '8gent':
+        return EIGHTGENT_CATEGORIES
       default:
         return CLAUDE_CATEGORIES
     }
@@ -105,9 +109,9 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
     }
   }, [categories, category])
 
-  // Category counts for Claude
+  // Category counts for Claude and 8gent (same structure)
   const claudeCounts = useMemo((): Record<string, number> => {
-    if (!isClaude) return {}
+    if (!isClaudeOrEightgent) return {}
     return {
       settings: 1,
       instructions: claude.instructionsExists ? 1 : 0,
@@ -117,11 +121,11 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
       skills: claude.skills.length,
       agents: claude.subagents.length,
     }
-  }, [isClaude, claude])
+  }, [isClaudeOrEightgent, claude])
 
   // Legacy category counts
   const legacyCounts = useMemo((): Record<string, number> => {
-    if (isClaude) return {}
+    if (isClaudeOrEightgent) return {}
 
     if (provider === 'codex') {
       return {
@@ -160,12 +164,12 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
       mcp: opencode.providerMcpServers.length + opencode.orchestraMcpServers.length,
       permissions: 1,
     }
-  }, [isClaude, provider, codex, gemini, opencode])
+  }, [isClaudeOrEightgent, provider, codex, gemini, opencode])
 
-  const categoryCounts = isClaude ? claudeCounts : legacyCounts
+  const categoryCounts = isClaudeOrEightgent ? claudeCounts : legacyCounts
 
   const providerItems = useMemo(() => {
-    if (isClaude) {
+    if (isClaudeOrEightgent) {
       return {
         config: [] as FileResourceItem[],
         instructions: [] as FileResourceItem[],
@@ -200,7 +204,7 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
         ? toResourceItems(provider, codex.rules)
         : [] as FileResourceItem[],
     }
-  }, [isClaude, provider, codex, gemini, opencode])
+  }, [isClaudeOrEightgent, provider, codex, gemini, opencode])
 
   const handleSelectCategory = (id: CategoryId) => {
     setCategory(id)
@@ -223,16 +227,14 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
           onProviderChange={(p) => {
             setProvider(p)
             setCategory(
-              p === 'claude'
+              p === 'claude' || p === '8gent' || p === 'gemini'
                 ? 'settings'
-                : p === 'gemini'
-                  ? 'settings'
-                  : 'config',
+                : 'config',
             )
           }}
           scope={scope}
           projectId={projectId}
-          projects={isClaude ? claude.projects : domainState.projects}
+          projects={isClaudeOrEightgent ? claude.projects : domainState.projects}
           onScopeChange={(s, pid) => { setScope(s); setProjectId(pid) }}
         />
 
@@ -250,7 +252,7 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
             <div className="flex-1 min-w-0 min-h-0">
               {state.loading ? (
                 <div className="p-6 space-y-3"><Skeleton className="h-6 w-48" /><Skeleton className="h-[300px] w-full" /></div>
-              ) : isClaude ? (
+              ) : isClaudeOrEightgent ? (
                 <>
                   {category === 'settings' && (
                     <SettingsPanel
