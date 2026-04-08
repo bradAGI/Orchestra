@@ -21,6 +21,8 @@ const (
 	ProviderOpenCode Provider = "OPENCODE"
 	// ProviderGemini identifies the Google Gemini agent.
 	ProviderGemini Provider = "GEMINI"
+	// Provider8gent identifies the 8gent Code open-source agent.
+	Provider8gent Provider = "8GENT"
 )
 
 // NormalizeProvider normalizes a provider string to UPPERCASE for backward compatibility.

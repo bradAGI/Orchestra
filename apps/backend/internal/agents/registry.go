@@ -77,6 +77,8 @@ func (r *Registry) SetCommand(provider Provider, command string) {
 	switch p {
 	case ProviderClaude:
 		r.runners[p] = NewClaudeRunner(command)
+	case Provider8gent:
+		r.runners[p] = NewEightgentRunner(command)
 	case ProviderOpenCode:
 		r.runners[p] = NewOpenCodeRunner(command)
 	case ProviderGemini:

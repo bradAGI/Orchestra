@@ -6,6 +6,7 @@ export const PROVIDERS: { id: Provider; label: string; description: string }[] =
   { id: 'codex', label: 'Codex', description: "OpenAI's Codex — fast iteration and broad knowledge" },
   { id: 'gemini', label: 'Gemini', description: "Google's Gemini CLI — multimodal and context-aware" },
   { id: 'opencode', label: 'OpenCode', description: 'Community-driven — flexible and extensible' },
+  { id: '8gent', label: '8gent', description: 'Open-source autonomous coding agent — local-first, self-evolving' },
 ]
 
 export const CLAUDE_CATEGORIES: CategoryDef[] = [
@@ -52,6 +53,14 @@ export const OPENCODE_CATEGORIES: CategoryDef[] = [
   { id: 'permissions', label: 'Permissions', icon: Shield },
 ]
 
+export const EIGHTGENT_CATEGORIES: CategoryDef[] = [
+  { id: 'settings', label: 'Settings', icon: Settings2, pinned: true },
+  { id: 'instructions', label: 'Instructions', icon: FileText, pinned: true },
+  { id: 'skills', label: 'Skills', icon: Sparkles },
+  { id: 'hooks', label: 'Hooks', icon: Zap },
+  { id: 'mcp', label: 'MCP Servers', icon: Plug },
+]
+
 export const MODELS_BY_PROVIDER: Record<Provider, { value: string; label: string }[]> = {
   claude: [
     { value: 'sonnet', label: 'Sonnet (latest)' },
@@ -96,6 +105,13 @@ export const MODELS_BY_PROVIDER: Record<Provider, { value: string; label: string
     { value: 'opencode/minimax-m2.5-free', label: 'Minimax M2.5 (free)' },
     { value: 'opencode/nemotron-3-super-free', label: 'Nemotron 3 Super (free)' },
   ],
+  '8gent': [
+    { value: 'qwen3.5', label: 'Qwen 3.5 (local, default)' },
+    { value: 'meta-llama/llama-4-scout:free', label: 'Llama 4 Scout (free, cloud)' },
+    { value: 'meta-llama/llama-4-maverick:free', label: 'Llama 4 Maverick (free, cloud)' },
+    { value: 'mistralai/mistral-small-3.1-24b-instruct:free', label: 'Mistral Small 3.1 (free, cloud)' },
+    { value: 'google/gemini-2.0-flash-exp:free', label: 'Gemini 2.0 Flash (free, cloud)' },
+  ],
 }
 
 export const HOOK_EVENTS_BY_PROVIDER: Record<Provider, string[]> = {
@@ -103,6 +119,7 @@ export const HOOK_EVENTS_BY_PROVIDER: Record<Provider, string[]> = {
   codex: [],
   gemini: ['SessionStart', 'SessionEnd', 'BeforeAgent', 'AfterAgent', 'BeforeModel', 'AfterModel', 'BeforeToolSelection'],
   opencode: [],
+  '8gent': ['SessionStart', 'SessionEnd', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop'],
 }
 
 export const EFFORT_LEVELS: Record<Provider, string[]> = {
@@ -110,6 +127,7 @@ export const EFFORT_LEVELS: Record<Provider, string[]> = {
   codex: ['low', 'medium', 'high', 'very-high', 'max', 'reasoning'],
   gemini: ['low', 'medium', 'high'],
   opencode: ['low', 'medium', 'high'],
+  '8gent': ['low', 'medium', 'high'],
 }
 
 export const APPROVAL_MODES: Record<Provider, { label: string; value: string }[]> = {
@@ -137,5 +155,11 @@ export const APPROVAL_MODES: Record<Provider, { label: string; value: string }[]
     { label: 'Auto-edit', value: 'auto-edit' },
     { label: 'Full-auto', value: 'full-auto' },
     { label: 'On-request', value: 'on-request' },
+  ],
+  '8gent': [
+    { label: 'Default (interactive)', value: 'default' },
+    { label: 'Accept Edits', value: 'acceptEdits' },
+    { label: 'Infinite (no approval)', value: 'infinite' },
+    { label: 'Plan only', value: 'plan' },
   ],
 }
