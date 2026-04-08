@@ -17,6 +17,7 @@ export type TerminalNode = {
 type ViewMode = 'tabs' | 'split'
 
 const agentCommands = [
+    { id: '8gent', label: '8gent', cmd: '8gent', color: 'text-orange-500' },
     { id: 'claude', label: 'Claude', cmd: 'claude', color: 'text-orange-400' },
     { id: 'codex', label: 'Codex', cmd: 'codex', color: 'text-emerald-400' },
     { id: 'gemini', label: 'Gemini', cmd: 'gemini', color: 'text-blue-400' },

@@ -65,13 +65,10 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
         fitAddonRef.current = fitAddon
         term.loadAddon(fitAddon)
         term.open(terminalRef.current)
-        // Delay initial fit to ensure the container has its final dimensions.
-        // Without this, xterm renders at a smaller size and doesn't fill the container.
-        requestAnimationFrame(() => {
-            try { fitAddon.fit() } catch { /* container may have zero dimensions */ }
-            // Double-fit after a short delay to catch late layout shifts
-            setTimeout(() => { try { fitAddon.fit() } catch {} }, 100)
-        })
+        // Single fit after layout has settled. A single delayed fit is enough —
+        // a double-fit causes two PTY resize events which makes Ink-based TUIs
+        // (like 8gent) emit ghost artifacts from the intermediate redraw.
+        setTimeout(() => { try { fitAddon.fit() } catch { /* container may have zero dimensions */ } }, 150)
 
         xtermRef.current = term
 
@@ -131,9 +128,12 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
             } catch { /* intentionally empty */ }
         }
 
-        // ResizeObserver for mosaic pane resizing
+        // ResizeObserver for mosaic pane resizing — debounced to avoid
+        // rapid sequential resize events which cause Ink TUI ghost artifacts.
+        let resizeDebounce: ReturnType<typeof setTimeout> | null = null
         const resizeObserver = new ResizeObserver(() => {
-            requestAnimationFrame(handleResize)
+            if (resizeDebounce) clearTimeout(resizeDebounce)
+            resizeDebounce = setTimeout(handleResize, 80)
         })
         if (terminalRef.current) {
             resizeObserver.observe(terminalRef.current)
@@ -154,6 +154,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
 
         return () => {
             window.removeEventListener('resize', handleResize)
+            if (resizeDebounce) clearTimeout(resizeDebounce)
             resizeObserver.disconnect()
             intersectionObserver.disconnect()
             ws.close()
