@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "provider": "8gent",
+  "model": "eight-1.0-q3:14b",
+  "fallback": ["qwen3:14b", "openrouter:auto:free"],
+  "permissions": {
+    "auto_approve": false,
+    "deny_globs": ["**/.env", "**/.env.*", "**/credentials*", "**/*.pem", "**/*.key"]
+  },
+  "memory": {
+    "enabled": true,
+    "scope": "workspace"
+  }
+}

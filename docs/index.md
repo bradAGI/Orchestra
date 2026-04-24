@@ -2,7 +2,7 @@
 
 > **Source files:** `apps/backend/`, `apps/desktop/`, `apps/tui/`, `packages/`
 
-Orchestra is a multi-agent orchestration platform that dispatches issues to coding agents, monitors their execution in real time, and surfaces results through an Electron desktop app and terminal dashboard. It coordinates multiple agent providers (Claude, Gemini, Codex, OpenCode, Unsandbox) behind a unified Go backend, streaming lifecycle events to connected frontends over SSE.
+Orchestra is a multi-agent orchestration platform that dispatches issues to coding agents, monitors their execution in real time, and surfaces results through an Electron desktop app and terminal dashboard. It coordinates multiple agent providers (Claude, Gemini, Codex, OpenCode, 8gent, Unsandbox) behind a unified Go backend, streaming lifecycle events to connected frontends over SSE.
 
 This documentation covers the system architecture, API surface, backend internals, frontend structure, operational guidance, and reference enums.
 
@@ -28,6 +28,7 @@ This documentation covers the system architecture, API surface, backend internal
 | **3** | **Backend** | | |
 | 3.1 | Orchestrator | [backend/orchestrator.md](backend/orchestrator.md) | Core dispatch loop, state machine, retry logic |
 | 3.2 | Agents | [backend/agents.md](backend/agents.md) | Agent providers, runner pool, command execution |
+| 3.2.1 | 8gent Integration | [backend/agents-8gent.md](backend/agents-8gent.md) | 8gent Code provider wiring, stream-json event shape, sample config, troubleshooting |
 | 3.3 | Tracker | [backend/tracker.md](backend/tracker.md) | Issue storage backends (in-memory, SQLite, GitHub) |
 | 3.4 | Workspace | [backend/workspace.md](backend/workspace.md) | Isolated git workspaces for agent execution |
 | 3.5 | Database | [backend/database.md](backend/database.md) | SQLite schema, migrations, query patterns |
@@ -107,7 +108,7 @@ Supporting infrastructure lives in `packages/` (shared modules), `ops/` (operati
 ### Key Concepts
 
 - **Issue** -- A unit of work dispatched to an agent. Common states in the current workflow include `Backlog`, `Todo`, `In Progress`, `Review`, and `Done`.
-- **Agent** -- A machine learning coding provider (Claude, Gemini, Codex, OpenCode, Unsandbox) that executes issues.
+- **Agent** -- A machine learning coding provider (Claude, Gemini, Codex, OpenCode, 8gent, Unsandbox) that executes issues.
 - **Tracker** -- A pluggable backend for issue storage. In normal local runtime the backend uses SQLite, with GitHub integration available when configured.
 - **Session** -- A single agent execution run against an issue, with token usage and event history.
 - **Snapshot** -- A point-in-time summary of all running and retrying issues, streamed to frontends.
