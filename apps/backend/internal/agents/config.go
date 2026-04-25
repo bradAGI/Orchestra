@@ -76,8 +76,8 @@ var AgentMeta = map[string]struct {
 		GlobalPaths:      []string{".8gent/config.json"},
 		LocalPaths:       []string{".8gent/config.json"},
 		Format:           "json",
-		GlobalSkillPaths: []string{".claude/skills", ".claude/agents"},
-		LocalSkillPaths:  []string{".claude/skills", ".claude/agents"},
+		GlobalSkillPaths: []string{".8gent/skills", ".8gent/agents", ".8gent/memory"},
+		LocalSkillPaths:  []string{".8gent/skills", ".8gent/agents", ".8gent/memory"},
 	},
 }
 
