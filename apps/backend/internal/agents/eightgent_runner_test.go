@@ -63,8 +63,11 @@ func TestParseLineToEvent8gentToolResultKind(t *testing.T) {
 func TestParseLineToEvent8gentResultKindTriggersCompletion(t *testing.T) {
 	line := `{"type":"result","subtype":"ok","session_id":"run-1735083240123-a1b2c3","ended_at":"2026-04-23T10:54:01.456Z","final_text":"Hello."}`
 	event := parseLineToEvent(Provider8gent, "stdout", line)
-	if event.Kind != "result" {
-		t.Fatalf("expected result kind to fire Orchestra completion detection, got %q", event.Kind)
+	// Orchestra's completion detection fires on "result" or any "result/*" kind.
+	// The 8gent extractKind branch promotes the subtype (e.g. "result/ok"),
+	// so accept either shape here.
+	if event.Kind != "result" && !strings.HasPrefix(event.Kind, "result/") {
+		t.Fatalf("expected result or result/<subtype> kind, got %q", event.Kind)
 	}
 	if event.Raw["session_id"] != "run-1735083240123-a1b2c3" {
 		t.Fatalf("expected session_id preserved on Raw for PTY-mode completion fallback, got %v", event.Raw["session_id"])
@@ -108,14 +111,12 @@ func TestEightgentRunnerStreamsFullLifecycleAndUsage(t *testing.T) {
 
 	var sawStart, sawAssistant, sawResult bool
 	for _, ev := range events {
-		switch ev.Kind {
-		case "session_start":
+		switch {
+		case ev.Kind == "session_start":
 			sawStart = true
-		case "assistant":
-			if ev.Message == "Hello." {
-				sawAssistant = true
-			}
-		case "result":
+		case ev.Kind == "assistant" && ev.Message == "Hello.":
+			sawAssistant = true
+		case ev.Kind == "result" || strings.HasPrefix(ev.Kind, "result/"):
 			sawResult = true
 		}
 	}

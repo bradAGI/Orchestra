@@ -678,6 +678,20 @@ func extractKind(provider Provider, source string, payload map[string]any) strin
 		}
 	}
 
+	if provider == Provider8gent {
+		if eventType := firstString(payload, "type"); eventType != "" {
+			switch eventType {
+			case "session_start", "assistant", "tool_use", "tool_result":
+				return eventType
+			case "result", "error":
+				if subtype := firstString(payload, "subtype"); subtype != "" {
+					return eventType + "/" + subtype
+				}
+				return eventType
+			}
+		}
+	}
+
 	return kind
 }
 
