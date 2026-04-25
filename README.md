@@ -12,7 +12,7 @@ Orchestra is a desktop development workspace that integrates AI coding agents wi
 
 ## What It Does
 
-Orchestra connects your local projects and GitHub to AI coding agents (Claude Code, Codex CLI, Gemini CLI, and Opencode) to automate development workflows.
+Orchestra connects your local projects and GitHub to AI coding agents (Claude Code, Codex CLI, Gemini CLI, Opencode, and [8gent Code](https://github.com/8gi-foundation/8gent-code)) to automate development workflows.
 
 **Project Integration**
 - Connect local Git repositories and remote GitHub projects
@@ -40,7 +40,7 @@ Orchestra connects your local projects and GitHub to AI coding agents (Claude Co
 
 
 **Multi-Agent Orchestration**
-- Deploy Claude, Codex, OpenCode, and Gemini agents simultaneously
+- Deploy Claude, Codex, OpenCode, Gemini, and 8gent agents simultaneously
 - Load balance work across available agents
 - Configure agent-specific skills, tools, and permissions
 - Monitor agent performance and resource usage
@@ -68,7 +68,7 @@ Orchestra connects your local projects and GitHub to AI coding agents (Claude Co
 - Node.js 22+
 - npm
 - Git
-- At least one installed agent CLI on `PATH`: `codex`, `claude`, `opencode`, or `gemini`
+- At least one installed agent CLI on `PATH`: `codex`, `claude`, `opencode`, `gemini`, or `8gent` (open-source, install with `npm i -g @8gi-foundation/8gent-code`)
 
 ### 1. Start the Backend
 
@@ -184,6 +184,7 @@ graph TB
         CLAUDE["Claude"]
         GEMINI["Gemini"]
         OPENCODE["OpenCode"]
+        EIGHT["8gent"]
         GH["GitHub"]
         LLM["LLM APIs"]
         MCP_SRV["MCP Servers"]
@@ -203,6 +204,7 @@ graph TB
     REG --> CLAUDE
     REG --> GEMINI
     REG --> OPENCODE
+    REG --> EIGHT
     TRACKER --> GH
     AGENT --> LLM
     ORCH --> MCP
