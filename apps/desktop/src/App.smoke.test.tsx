@@ -8,6 +8,7 @@ vi.mock('@/components/terminal/TerminalView', () => ({
 }))
 
 import App from './App'
+import { resetAppStore } from '@/store'
 
 // Mock Electron bridge
 const defaultProfiles: BridgeProfilesPayload = {
@@ -264,6 +265,7 @@ describe('App smoke render', () => {
 
   afterEach(() => {
     cleanup()
+    resetAppStore()
     vi.unstubAllGlobals()
   })
 

@@ -73,26 +73,100 @@ import { AppTooltipProvider } from '@/components/ui/tooltip-wrapper'
 import { SectionErrorBoundary } from '@/components/ui/section-error-boundary'
 import { EmbeddedAgentWidget } from '@/components/embedded-agent'
 import { useBackendConfig, useNotifications, useIssueLookup, useWorkspaceMigration } from '@/hooks'
+import { useAppStore } from '@/store'
 
 /** Root application component that manages backend sync, navigation, and top-level UI state. */
 export default function App() {
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    if (typeof window === 'undefined') {
-      return 'dark'
-    }
-    const stored = window.localStorage.getItem('orchestra-theme')
-    return stored === 'light' ? 'light' : 'dark'
-  })
+  // ---------------------------------------------------------------------------
+  // Zustand store selectors
+  // ---------------------------------------------------------------------------
+  const theme = useAppStore(s => s.theme)
+  const setTheme = useAppStore(s => s.setTheme)
+  const activeSection = useAppStore(s => s.activeSection)
+  const setActiveSection = useAppStore(s => s.setActiveSection)
+  const sidebarCollapsed = useAppStore(s => s.sidebarCollapsed)
+  const setSidebarCollapsed = useAppStore(s => s.setSidebarCollapsed)
+  const paletteOpen = useAppStore(s => s.paletteOpen)
+  const setPaletteOpen = useAppStore(s => s.setPaletteOpen)
+  const inspectDialogOpen = useAppStore(s => s.inspectDialogOpen)
+  const setInspectDialogOpen = useAppStore(s => s.setInspectDialogOpen)
+  const sessionInspectDialogOpen = useAppStore(s => s.sessionInspectDialogOpen)
+  const setSessionInspectDialogOpen = useAppStore(s => s.setSessionInspectDialogOpen)
+  const createTaskDialogOpen = useAppStore(s => s.createTaskDialogOpen)
+  const createProjectDialogOpen = useAppStore(s => s.createProjectDialogOpen)
+  const setCreateProjectDialogOpen = useAppStore(s => s.setCreateProjectDialogOpen)
+  const settingsInitialTab = useAppStore(s => s.settingsInitialTab)
+  const setSettingsInitialTab = useAppStore(s => s.setSettingsInitialTab)
+  const activePeriod = useAppStore(s => s.activePeriod)
+  const setActivePeriod = useAppStore(s => s.setActivePeriod)
 
-  // Extracted hooks
+  const snapshot = useAppStore(s => s.snapshot)
+  const setSnapshot = useAppStore(s => s.setSnapshot)
+  const timeline = useAppStore(s => s.timeline)
+  const loadingState = useAppStore(s => s.loadingState)
+  const setLoadingState = useAppStore(s => s.setLoadingState)
+  const statusMessage = useAppStore(s => s.statusMessage)
+  const setStatusMessage = useAppStore(s => s.setStatusMessage)
+  const usePolling = useAppStore(s => s.usePolling)
+  const setUsePolling = useAppStore(s => s.setUsePolling)
+  const refreshPending = useAppStore(s => s.refreshPending)
+  const setRefreshPending = useAppStore(s => s.setRefreshPending)
+
+  const boardIssues = useAppStore(s => s.boardIssues)
+  const setBoardIssues = useAppStore(s => s.setBoardIssues)
+  const setGithubBacklogIssues = useAppStore(s => s.setGithubBacklogIssues)
+  const allBoardIssues = useAppStore(s => s.allBoardIssues)
+
+  const projects = useAppStore(s => s.projects)
+  const setProjects = useAppStore(s => s.setProjects)
+  const projectStats = useAppStore(s => s.projectStats)
+  const setProjectStats = useAppStore(s => s.setProjectStats)
+  const warehouseStats = useAppStore(s => s.warehouseStats)
+  const setWarehouseStats = useAppStore(s => s.setWarehouseStats)
+  const selectedProjectID = useAppStore(s => s.selectedProjectID)
+  const setSelectedProjectID = useAppStore(s => s.setSelectedProjectID)
+  const dataLoading = useAppStore(s => s.dataLoading)
+  const setDataLoading = useAppStore(s => s.setDataLoading)
+
+  const agentConfig = useAppStore(s => s.agentConfig)
+  const setAgentConfig = useAppStore(s => s.setAgentConfig)
+  const availableAgents = useAppStore(s => s.availableAgents)
+  const setAvailableAgents = useAppStore(s => s.setAvailableAgents)
+  const allTools = useAppStore(s => s.allTools)
+  const setAllTools = useAppStore(s => s.setAllTools)
+
+  const openTerminals = useAppStore(s => s.openTerminals)
+  const setOpenTerminals = useAppStore(s => s.setOpenTerminals)
+
+  // createTaskInitialState: store uses Record<string, unknown> | null, but component
+  // needs a string. We store it wrapped and unwrap at the usage site.
+  const createTaskInitialState = useAppStore(s => s.createTaskInitialState)
+
+  // ---------------------------------------------------------------------------
+  // Custom hooks (bridged to store where needed)
+  // ---------------------------------------------------------------------------
   const {
-    config, setConfig,
+    config, setConfig: setConfigHook,
     loadingConfig, savingConfig, setSavingConfig,
     backendProfiles, setBackendProfiles,
     activeProfileId, setActiveProfileId,
     profilesPending, setProfilesPending,
     errorMessage, setErrorMessage,
   } = useBackendConfig()
+
+  // Bridge useBackendConfig state into the store for consumers
+  const storeSetConfig = useAppStore(s => s.setConfig)
+  const storeSetLoadingConfig = useAppStore(s => s.setLoadingConfig)
+  useEffect(() => {
+    storeSetConfig(config)
+    storeSetLoadingConfig(loadingConfig)
+  }, [config, loadingConfig, storeSetConfig, storeSetLoadingConfig])
+
+  const setConfig = (cfg: BackendConfig | null) => {
+    setConfigHook(cfg)
+    storeSetConfig(cfg)
+  }
+
   const {
     notifSound, setNotifSound,
     notifMuted, setNotifMuted,
@@ -100,19 +174,8 @@ export default function App() {
     playNotification,
   } = useNotifications()
 
-  const [snapshot, setSnapshot] = useState<SnapshotPayload | null>(null)
-  const [timeline, setTimeline] = useState<TimelineItem[]>([])
-  const [boardIssues, setBoardIssues] = useState<IssueListItem[]>([])
-  const [githubBacklogIssues, setGithubBacklogIssues] = useState<IssueListItem[]>([])
-  const [agentConfig, setAgentConfig] = useState<{ commands: Record<string, string>; agent_provider: string; max_turns: number } | null>(null)
-  const [availableAgents, setAvailableAgents] = useState<string[]>([])
-  const [allTools, setAllTools] = useState<ToolSummary[]>([])
-  const [loadingState, setLoadingState] = useState(true)
-  const [usePolling, setUsePolling] = useState(false)
   const syncControls = useRef<{ startPolling: () => void; stopPolling: () => void } | null>(null)
   const lastIssueFetchRef = useRef(0)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [statusMessage, setStatusMessage] = useState('')
 
   const setOperatorError = (prefix: string, err: unknown) => {
     const message = toDisplayError(err)
@@ -142,28 +205,14 @@ export default function App() {
   const [sessionLookupResult, setSessionLookupResult] = useState<SessionDetail | null>(null)
   const [sessionLookupPending, setSessionLookupPending] = useState(false)
   const [sessionLookupError, setSessionLookupError] = useState('')
-  const [refreshPending, setRefreshPending] = useState(false)
-  const [inspectDialogOpen, setInspectDialogOpen] = useState(false)
-  const [sessionInspectDialogOpen, setSessionInspectDialogOpen] = useState(false)
-  const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false)
-  const [createTaskInitialState, setCreateTaskInitialState] = useState('Backlog')
-  const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false)
-  const [activeSection, setActiveSection] = useState<SectionID>('ISSUES')
-  const [settingsInitialTab, setSettingsInitialTab] = useState<'backend' | 'agents' | 'integrations' | 'shortcuts' | 'notifications' | undefined>(undefined)
-  const [activePeriod, setActivePeriod] = useState<'Today' | 'Week' | 'Month'>('Week')
-  const [paletteOpen, setPaletteOpen] = useState(false)
 
   const handleRefreshRef = useRef<(() => Promise<void>) | null>(null)
-  const issueLookupIdRef = useRef(issueLookupId)
-  issueLookupIdRef.current = issueLookupId
-  const executeIssueLookupRef = useRef(executeIssueLookup)
-  executeIssueLookupRef.current = executeIssueLookup
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
-        setPaletteOpen((open) => !open)
+        useAppStore.getState().togglePalette()
       }
       if (e.key === 'r' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
@@ -171,14 +220,14 @@ export default function App() {
       }
       if (e.key === '/' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
-        setSidebarCollapsed((v) => !v)
+        useAppStore.getState().toggleSidebar()
       }
       // Ctrl+1-8 tab switching (fallback for non-Electron)
       if (e.ctrlKey && !e.altKey && !e.shiftKey) {
         const num = parseInt(e.key, 10)
         if (!isNaN(num) && num >= 1 && num <= sidebarItems.length) {
           e.preventDefault()
-          setActiveSection(sidebarItems[num - 1].id as SectionID)
+          useAppStore.getState().setActiveSection(sidebarItems[num - 1].id as SectionID)
         }
       }
     }
@@ -192,35 +241,24 @@ export default function App() {
     if (bridge?.onSwitchTab) {
       bridge.onSwitchTab((tabNum: number) => {
         if (tabNum >= 1 && tabNum <= sidebarItems.length) {
-          setActiveSection(sidebarItems[tabNum - 1].id as SectionID)
+          useAppStore.getState().setActiveSection(sidebarItems[tabNum - 1].id as SectionID)
         }
       })
     }
   }, [])
 
-  // Projects & Warehouse State
-  const [projects, setProjects] = useState<Project[]>([])
-  const [projectStats, setProjectStats] = useState<Record<string, ProjectStats>>({})
-  const [warehouseStats, setWarehouseStats] = useState<GlobalStats | null>(null)
-  const [selectedProjectID, setSelectedProjectID] = useState<string | null>(null)
-  const [dataLoading, setDataLoading] = useState(false)
-
-  const [openTerminals, setOpenTerminals] = useState<TerminalNode[]>([])
-
-  // Terminals are for manual use only (quick-launch, user shells).
-  // Issue agent sessions run in subprocess mode — their output is
-  // shown in the inspector's Session tab, not in terminal tabs.
+  // Projects & Warehouse State — now from store
 
   const handleCloseTerminal = (id: string) => {
-    setOpenTerminals(prev => prev.filter(t => t.id !== id))
+    setOpenTerminals(openTerminals.filter(t => t.id !== id))
   }
 
   const handleJumpToTerminal = (identifier: string) => {
     const termId = `issue-${identifier}`
-    setOpenTerminals(prev => {
-      if (prev.some(p => p.id === termId)) return prev
-      return [...prev, { id: termId, title: `Agent: ${identifier}` }]
-    })
+    const current = useAppStore.getState().openTerminals
+    if (!current.some(p => p.id === termId)) {
+      setOpenTerminals([...current, { id: termId, title: `Agent: ${identifier}` }])
+    }
     setActiveSection('CONSOLE')
   }
 
@@ -233,8 +271,7 @@ export default function App() {
 
   const handleCloneSession = (session: SessionSummary) => {
     setSelectedProjectID(session.project_id || null)
-    setCreateTaskInitialState('Todo')
-    setCreateTaskDialogOpen(true)
+    useAppStore.getState().openCreateTaskDialog({ state: 'Todo' } as Record<string, unknown>)
     setActiveSection('ISSUES')
   }
 
@@ -264,7 +301,7 @@ export default function App() {
     }
     mediaQuery.addEventListener('change', handleChange)
     return () => mediaQuery.removeEventListener('change', handleChange)
-  }, [])
+  }, [setTheme])
 
   useEffect(() => {
     if (!config) return
@@ -357,15 +394,9 @@ export default function App() {
       setGithubBacklogIssues(results.flat())
     })
     return () => { mounted = false }
-  }, [config, projects])
+  }, [config, projects, setGithubBacklogIssues])
 
-  const allBoardIssues = useMemo(() => {
-    const localTitles = new Set(boardIssues.map(i => i.title))
-    const uniqueGh = githubBacklogIssues.filter(gh => !localTitles.has(gh.title))
-    return [...boardIssues, ...uniqueGh]
-  }, [boardIssues, githubBacklogIssues])
-  const allBoardIssuesRef = useRef(allBoardIssues)
-  allBoardIssuesRef.current = allBoardIssues
+  // allBoardIssues is now computed by the store's issues slice — no useMemo needed
 
   const handleAgentConfigSave = async (nextAgentConfig: { commands: Record<string, string>; agent_provider: string; max_turns: number }) => {
     if (!config) return
@@ -391,28 +422,30 @@ export default function App() {
       config,
       {
         onSnapshot: (next) => {
-          setSnapshot((previous) => applySnapshotUpdate(previous, next))
-          setLoadingState(false)
+          const store = useAppStore.getState()
+          store.setSnapshot(applySnapshotUpdate(store.snapshot, next))
+          store.setLoadingState(false)
           setErrorMessage('')
           // Fetch board issues to populate the Kanban board persistence (throttled)
           const now = Date.now()
           if (now - lastIssueFetchRef.current > 10000) {
             lastIssueFetchRef.current = now
-            fetchIssues(config).then(setBoardIssues).catch(() => {})
+            fetchIssues(config).then(issues => useAppStore.getState().setBoardIssues(issues)).catch(() => {})
             // Also refresh the open issue detail so plan/state update live
-            if (issueLookupIdRef.current) {
-              void executeIssueLookupRef.current(issueLookupIdRef.current)
+            const currentIssueLookupId = issueLookupId
+            if (currentIssueLookupId) {
+              void executeIssueLookup(currentIssueLookupId)
             }
           }
         },
         onTimelineEvent: (eventType, envelope) => {
-          setTimeline((previous) => appendTimelineEvent(previous, { type: envelope.type, at: envelope.timestamp, data: envelope.data }))
+          useAppStore.getState().addTimelineEvent({ type: envelope.type, at: envelope.timestamp, data: envelope.data })
           if (eventType === 'RUN_SUCCEEDED') {
             const issueIdentifier = (envelope.data.issue_identifier as string) || ''
             // Don't optimistically set state — the backend auto-advances (Todo→InProgress or InProgress→Review)
             // Just force a refresh to pick up whatever state the backend set
             fetchIssues(config).then((issues) => {
-              setBoardIssues(issues)
+              useAppStore.getState().setBoardIssues(issues)
               // Only notify when issue reaches Review (not after every turn)
               const issue = issues.find(i => (i.identifier || i.issue_identifier) === issueIdentifier)
               if (issue && issue.state === 'Review') {
@@ -422,23 +455,23 @@ export default function App() {
             lastIssueFetchRef.current = Date.now()
             // Re-fetch the issue detail so the inspector shows updated plan/state
             if (issueIdentifier) {
-              void executeIssueLookupRef.current(issueIdentifier)
+              void executeIssueLookup(issueIdentifier)
             }
           }
         },
         onStatus: (message) => {
-          setStatusMessage(message)
+          useAppStore.getState().setStatusMessage(message)
         },
         onError: (message) => {
           setErrorMessage(message)
           if (isUnauthorizedError(message) || message.includes('unauthorized:')) {
-            setStatusMessage('Protected host detected. Add bearer token in Settings -> Backend Configuration.')
+            useAppStore.getState().setStatusMessage('Protected host detected. Add bearer token in Settings -> Backend Configuration.')
           }
-          setLoadingState(false)
+          useAppStore.getState().setLoadingState(false)
         },
         onGitHubChange: (_eventType, _projectId) => {
           // Refresh project list when GitHub connection status changes via SSE
-          fetchProjects(config).then(setProjects).catch(() => {})
+          fetchProjects(config).then(projs => useAppStore.getState().setProjects(projs)).catch(() => {})
         },
       },
       {
@@ -466,7 +499,7 @@ export default function App() {
   useEffect(() => {
     if (!config) return
     const handler = () => {
-      fetchIssues(config).then(setBoardIssues).catch(() => {})
+      fetchIssues(config).then(issues => useAppStore.getState().setBoardIssues(issues)).catch(() => {})
     }
     window.addEventListener('orchestra-data-changed', handler)
     return () => window.removeEventListener('orchestra-data-changed', handler)
@@ -523,7 +556,8 @@ export default function App() {
     try {
       // If this is a GitHub backlog issue, promote to local task linked to the SAME GitHub issue
       if (identifier.startsWith('GH-')) {
-        const ghIssue = allBoardIssuesRef.current.find(i =>
+        const currentAllBoardIssues = useAppStore.getState().allBoardIssues
+        const ghIssue = currentAllBoardIssues.find(i =>
           i.identifier === identifier || i.issue_identifier === identifier
         )
         if (ghIssue) {
@@ -559,11 +593,13 @@ export default function App() {
       // If title/description changed and project is GitHub-connected, sync to GitHub
       const updatesRec = updates as Record<string, unknown>
       if (updatesRec.title || updatesRec.description) {
-        const issue = allBoardIssuesRef.current.find(i =>
+        const currentAllBoardIssues = useAppStore.getState().allBoardIssues
+        const issue = currentAllBoardIssues.find(i =>
           i.identifier === identifier || i.issue_identifier === identifier
         )
         if (issue?.project_id && issue.url?.includes('github.com')) {
-          const project = projects.find(p => p.id === issue.project_id)
+          const currentProjects = useAppStore.getState().projects
+          const project = currentProjects.find(p => p.id === issue.project_id)
           if (project?.github_token) {
             // Extract GH issue number from URL (e.g. .../issues/22)
             const ghMatch = issue.url.match(/\/issues\/(\d+)$/)
@@ -584,11 +620,13 @@ export default function App() {
 
       // If state changed, sync open/closed to GitHub
       if (updatesRec.state) {
-        const issue = allBoardIssuesRef.current.find(i =>
+        const currentAllBoardIssues = useAppStore.getState().allBoardIssues
+        const issue = currentAllBoardIssues.find(i =>
           i.identifier === identifier || i.issue_identifier === identifier
         )
         if (issue?.project_id && issue.url?.includes('github.com')) {
-          const proj = projects.find(p => p.id === issue.project_id)
+          const currentProjects = useAppStore.getState().projects
+          const proj = currentProjects.find(p => p.id === issue.project_id)
           if (proj?.github_token) {
             const ghMatch = issue.url.match(/\/issues\/(\d+)$/)
             if (ghMatch) {
@@ -638,8 +676,7 @@ export default function App() {
   }
 
   const handleCreateIssue = (initialState: string) => {
-    setCreateTaskInitialState(initialState)
-    setCreateTaskDialogOpen(true)
+    useAppStore.getState().openCreateTaskDialog({ state: initialState } as Record<string, unknown>)
   }
 
   const handleTaskSubmit = async (payload: IssueCreatePayload) => {
@@ -695,11 +732,13 @@ export default function App() {
       // (calling it would reset state to Todo via DeleteIssueSession, breaking the delete)
 
       // Close the linked GitHub issue before deleting locally
-      const issueToClose = allBoardIssuesRef.current.find(i =>
+      const currentAllBoardIssues = useAppStore.getState().allBoardIssues
+      const issueToClose = currentAllBoardIssues.find(i =>
         i.identifier === identifier || i.issue_identifier === identifier
       )
       if (issueToClose?.project_id && issueToClose.url?.includes('github.com')) {
-        const proj = projects.find(p => p.id === issueToClose.project_id)
+        const currentProjects = useAppStore.getState().projects
+        const proj = currentProjects.find(p => p.id === issueToClose.project_id)
         if (proj?.github_token) {
           const ghMatch = issueToClose.url.match(/\/issues\/(\d+)$/)
           if (ghMatch) {
@@ -716,7 +755,7 @@ export default function App() {
       // GH- prefixed issues are virtual (from GitHub sync) — not in local tracker
       if (identifier.startsWith('GH-')) {
         // Just remove from board and close on GitHub (already handled above)
-        setBoardIssues((prev) => prev.filter((issue) => {
+        setBoardIssues(useAppStore.getState().boardIssues.filter((issue) => {
           const candidate = typeof issue.identifier === 'string' ? issue.identifier : issue.issue_identifier
           return candidate !== identifier
         }))
@@ -727,23 +766,23 @@ export default function App() {
       }
 
       // Remove from board immediately so UI reflects deletion even if follow-up refresh fails.
-      setBoardIssues((prev) => prev.filter((issue) => {
+      setBoardIssues(useAppStore.getState().boardIssues.filter((issue) => {
         const candidate = typeof issue.identifier === 'string' ? issue.identifier : issue.issue_identifier
         return candidate !== identifier
       }))
 
       // Optimistically remove from snapshot
-      setSnapshot(prev => {
-        if (!prev) return prev
-        return {
-          ...prev,
-          running: prev.running.filter(r => r.issue_identifier !== identifier),
-          retrying: prev.retrying.filter(r => r.issue_identifier !== identifier)
-        }
-      })
+      const currentSnapshot = useAppStore.getState().snapshot
+      if (currentSnapshot) {
+        setSnapshot({
+          ...currentSnapshot,
+          running: currentSnapshot.running.filter(r => r.issue_identifier !== identifier),
+          retrying: currentSnapshot.retrying.filter(r => r.issue_identifier !== identifier)
+        })
+      }
 
       // Close issue-specific terminal if currently open.
-      setOpenTerminals((prev) => prev.filter((terminal) => terminal.id !== `issue-${identifier}`))
+      setOpenTerminals(useAppStore.getState().openTerminals.filter((terminal) => terminal.id !== `issue-${identifier}`))
 
       // Instantly update the board issues
       const updatedIssues = await fetchIssues(config)
@@ -768,15 +807,17 @@ export default function App() {
 
     // For GitHub backlog issues, populate directly from cached data instead of API
     if (issueIdentifier.startsWith('GH-')) {
-      const ghIssue = allBoardIssuesRef.current.find(i =>
+      const currentAllBoardIssues = useAppStore.getState().allBoardIssues
+      const ghIssue = currentAllBoardIssues.find(i =>
         i.identifier === issueIdentifier ||
         i.issue_identifier === issueIdentifier ||
         i.id === issueIdentifier
       )
       if (ghIssue) {
+        const currentProjects = useAppStore.getState().projects
         setIssueLookupResult({
           ...ghIssue,
-          project_name: projects.find(p => p.id === ghIssue.project_id)?.name || '',
+          project_name: currentProjects.find(p => p.id === ghIssue.project_id)?.name || '',
         } as IssueDetailResult)
         return
       }
@@ -919,7 +960,8 @@ export default function App() {
     const projs = await fetchProjects(config)
     setProjects(projs)
 
-    const statsMap: Record<string, ProjectStats> = { ...projectStats }
+    const currentProjectStats = useAppStore.getState().projectStats
+    const statsMap: Record<string, ProjectStats> = { ...currentProjectStats }
     let statsChanged = false
     for (const p of projs) {
       if (statsMap[p.id]) continue
@@ -955,7 +997,7 @@ export default function App() {
     try {
       await deleteProject(config, projectId)
       setStatusMessage('Project removed.')
-      setProjects(prev => prev.filter(p => p.id !== projectId))
+      setProjects(useAppStore.getState().projects.filter(p => p.id !== projectId))
       setSelectedProjectID(null)
     } catch (err) {
       setErrorMessage(`failed to delete project: ${toDisplayError(err)}`)
@@ -998,6 +1040,9 @@ export default function App() {
     URL.revokeObjectURL(url)
   }
 
+  // Extract initial state string from store's Record<string, unknown> | null
+  const createTaskInitialStateStr = (createTaskInitialState as Record<string, string> | null)?.state ?? 'Backlog'
+
   return (
     <AppTooltipProvider>
       <AppShell
@@ -1005,7 +1050,7 @@ export default function App() {
         activeSection={activeSection}
         onSectionChange={handleSectionChange}
         sidebarCollapsed={sidebarCollapsed}
-        onToggleCollapsed={() => setSidebarCollapsed((prev) => !prev)}
+        onToggleCollapsed={() => useAppStore.getState().toggleSidebar()}
         sidebarWidth={sidebarWidth}
         osOptions={osOptions}
         flushContent={sectionVisibility.showDocs}
@@ -1131,10 +1176,10 @@ export default function App() {
                       if (!projectId) return
                       const proj = projects.find(p => p.id === projectId)
                       const name = proj?.name ?? 'Shell'
-                      setOpenTerminals(prev => [...prev, { id: `shell-${Date.now()}`, title: `${name} Shell`, projectId }])
+                      setOpenTerminals([...useAppStore.getState().openTerminals, { id: `shell-${Date.now()}`, title: `${name} Shell`, projectId }])
                     }}
                     onAddAgentTerminal={(id, title, command, projectId) => {
-                      setOpenTerminals(prev => [...prev, { id, title, projectId, initialCommand: command }])
+                      setOpenTerminals([...useAppStore.getState().openTerminals, { id, title, projectId, initialCommand: command }])
                     }}
                     theme={theme}
                   />
@@ -1265,9 +1310,11 @@ export default function App() {
 
       <CreateTaskDialog
         open={createTaskDialogOpen}
-        onOpenChange={setCreateTaskDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) useAppStore.getState().closeCreateTaskDialog()
+        }}
         config={config}
-        initialState={createTaskInitialState}
+        initialState={createTaskInitialStateStr}
         availableAgents={availableAgents}
         allTools={allTools}
         projects={projects}

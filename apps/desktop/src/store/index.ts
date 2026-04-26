@@ -30,4 +30,13 @@ export const useAppStore = create<AppState>()((...a) => ({
   ...createEditorSlice(...a),
 }))
 
+/**
+ * Reset the store to its initial state.
+ * Useful in tests to prevent state leaking between test cases.
+ */
+export function resetAppStore(): void {
+  const initial = useAppStore.getInitialState()
+  useAppStore.setState(initial, true)
+}
+
 export type { AppState } from './types'
