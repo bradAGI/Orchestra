@@ -20,19 +20,28 @@ export function EditorContent({ file }: EditorContentProps) {
     let cancelled = false
     const load = async () => {
       try {
-        const result = await window.orchestraDesktop.fs.readFile(file.filePath)
-        if (cancelled) return
-        if (result.isBinary) {
-          setFileContent(file.id, '// Binary file — cannot display')
-        } else if (result.tooLarge) {
-          setFileContent(file.id, '// File too large to display (>5MB)')
-        } else {
-          setFileContent(file.id, result.content)
-          originalContentRef.current = result.content
+        // Try Electron IPC first (works when running inside Electron)
+        if (window.orchestraDesktop?.fs?.readFile) {
+          const result = await window.orchestraDesktop.fs.readFile(file.filePath)
+          if (cancelled) return
+          if (result.isBinary) {
+            setFileContent(file.id, '// Binary file — cannot display')
+          } else if (result.tooLarge) {
+            setFileContent(file.id, '// File too large to display (>5MB)')
+          } else {
+            setFileContent(file.id, result.content)
+            originalContentRef.current = result.content
+          }
+          return
         }
-      } catch {
+        // Fallback: IPC not available (browser-only dev mode)
         if (!cancelled) {
-          setFileContent(file.id, '// Error loading file')
+          setFileContent(file.id, `// Cannot read file: Electron IPC not available\n// File: ${file.filePath}\n// Run the app via Electron (make dash) for file editing`)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          const msg = err instanceof Error ? err.message : String(err)
+          setFileContent(file.id, `// Error loading file: ${msg}\n// File: ${file.filePath}`)
         }
       }
     }
@@ -41,7 +50,7 @@ export function EditorContent({ file }: EditorContentProps) {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [file.id, file.content])
+  }, [file.id])
 
   // Update originalContentRef when switching to a file that's already loaded
   useEffect(() => {
