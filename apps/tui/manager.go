@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -92,7 +93,11 @@ func (s *Service) run(ctx context.Context) {
 
 	cmd := exec.CommandContext(ctx, "bash", "-c", s.Cmd)
 	cmd.Dir = s.Cwd
-	cmd.Env = os.Environ()
+	for _, e := range os.Environ() {
+		if !strings.HasPrefix(e, "ELECTRON_RUN_AS_NODE=") {
+			cmd.Env = append(cmd.Env, e)
+		}
+	}
 	cmd.Env = append(cmd.Env, s.Env...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 

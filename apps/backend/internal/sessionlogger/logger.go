@@ -1,11 +1,8 @@
-// Package unfirehose writes unfirehose/1.0 JSONL session logs.
+// Package sessionlogger writes JSONL session logs.
 //
-// Port of ~/git/uncloseai-cli/unfirehose.py — the Python reference SDK.
 // Each session gets its own JSONL file under
-// ~/.unfirehose/canonical/orchestra/{session-uuid}.jsonl
-//
-// See: https://www.npmjs.com/package/@unturf/unfirehose-schema
-package unfirehose
+// ~/.orchestra/sessions/{session-uuid}.jsonl
+package sessionlogger
 
 import (
 	"encoding/json"
@@ -22,11 +19,11 @@ import (
 )
 
 const (
-	SchemaVersion = "unfirehose/1.0"
+	SchemaVersion = "orchestra/session-log/1.0"
 	Harness       = "orchestra"
 )
 
-// --- Schema Types (unfirehose/1.0) ---
+// --- Schema Types ---
 
 // ContentBlock is a typed content element within a message.
 type ContentBlock struct {
@@ -81,7 +78,7 @@ func ToolResultBlock(toolCallID, toolName string, output any, isError bool) Cont
 
 // --- Logger ---
 
-// Logger writes unfirehose/1.0 JSONL to disk. Thread-safe.
+// Logger writes JSONL session logs to disk. Thread-safe.
 type Logger struct {
 	mu        sync.Mutex
 	outputDir string
@@ -92,11 +89,11 @@ type Logger struct {
 	gitBranch string
 }
 
-// NewLogger creates a logger writing to ~/.unfirehose/canonical/orchestra/.
+// NewLogger creates a logger writing to ~/.orchestra/sessions/.
 func NewLogger(version string) (*Logger, error) {
 	dir, err := defaultOutputDir()
 	if err != nil {
-		return nil, fmt.Errorf("unfirehose: output dir: %w", err)
+		return nil, fmt.Errorf("session-logger: output dir: %w", err)
 	}
 	return newLogger(dir, version), nil
 }
@@ -379,7 +376,7 @@ var ValidMetricTypes = map[string]bool{
 // LogDataPoint writes a Datadog/StatsD/OpenTelemetry compatible metric.
 func (l *Logger) LogDataPoint(sessionID string, metricName, metricType string, value any, tags map[string]string, interval int, unit string) error {
 	if !ValidMetricTypes[metricType] {
-		return fmt.Errorf("unfirehose: invalid metricType %q", metricType)
+		return fmt.Errorf("session-logger: invalid metricType %q", metricType)
 	}
 
 	m := l.base()
@@ -515,7 +512,7 @@ func (l *Logger) Close() {
 func (l *Logger) appendJSON(sessionID string, obj any) error {
 	data, err := json.Marshal(obj)
 	if err != nil {
-		return fmt.Errorf("unfirehose: marshal: %w", err)
+		return fmt.Errorf("session-logger: marshal: %w", err)
 	}
 	data = append(data, '\n')
 
@@ -525,12 +522,12 @@ func (l *Logger) appendJSON(sessionID string, obj any) error {
 	f, ok := l.files[sessionID]
 	if !ok {
 		if err := os.MkdirAll(l.outputDir, 0755); err != nil {
-			return fmt.Errorf("unfirehose: mkdir: %w", err)
+			return fmt.Errorf("session-logger: mkdir: %w", err)
 		}
 		path := filepath.Join(l.outputDir, sessionID+".jsonl")
 		f, err = os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
-			return fmt.Errorf("unfirehose: open %s: %w", path, err)
+			return fmt.Errorf("session-logger: open %s: %w", path, err)
 		}
 		l.files[sessionID] = f
 	}
@@ -544,7 +541,7 @@ func defaultOutputDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(u.HomeDir, ".orchestra", "unfirehose")
+	dir := filepath.Join(u.HomeDir, ".orchestra", "sessions")
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", err
 	}

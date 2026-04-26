@@ -3,6 +3,7 @@ import type { GlobalStats, SessionSummary } from '@/lib/orchestra-types'
 import type { BackendConfig } from '@/lib/orchestra-client'
 import { TimeRangeSelector } from './TimeRangeSelector'
 import { useAnalyticsData } from './useAnalyticsData'
+import { AnalyticsLanding } from './AnalyticsLanding'
 import { ExecutiveView } from './views/ExecutiveView'
 import { OperationalView } from './views/OperationalView'
 import { OptimizationView } from './views/OptimizationView'
@@ -91,6 +92,11 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           ))}
         </div>
         <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+      </div>
+
+      {/* Landing: stat cards + daily token chart */}
+      <div className="flex flex-col gap-6">
+        <AnalyticsLanding stats={stats} dailyData={analytics.daily.data} />
       </div>
 
       {/* Active view */}

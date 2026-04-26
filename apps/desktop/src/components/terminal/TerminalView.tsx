@@ -1,7 +1,9 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
+import { SearchAddon } from 'xterm-addon-search'
 import 'xterm/css/xterm.css'
+import { TerminalSearch } from './TerminalSearch'
 
 // Track which sessions have already had their initial command sent,
 // so tab switches (unmount+remount) don't re-inject the command.
@@ -25,7 +27,9 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
     const terminalRef = useRef<HTMLDivElement>(null)
     const xtermRef = useRef<Terminal | null>(null)
     const fitAddonRef = useRef<FitAddon | null>(null)
+    const searchAddonRef = useRef<SearchAddon | null>(null)
     const wsRef = useRef<WebSocket | null>(null)
+    const [searchOpen, setSearchOpen] = useState(false)
 
     useEffect(() => {
         if (!terminalRef.current) return
@@ -64,6 +68,11 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
         const fitAddon = new FitAddon()
         fitAddonRef.current = fitAddon
         term.loadAddon(fitAddon)
+
+        const searchAddon = new SearchAddon()
+        searchAddonRef.current = searchAddon
+        term.loadAddon(searchAddon)
+
         term.open(terminalRef.current)
         // Single fit after layout has settled. A single delayed fit is enough —
         // a double-fit causes two PTY resize events which makes Ink-based TUIs
@@ -163,9 +172,29 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sessionId, projectId, baseUrl, apiToken, theme])
 
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+                e.preventDefault()
+                setSearchOpen(true)
+            }
+        }
+        const container = terminalRef.current
+        container?.addEventListener('keydown', handleKeyDown)
+        return () => container?.removeEventListener('keydown', handleKeyDown)
+    }, [])
+
     return (
         <div className="w-full h-full overflow-hidden">
-            <div ref={terminalRef} className="w-full h-full" />
+            <div className="relative h-full">
+                <div ref={terminalRef} className="w-full h-full" />
+                {searchOpen && (
+                    <TerminalSearch
+                        searchAddon={searchAddonRef.current}
+                        onClose={() => setSearchOpen(false)}
+                    />
+                )}
+            </div>
         </div>
     )
 }

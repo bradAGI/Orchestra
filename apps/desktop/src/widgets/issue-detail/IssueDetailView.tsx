@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, ChevronDown, FileText, GitPullRequest, Github, Info, Loader2, Pencil, Terminal, X } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer'
 
 import type { BackendConfig, IssueUpdatePayload, IssueHistoryEntry } from '@/lib/orchestra-client'
 import { fetchIssueHistory, fetchIssueDiff, fetchIssueLogs, updateProjectGitHubIssue, stopIssue, createGitHubPR } from '@/lib/orchestra-client'
@@ -96,7 +95,7 @@ function DescriptionEditor({ value, onChange, onBlur, theme }: {
         prose-img:rounded-lg prose-img:border prose-img:border-border/20
         prose-table:text-sm prose-th:text-foreground/70 prose-td:text-foreground/50
       `}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{value}</ReactMarkdown>
+        <MarkdownRenderer content={value} />
       </div>
     </div>
   )
@@ -615,7 +614,7 @@ export function IssueDetailView({
                         {item.done && <CheckCircle2 size={12} />}
                       </div>
                       <div className={`text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none prose-p:my-0 prose-code:text-primary/70 ${item.done ? 'text-muted-foreground/40 line-through opacity-50' : 'text-foreground'}`}>
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{item.text}</ReactMarkdown>
+                        <MarkdownRenderer content={item.text} />
                       </div>
                     </div>
                   ))}

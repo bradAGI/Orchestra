@@ -11,9 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { fetchDocs, fetchDocContent } from '@/lib/orchestra-client'
 import { OverlayScrollbarsComponent, type OverlayScrollbarsComponentRef } from 'overlayscrollbars-react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import rehypeSlug from 'rehype-slug'
+import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { D3ArchitectureGraph } from '../diagrams/D3ArchitectureGraph'
@@ -472,13 +470,11 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
                                     </div>
 
                                     <article className="prose prose-invert max-w-none prose-wiki">
-                                        <ReactMarkdown
-                                            remarkPlugins={[remarkGfm]}
-                                            rehypePlugins={[rehypeSlug]}
+                                        <MarkdownRenderer
+                                            content={content}
+                                            allowHtml
                                             components={markdownComponents}
-                                        >
-                                            {content}
-                                        </ReactMarkdown>
+                                        />
                                     </article>
                                     
                                     {/* Wiki Footer */}

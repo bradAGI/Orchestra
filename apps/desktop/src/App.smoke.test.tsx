@@ -8,6 +8,7 @@ vi.mock('@/components/terminal/TerminalView', () => ({
 }))
 
 import App from './App'
+import { resetAppStore } from '@/store'
 
 // Mock Electron bridge
 const defaultProfiles: BridgeProfilesPayload = {
@@ -87,6 +88,15 @@ function setupDesktopBridge(overrides?: {
     openExternal: vi.fn(async () => {}),
     openPath: vi.fn(async () => {}),
     getScaleFactor: vi.fn(() => 1),
+    fs: {
+      readDir: vi.fn(async () => []),
+      readFile: vi.fn(async () => ({ content: '', isBinary: false })),
+      writeFile: vi.fn(async () => {}),
+      stat: vi.fn(async () => ({ isDirectory: false, size: 0, mtime: 0 })),
+      deletePath: vi.fn(async () => {}),
+      gitStatus: vi.fn(async () => ({})),
+      search: vi.fn(async () => []),
+    },
   }
 
   window.orchestraDesktop = bridge
@@ -264,6 +274,7 @@ describe('App smoke render', () => {
 
   afterEach(() => {
     cleanup()
+    resetAppStore()
     vi.unstubAllGlobals()
   })
 
