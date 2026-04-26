@@ -6,6 +6,7 @@ import {
   type BackendConfig,
 } from '@/lib/orchestra-client'
 import type { IssueDetailResult } from '@widgets/issue-detail/types'
+import { useAppStore } from '@/store'
 
 type IssueLookupState = {
   issueLookupId: string
@@ -47,6 +48,11 @@ export function useIssueLookup(
     try {
       const result = await fetchIssueDetail(config, normalized)
       setIssueLookupResult(result)
+      // Wire the file explorer root to the active issue's workspace path
+      const workspacePath = (result as Record<string, unknown>)?.workspace as { path?: string } | undefined
+      if (workspacePath?.path) {
+        useAppStore.getState().setExplorerRoot(workspacePath.path)
+      }
       setStatusMessage(`Issue lookup loaded: ${normalized}`)
     } catch (err) {
       const message = toDisplayError(err)
