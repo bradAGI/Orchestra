@@ -581,6 +581,9 @@ ipcMain.handle('orchestra:delete-backend-profile', async (_event, profileId) => 
   return getProfilesPayload()
 })
 
+const { registerFilesystemIPC } = require('./ipc-filesystem.cjs')
+registerFilesystemIPC()
+
 ipcMain.handle('orchestra:open-external', async (_event, url) => {
   if (!url || typeof url !== 'string') return
   const parsed = new URL(url)
