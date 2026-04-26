@@ -1,6 +1,9 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
 import { useAppStore } from '@/store'
-import { ArrowLeft, ArrowRight, RotateCw, Globe, X, Plus } from 'lucide-react'
+import { ArrowLeft, ArrowRight, RotateCw, Globe, X, Plus, Crosshair } from 'lucide-react'
+import { useGrabMode } from './useGrabMode'
+import { GrabConfirmation } from './GrabConfirmation'
+import { formatGrabPayload } from './grab-format'
 
 /**
  * Electron webview element type — not part of standard HTMLElement typings.
@@ -30,6 +33,7 @@ export function BrowserPane() {
   const activeTab = browserTabs.find((t) => t.id === activeBrowserTabId)
   const webviewRef = useRef<WebviewElement | null>(null)
   const [urlInput, setUrlInput] = useState('')
+  const { grabState, lastPayload, armGrab, handleConsoleMessage, resetGrab } = useGrabMode()
 
   // Sync URL input with active tab
   useEffect(() => {
@@ -101,6 +105,14 @@ export function BrowserPane() {
       wv.removeEventListener('did-start-loading', handleDidStartLoading)
     }
   }, [activeTab?.id, handleDomReady, handleDidNavigate, handleDidStartLoading])
+
+  // Listen for grab mode console messages from webview
+  useEffect(() => {
+    const wv = webviewRef.current
+    if (!wv) return
+    wv.addEventListener('console-message', handleConsoleMessage)
+    return () => wv.removeEventListener('console-message', handleConsoleMessage)
+  }, [activeTab?.id, handleConsoleMessage])
 
   if (browserTabs.length === 0) {
     return (
@@ -175,6 +187,13 @@ export function BrowserPane() {
         >
           <RotateCw size={14} className={activeTab?.loading ? 'animate-spin' : ''} />
         </button>
+        <button
+          onClick={() => armGrab(webviewRef.current)}
+          className={`p-1 rounded ${grabState === 'armed' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+          title="Grab element (click to capture)"
+        >
+          <Crosshair size={14} />
+        </button>
         <form
           className="flex-1 mx-1"
           onSubmit={(e) => {
@@ -192,7 +211,7 @@ export function BrowserPane() {
       </div>
 
       {/* Webview */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 relative">
         {activeTab && (
           <webview
             ref={webviewRef as React.RefObject<never>}
@@ -200,6 +219,22 @@ export function BrowserPane() {
             className="w-full h-full"
             partition="persist:orchestra-browser"
             allowpopups={true}
+          />
+        )}
+        {grabState === 'captured' && lastPayload && (
+          <GrabConfirmation
+            payload={lastPayload}
+            onCopy={() => {
+              navigator.clipboard.writeText(formatGrabPayload(lastPayload))
+              resetGrab()
+            }}
+            onSendToAgent={() => {
+              window.dispatchEvent(new CustomEvent('orchestra-grab-to-agent', {
+                detail: { text: formatGrabPayload(lastPayload) }
+              }))
+              resetGrab()
+            }}
+            onDismiss={resetGrab}
           />
         )}
       </div>

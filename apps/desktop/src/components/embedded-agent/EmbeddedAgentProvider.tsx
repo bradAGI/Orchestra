@@ -80,6 +80,18 @@ export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selec
     sendMessageRef.current = sendMessage
   }, [sendMessage])
 
+  // Listen for grab-to-agent events from the browser pane
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (detail?.text && sendMessage) {
+        sendMessage(detail.text)
+      }
+    }
+    window.addEventListener('orchestra-grab-to-agent', handler)
+    return () => window.removeEventListener('orchestra-grab-to-agent', handler)
+  }, [sendMessage])
+
   const togglePanel = useCallback(() => {
     setIsPanelOpen((prev) => {
       if (!prev) refetchKeys() // re-fetch keys when opening panel
