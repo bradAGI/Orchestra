@@ -4,7 +4,7 @@ import {
   IssueDetailView,
   CreateTaskDialog,
   CreateProjectDialog,
-  SettingsCard,
+  SettingsPage,
 } from '@/components/app-shell/panels'
 import {
   Dialog,
@@ -1227,7 +1227,7 @@ export default function App() {
               {sectionVisibility.showSettings ? (
                 <SectionErrorBoundary name="Settings">
                 <section className="flex-1 flex flex-col min-h-0">
-                  <SettingsCard
+                  <SettingsPage
                     loadingConfig={loadingConfig}
                     savingConfig={savingConfig}
                     profilesPending={profilesPending}
