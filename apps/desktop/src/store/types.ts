@@ -198,6 +198,7 @@ export interface WorkspaceSlice {
   // State
   explorerRoot: string | null
   activeLeftPanel: 'explorer' | 'search'
+  leftSidebarOpen: boolean
   leftSidebarWidth: number
   rightSidebarWidth: number
   rightSidebarOpen: boolean
@@ -211,6 +212,8 @@ export interface WorkspaceSlice {
   // Actions
   setExplorerRoot: (root: string | null) => void
   setActiveLeftPanel: (panel: 'explorer' | 'search') => void
+  setLeftSidebarOpen: (open: boolean) => void
+  toggleLeftSidebar: () => void
   setLeftSidebarWidth: (width: number) => void
   setRightSidebarWidth: (width: number) => void
   setRightSidebarOpen: (open: boolean) => void

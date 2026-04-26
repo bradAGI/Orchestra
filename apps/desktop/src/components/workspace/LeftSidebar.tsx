@@ -1,4 +1,4 @@
-import { FolderTree, Search } from 'lucide-react'
+import { FolderTree, Search, PanelLeftOpen } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { ResizeHandle } from './ResizeHandle'
 import { FileExplorer } from './FileExplorer'
@@ -7,8 +7,25 @@ import { WorkspaceSearch } from './WorkspaceSearch'
 export function LeftSidebar() {
   const activeLeftPanel = useAppStore(s => s.activeLeftPanel)
   const setActiveLeftPanel = useAppStore(s => s.setActiveLeftPanel)
+  const leftSidebarOpen = useAppStore(s => s.leftSidebarOpen)
+  const toggleLeftSidebar = useAppStore(s => s.toggleLeftSidebar)
   const leftSidebarWidth = useAppStore(s => s.leftSidebarWidth)
   const setLeftSidebarWidth = useAppStore(s => s.setLeftSidebarWidth)
+
+  if (!leftSidebarOpen) {
+    return (
+      <div className="flex flex-col items-center py-2 px-1 border-r border-border bg-background flex-shrink-0">
+        <button
+          className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+          onClick={toggleLeftSidebar}
+          title="Open Sidebar (Cmd+B)"
+          aria-label="Open sidebar"
+        >
+          <PanelLeftOpen className="h-4 w-4" />
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div

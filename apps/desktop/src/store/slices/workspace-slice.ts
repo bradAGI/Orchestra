@@ -26,6 +26,7 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
   // ---- State ----------------------------------------------------------------
   explorerRoot: null,
   activeLeftPanel: 'explorer',
+  leftSidebarOpen: true,
   leftSidebarWidth: 280,
   rightSidebarWidth: 320,
   rightSidebarOpen: true,
@@ -40,6 +41,10 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
   setExplorerRoot: (root) => set({ explorerRoot: root }),
 
   setActiveLeftPanel: (panel) => set({ activeLeftPanel: panel }),
+
+  setLeftSidebarOpen: (open) => set({ leftSidebarOpen: open }),
+
+  toggleLeftSidebar: () => set((s) => ({ leftSidebarOpen: !s.leftSidebarOpen })),
 
   setLeftSidebarWidth: (width) =>
     set({ leftSidebarWidth: clamp(width, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX) }),

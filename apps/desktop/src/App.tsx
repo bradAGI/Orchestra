@@ -226,7 +226,7 @@ export default function App() {
       // Cmd+Shift+B — open browser tab
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'b') {
         e.preventDefault()
-        useAppStore.getState().openBrowserTab('http://localhost:5173')
+        useAppStore.getState().openBrowserTab()
         return
       }
       // Cmd+Shift+E — switch to explorer panel
@@ -239,6 +239,12 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
         e.preventDefault()
         useAppStore.getState().setActiveLeftPanel('search')
+        return
+      }
+      // Cmd+B — toggle left sidebar (when in CONSOLE section)
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault()
+        useAppStore.getState().toggleLeftSidebar()
         return
       }
       // Cmd+L — toggle right sidebar
