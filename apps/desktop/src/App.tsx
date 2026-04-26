@@ -223,6 +223,12 @@ export default function App() {
         e.preventDefault()
         useAppStore.getState().toggleSidebar()
       }
+      // Cmd+Shift+B — open browser tab
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault()
+        useAppStore.getState().openBrowserTab('http://localhost:5173')
+        return
+      }
       // Cmd+Shift+E — switch to explorer panel
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'e') {
         e.preventDefault()

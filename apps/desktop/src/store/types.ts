@@ -249,6 +249,28 @@ export interface EditorSlice {
 }
 
 // ---------------------------------------------------------------------------
+// Browser Slice
+// ---------------------------------------------------------------------------
+
+export type BrowserTab = {
+  id: string
+  url: string
+  title: string
+  loading: boolean
+  canGoBack: boolean
+  canGoForward: boolean
+}
+
+export interface BrowserSlice {
+  browserTabs: BrowserTab[]
+  activeBrowserTabId: string | null
+  openBrowserTab: (url?: string) => void
+  closeBrowserTab: (tabId: string) => void
+  setActiveBrowserTab: (tabId: string) => void
+  updateBrowserTab: (tabId: string, updates: Partial<BrowserTab>) => void
+}
+
+// ---------------------------------------------------------------------------
 // Composite App State
 // ---------------------------------------------------------------------------
 
@@ -260,4 +282,5 @@ export type AppState = UISlice &
   SettingsSlice &
   TerminalsSlice &
   WorkspaceSlice &
-  EditorSlice
+  EditorSlice &
+  BrowserSlice

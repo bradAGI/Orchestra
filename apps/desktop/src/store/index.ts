@@ -17,6 +17,7 @@ import { createSettingsSlice } from './slices/settings'
 import { createTerminalsSlice } from './slices/terminals'
 import { createWorkspaceSlice } from './slices/workspace'
 import { createEditorSlice } from './slices/editor'
+import { createBrowserSlice } from './slices/browser'
 
 export const useAppStore = create<AppState>()((...a) => ({
   ...createUISlice(...a),
@@ -28,6 +29,7 @@ export const useAppStore = create<AppState>()((...a) => ({
   ...createTerminalsSlice(...a),
   ...createWorkspaceSlice(...a),
   ...createEditorSlice(...a),
+  ...createBrowserSlice(...a),
 }))
 
 /**
