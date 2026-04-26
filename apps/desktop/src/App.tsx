@@ -74,6 +74,7 @@ import { SectionErrorBoundary } from '@/components/ui/section-error-boundary'
 import { EmbeddedAgentWidget } from '@/components/embedded-agent'
 import { useBackendConfig, useNotifications, useIssueLookup, useWorkspaceMigration } from '@/hooks'
 import { useAppStore } from '@/store'
+import { WorkspaceLayout } from '@/components/workspace/WorkspaceLayout'
 
 /** Root application component that manages backend sync, navigation, and top-level UI state. */
 export default function App() {
@@ -221,6 +222,24 @@ export default function App() {
       if (e.key === '/' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
         useAppStore.getState().toggleSidebar()
+      }
+      // Cmd+Shift+E — switch to explorer panel
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'e') {
+        e.preventDefault()
+        useAppStore.getState().setActiveLeftPanel('explorer')
+        return
+      }
+      // Cmd+Shift+F — switch to search panel
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        useAppStore.getState().setActiveLeftPanel('search')
+        return
+      }
+      // Cmd+L — toggle right sidebar
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'l') {
+        e.preventDefault()
+        useAppStore.getState().toggleRightSidebar()
+        return
       }
       // Ctrl+1-8 tab switching (fallback for non-Electron)
       if (e.ctrlKey && !e.altKey && !e.shiftKey) {
@@ -1053,7 +1072,7 @@ export default function App() {
         onToggleCollapsed={() => useAppStore.getState().toggleSidebar()}
         sidebarWidth={sidebarWidth}
         osOptions={osOptions}
-        flushContent={sectionVisibility.showDocs}
+        flushContent={sectionVisibility.showDocs || activeSection === 'CONSOLE'}
         topBarProps={{
           sectionLabel: currentSectionMeta.label,
           sectionTitle: currentSectionMeta.title,
@@ -1165,23 +1184,27 @@ export default function App() {
 
               {sectionVisibility.showConsole && config ? (
                 <SectionErrorBoundary name="Console">
-                <section className="flex-1 flex flex-col min-h-0 border border-border rounded-xl overflow-hidden shadow-2xl">
-                  <TerminalMultiplexer
-                    activeTerminals={openTerminals}
-                    baseUrl={config.baseUrl}
-                    apiToken={config.apiToken}
-                    projects={projects}
-                    onCloseTerminal={handleCloseTerminal}
-                    onAddTerminal={(projectId) => {
-                      if (!projectId) return
-                      const proj = projects.find(p => p.id === projectId)
-                      const name = proj?.name ?? 'Shell'
-                      setOpenTerminals([...useAppStore.getState().openTerminals, { id: `shell-${Date.now()}`, title: `${name} Shell`, projectId }])
-                    }}
-                    onAddAgentTerminal={(id, title, command, projectId) => {
-                      setOpenTerminals([...useAppStore.getState().openTerminals, { id, title, projectId, initialCommand: command }])
-                    }}
-                    theme={theme}
+                <section className="flex-1 flex flex-col min-h-0">
+                  <WorkspaceLayout
+                    centerContent={
+                      <TerminalMultiplexer
+                        activeTerminals={openTerminals}
+                        baseUrl={config.baseUrl}
+                        apiToken={config.apiToken}
+                        projects={projects}
+                        onCloseTerminal={handleCloseTerminal}
+                        onAddTerminal={(projectId) => {
+                          if (!projectId) return
+                          const proj = projects.find(p => p.id === projectId)
+                          const name = proj?.name ?? 'Shell'
+                          setOpenTerminals([...useAppStore.getState().openTerminals, { id: `shell-${Date.now()}`, title: `${name} Shell`, projectId }])
+                        }}
+                        onAddAgentTerminal={(id, title, command, projectId) => {
+                          setOpenTerminals([...useAppStore.getState().openTerminals, { id, title, projectId, initialCommand: command }])
+                        }}
+                        theme={theme}
+                      />
+                    }
                   />
                 </section>
                 </SectionErrorBoundary>
