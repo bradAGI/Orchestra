@@ -3,7 +3,7 @@
  */
 
 import type { StateCreator } from 'zustand'
-import type { AppState, WorkspaceSlice } from '../types'
+import type { AppState, WorkspaceSlice, TreeNode } from '../types'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -29,6 +29,9 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
   leftSidebarWidth: 280,
   rightSidebarWidth: 320,
   rightSidebarOpen: true,
+  expandedDirs: new Set<string>(),
+  dirCache: {},
+  gitStatusMap: {},
 
   // ---- Actions --------------------------------------------------------------
   setExplorerRoot: (root) => set({ explorerRoot: root }),
@@ -44,4 +47,37 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
   setRightSidebarOpen: (open) => set({ rightSidebarOpen: open }),
 
   toggleRightSidebar: () => set((s) => ({ rightSidebarOpen: !s.rightSidebarOpen })),
+
+  toggleDir: (dirPath: string) =>
+    set((s) => {
+      const next = new Set(s.expandedDirs)
+      if (next.has(dirPath)) {
+        next.delete(dirPath)
+      } else {
+        next.add(dirPath)
+      }
+      return { expandedDirs: next }
+    }),
+
+  setDirChildren: (dirPath: string, children: TreeNode[]) =>
+    set((s) => ({
+      dirCache: { ...s.dirCache, [dirPath]: { children, loading: false } },
+    })),
+
+  setDirLoading: (dirPath: string, loading: boolean) =>
+    set((s) => {
+      const existing = s.dirCache[dirPath]
+      return {
+        dirCache: {
+          ...s.dirCache,
+          [dirPath]: { children: existing?.children ?? [], loading },
+        },
+      }
+    }),
+
+  setGitStatusMap: (statusMap: Record<string, string>) =>
+    set({ gitStatusMap: statusMap }),
+
+  clearExplorerCache: () =>
+    set({ expandedDirs: new Set<string>(), dirCache: {}, gitStatusMap: {} }),
 })

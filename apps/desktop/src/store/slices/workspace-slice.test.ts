@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createWorkspaceSlice } from './workspace-slice'
-import type { AppState } from '../types'
+import type { AppState, TreeNode } from '../types'
 
 // ---------------------------------------------------------------------------
 // Test helper
@@ -135,5 +135,88 @@ describe('WorkspaceSlice — simple setters', () => {
     const { get, state } = createTestSlice()
     state.setRightSidebarOpen(false)
     expect(get().rightSidebarOpen).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Explorer state tests
+// ---------------------------------------------------------------------------
+
+describe('WorkspaceSlice — toggleDir', () => {
+  it('adds a directory to expandedDirs', () => {
+    const { get, state } = createTestSlice()
+    state.toggleDir('/home/user/project/src')
+    expect(get().expandedDirs.has('/home/user/project/src')).toBe(true)
+  })
+
+  it('removes a directory on second toggle', () => {
+    const { get, state } = createTestSlice()
+    state.toggleDir('/home/user/project/src')
+    state.toggleDir('/home/user/project/src')
+    expect(get().expandedDirs.has('/home/user/project/src')).toBe(false)
+  })
+
+  it('creates a new Set reference each time', () => {
+    const { get, state } = createTestSlice()
+    const before = get().expandedDirs
+    state.toggleDir('/tmp')
+    expect(get().expandedDirs).not.toBe(before)
+  })
+})
+
+describe('WorkspaceSlice — setDirChildren', () => {
+  it('stores children and sets loading to false', () => {
+    const { get, state } = createTestSlice()
+    const children: TreeNode[] = [
+      { name: 'src', path: '/p/src', relativePath: 'src', isDirectory: true, depth: 0 },
+      { name: 'README.md', path: '/p/README.md', relativePath: 'README.md', isDirectory: false, depth: 0 },
+    ]
+    state.setDirChildren('/p', children)
+    const cache = get().dirCache['/p']
+    expect(cache.children).toEqual(children)
+    expect(cache.loading).toBe(false)
+  })
+})
+
+describe('WorkspaceSlice — setDirLoading', () => {
+  it('sets loading on a new entry', () => {
+    const { get, state } = createTestSlice()
+    state.setDirLoading('/p/src', true)
+    expect(get().dirCache['/p/src'].loading).toBe(true)
+    expect(get().dirCache['/p/src'].children).toEqual([])
+  })
+
+  it('preserves existing children when setting loading', () => {
+    const { get, state } = createTestSlice()
+    const children: TreeNode[] = [
+      { name: 'a.ts', path: '/p/a.ts', relativePath: 'a.ts', isDirectory: false, depth: 1 },
+    ]
+    state.setDirChildren('/p', children)
+    state.setDirLoading('/p', true)
+    expect(get().dirCache['/p'].loading).toBe(true)
+    expect(get().dirCache['/p'].children).toEqual(children)
+  })
+})
+
+describe('WorkspaceSlice — setGitStatusMap', () => {
+  it('replaces the git status map', () => {
+    const { get, state } = createTestSlice()
+    state.setGitStatusMap({ 'src/index.ts': 'M', 'new.txt': '??' })
+    expect(get().gitStatusMap).toEqual({ 'src/index.ts': 'M', 'new.txt': '??' })
+  })
+})
+
+describe('WorkspaceSlice — clearExplorerCache', () => {
+  it('resets expandedDirs, dirCache, and gitStatusMap', () => {
+    const { get, state } = createTestSlice()
+    state.toggleDir('/p/src')
+    state.setDirChildren('/p', [
+      { name: 'src', path: '/p/src', relativePath: 'src', isDirectory: true, depth: 0 },
+    ])
+    state.setGitStatusMap({ 'src/index.ts': 'M' })
+    state.clearExplorerCache()
+    expect(get().expandedDirs.size).toBe(0)
+    expect(get().dirCache).toEqual({})
+    expect(get().gitStatusMap).toEqual({})
   })
 })

@@ -22,6 +22,19 @@ import type { TerminalNode } from '@/components/terminal/TerminalMultiplexer'
 // Helpers
 // ---------------------------------------------------------------------------
 
+export type TreeNode = {
+  name: string
+  path: string
+  relativePath: string
+  isDirectory: boolean
+  depth: number
+}
+
+export type DirCache = {
+  children: TreeNode[]
+  loading: boolean
+}
+
 export type ToolSummary = {
   name: string
   description?: string
@@ -185,6 +198,9 @@ export interface WorkspaceSlice {
   leftSidebarWidth: number
   rightSidebarWidth: number
   rightSidebarOpen: boolean
+  expandedDirs: Set<string>
+  dirCache: Record<string, DirCache>
+  gitStatusMap: Record<string, string>
 
   // Actions
   setExplorerRoot: (root: string | null) => void
@@ -193,6 +209,11 @@ export interface WorkspaceSlice {
   setRightSidebarWidth: (width: number) => void
   setRightSidebarOpen: (open: boolean) => void
   toggleRightSidebar: () => void
+  toggleDir: (dirPath: string) => void
+  setDirChildren: (dirPath: string, children: TreeNode[]) => void
+  setDirLoading: (dirPath: string, loading: boolean) => void
+  setGitStatusMap: (statusMap: Record<string, string>) => void
+  clearExplorerCache: () => void
 }
 
 // ---------------------------------------------------------------------------

@@ -32,6 +32,14 @@ declare global {
       openPath: (targetPath: string) => Promise<void>
       selectFolder: () => Promise<string | null>
       getScaleFactor: () => number
+      fs: {
+        readDir: (dirPath: string) => Promise<Array<{ name: string; isDirectory: boolean }>>
+        readFile: (filePath: string) => Promise<string>
+        writeFile: (filePath: string, content: string) => Promise<void>
+        stat: (filePath: string) => Promise<{ isDirectory: boolean; size: number; mtime: number }>
+        deletePath: (filePath: string) => Promise<void>
+        gitStatus: (worktreePath: string) => Promise<Record<string, string>>
+      }
     }
   }
 }

@@ -1,0 +1,143 @@
+import { useEffect, useMemo, useRef } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
+import { useAppStore } from '@/store'
+import type { TreeNode } from '@/store/types'
+import { FileTreeRow } from './FileTreeRow'
+
+export function FileExplorer() {
+  const explorerRoot = useAppStore((s) => s.explorerRoot)
+  const expandedDirs = useAppStore((s) => s.expandedDirs)
+  const dirCache = useAppStore((s) => s.dirCache)
+  const gitStatusMap = useAppStore((s) => s.gitStatusMap)
+  const toggleDir = useAppStore((s) => s.toggleDir)
+  const setDirChildren = useAppStore((s) => s.setDirChildren)
+  const setDirLoading = useAppStore((s) => s.setDirLoading)
+  const setGitStatusMap = useAppStore((s) => s.setGitStatusMap)
+  const clearExplorerCache = useAppStore((s) => s.clearExplorerCache)
+
+  // ---- Load root directory when explorerRoot changes -------------------------
+  useEffect(() => {
+    if (!explorerRoot) return
+    clearExplorerCache()
+
+    const loadRoot = async () => {
+      try {
+        const entries = await window.orchestraDesktop.fs.readDir(explorerRoot)
+        const children: TreeNode[] = entries.map((e) => ({
+          name: e.name,
+          path: `${explorerRoot}/${e.name}`,
+          relativePath: e.name,
+          isDirectory: e.isDirectory,
+          depth: 0,
+        }))
+        setDirChildren(explorerRoot, children)
+
+        const status = await window.orchestraDesktop.fs.gitStatus(explorerRoot)
+        setGitStatusMap(status)
+      } catch {
+        setDirChildren(explorerRoot, [])
+      }
+    }
+
+    loadRoot()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [explorerRoot])
+
+  // ---- Flatten the tree for virtual scrolling --------------------------------
+  const flatRows = useMemo(() => {
+    if (!explorerRoot || !dirCache[explorerRoot]) return []
+    const rows: TreeNode[] = []
+
+    function walk(dirPath: string) {
+      const cache = dirCache[dirPath]
+      if (!cache) return
+      for (const child of cache.children) {
+        rows.push(child)
+        if (child.isDirectory && expandedDirs.has(child.path)) {
+          walk(child.path)
+        }
+      }
+    }
+
+    walk(explorerRoot)
+    return rows
+  }, [explorerRoot, dirCache, expandedDirs])
+
+  // ---- Virtualizer -----------------------------------------------------------
+  const parentRef = useRef<HTMLDivElement>(null)
+  const virtualizer = useVirtualizer({
+    count: flatRows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 26,
+    overscan: 20,
+  })
+
+  // ---- Directory toggle with lazy loading ------------------------------------
+  async function handleToggleDir(node: TreeNode) {
+    const wasExpanded = expandedDirs.has(node.path)
+    toggleDir(node.path)
+
+    if (!wasExpanded && !dirCache[node.path]) {
+      setDirLoading(node.path, true)
+      try {
+        const entries = await window.orchestraDesktop.fs.readDir(node.path)
+        const children: TreeNode[] = entries.map((e) => ({
+          name: e.name,
+          path: `${node.path}/${e.name}`,
+          relativePath: `${node.relativePath}/${e.name}`,
+          isDirectory: e.isDirectory,
+          depth: node.depth + 1,
+        }))
+        setDirChildren(node.path, children)
+      } catch {
+        setDirChildren(node.path, [])
+      }
+    }
+  }
+
+  // ---- Empty state -----------------------------------------------------------
+  if (!explorerRoot) {
+    return (
+      <p className="text-xs text-muted-foreground p-3">
+        Select a task to browse its workspace
+      </p>
+    )
+  }
+
+  // ---- Render ----------------------------------------------------------------
+  return (
+    <div ref={parentRef} className="h-full overflow-auto" role="tree">
+      <div
+        style={{
+          height: virtualizer.getTotalSize(),
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualRow) => {
+          const node = flatRows[virtualRow.index]
+          return (
+            <FileTreeRow
+              key={node.path}
+              node={node}
+              isExpanded={expandedDirs.has(node.path)}
+              gitStatus={gitStatusMap[node.relativePath]}
+              onToggle={() => handleToggleDir(node)}
+              onClick={() => {
+                /* Phase 1B -- open in editor */
+              }}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: `${virtualRow.size}px`,
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            />
+          )
+        })}
+      </div>
+    </div>
+  )
+}

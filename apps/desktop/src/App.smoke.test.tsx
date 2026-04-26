@@ -88,6 +88,14 @@ function setupDesktopBridge(overrides?: {
     openExternal: vi.fn(async () => {}),
     openPath: vi.fn(async () => {}),
     getScaleFactor: vi.fn(() => 1),
+    fs: {
+      readDir: vi.fn(async () => []),
+      readFile: vi.fn(async () => ''),
+      writeFile: vi.fn(async () => {}),
+      stat: vi.fn(async () => ({ isDirectory: false, size: 0, mtime: 0 })),
+      deletePath: vi.fn(async () => {}),
+      gitStatus: vi.fn(async () => ({})),
+    },
   }
 
   window.orchestraDesktop = bridge
