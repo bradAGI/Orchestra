@@ -34,7 +34,7 @@ declare global {
       getScaleFactor: () => number
       fs: {
         readDir: (dirPath: string) => Promise<Array<{ name: string; isDirectory: boolean }>>
-        readFile: (filePath: string) => Promise<string>
+        readFile: (filePath: string) => Promise<{ content: string; isBinary: boolean; tooLarge?: boolean }>
         writeFile: (filePath: string, content: string) => Promise<void>
         stat: (filePath: string) => Promise<{ isDirectory: boolean; size: number; mtime: number }>
         deletePath: (filePath: string) => Promise<void>

@@ -19,10 +19,16 @@ export function EditorPanel() {
     let cancelled = false
     const load = async () => {
       try {
-        const content = await window.orchestraDesktop.fs.readFile(activeFile.filePath)
+        const result = await window.orchestraDesktop.fs.readFile(activeFile.filePath)
         if (cancelled) return
-        setFileContent(activeFile.id, content)
-        originalContentRef.current = content
+        if (result.isBinary) {
+          setFileContent(activeFile.id, '// Binary file — cannot display')
+        } else if (result.tooLarge) {
+          setFileContent(activeFile.id, '// File too large to display (>5MB)')
+        } else {
+          setFileContent(activeFile.id, result.content)
+          originalContentRef.current = result.content
+        }
       } catch {
         if (!cancelled) {
           setFileContent(activeFile.id, '// Error loading file')

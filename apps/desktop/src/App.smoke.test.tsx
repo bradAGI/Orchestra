@@ -90,7 +90,7 @@ function setupDesktopBridge(overrides?: {
     getScaleFactor: vi.fn(() => 1),
     fs: {
       readDir: vi.fn(async () => []),
-      readFile: vi.fn(async () => ''),
+      readFile: vi.fn(async () => ({ content: '', isBinary: false })),
       writeFile: vi.fn(async () => {}),
       stat: vi.fn(async () => ({ isDirectory: false, size: 0, mtime: 0 })),
       deletePath: vi.fn(async () => {}),
