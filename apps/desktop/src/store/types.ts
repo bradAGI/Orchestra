@@ -197,7 +197,7 @@ export interface TerminalsSlice {
 export interface WorkspaceSlice {
   // State
   explorerRoot: string | null
-  activeLeftPanel: 'explorer' | 'search'
+  activeLeftPanel: 'explorer' | 'search' | 'issues'
   leftSidebarOpen: boolean
   leftSidebarWidth: number
   rightSidebarWidth: number
@@ -211,7 +211,7 @@ export interface WorkspaceSlice {
 
   // Actions
   setExplorerRoot: (root: string | null) => void
-  setActiveLeftPanel: (panel: 'explorer' | 'search') => void
+  setActiveLeftPanel: (panel: 'explorer' | 'search' | 'issues') => void
   setLeftSidebarOpen: (open: boolean) => void
   toggleLeftSidebar: () => void
   setLeftSidebarWidth: (width: number) => void

@@ -1,8 +1,9 @@
-import { FolderTree, Search, PanelLeftOpen, PanelLeftClose } from 'lucide-react'
+import { FolderTree, Search, ListTodo, PanelLeftOpen, PanelLeftClose } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { ResizeHandle } from './ResizeHandle'
 import { FileExplorer } from './FileExplorer'
 import { WorkspaceSearch } from './WorkspaceSearch'
+import { IssuesPanel } from './IssuesPanel'
 
 export function LeftSidebar() {
   const activeLeftPanel = useAppStore(s => s.activeLeftPanel)
@@ -37,6 +38,18 @@ export function LeftSidebar() {
         {/* Top bar with panel toggle buttons */}
         <div className="flex items-center justify-between px-2 py-2 border-b border-border">
           <div className="flex items-center gap-1">
+            <button
+              className={`p-1.5 rounded transition-colors ${
+                activeLeftPanel === 'issues'
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+              }`}
+              onClick={() => setActiveLeftPanel('issues')}
+              title="Issues & Terminals"
+              aria-label="Issues & Terminals"
+            >
+              <ListTodo className="h-4 w-4" />
+            </button>
             <button
               className={`p-1.5 rounded transition-colors ${
                 activeLeftPanel === 'explorer'
@@ -74,11 +87,9 @@ export function LeftSidebar() {
 
         {/* Content area */}
         <div className="flex-1 min-h-0 overflow-auto">
-          {activeLeftPanel === 'explorer' ? (
-            <FileExplorer />
-          ) : (
-            <WorkspaceSearch />
-          )}
+          {activeLeftPanel === 'issues' && <IssuesPanel />}
+          {activeLeftPanel === 'explorer' && <FileExplorer />}
+          {activeLeftPanel === 'search' && <WorkspaceSearch />}
         </div>
       </div>
 
