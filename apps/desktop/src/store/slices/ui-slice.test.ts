@@ -64,9 +64,9 @@ describe('UISlice — default initialization', () => {
     expect(state.createTaskInitialState).toBeNull()
   })
 
-  it('initializes settingsInitialTab to null', () => {
+  it('initializes settingsInitialTab to undefined', () => {
     const { state } = createTestSlice()
-    expect(state.settingsInitialTab).toBeNull()
+    expect(state.settingsInitialTab).toBeUndefined()
   })
 
   it('initializes activePeriod to Week', () => {

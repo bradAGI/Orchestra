@@ -27,6 +27,14 @@ export type ToolSummary = {
   description?: string
 }
 
+export type AgentConfig = {
+  commands: Record<string, string>
+  agent_provider: string
+  max_turns: number
+}
+
+export type SettingsTab = 'agents' | 'backend' | 'integrations' | 'shortcuts' | 'notifications'
+
 // ---------------------------------------------------------------------------
 // UI Slice
 // ---------------------------------------------------------------------------
@@ -36,21 +44,21 @@ export interface UISlice {
   activeSection: SectionID
   sidebarCollapsed: boolean
   theme: 'light' | 'dark'
-  activePeriod: string
+  activePeriod: 'Today' | 'Week' | 'Month'
   paletteOpen: boolean
   inspectDialogOpen: boolean
   sessionInspectDialogOpen: boolean
   createTaskDialogOpen: boolean
   createTaskInitialState: Record<string, unknown> | null
   createProjectDialogOpen: boolean
-  settingsInitialTab: string | null
+  settingsInitialTab: SettingsTab | undefined
 
   // Actions
   setActiveSection: (section: SectionID) => void
   setSidebarCollapsed: (collapsed: boolean) => void
   toggleSidebar: () => void
   setTheme: (theme: 'light' | 'dark') => void
-  setActivePeriod: (period: string) => void
+  setActivePeriod: (period: 'Today' | 'Week' | 'Month') => void
   setPaletteOpen: (open: boolean) => void
   togglePalette: () => void
   setInspectDialogOpen: (open: boolean) => void
@@ -58,7 +66,7 @@ export interface UISlice {
   openCreateTaskDialog: (initialState?: Record<string, unknown>) => void
   closeCreateTaskDialog: () => void
   setCreateProjectDialogOpen: (open: boolean) => void
-  setSettingsInitialTab: (tab: string | null) => void
+  setSettingsInitialTab: (tab: SettingsTab | undefined) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -126,12 +134,12 @@ export interface ProjectsSlice {
 
 export interface AgentsSlice {
   // State
-  agentConfig: Record<string, unknown> | null
+  agentConfig: AgentConfig | null
   availableAgents: string[]
   allTools: ToolSummary[]
 
   // Actions
-  setAgentConfig: (config: Record<string, unknown> | null) => void
+  setAgentConfig: (config: AgentConfig | null) => void
   setAvailableAgents: (agents: string[]) => void
   setAllTools: (tools: ToolSummary[]) => void
 }

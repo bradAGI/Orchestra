@@ -58,14 +58,14 @@ describe('AgentsSlice — setAvailableAgents', () => {
 describe('AgentsSlice — simple setters', () => {
   it('setAgentConfig updates agentConfig', () => {
     const { get, state } = createTestSlice()
-    const config = { provider: 'claude', model: 'sonnet' }
+    const config = { commands: {}, agent_provider: 'claude', max_turns: 10 }
     state.setAgentConfig(config)
     expect(get().agentConfig).toEqual(config)
   })
 
   it('setAgentConfig accepts null', () => {
     const { get, state } = createTestSlice()
-    state.setAgentConfig({ provider: 'claude' })
+    state.setAgentConfig({ commands: {}, agent_provider: 'claude', max_turns: 10 })
     state.setAgentConfig(null)
     expect(get().agentConfig).toBeNull()
   })

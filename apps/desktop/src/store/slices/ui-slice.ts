@@ -50,7 +50,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   createTaskDialogOpen: false,
   createTaskInitialState: null,
   createProjectDialogOpen: false,
-  settingsInitialTab: null,
+  settingsInitialTab: undefined,
 
   // ---- Actions --------------------------------------------------------------
   setActiveSection: (section) => set({ activeSection: section }),

@@ -18,12 +18,12 @@ function mergeIssues(
   const result: IssueListItem[] = []
 
   for (const issue of boardIssues) {
-    seen.add(issue.title)
+    seen.add(issue.title ?? '')
     result.push(issue)
   }
 
   for (const issue of githubBacklogIssues) {
-    if (!seen.has(issue.title)) {
+    if (!seen.has(issue.title ?? '')) {
       result.push(issue)
     }
   }
