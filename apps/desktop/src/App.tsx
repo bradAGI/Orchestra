@@ -1213,9 +1213,18 @@ export default function App() {
                           const proj = projects.find(p => p.id === projectId)
                           const name = proj?.name ?? 'Shell'
                           setOpenTerminals([...useAppStore.getState().openTerminals, { id: `shell-${Date.now()}`, title: `${name} Shell`, projectId }])
+                          if (proj?.root_path) {
+                            useAppStore.getState().setExplorerRoot(proj.root_path)
+                          }
                         }}
                         onAddAgentTerminal={(id, title, command, projectId) => {
                           setOpenTerminals([...useAppStore.getState().openTerminals, { id, title, projectId, initialCommand: command }])
+                          if (projectId) {
+                            const proj = projects.find(p => p.id === projectId)
+                            if (proj?.root_path) {
+                              useAppStore.getState().setExplorerRoot(proj.root_path)
+                            }
+                          }
                         }}
                         theme={theme}
                       />
