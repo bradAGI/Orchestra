@@ -3,7 +3,6 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { useAppStore } from '@/store'
 import type { TreeNode } from '@/store/types'
 import { FileTreeRow } from './FileTreeRow'
-import { fetchProjectTree } from '@/lib/orchestra-client'
 
 export function FileExplorer() {
   const explorerRoot = useAppStore((s) => s.explorerRoot)
@@ -17,7 +16,6 @@ export function FileExplorer() {
   const clearExplorerCache = useAppStore((s) => s.clearExplorerCache)
   const openFile = useAppStore((s) => s.openFile)
   const config = useAppStore((s) => s.config)
-  const projects = useAppStore((s) => s.projects)
 
   // ---- Auto-detect workspace root from running issues -----------------------
   const snapshot = useAppStore((s) => s.snapshot)
@@ -41,45 +39,30 @@ export function FileExplorer() {
     clearExplorerCache()
 
     const loadRoot = async () => {
-      // Try HTTP API first — find which project contains this root
-      const project = projects.find((p) => explorerRoot.startsWith(p.root_path))
-      if (project && config) {
-        try {
-          const tree = await fetchProjectTree(config, project.id)
-          const children: TreeNode[] = tree.map((entry) => ({
-            name: entry.name,
-            path: `${explorerRoot}/${entry.name}`,
-            relativePath: entry.name,
-            isDirectory: entry.is_dir,
-            depth: 0,
-          }))
-          setDirChildren(explorerRoot, children)
-
-          try {
-            const status = await window.orchestraDesktop?.fs?.gitStatus?.(explorerRoot)
-            if (status) setGitStatusMap(status)
-          } catch { /* git status is best-effort */ }
-          return
-        } catch {
+      if (!config) return
+      try {
+        const url = `${config.baseUrl}/api/v1/workspace/tree?path=${encodeURIComponent(explorerRoot)}`
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${config.apiToken}` },
+        })
+        if (!res.ok) {
           setDirChildren(explorerRoot, [])
           return
         }
-      }
-
-      // Fallback: Electron IPC (no matching project found)
-      try {
-        const entries = await window.orchestraDesktop.fs.readDir(explorerRoot)
-        const children: TreeNode[] = entries.map((e) => ({
-          name: e.name,
-          path: `${explorerRoot}/${e.name}`,
-          relativePath: e.name,
-          isDirectory: e.isDirectory,
+        const tree: Array<{ name: string; path: string; is_dir: boolean }> = await res.json()
+        const children: TreeNode[] = tree.map((entry) => ({
+          name: entry.name,
+          path: `${explorerRoot}/${entry.name}`,
+          relativePath: entry.name,
+          isDirectory: entry.is_dir,
           depth: 0,
         }))
         setDirChildren(explorerRoot, children)
 
-        const status = await window.orchestraDesktop.fs.gitStatus(explorerRoot)
-        setGitStatusMap(status)
+        try {
+          const status = await window.orchestraDesktop?.fs?.gitStatus?.(explorerRoot)
+          if (status) setGitStatusMap(status)
+        } catch { /* git status is best-effort */ }
       } catch {
         setDirChildren(explorerRoot, [])
       }
@@ -126,22 +109,25 @@ export function FileExplorer() {
     if (!wasExpanded && !dirCache[node.path]) {
       setDirLoading(node.path, true)
 
-      // Try HTTP API first
-      const project = projects.find((p) => explorerRoot?.startsWith(p.root_path))
-      if (project && config) {
+      if (config) {
         try {
-          const relPath = explorerRoot
-            ? node.path.slice(project.root_path.length + 1)
-            : node.relativePath
-          const tree = await fetchProjectTree(config, project.id, relPath)
-          const children: TreeNode[] = tree.map((entry) => ({
-            name: entry.name,
-            path: `${node.path}/${entry.name}`,
-            relativePath: relPath ? `${relPath}/${entry.name}` : entry.name,
-            isDirectory: entry.is_dir,
-            depth: node.depth + 1,
-          }))
-          setDirChildren(node.path, children)
+          const url = `${config.baseUrl}/api/v1/workspace/tree?path=${encodeURIComponent(node.path)}`
+          const res = await fetch(url, {
+            headers: { Authorization: `Bearer ${config.apiToken}` },
+          })
+          if (res.ok) {
+            const tree: Array<{ name: string; path: string; is_dir: boolean }> = await res.json()
+            const children: TreeNode[] = tree.map((entry) => ({
+              name: entry.name,
+              path: `${node.path}/${entry.name}`,
+              relativePath: `${node.relativePath}/${entry.name}`,
+              isDirectory: entry.is_dir,
+              depth: node.depth + 1,
+            }))
+            setDirChildren(node.path, children)
+          } else {
+            setDirChildren(node.path, [])
+          }
           return
         } catch {
           setDirChildren(node.path, [])

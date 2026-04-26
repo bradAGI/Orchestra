@@ -586,6 +586,66 @@ func walkTree(root, rel string, maxDepth int) ([]FileNode, error) {
 	return nodes, nil
 }
 
+// GetWorkspaceFile reads any file by absolute path. Bound to loopback+token auth.
+func (s *Server) GetWorkspaceFile(w http.ResponseWriter, r *http.Request) {
+	absPath := r.URL.Query().Get("path")
+	if absPath == "" || !filepath.IsAbs(absPath) {
+		writeJSONError(w, http.StatusBadRequest, "invalid_path", "absolute path required")
+		return
+	}
+	content, err := os.ReadFile(absPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			writeJSONError(w, http.StatusNotFound, "file_not_found", "file not found")
+			return
+		}
+		writeJSONError(w, http.StatusInternalServerError, "read_failed", "failed to read file")
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Write(content)
+}
+
+// GetWorkspaceTree lists directory contents by absolute path. Bound to loopback+token auth.
+func (s *Server) GetWorkspaceTree(w http.ResponseWriter, r *http.Request) {
+	absPath := r.URL.Query().Get("path")
+	if absPath == "" || !filepath.IsAbs(absPath) {
+		writeJSONError(w, http.StatusBadRequest, "invalid_path", "absolute path required")
+		return
+	}
+	entries, err := os.ReadDir(absPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			writeJSONError(w, http.StatusNotFound, "path_not_found", "directory not found")
+			return
+		}
+		writeJSONError(w, http.StatusInternalServerError, "read_failed", "failed to read directory")
+		return
+	}
+	var nodes []FileNode
+	for _, entry := range entries {
+		name := entry.Name()
+		if name == ".git" || name == "node_modules" || name == ".DS_Store" {
+			continue
+		}
+		nodes = append(nodes, FileNode{
+			Name:  name,
+			Path:  name,
+			IsDir: entry.IsDir(),
+		})
+	}
+	sort.Slice(nodes, func(i, j int) bool {
+		if nodes[i].IsDir && !nodes[j].IsDir {
+			return true
+		}
+		if !nodes[i].IsDir && nodes[j].IsDir {
+			return false
+		}
+		return nodes[i].Name < nodes[j].Name
+	})
+	writeJSON(w, http.StatusOK, nodes)
+}
+
 func (s *Server) GetProjectGitStatus(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "project_id")
 	project, err := s.db.GetProjectByID(r.Context(), projectID)
