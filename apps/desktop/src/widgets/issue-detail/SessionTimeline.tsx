@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, Loader2, Terminal } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer'
 
 interface SessionTimelineProps {
   logs: string
@@ -261,7 +260,7 @@ export function SessionTimeline({ logs, loading }: SessionTimelineProps) {
                       <div className="text-[9px] font-bold uppercase tracking-widest text-violet-400/60 mb-1.5">Reasoning</div>
                     )}
                     <div className="prose prose-invert prose-sm max-w-none text-[12px] leading-relaxed prose-p:my-1 prose-p:text-foreground/90 prose-code:text-primary prose-code:bg-primary/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-[11px] prose-pre:bg-background prose-pre:border prose-pre:border-border/30 prose-pre:rounded-lg prose-li:text-foreground/80 prose-headings:text-foreground prose-headings:text-xs prose-strong:text-foreground">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.content}</ReactMarkdown>
+                      <MarkdownRenderer content={entry.content} />
                     </div>
                     {entry.ts && <div className="text-[8px] font-mono text-muted-foreground/30 mt-2">{entry.ts}</div>}
                   </div>
