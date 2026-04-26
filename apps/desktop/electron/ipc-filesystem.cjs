@@ -68,6 +68,68 @@ function registerFilesystemIPC() {
     }
   })
 
+  ipcMain.handle('orchestra:fs:search', (_event, worktreePath, query, options = {}) => {
+    assertAbsolutePath(worktreePath)
+    if (!query || typeof query !== 'string') return []
+
+    const MAX_TOTAL = 2000
+    const MAX_PER_FILE = 100
+
+    try {
+      const args = ['grep', '-n', '-I', '--null', '--untracked']
+      if (!options.caseSensitive) args.push('-i')
+      if (options.wholeWord) args.push('-w')
+      if (options.regex) {
+        args.push('-E')
+      } else {
+        args.push('-F')
+      }
+      args.push('--', query)
+      if (options.includeGlob) args.push(options.includeGlob)
+      if (options.excludeGlob) args.push(`:!${options.excludeGlob}`)
+
+      const output = execSync(['git', ...args].map(a => a).join(' '), {
+        cwd: worktreePath,
+        encoding: 'utf-8',
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: 15000,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+
+      const groups = new Map()
+      let totalMatches = 0
+
+      for (const line of output.split('\n')) {
+        if (!line || totalMatches >= MAX_TOTAL) break
+
+        // git grep with -n --null outputs: file\0lineNumber:matchText
+        const nullIdx = line.indexOf('\0')
+        if (nullIdx === -1) continue
+        const file = line.substring(0, nullIdx)
+        const rest = line.substring(nullIdx + 1)
+        const colonIdx = rest.indexOf(':')
+        if (colonIdx === -1) continue
+        const lineNum = parseInt(rest.substring(0, colonIdx), 10)
+        const text = rest.substring(colonIdx + 1)
+
+        if (isNaN(lineNum)) continue
+
+        if (!groups.has(file)) {
+          groups.set(file, { file: path.join(worktreePath, file), relativePath: file, matches: [] })
+        }
+        const group = groups.get(file)
+        if (group.matches.length >= MAX_PER_FILE) continue
+
+        group.matches.push({ line: lineNum, text: text.substring(0, 500) })
+        totalMatches++
+      }
+
+      return Array.from(groups.values())
+    } catch {
+      return []
+    }
+  })
+
   ipcMain.handle('orchestra:fs:gitStatus', (_event, worktreePath) => {
     assertAbsolutePath(worktreePath)
     try {

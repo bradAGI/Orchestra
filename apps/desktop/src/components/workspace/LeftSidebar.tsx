@@ -2,6 +2,7 @@ import { FolderTree, Search } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { ResizeHandle } from './ResizeHandle'
 import { FileExplorer } from './FileExplorer'
+import { WorkspaceSearch } from './WorkspaceSearch'
 
 export function LeftSidebar() {
   const activeLeftPanel = useAppStore(s => s.activeLeftPanel)
@@ -49,9 +50,7 @@ export function LeftSidebar() {
           {activeLeftPanel === 'explorer' ? (
             <FileExplorer />
           ) : (
-            <p className="text-xs text-muted-foreground">
-              Search — available in Phase 1
-            </p>
+            <WorkspaceSearch />
           )}
         </div>
       </div>

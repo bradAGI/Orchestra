@@ -95,6 +95,7 @@ function setupDesktopBridge(overrides?: {
       stat: vi.fn(async () => ({ isDirectory: false, size: 0, mtime: 0 })),
       deletePath: vi.fn(async () => {}),
       gitStatus: vi.fn(async () => ({})),
+      search: vi.fn(async () => []),
     },
   }
 

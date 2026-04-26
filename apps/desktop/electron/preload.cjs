@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld('orchestraDesktop', {
     stat: (filePath) => ipcRenderer.invoke('orchestra:fs:stat', filePath),
     deletePath: (filePath) => ipcRenderer.invoke('orchestra:fs:deletePath', filePath),
     gitStatus: (worktreePath) => ipcRenderer.invoke('orchestra:fs:gitStatus', worktreePath),
+    search: (worktreePath, query, options) => ipcRenderer.invoke('orchestra:fs:search', worktreePath, query, options),
   },
   getScaleFactor: () => 1,
   onSwitchTab: (callback) => ipcRenderer.on('orchestra:switch-tab', (_event, tabNum) => callback(tabNum)),

@@ -39,6 +39,7 @@ declare global {
         stat: (filePath: string) => Promise<{ isDirectory: boolean; size: number; mtime: number }>
         deletePath: (filePath: string) => Promise<void>
         gitStatus: (worktreePath: string) => Promise<Record<string, string>>
+        search: (worktreePath: string, query: string, options?: { caseSensitive?: boolean; wholeWord?: boolean; regex?: boolean; includeGlob?: string; excludeGlob?: string }) => Promise<Array<{ file: string; relativePath: string; matches: Array<{ line: number; text: string }> }>>
       }
     }
   }

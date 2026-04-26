@@ -48,6 +48,9 @@ export type AgentConfig = {
 
 export type SettingsTab = 'agents' | 'backend' | 'integrations' | 'shortcuts' | 'notifications'
 
+export type SearchMatch = { line: number; text: string }
+export type SearchResultGroup = { file: string; relativePath: string; matches: SearchMatch[] }
+
 // ---------------------------------------------------------------------------
 // UI Slice
 // ---------------------------------------------------------------------------
@@ -201,6 +204,9 @@ export interface WorkspaceSlice {
   expandedDirs: Set<string>
   dirCache: Record<string, DirCache>
   gitStatusMap: Record<string, string>
+  searchQuery: string
+  searchResults: SearchResultGroup[]
+  searchLoading: boolean
 
   // Actions
   setExplorerRoot: (root: string | null) => void
@@ -214,6 +220,9 @@ export interface WorkspaceSlice {
   setDirLoading: (dirPath: string, loading: boolean) => void
   setGitStatusMap: (statusMap: Record<string, string>) => void
   clearExplorerCache: () => void
+  setSearchQuery: (query: string) => void
+  setSearchResults: (results: SearchResultGroup[]) => void
+  setSearchLoading: (loading: boolean) => void
 }
 
 // ---------------------------------------------------------------------------

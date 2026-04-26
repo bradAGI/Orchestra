@@ -32,6 +32,9 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
   expandedDirs: new Set<string>(),
   dirCache: {},
   gitStatusMap: {},
+  searchQuery: '',
+  searchResults: [],
+  searchLoading: false,
 
   // ---- Actions --------------------------------------------------------------
   setExplorerRoot: (root) => set({ explorerRoot: root }),
@@ -80,4 +83,8 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
 
   clearExplorerCache: () =>
     set({ expandedDirs: new Set<string>(), dirCache: {}, gitStatusMap: {} }),
+
+  setSearchQuery: (query) => set({ searchQuery: query }),
+  setSearchResults: (results) => set({ searchResults: results }),
+  setSearchLoading: (loading) => set({ searchLoading: loading }),
 })
