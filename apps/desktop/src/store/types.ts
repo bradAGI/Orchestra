@@ -194,6 +194,8 @@ export interface TerminalsSlice {
 // Workspace Slice
 // ---------------------------------------------------------------------------
 
+export type ActiveWorkspaceTab = { type: 'terminal' | 'editor' | 'browser'; id: string } | null
+
 export interface WorkspaceSlice {
   // State
   explorerRoot: string | null
@@ -208,6 +210,7 @@ export interface WorkspaceSlice {
   searchQuery: string
   searchResults: SearchResultGroup[]
   searchLoading: boolean
+  activeWorkspaceTab: ActiveWorkspaceTab
 
   // Actions
   setExplorerRoot: (root: string | null) => void
@@ -226,6 +229,7 @@ export interface WorkspaceSlice {
   setSearchQuery: (query: string) => void
   setSearchResults: (results: SearchResultGroup[]) => void
   setSearchLoading: (loading: boolean) => void
+  setActiveWorkspaceTab: (tab: ActiveWorkspaceTab) => void
 }
 
 // ---------------------------------------------------------------------------

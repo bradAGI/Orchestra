@@ -36,6 +36,7 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
   searchQuery: '',
   searchResults: [],
   searchLoading: false,
+  activeWorkspaceTab: null,
 
   // ---- Actions --------------------------------------------------------------
   setExplorerRoot: (root) => set({ explorerRoot: root }),
@@ -92,4 +93,5 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
   setSearchQuery: (query) => set({ searchQuery: query }),
   setSearchResults: (results) => set({ searchResults: results }),
   setSearchLoading: (loading) => set({ searchLoading: loading }),
+  setActiveWorkspaceTab: (tab) => set({ activeWorkspaceTab: tab }),
 })

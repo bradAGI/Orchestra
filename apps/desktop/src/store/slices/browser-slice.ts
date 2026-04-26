@@ -28,6 +28,7 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
     set((s) => ({
       browserTabs: [...s.browserTabs, newTab],
       activeBrowserTabId: id,
+      activeWorkspaceTab: { type: 'browser' as const, id },
     }))
   },
 

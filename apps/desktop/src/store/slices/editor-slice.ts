@@ -51,7 +51,7 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
     const { openFiles } = get()
     const existing = openFiles.find((f) => f.filePath === filePath)
     if (existing) {
-      set({ activeFileId: existing.id })
+      set({ activeFileId: existing.id, activeWorkspaceTab: { type: 'editor', id: existing.id } })
       return
     }
     const newFile: OpenFile = {
@@ -62,7 +62,7 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
       isDirty: false,
       content: null,
     }
-    set({ openFiles: [...openFiles, newFile], activeFileId: newFile.id })
+    set({ openFiles: [...openFiles, newFile], activeFileId: newFile.id, activeWorkspaceTab: { type: 'editor', id: newFile.id } })
   },
 
   closeFile: (fileId: string) => {
