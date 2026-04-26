@@ -16,6 +16,22 @@ export function FileExplorer() {
   const clearExplorerCache = useAppStore((s) => s.clearExplorerCache)
   const openFile = useAppStore((s) => s.openFile)
 
+  // ---- Auto-detect workspace root from running issues -----------------------
+  const snapshot = useAppStore((s) => s.snapshot)
+  useEffect(() => {
+    if (explorerRoot) return
+    const running = snapshot?.running ?? []
+    for (const entry of running) {
+      if (entry.session_log_path) {
+        const logsIdx = entry.session_log_path.indexOf('/_logs/')
+        if (logsIdx > 0) {
+          useAppStore.getState().setExplorerRoot(entry.session_log_path.slice(0, logsIdx))
+          return
+        }
+      }
+    }
+  }, [explorerRoot, snapshot])
+
   // ---- Load root directory when explorerRoot changes -------------------------
   useEffect(() => {
     if (!explorerRoot) return
@@ -99,9 +115,24 @@ export function FileExplorer() {
   // ---- Empty state -----------------------------------------------------------
   if (!explorerRoot) {
     return (
-      <p className="text-xs text-muted-foreground p-3">
-        Select a task to browse its workspace
-      </p>
+      <div className="flex flex-col gap-2 p-3">
+        <p className="text-xs text-muted-foreground">
+          No workspace folder open
+        </p>
+        <button
+          className="text-xs px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-accent-foreground w-fit"
+          onClick={async () => {
+            try {
+              const folder = await window.orchestraDesktop.selectFolder()
+              if (folder) {
+                useAppStore.getState().setExplorerRoot(folder)
+              }
+            } catch { /* user cancelled */ }
+          }}
+        >
+          Open Folder
+        </button>
+      </div>
     )
   }
 
