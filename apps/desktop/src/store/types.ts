@@ -217,10 +217,27 @@ export interface WorkspaceSlice {
 }
 
 // ---------------------------------------------------------------------------
-// Editor Slice (placeholder — Phase 1)
+// Editor Slice
 // ---------------------------------------------------------------------------
 
-export interface EditorSlice {}
+export type OpenFile = {
+  id: string
+  filePath: string
+  relativePath: string
+  language: string
+  isDirty: boolean
+  content: string | null // null = not yet loaded
+}
+
+export interface EditorSlice {
+  openFiles: OpenFile[]
+  activeFileId: string | null
+  openFile: (filePath: string, relativePath: string) => void
+  closeFile: (fileId: string) => void
+  setActiveFile: (fileId: string) => void
+  setFileDirty: (fileId: string, isDirty: boolean) => void
+  setFileContent: (fileId: string, content: string) => void
+}
 
 // ---------------------------------------------------------------------------
 // Composite App State

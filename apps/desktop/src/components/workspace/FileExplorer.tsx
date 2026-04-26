@@ -14,6 +14,7 @@ export function FileExplorer() {
   const setDirLoading = useAppStore((s) => s.setDirLoading)
   const setGitStatusMap = useAppStore((s) => s.setGitStatusMap)
   const clearExplorerCache = useAppStore((s) => s.clearExplorerCache)
+  const openFile = useAppStore((s) => s.openFile)
 
   // ---- Load root directory when explorerRoot changes -------------------------
   useEffect(() => {
@@ -124,7 +125,9 @@ export function FileExplorer() {
               gitStatus={gitStatusMap[node.relativePath]}
               onToggle={() => handleToggleDir(node)}
               onClick={() => {
-                /* Phase 1B -- open in editor */
+                if (!node.isDirectory) {
+                  openFile(node.path, node.relativePath)
+                }
               }}
               style={{
                 position: 'absolute',
