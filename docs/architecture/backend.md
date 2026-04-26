@@ -39,7 +39,7 @@ graph TD
     UTILS_GH["utils/github"]
     WORKFLOW["workflow<br/><small>frontmatter</small>"]
     UNSANDBOX["unsandbox<br/><small>remote exec</small>"]
-    UNFIREHOSE["unfirehose<br/><small>event stream</small>"]
+    SESSIONLOGGER["sessionlogger<br/><small>event stream</small>"]
 
     CMD --> APP
     APP --> API
@@ -57,7 +57,7 @@ graph TD
     APP --> LOGFILE
     APP --> PROMPT
     APP --> RUNTIME
-    APP --> UNFIREHOSE
+    APP --> SESSIONLOGGER
     APP --> UTILS_GIT
     APP --> UTILS_GH
 
@@ -118,7 +118,7 @@ graph TD
 | `unsandbox` | `internal/unsandbox/` | Client for the Unsandbox remote execution platform | - |
 | `analytics` | `internal/analytics/` | Cost, productivity, rate-limit, and external usage aggregation support | - |
 | `pricing` | `internal/pricing/` | Provider pricing helpers used by analytics calculations | - |
-| `unfirehose` | `internal/unfirehose/` | Session logging sink for external event capture | `Logger` |
+| `sessionlogger` | `internal/sessionlogger/` | Session logging sink for event capture | `Logger` |
 
 ---
 
@@ -222,7 +222,7 @@ At startup, `app.Run()` also:
 - restores persisted orchestrator state from SQLite
 - merges MCP server definitions from config and the database
 - starts background workers for execution polling, refreshes, garbage collection, daily metrics rollups, and telemetry ingestion
-- initializes the terminal manager, provider registry, tracker client, and optional unfirehose session logger
+- initializes the terminal manager, provider registry, tracker client, and optional session logger
 
 ---
 

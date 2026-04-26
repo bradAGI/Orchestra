@@ -25,7 +25,7 @@ const (
 // streams it into an unsandbox session via heredoc shell commands.
 // The tarball lands at /tmp/input/{name}.tar.gz then gets extracted to destDir.
 //
-// This mirrors the unfirehose tmux upload pattern (chunked heredoc injection).
+// This uses a chunked heredoc injection pattern for reliable transfer.
 func (c *Client) InjectDirectory(ctx context.Context, sessionID, localDir, destDir string) error {
 	// Create tarball in memory
 	tarBuf, err := tarDirectory(localDir)

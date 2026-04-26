@@ -14,7 +14,7 @@ import (
 )
 
 // ExtractSessionArtifacts pulls Claude JSONL session files from a container
-// session and writes them to the local filesystem where unfirehose's ingest
+// session and writes them to the local filesystem where the ingest
 // pipeline can pick them up (~/.claude/projects/).
 //
 // Returns the number of bytes extracted, or 0 if nothing was found.
@@ -36,7 +36,7 @@ func ExtractSessionArtifacts(ctx context.Context, client *Client, sessionID stri
 		return 0
 	}
 
-	// Extract into ~/.claude/projects/ so unfirehose claude-code adapter ingests it
+	// Extract into ~/.claude/projects/ so the claude-code adapter ingests it
 	claudeDir := filepath.Join(u.HomeDir, ".claude", "projects")
 	os.MkdirAll(claudeDir, 0755)
 	ExtractTarGz(tarData, claudeDir)
