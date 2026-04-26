@@ -2,6 +2,7 @@ import Editor from '@monaco-editor/react'
 import { useAppStore } from '@/store'
 import { useEffect, useRef } from 'react'
 import type { OpenFile } from '@/store/types'
+import { fetchProjectFileContent } from '@/lib/orchestra-client'
 
 interface EditorContentProps {
   file: OpenFile
@@ -11,6 +12,8 @@ export function EditorContent({ file }: EditorContentProps) {
   const setFileContent = useAppStore((s) => s.setFileContent)
   const setFileDirty = useAppStore((s) => s.setFileDirty)
   const theme = useAppStore((s) => s.theme)
+  const config = useAppStore((s) => s.config)
+  const projects = useAppStore((s) => s.projects)
 
   const originalContentRef = useRef<string>('')
 
@@ -19,8 +22,26 @@ export function EditorContent({ file }: EditorContentProps) {
     if (file.content !== null) return
     let cancelled = false
     const load = async () => {
+      // Try HTTP API first — find which project contains this file
+      const project = projects.find((p) => file.filePath.startsWith(p.root_path))
+      if (project && config) {
+        try {
+          const relativePath = file.filePath.slice(project.root_path.length + 1)
+          const content = await fetchProjectFileContent(config, project.id, relativePath)
+          if (cancelled) return
+          setFileContent(file.id, content)
+          originalContentRef.current = content
+          return
+        } catch (err) {
+          if (cancelled) return
+          const msg = err instanceof Error ? err.message : String(err)
+          setFileContent(file.id, `// Error loading file via HTTP API: ${msg}\n// File: ${file.filePath}`)
+          return
+        }
+      }
+
+      // Fallback: try Electron IPC (works when running inside Electron without a matching project)
       try {
-        // Try Electron IPC first (works when running inside Electron)
         if (window.orchestraDesktop?.fs?.readFile) {
           const result = await window.orchestraDesktop.fs.readFile(file.filePath)
           if (cancelled) return
@@ -34,9 +55,9 @@ export function EditorContent({ file }: EditorContentProps) {
           }
           return
         }
-        // Fallback: IPC not available (browser-only dev mode)
+        // No project match and no IPC available
         if (!cancelled) {
-          setFileContent(file.id, `// Cannot read file: Electron IPC not available\n// File: ${file.filePath}\n// Run the app via Electron (make dash) for file editing`)
+          setFileContent(file.id, `// Cannot read file: no matching project found and Electron IPC not available\n// File: ${file.filePath}`)
         }
       } catch (err) {
         if (!cancelled) {
