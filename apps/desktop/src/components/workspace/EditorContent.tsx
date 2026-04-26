@@ -15,8 +15,11 @@ export function EditorContent({ file }: EditorContentProps) {
 
   const originalContentRef = useRef<string>('')
 
+  console.log('[EditorContent] render', file.id, 'content:', file.content === null ? 'NULL' : `${file.content.length} chars`)
+
   // Load file content when file changes
   useEffect(() => {
+    console.log('[EditorContent] effect running for', file.id, 'content:', file.content === null ? 'NULL' : 'LOADED')
     if (file.content !== null) return
     let cancelled = false
     const load = async () => {
@@ -26,22 +29,26 @@ export function EditorContent({ file }: EditorContentProps) {
       }
       try {
         const url = `${config.baseUrl}/api/v1/workspace/file?path=${encodeURIComponent(file.filePath)}`
+        console.log('[EditorContent] loading file:', file.filePath, 'via', url, 'token:', config.apiToken ? 'set' : 'EMPTY')
         const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${config.apiToken}` },
+          headers: config.apiToken ? { Authorization: `Bearer ${config.apiToken}` } : {},
         })
         if (!res.ok) {
           const errBody = await res.text().catch(() => res.statusText)
+          console.error('[EditorContent] HTTP error:', res.status, errBody)
           if (!cancelled) setFileContent(file.id, `// Error ${res.status}: ${errBody}\n// File: ${file.filePath}`)
           return
         }
         const content = await res.text()
+        console.log('[EditorContent] loaded', content.length, 'chars for', file.filePath)
         if (!cancelled) {
           setFileContent(file.id, content)
           originalContentRef.current = content
         }
       } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error('[EditorContent] fetch error:', msg)
         if (!cancelled) {
-          const msg = err instanceof Error ? err.message : String(err)
           setFileContent(file.id, `// Error loading file: ${msg}\n// File: ${file.filePath}`)
         }
       }
