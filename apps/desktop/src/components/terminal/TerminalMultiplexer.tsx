@@ -33,6 +33,7 @@ interface TerminalMultiplexerProps {
     onAddTerminal?: (projectId?: string) => void
     onAddAgentTerminal?: (id: string, title: string, command: string, projectId: string) => void
     theme?: 'light' | 'dark'
+    hideToolbar?: boolean
 }
 
 export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
@@ -43,7 +44,8 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
     onCloseTerminal,
     onAddTerminal,
     onAddAgentTerminal,
-    theme
+    theme,
+    hideToolbar
 }) => {
     const [currentNode, setCurrentNode] = useState<MosaicNode<string> | null>(null)
     const [activeTabId, setActiveTabId] = useState<string | null>(null)
@@ -137,8 +139,8 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
 
     return (
         <div className="w-full h-full bg-background overflow-hidden terminal-multiplexer flex flex-col">
-            {/* Toolbar */}
-            <div className="shrink-0 bg-card/50 border-b border-border">
+            {/* Toolbar — hidden when parent provides unified tab bar */}
+            <div className={`shrink-0 bg-card/50 border-b border-border ${hideToolbar ? 'hidden' : ''}`}>
                 {/* Top row: tabs + view toggle */}
                 <div className="flex items-center h-9">
                     <div className="flex-1 flex items-center overflow-x-auto min-w-0">

@@ -1203,6 +1203,7 @@ export default function App() {
                     }}
                     centerContent={
                       <TerminalMultiplexer
+                        hideToolbar
                         activeTerminals={openTerminals}
                         baseUrl={config.baseUrl}
                         apiToken={config.apiToken}
