@@ -1198,6 +1198,9 @@ export default function App() {
                 <SectionErrorBoundary name="Console">
                 <section className="flex-1 flex flex-col min-h-0">
                   <WorkspaceLayout
+                    onAddTerminal={() => {
+                      setOpenTerminals([...useAppStore.getState().openTerminals, { id: `shell-${Date.now()}`, title: 'Shell' }])
+                    }}
                     centerContent={
                       <TerminalMultiplexer
                         activeTerminals={openTerminals}

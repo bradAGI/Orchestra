@@ -1,4 +1,4 @@
-import { FolderTree, Search, PanelLeftOpen } from 'lucide-react'
+import { FolderTree, Search, PanelLeftOpen, PanelLeftClose } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { ResizeHandle } from './ResizeHandle'
 import { FileExplorer } from './FileExplorer'
@@ -35,30 +35,40 @@ export function LeftSidebar() {
       {/* Main sidebar content */}
       <div className="flex flex-col h-full bg-background border-r border-border flex-1 min-w-0">
         {/* Top bar with panel toggle buttons */}
-        <div className="flex items-center gap-1 px-2 py-2 border-b border-border">
+        <div className="flex items-center justify-between px-2 py-2 border-b border-border">
+          <div className="flex items-center gap-1">
+            <button
+              className={`p-1.5 rounded transition-colors ${
+                activeLeftPanel === 'explorer'
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+              }`}
+              onClick={() => setActiveLeftPanel('explorer')}
+              title="File Explorer"
+              aria-label="File Explorer"
+            >
+              <FolderTree className="h-4 w-4" />
+            </button>
+            <button
+              className={`p-1.5 rounded transition-colors ${
+                activeLeftPanel === 'search'
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+              }`}
+              onClick={() => setActiveLeftPanel('search')}
+              title="Search"
+              aria-label="Search"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+          </div>
           <button
-            className={`p-1.5 rounded transition-colors ${
-              activeLeftPanel === 'explorer'
-                ? 'bg-accent text-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-            }`}
-            onClick={() => setActiveLeftPanel('explorer')}
-            title="File Explorer"
-            aria-label="File Explorer"
+            className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+            onClick={toggleLeftSidebar}
+            title="Close Sidebar (Cmd+B)"
+            aria-label="Close sidebar"
           >
-            <FolderTree className="h-4 w-4" />
-          </button>
-          <button
-            className={`p-1.5 rounded transition-colors ${
-              activeLeftPanel === 'search'
-                ? 'bg-accent text-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-            }`}
-            onClick={() => setActiveLeftPanel('search')}
-            title="Search"
-            aria-label="Search"
-          >
-            <Search className="h-4 w-4" />
+            <PanelLeftClose className="h-4 w-4" />
           </button>
         </div>
 
