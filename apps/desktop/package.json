@@ -48,6 +48,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tailwindcss/postcss": "^4.2.2",
     "@tailwindcss/typography": "^0.5.19",
+    "@tanstack/react-virtual": "^3.13.24",
     "@testing-library/dom": "^10.4.1",
     "ai": "^6.0.116",
     "ansi-to-react": "^6.2.6",
