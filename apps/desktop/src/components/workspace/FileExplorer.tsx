@@ -15,6 +15,23 @@ export function FileExplorer() {
   const setGitStatusMap = useAppStore((s) => s.setGitStatusMap)
   const clearExplorerCache = useAppStore((s) => s.clearExplorerCache)
   const openFile = useAppStore((s) => s.openFile)
+  const config = useAppStore((s) => s.config)
+
+  // ---- Auto-detect workspace root from running issues -----------------------
+  const snapshot = useAppStore((s) => s.snapshot)
+  useEffect(() => {
+    if (explorerRoot) return
+    const running = snapshot?.running ?? []
+    for (const entry of running) {
+      if (entry.session_log_path) {
+        const logsIdx = entry.session_log_path.indexOf('/_logs/')
+        if (logsIdx > 0) {
+          useAppStore.getState().setExplorerRoot(entry.session_log_path.slice(0, logsIdx))
+          return
+        }
+      }
+    }
+  }, [explorerRoot, snapshot])
 
   // ---- Load root directory when explorerRoot changes -------------------------
   useEffect(() => {
@@ -22,19 +39,30 @@ export function FileExplorer() {
     clearExplorerCache()
 
     const loadRoot = async () => {
+      if (!config) return
       try {
-        const entries = await window.orchestraDesktop.fs.readDir(explorerRoot)
-        const children: TreeNode[] = entries.map((e) => ({
-          name: e.name,
-          path: `${explorerRoot}/${e.name}`,
-          relativePath: e.name,
-          isDirectory: e.isDirectory,
+        const url = `${config.baseUrl}/api/v1/workspace/tree?path=${encodeURIComponent(explorerRoot)}`
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${config.apiToken}` },
+        })
+        if (!res.ok) {
+          setDirChildren(explorerRoot, [])
+          return
+        }
+        const tree: Array<{ name: string; path: string; is_dir: boolean }> = await res.json()
+        const children: TreeNode[] = tree.map((entry) => ({
+          name: entry.name,
+          path: `${explorerRoot}/${entry.name}`,
+          relativePath: entry.name,
+          isDirectory: entry.is_dir,
           depth: 0,
         }))
         setDirChildren(explorerRoot, children)
 
-        const status = await window.orchestraDesktop.fs.gitStatus(explorerRoot)
-        setGitStatusMap(status)
+        try {
+          const status = await window.orchestraDesktop?.fs?.gitStatus?.(explorerRoot)
+          if (status) setGitStatusMap(status)
+        } catch { /* git status is best-effort */ }
       } catch {
         setDirChildren(explorerRoot, [])
       }
@@ -80,6 +108,34 @@ export function FileExplorer() {
 
     if (!wasExpanded && !dirCache[node.path]) {
       setDirLoading(node.path, true)
+
+      if (config) {
+        try {
+          const url = `${config.baseUrl}/api/v1/workspace/tree?path=${encodeURIComponent(node.path)}`
+          const res = await fetch(url, {
+            headers: { Authorization: `Bearer ${config.apiToken}` },
+          })
+          if (res.ok) {
+            const tree: Array<{ name: string; path: string; is_dir: boolean }> = await res.json()
+            const children: TreeNode[] = tree.map((entry) => ({
+              name: entry.name,
+              path: `${node.path}/${entry.name}`,
+              relativePath: `${node.relativePath}/${entry.name}`,
+              isDirectory: entry.is_dir,
+              depth: node.depth + 1,
+            }))
+            setDirChildren(node.path, children)
+          } else {
+            setDirChildren(node.path, [])
+          }
+          return
+        } catch {
+          setDirChildren(node.path, [])
+          return
+        }
+      }
+
+      // Fallback: Electron IPC
       try {
         const entries = await window.orchestraDesktop.fs.readDir(node.path)
         const children: TreeNode[] = entries.map((e) => ({
@@ -99,9 +155,24 @@ export function FileExplorer() {
   // ---- Empty state -----------------------------------------------------------
   if (!explorerRoot) {
     return (
-      <p className="text-xs text-muted-foreground p-3">
-        Select a task to browse its workspace
-      </p>
+      <div className="flex flex-col gap-2 p-3">
+        <p className="text-xs text-muted-foreground">
+          No workspace folder open
+        </p>
+        <button
+          className="text-xs px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-accent-foreground w-fit"
+          onClick={async () => {
+            try {
+              const folder = await window.orchestraDesktop.selectFolder()
+              if (folder) {
+                useAppStore.getState().setExplorerRoot(folder)
+              }
+            } catch { /* user cancelled */ }
+          }}
+        >
+          Open Folder
+        </button>
+      </div>
     )
   }
 

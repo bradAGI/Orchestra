@@ -194,10 +194,13 @@ export interface TerminalsSlice {
 // Workspace Slice
 // ---------------------------------------------------------------------------
 
+export type ActiveWorkspaceTab = { type: 'terminal' | 'editor' | 'browser'; id: string } | null
+
 export interface WorkspaceSlice {
   // State
   explorerRoot: string | null
-  activeLeftPanel: 'explorer' | 'search'
+  activeLeftPanel: 'explorer' | 'search' | 'issues'
+  leftSidebarOpen: boolean
   leftSidebarWidth: number
   rightSidebarWidth: number
   rightSidebarOpen: boolean
@@ -207,10 +210,13 @@ export interface WorkspaceSlice {
   searchQuery: string
   searchResults: SearchResultGroup[]
   searchLoading: boolean
+  activeWorkspaceTab: ActiveWorkspaceTab
 
   // Actions
   setExplorerRoot: (root: string | null) => void
-  setActiveLeftPanel: (panel: 'explorer' | 'search') => void
+  setActiveLeftPanel: (panel: 'explorer' | 'search' | 'issues') => void
+  setLeftSidebarOpen: (open: boolean) => void
+  toggleLeftSidebar: () => void
   setLeftSidebarWidth: (width: number) => void
   setRightSidebarWidth: (width: number) => void
   setRightSidebarOpen: (open: boolean) => void
@@ -223,6 +229,7 @@ export interface WorkspaceSlice {
   setSearchQuery: (query: string) => void
   setSearchResults: (results: SearchResultGroup[]) => void
   setSearchLoading: (loading: boolean) => void
+  setActiveWorkspaceTab: (tab: ActiveWorkspaceTab) => void
 }
 
 // ---------------------------------------------------------------------------

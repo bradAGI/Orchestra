@@ -226,7 +226,7 @@ export default function App() {
       // Cmd+Shift+B — open browser tab
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'b') {
         e.preventDefault()
-        useAppStore.getState().openBrowserTab('http://localhost:5173')
+        useAppStore.getState().openBrowserTab()
         return
       }
       // Cmd+Shift+E — switch to explorer panel
@@ -239,6 +239,12 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
         e.preventDefault()
         useAppStore.getState().setActiveLeftPanel('search')
+        return
+      }
+      // Cmd+B — toggle left sidebar (when in CONSOLE section)
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault()
+        useAppStore.getState().toggleLeftSidebar()
         return
       }
       // Cmd+L — toggle right sidebar
@@ -1192,8 +1198,12 @@ export default function App() {
                 <SectionErrorBoundary name="Console">
                 <section className="flex-1 flex flex-col min-h-0">
                   <WorkspaceLayout
+                    onAddTerminal={() => {
+                      setOpenTerminals([...useAppStore.getState().openTerminals, { id: `shell-${Date.now()}`, title: 'Shell' }])
+                    }}
                     centerContent={
                       <TerminalMultiplexer
+                        hideToolbar
                         activeTerminals={openTerminals}
                         baseUrl={config.baseUrl}
                         apiToken={config.apiToken}
@@ -1204,9 +1214,18 @@ export default function App() {
                           const proj = projects.find(p => p.id === projectId)
                           const name = proj?.name ?? 'Shell'
                           setOpenTerminals([...useAppStore.getState().openTerminals, { id: `shell-${Date.now()}`, title: `${name} Shell`, projectId }])
+                          if (proj?.root_path) {
+                            useAppStore.getState().setExplorerRoot(proj.root_path)
+                          }
                         }}
                         onAddAgentTerminal={(id, title, command, projectId) => {
                           setOpenTerminals([...useAppStore.getState().openTerminals, { id, title, projectId, initialCommand: command }])
+                          if (projectId) {
+                            const proj = projects.find(p => p.id === projectId)
+                            if (proj?.root_path) {
+                              useAppStore.getState().setExplorerRoot(proj.root_path)
+                            }
+                          }
                         }}
                         theme={theme}
                       />
