@@ -48,7 +48,7 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
 
   // ---- Actions --------------------------------------------------------------
   openFile: (filePath: string, relativePath: string) => {
-    const { openFiles } = get()
+    const { openFiles, config } = get()
     const existing = openFiles.find((f) => f.filePath === filePath)
     if (existing) {
       set({ activeFileId: existing.id, activeWorkspaceTab: { type: 'editor', id: existing.id } })
@@ -63,6 +63,34 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
       content: null,
     }
     set({ openFiles: [...openFiles, newFile], activeFileId: newFile.id, activeWorkspaceTab: { type: 'editor', id: newFile.id } })
+
+    // Eagerly load file content via backend API
+    if (config?.baseUrl) {
+      const url = `${config.baseUrl}/api/v1/workspace/file?path=${encodeURIComponent(filePath)}`
+      const headers: Record<string, string> = {}
+      if (config.apiToken) headers['Authorization'] = `Bearer ${config.apiToken}`
+      fetch(url, { headers })
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          return res.text()
+        })
+        .then((content) => {
+          const state = get()
+          set({
+            openFiles: state.openFiles.map((f) =>
+              f.id === filePath ? { ...f, content } : f,
+            ),
+          })
+        })
+        .catch((err) => {
+          const state = get()
+          set({
+            openFiles: state.openFiles.map((f) =>
+              f.id === filePath ? { ...f, content: `// Error: ${err.message}\n// File: ${filePath}` } : f,
+            ),
+          })
+        })
+    }
   },
 
   closeFile: (fileId: string) => {
