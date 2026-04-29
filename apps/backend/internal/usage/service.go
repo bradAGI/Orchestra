@@ -3,6 +3,7 @@ package usage
 import (
 	"context"
 	"fmt"
+	"os"
 	"sort"
 	"sync"
 	"time"
@@ -134,7 +135,15 @@ func (s *Service) ScanState(p Provider) (ScanState, error) {
 
 func (s *Service) scanState(p Provider, state *PersistedState) ScanState {
 	src := s.SourcePath(p)
-	exists := s.sourceExists[p]
+	exists, known := s.sourceExists[p]
+	if !known && src != "" {
+		// Cheap stat so the UI can decide whether to allow enabling without
+		// having to first run a scan.
+		if info, err := os.Stat(src); err == nil && info.IsDir() {
+			exists = true
+		}
+		s.sourceExists[p] = exists
+	}
 	out := ScanState{
 		Provider:         p,
 		Enabled:          state.ScanState.Enabled,
