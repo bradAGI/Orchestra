@@ -52,6 +52,7 @@ import type { GlobalStats, Project, ProjectStats, SessionDetail, SessionSummary,
 import { ProjectGrid } from '@/components/projects/ProjectGrid'
 import { ProjectDetailView } from '@/components/projects/ProjectDetailView'
 import { UsagePage } from '@/components/usage/UsagePage'
+import { UsageStatusBar } from '@/components/usage/UsageStatusBar'
 import { SessionDetailView } from '@/components/analytics/SessionDetailView'
 import { AgentsDashboard } from '@/components/agents/AgentsDashboard'
 import { DocsDashboard } from '@/components/docs/DocsDashboard'
@@ -1085,6 +1086,7 @@ export default function App() {
         sidebarWidth={sidebarWidth}
         osOptions={osOptions}
         flushContent={sectionVisibility.showDocs || sectionVisibility.showSettings || activeSection === 'CONSOLE'}
+        bottomBar={<UsageStatusBar config={config} />}
         topBarProps={{
           sectionLabel: currentSectionMeta.label,
           sectionTitle: currentSectionMeta.title,

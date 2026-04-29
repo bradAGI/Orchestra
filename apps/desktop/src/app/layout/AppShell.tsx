@@ -14,6 +14,7 @@ type AppShellProps = {
   osOptions: ComponentProps<typeof OverlayScrollbarsComponent>['options']
   topBarProps: ComponentProps<typeof TopBar>
   flushContent?: boolean
+  bottomBar?: ReactNode
   children: ReactNode
 }
 
@@ -27,11 +28,12 @@ export function AppShell({
   osOptions,
   topBarProps,
   flushContent,
+  bottomBar,
   children,
 }: AppShellProps) {
   return (
-    <div className="h-full w-full overflow-hidden bg-background text-foreground">
-      <div className="flex h-full w-full">
+    <div className="h-full w-full overflow-hidden bg-background text-foreground flex flex-col">
+      <div className="flex flex-1 w-full min-h-0">
         <SidebarNav
           items={items}
           activeSection={activeSection}
@@ -54,6 +56,7 @@ export function AppShell({
           </div>
         </OverlayScrollbarsComponent>
       </div>
+      {bottomBar}
     </div>
   )
 }
