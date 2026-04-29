@@ -2321,3 +2321,164 @@ export async function fetchExternalReconcile(config: BackendConfig, since?: stri
 export async function fetchExternalStatus(config: BackendConfig): Promise<ExternalStatus> {
   return requestJSON<ExternalStatus>(config, '/api/v1/external/status')
 }
+
+// ===========================================================================
+// Usage tracking — per-provider session/cost analytics from local CLI logs.
+// Mirrors Orca's claude-usage / codex-usage IPC surface as REST.
+// ===========================================================================
+
+export type UsageProvider = 'claude' | 'codex' | 'gemini' | 'opencode'
+export type UsageScope = 'orchestra' | 'all'
+export type UsageRange = '7d' | '30d' | '90d' | 'all'
+export type UsageBreakdownKind = 'model' | 'project'
+
+export type UsageScanState = {
+  provider: UsageProvider
+  enabled: boolean
+  is_scanning: boolean
+  last_scan_started_at?: number
+  last_scan_completed_at?: number
+  last_scan_error?: string
+  has_any_data: boolean
+  source_path_exists: boolean
+  source_path?: string
+}
+
+export type UsageSummary = {
+  provider: UsageProvider
+  scope: UsageScope
+  range: UsageRange
+  sessions: number
+  turns: number
+  zero_cache_read_turns: number
+  input_tokens: number
+  cached_input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  cache_write_tokens: number
+  reasoning_tokens: number
+  total_tokens: number
+  cache_reuse_rate?: number
+  estimated_cost_usd?: number
+  top_model?: string
+  top_project?: string
+  has_any_data: boolean
+  has_inferred_pricing: boolean
+}
+
+export type UsageDailyPoint = {
+  day: string
+  input_tokens: number
+  cached_input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  cache_write_tokens: number
+  reasoning_tokens: number
+}
+
+export type UsageBreakdownRow = {
+  key: string
+  label: string
+  sessions: number
+  turns: number
+  input_tokens: number
+  cached_input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  cache_write_tokens: number
+  reasoning_tokens: number
+  total_tokens: number
+  estimated_cost_usd?: number
+  has_inferred_pricing: boolean
+}
+
+export type UsageSessionRow = {
+  provider: UsageProvider
+  session_id: string
+  last_active_at: string
+  duration_minutes: number
+  project_label: string
+  branch?: string
+  model?: string
+  turns: number
+  input_tokens: number
+  cached_input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  cache_write_tokens: number
+  reasoning_tokens: number
+  estimated_cost_usd?: number
+  has_inferred_pricing: boolean
+}
+
+export type RateLimitWindow = {
+  used_percent: number
+  window_minutes: number
+  resets_at?: number
+  reset_description?: string
+}
+
+export type ProviderRateLimits = {
+  provider: UsageProvider
+  session?: RateLimitWindow
+  weekly?: RateLimitWindow
+  updated_at: number
+  status: 'idle' | 'fetching' | 'ok' | 'error' | 'unavailable'
+  error?: string
+}
+
+export type RateLimitState = {
+  claude?: ProviderRateLimits
+  codex?: ProviderRateLimits
+  gemini?: ProviderRateLimits
+  opencode?: ProviderRateLimits
+}
+
+function usageQS(scope: UsageScope, range: UsageRange, extra: Record<string, string> = {}): string {
+  const params = new URLSearchParams({ scope, range, ...extra })
+  return `?${params.toString()}`
+}
+
+export async function fetchUsageScanState(config: BackendConfig, provider: UsageProvider): Promise<UsageScanState> {
+  return requestJSON<UsageScanState>(config, `/api/v1/usage/${provider}/scan-state`)
+}
+
+export async function setUsageEnabled(config: BackendConfig, provider: UsageProvider, enabled: boolean): Promise<UsageScanState> {
+  return requestJSON<UsageScanState>(config, `/api/v1/usage/${provider}/enabled`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+  })
+}
+
+export async function refreshUsage(config: BackendConfig, provider: UsageProvider, force = false): Promise<UsageScanState> {
+  return requestJSON<UsageScanState>(config, `/api/v1/usage/${provider}/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ force }),
+  })
+}
+
+export async function fetchUsageSummary(config: BackendConfig, provider: UsageProvider, scope: UsageScope, range: UsageRange): Promise<UsageSummary> {
+  return requestJSON<UsageSummary>(config, `/api/v1/usage/${provider}/summary${usageQS(scope, range)}`)
+}
+
+export async function fetchUsageDaily(config: BackendConfig, provider: UsageProvider, scope: UsageScope, range: UsageRange): Promise<UsageDailyPoint[]> {
+  return requestJSON<UsageDailyPoint[]>(config, `/api/v1/usage/${provider}/daily${usageQS(scope, range)}`) ?? []
+}
+
+export async function fetchUsageBreakdown(config: BackendConfig, provider: UsageProvider, scope: UsageScope, range: UsageRange, kind: UsageBreakdownKind): Promise<UsageBreakdownRow[]> {
+  return requestJSON<UsageBreakdownRow[]>(config, `/api/v1/usage/${provider}/breakdown${usageQS(scope, range, { kind })}`) ?? []
+}
+
+export async function fetchUsageSessions(config: BackendConfig, provider: UsageProvider, scope: UsageScope, range: UsageRange, limit = 25): Promise<UsageSessionRow[]> {
+  return requestJSON<UsageSessionRow[]>(config, `/api/v1/usage/${provider}/sessions${usageQS(scope, range, { limit: String(limit) })}`) ?? []
+}
+
+export async function fetchRateLimits(config: BackendConfig): Promise<RateLimitState> {
+  return requestJSON<RateLimitState>(config, '/api/v1/usage/rate-limits')
+}
+
+export async function refreshRateLimits(config: BackendConfig): Promise<RateLimitState> {
+  return requestJSON<RateLimitState>(config, '/api/v1/usage/rate-limits/refresh', { method: 'POST' })
+}

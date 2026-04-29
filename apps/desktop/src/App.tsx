@@ -51,7 +51,7 @@ import { appendTimelineEvent, applySnapshotUpdate } from '@/lib/runtime-store'
 import type { GlobalStats, Project, ProjectStats, SessionDetail, SessionSummary, SnapshotPayload } from '@/lib/orchestra-types'
 import { ProjectGrid } from '@/components/projects/ProjectGrid'
 import { ProjectDetailView } from '@/components/projects/ProjectDetailView'
-import { AnalyticsDashboard } from '@/components/analytics/AnalyticsDashboard'
+import { UsagePage } from '@/components/usage/UsagePage'
 import { SessionDetailView } from '@/components/analytics/SessionDetailView'
 import { AgentsDashboard } from '@/components/agents/AgentsDashboard'
 import { DocsDashboard } from '@/components/docs/DocsDashboard'
@@ -1152,16 +1152,9 @@ export default function App() {
               ) : null}
 
               {sectionVisibility.showWarehouse ? (
-                <SectionErrorBoundary name="Analytics">
+                <SectionErrorBoundary name="Usage">
                 <section className="flex-1 flex flex-col min-h-0">
-                  <AnalyticsDashboard
-                    stats={warehouseStats}
-                    loading={dataLoading}
-                    config={config}
-                    projects={projects}
-                    onInspectSession={handleInspectSession}
-                    onCloneSession={handleCloneSession}
-                  />
+                  <UsagePage config={config} />
                 </section>
                 </SectionErrorBoundary>
               ) : null}
@@ -1433,7 +1426,7 @@ export default function App() {
               onSelect={() => { setActiveSection('WAREHOUSE'); setPaletteOpen(false) }}
               className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
             >
-              <Database className="h-4 w-4" /> Go to Analytics
+              <Database className="h-4 w-4" /> Go to Usage
             </Command.Item>
             <Command.Item
               onSelect={() => { setActiveSection('SETTINGS'); setPaletteOpen(false) }}
