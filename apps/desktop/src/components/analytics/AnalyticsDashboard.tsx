@@ -76,20 +76,22 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     <div className="p-6 space-y-6 overflow-y-auto h-full custom-scrollbar bg-background/20">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-1 bg-muted/30 rounded-lg p-0.5 border border-border/40">
-          {TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveView(tab.key)}
-              className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-md transition-all ${
-                activeView === tab.key
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-0">
+          {TABS.map((tab) => {
+            const isActive = activeView === tab.key
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveView(tab.key)}
+                className={`relative inline-flex items-center px-3 h-9 text-[12px] font-medium tracking-tight transition-colors ${
+                  isActive ? 'text-foreground' : 'text-muted-foreground/70 hover:text-foreground'
+                }`}
+              >
+                {tab.label}
+                {isActive && <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-primary" />}
+              </button>
+            )
+          })}
         </div>
         <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
       </div>

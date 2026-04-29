@@ -28,18 +28,20 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 /** Centered dialog panel with overlay, close button, and animated entry. */
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { srTitle?: string }
+>(({ className, children, srTitle = 'Dialog', ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
+      aria-describedby={props['aria-describedby'] ?? undefined}
       className={cn(
         'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border border-border bg-card p-6 shadow-lg duration-200 sm:rounded-lg',
         className,
       )}
       {...props}
     >
+      <DialogPrimitive.Title className="sr-only">{srTitle}</DialogPrimitive.Title>
       {children}
       <DialogClose className="absolute right-6 top-[18px] rounded-lg p-1.5 text-muted-foreground/30 hover:text-foreground hover:bg-muted/20 transition-all z-50">
         <X className="h-5 w-5" />

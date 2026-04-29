@@ -396,68 +396,70 @@ body {
 }
 
 .prose-wiki h1 {
-  font-size: var(--text-4xl);
+  font-size: var(--text-3xl);
   font-weight: 900;
-  letter-spacing: -0.05em;
-  margin-bottom: 2.5rem;
-  padding-bottom: 1.5rem;
+  letter-spacing: -0.04em;
+  margin-top: 0;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
   border-bottom: 1px solid hsl(var(--border) / 0.4);
   color: var(--color-foreground);
 }
 
 .prose-wiki h2 {
-  font-size: var(--text-2xl);
-  font-weight: 700;
+  font-size: var(--text-xl);
+  font-weight: 800;
   letter-spacing: -0.025em;
-  margin-top: 4rem;
-  margin-bottom: 1.5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  color: hsl(var(--foreground) / 0.9);
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  color: hsl(var(--foreground) / 0.95);
 }
 
 .prose-wiki h3 {
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
   font-weight: 700;
-  letter-spacing: -0.025em;
-  margin-top: 2.5rem;
-  margin-bottom: 1rem;
-  color: hsl(var(--foreground) / 0.8);
+  letter-spacing: -0.02em;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: hsl(var(--foreground) / 0.85);
 }
 
 .prose-wiki p {
-  line-height: 1.625;
-  font-size: 15px;
-  margin-bottom: 1.5rem;
+  line-height: 1.6;
+  font-size: 14px;
+  margin-bottom: 0.875rem;
   color: hsl(var(--foreground) / 0.75);
 }
 
 .prose-wiki ul, .prose-wiki ol {
-  margin-top: 1.5rem;
-  margin-bottom: 1.5rem;
-  margin-left: 1.5rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.875rem;
+  margin-left: 1.25rem;
 }
 
 .prose-wiki ul > * + *, .prose-wiki ol > * + * {
-  margin-top: 0.5rem;
+  margin-top: 0.25rem;
 }
 
 .prose-wiki li {
   color: hsl(var(--foreground) / 0.75);
+  line-height: 1.55;
 }
 
 .prose-wiki blockquote {
-  font-style: italic;
-  border-left: 4px solid hsl(var(--primary) / 0.4);
-  padding-left: 2rem;
-  margin-top: 2.5rem;
-  margin-bottom: 2.5rem;
-  padding-top: 1rem;
-  padding-bottom: 1rem;
-  background: hsl(var(--primary) / 0.05);
-  border-radius: 0 1rem 1rem 0;
-  color: hsl(var(--foreground) / 0.8);
+  border-left: 3px solid hsl(var(--primary) / 0.4);
+  padding-left: 1.25rem;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  background: hsl(var(--primary) / 0.04);
+  border-radius: 0 0.5rem 0.5rem 0;
+  color: hsl(var(--foreground) / 0.85);
+}
+
+.prose-wiki hr {
+  display: none;
 }
 
 .prose-wiki strong {

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -604,6 +605,26 @@ func (s *Server) GetWorkspaceFile(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Write(content)
+}
+
+// PutWorkspaceFile writes file content to an absolute path. Bound to loopback+token auth.
+func (s *Server) PutWorkspaceFile(w http.ResponseWriter, r *http.Request) {
+	absPath := r.URL.Query().Get("path")
+	if absPath == "" || !filepath.IsAbs(absPath) {
+		writeJSONError(w, http.StatusBadRequest, "invalid_path", "absolute path required")
+		return
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "read_failed", "failed to read body")
+		return
+	}
+	defer r.Body.Close()
+	if err := os.WriteFile(absPath, body, 0o644); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "write_failed", "failed to write file")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "bytes": len(body)})
 }
 
 // GetWorkspaceTree lists directory contents by absolute path. Bound to loopback+token auth.

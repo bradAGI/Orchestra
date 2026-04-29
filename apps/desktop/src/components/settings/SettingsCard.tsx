@@ -133,24 +133,24 @@ export function SettingsCard({
           </button>
         </div>
 
-        <div className="flex gap-1 px-2">
-          {tabs.map((tab) => (
-            <AppTooltip key={tab.id} content={tab.tooltip}>
-              <button
-                onClick={() => setActiveTab(tab.id)}
-                className={`relative flex items-center gap-2 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all duration-300 rounded-t-lg ${activeTab === tab.id
-                  ? 'text-primary bg-background'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+        <div className="flex items-center gap-0 px-3 border-b border-border/30">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id
+            return (
+              <AppTooltip key={tab.id} content={tab.tooltip}>
+                <button
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`relative inline-flex items-center gap-1.5 px-3 h-9 text-[12px] font-medium tracking-tight transition-colors ${
+                    isActive ? 'text-foreground' : 'text-muted-foreground/70 hover:text-foreground'
                   }`}
-              >
-                {tab.icon}
-                {tab.label}
-                {activeTab === tab.id && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full" />
-                )}
-              </button>
-            </AppTooltip>
-          ))}
+                >
+                  <span className={isActive ? 'text-primary' : 'text-muted-foreground/60'}>{tab.icon}</span>
+                  {tab.label}
+                  {isActive && <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-primary" />}
+                </button>
+              </AppTooltip>
+            )
+          })}
         </div>
       </CardHeader>
 

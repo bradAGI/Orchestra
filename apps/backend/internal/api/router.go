@@ -191,6 +191,7 @@ func NewRouterWithPubSub(
 	r.Get("/api/v1/terminal/{session_id}", server.TerminalWebSocket)
 
 	protected.Get("/api/v1/workspace/file", server.GetWorkspaceFile)
+	protected.Put("/api/v1/workspace/file", server.PutWorkspaceFile)
 	protected.Get("/api/v1/workspace/tree", server.GetWorkspaceTree)
 	protected.Get("/api/v1/projects", server.GetProjects)
 	protected.Post("/api/v1/projects", server.CreateProject)

@@ -38,33 +38,33 @@ export function EmbeddedAgentPanel({ onOpenSettings }: { onOpenSettings?: () => 
     [sendMessage, onNavigate],
   )
 
-  return (
-    <div className="agent-panel-enter fixed bottom-6 right-6 z-50 flex w-[420px] flex-col overflow-hidden rounded-2xl border border-border/20 bg-card shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] backdrop-blur-xl" style={{ top: '140px' }}>
-      {/* Subtle top gradient accent */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+  const modelLabel = providerConfig.modelId
+    ? providerConfig.modelId.split('/').pop()?.replace(/-/g, ' ') ?? providerConfig.modelId
+    : null
 
+  return (
+    <div
+      className="agent-panel-enter fixed bottom-6 right-6 z-50 flex w-[420px] flex-col overflow-hidden rounded-xl border border-border/50 bg-background shadow-xl shadow-black/30"
+      style={{ top: '140px' }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          {providerConfig.apiKey ? (
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              {providerConfig.modelId}
-            </span>
+      <div className="flex items-center justify-between px-4 pt-5 pb-3">
+        <div className="min-w-0 space-y-1">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">Agent</p>
+          {modelLabel ? (
+            <h2 className="text-base font-black tracking-tight truncate capitalize">{modelLabel}</h2>
           ) : onOpenSettings ? (
             <button
               onClick={() => { togglePanel(); onOpenSettings() }}
-              className="text-[10px] font-bold uppercase tracking-widest text-primary hover:text-primary/80 transition-colors"
+              className="text-base font-black tracking-tight text-primary hover:text-primary/80 transition-colors"
             >
               Configure API key
             </button>
           ) : (
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
-              No API key
-            </span>
+            <h2 className="text-base font-black tracking-tight text-muted-foreground/60">No API key</h2>
           )}
         </div>
-        <div className="flex items-center gap-0.5">
-          {/* Watch mode toggle */}
+        <div className="flex items-center gap-0.5 shrink-0 -mt-1">
           <WatchToggle
             enabled={watchMode.enabled}
             onToggle={watchMode.toggle}
@@ -76,7 +76,7 @@ export function EmbeddedAgentPanel({ onOpenSettings }: { onOpenSettings?: () => 
                 variant="ghost"
                 size="sm"
                 onClick={() => { togglePanel(); onOpenSettings() }}
-                className="h-7 w-7 p-0 text-muted-foreground/60 hover:text-foreground"
+                className="h-7 w-7 p-0 text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.04]"
               >
                 <Settings2 className="h-3.5 w-3.5" />
               </Button>
@@ -87,7 +87,7 @@ export function EmbeddedAgentPanel({ onOpenSettings }: { onOpenSettings?: () => 
               variant="ghost"
               size="sm"
               onClick={clearChat}
-              className="h-7 w-7 p-0 text-muted-foreground/60 hover:text-foreground"
+              className="h-7 w-7 p-0 text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.04]"
             >
               <RefreshCcw className="h-3.5 w-3.5" />
             </Button>
@@ -97,9 +97,9 @@ export function EmbeddedAgentPanel({ onOpenSettings }: { onOpenSettings?: () => 
               variant="ghost"
               size="sm"
               onClick={togglePanel}
-              className="h-7 w-7 p-0 text-muted-foreground/60 hover:text-foreground"
+              className="h-7 w-7 p-0 text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.04]"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5" />
             </Button>
           </AppTooltip>
         </div>

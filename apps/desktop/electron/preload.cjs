@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('orchestraDesktop', {
     return ipcRenderer.invoke('orchestra:open-path', targetPath)
   },
   selectFolder: () => ipcRenderer.invoke('orchestra:select-folder'),
+  selectFile: (options) => ipcRenderer.invoke('orchestra:select-file', options),
   fs: {
     readDir: (dirPath) => ipcRenderer.invoke('orchestra:fs:readDir', dirPath),
     readFile: (filePath) => ipcRenderer.invoke('orchestra:fs:readFile', filePath),

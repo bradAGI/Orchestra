@@ -44,42 +44,38 @@ export function SidebarNav({
 
   return (
     <aside
-      className="relative h-full border-r border-border bg-card shadow-[10px_0_40px_rgba(0,0,0,0.04)] transition-all duration-300 dark:border-border dark:bg-card dark:shadow-[10px_0_40px_rgba(0,0,0,0.2)]"
+      className="relative h-full bg-background border-r border-border/40 transition-all duration-200"
       style={{ width: `${sidebarWidth}px` }}
     >
-      <AppTooltip 
-        side="right" 
+      <AppTooltip
+        side="right"
         content={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
         <button
           type="button"
           onClick={onToggleCollapsed}
-          className="absolute left-full top-6 z-20 grid h-8 w-8 -translate-x-1/2 place-items-center rounded-full border border-border bg-card text-foreground shadow-lg transition hover:bg-muted dark:border-border dark:bg-background dark:text-foreground dark:hover:bg-muted"
+          className="absolute left-full top-6 z-20 grid h-7 w-7 -translate-x-1/2 place-items-center rounded-full bg-muted/40 text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
         >
-          {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          {sidebarCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
         </button>
       </AppTooltip>
 
       <div className="flex h-full flex-col">
-        <div className="mb-1 flex justify-center pt-2">
-          <div className="flex flex-col items-center">
-            <span className="grid h-28 w-28 shrink-0 place-items-center text-foreground">
-              <AppMonogramIcon className="h-24 w-24" />
-            </span>
-            {!sidebarCollapsed ? (
-              <div className="min-w-0 -mt-3">
-                <p className="truncate text-xl font-black uppercase tracking-[0.15em] text-foreground dark:text-muted-foreground leading-none">Orchestra</p>
-              </div>
-            ) : null}
-          </div>
+        <div className={`flex flex-col items-center ${sidebarCollapsed ? 'pt-4 pb-3' : 'pt-5 pb-3'}`}>
+          <span className="grid shrink-0 place-items-center text-foreground">
+            <AppMonogramIcon className={sidebarCollapsed ? 'h-12 w-12' : 'h-24 w-24'} />
+          </span>
+          {!sidebarCollapsed && (
+            <span className="text-[15px] font-black tracking-tight leading-none -mt-1">Orchestra</span>
+          )}
         </div>
 
         <OverlayScrollbarsComponent
           element="div"
           options={osOptions}
-          className="flex-1 px-2 pt-6 min-h-0"
+          className={`flex-1 min-h-0 pt-4 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}
         >
-          <nav className="space-y-1.5" aria-label="Primary navigation">
+          <nav className="flex flex-col gap-1.5" aria-label="Primary navigation">
             {items.map((item, index) => {
               const ItemIcon = item.icon
               const active = activeSection === item.id
@@ -98,24 +94,20 @@ export function SidebarNav({
                     onKeyDown={handleNavKeyDown(index)}
                     aria-current={active ? 'page' : undefined}
                     data-testid={`sidebar-nav-${item.id}`}
-                    className={`group relative flex w-full items-center gap-3.5 rounded-xl border text-left transition-all duration-300 ${sidebarCollapsed ? 'justify-center px-2 py-4' : 'px-4 py-4'
-                      } ${active
-                        ? 'border-primary/30 bg-primary/10 text-primary shadow-[0_0_15px_rgba(var(--primary),0.1)]'
-                        : 'border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                      }`}
+                    className={`group relative flex w-full items-center text-left rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+                      sidebarCollapsed ? 'justify-center h-11 w-11 mx-auto' : 'gap-3 px-3 h-11'
+                    } ${active
+                      ? 'bg-foreground/[0.06] text-foreground'
+                      : 'text-muted-foreground/80 hover:text-foreground hover:bg-foreground/[0.03]'
+                    }`}
                   >
-                    {active ? <span className="absolute left-0 top-1/2 h-4 w-1 -translate-y-1/2 rounded-r-full bg-primary shadow-[0_0_8px_rgba(var(--primary),0.6)]" /> : null}
-                    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg transition-all duration-300 ${
-                      active ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'bg-muted/50 text-muted-foreground group-hover:bg-muted group-hover:text-foreground'
-                    }`}>
-                      <ItemIcon className="h-4 w-4" />
-                    </span>
-                    {!sidebarCollapsed ? (
-                      <span className="min-w-0 flex-1">
-                        <span className={`block truncate text-base font-bold tracking-tight ${active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}`}>{item.label}</span>
-                        <span className="block truncate text-xs text-muted-foreground/60 leading-tight font-medium">{item.description}</span>
-                      </span>
-                    ) : null}
+                    {!sidebarCollapsed && active && (
+                      <span className="absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-primary" />
+                    )}
+                    <ItemIcon className={`h-[17px] w-[17px] shrink-0 transition-colors ${active ? 'text-primary' : 'text-muted-foreground/60 group-hover:text-foreground'}`} strokeWidth={active ? 2.25 : 1.75} />
+                    {!sidebarCollapsed && (
+                      <span className="truncate text-[13px] font-medium tracking-tight">{item.label}</span>
+                    )}
                   </button>
                 </AppTooltip>
               )

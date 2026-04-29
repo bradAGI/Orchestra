@@ -16,6 +16,7 @@ export function clearInitialCommandTracking(sessionId: string) {
 interface TerminalViewProps {
     sessionId: string
     projectId?: string
+    cwd?: string
     baseUrl: string
     apiToken?: string
     onClose?: () => void
@@ -23,7 +24,7 @@ interface TerminalViewProps {
     theme?: 'light' | 'dark'
 }
 
-export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId, baseUrl, apiToken, onClose: _onClose, initialCommand, theme }) => {
+export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId, cwd, baseUrl, apiToken, onClose: _onClose, initialCommand, theme }) => {
     const terminalRef = useRef<HTMLDivElement>(null)
     const xtermRef = useRef<Terminal | null>(null)
     const fitAddonRef = useRef<FitAddon | null>(null)
@@ -86,6 +87,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
         wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:'
         wsUrl.pathname = `/api/v1/terminal/${sessionId}`
         if (projectId) wsUrl.searchParams.set('project_id', projectId)
+        if (cwd) wsUrl.searchParams.set('cwd', cwd)
         if (apiToken && apiToken.trim() !== '') wsUrl.searchParams.set('token', apiToken.trim())
 
         const ws = new WebSocket(wsUrl.toString())
@@ -170,7 +172,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
             term.dispose()
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sessionId, projectId, baseUrl, apiToken, theme])
+    }, [sessionId, projectId, cwd, baseUrl, apiToken, theme])
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {

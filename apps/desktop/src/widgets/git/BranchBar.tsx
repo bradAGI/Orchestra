@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { GitBranch, ChevronDown, Archive } from 'lucide-react'
+import { GitBranch, ChevronDown, Archive, ArrowDownToLine, ArrowDown, ArrowUp, RefreshCcw, Plus } from 'lucide-react'
 import type { BackendConfig, StashEntry } from '@/lib/orchestra-client'
 import { gitCheckout, gitCreateBranch, gitStash, gitStashPop } from '@/lib/orchestra-client'
 import { StashPanel } from './StashPanel'
+import { AppTooltip } from '@/components/ui/tooltip-wrapper'
 
 interface BranchBarProps {
   projectId: string
@@ -133,7 +134,7 @@ export function BranchBar({
     }
   }
 
-  async function handleStashPop() {
+  async function _handleStashPop() {
     setStashOpen(false)
     setLoading(true)
     try {
@@ -156,13 +157,12 @@ export function BranchBar({
     onMerge?.(branch)
   }
 
-  const actionBtnClass =
-    'rounded-md px-2.5 py-1 text-[10px] font-bold text-muted-foreground/50 bg-muted/10 border border-border/20 hover:bg-muted/30 hover:text-foreground transition-all'
+  const iconBtn = 'inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors disabled:opacity-40 relative'
 
   return (
-    <div className="flex items-center gap-1.5 px-3 py-2 shrink-0 relative h-10">
+    <div className="flex items-center gap-1 px-2 shrink-0 relative">
       {error && (
-        <div className="absolute top-full left-0 right-0 z-10 px-3 py-1.5 bg-red-500/10 border-b border-red-500/20 text-[10px] text-red-400">
+        <div className="absolute top-full left-0 right-0 z-10 px-3 py-1.5 bg-destructive/10 text-[11px] text-destructive">
           {error}
         </div>
       )}
@@ -173,183 +173,220 @@ export function BranchBar({
           data-testid="branch-trigger"
           onClick={() => setDropdownOpen((v) => !v)}
           disabled={loading}
-          className="rounded-md px-2.5 py-1 text-[10px] font-bold bg-primary/15 text-primary border border-primary/20 shadow-sm shadow-primary/10 flex items-center gap-1.5 transition-all"
+          className="inline-flex items-center gap-1.5 h-7 px-2 rounded-md hover:bg-foreground/[0.04] text-[11.5px] font-medium tracking-tight transition-colors"
+          title={currentBranch}
         >
-          <GitBranch size={12} className="shrink-0" />
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-          {currentBranch}
-          <ChevronDown size={10} className="opacity-60" />
+          <GitBranch size={12} className="text-primary shrink-0" strokeWidth={2.25} />
+          <span className="font-mono text-foreground/90 truncate max-w-[180px]">{currentBranch || '…'}</span>
+          {aheadBehind && (aheadBehind.ahead > 0 || aheadBehind.behind > 0) && (
+            <span className="inline-flex items-center gap-1 ml-0.5 tabular-nums text-[10.5px] font-medium">
+              {aheadBehind.ahead > 0 && (
+                <span className="inline-flex items-center gap-px text-emerald-500">
+                  <ArrowUp size={9} strokeWidth={2.5} />
+                  {aheadBehind.ahead}
+                </span>
+              )}
+              {aheadBehind.behind > 0 && (
+                <span className="inline-flex items-center gap-px text-amber-500">
+                  <ArrowDown size={9} strokeWidth={2.5} />
+                  {aheadBehind.behind}
+                </span>
+              )}
+            </span>
+          )}
+          <ChevronDown size={11} className="text-muted-foreground/55" />
         </button>
 
         {dropdownOpen && (
-          <div className="absolute left-0 top-full mt-1 bg-card border border-border/40 rounded-xl shadow-lg z-50 py-1 min-w-[240px] max-h-[300px] overflow-y-auto">
-            {/* Local branches section */}
-            <div className="px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">
-              Local Branches
+          <div className="absolute left-0 top-full mt-1.5 bg-popover border border-border/60 rounded-lg shadow-xl py-2 z-50 min-w-[280px] max-h-[360px] overflow-y-auto">
+            {/* Local */}
+            <div className="px-3 pb-1">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">Local</span>
+              <span className="ml-1.5 text-[10px] font-medium tabular-nums text-muted-foreground/40">{branches.length}</span>
             </div>
-            {branches.map((branch) =>
-              confirmAction?.branch === branch ? (
-                <div key={branch} data-testid={`branch-row-${branch}`} className="px-3 py-1.5 text-[11px] flex items-center gap-2">
-                  <span className="text-foreground">
-                    {confirmAction.type === 'delete'
-                      ? `Delete ${branch}?`
-                      : `Merge ${branch} into ${currentBranch}?`}
-                  </span>
-                  <button
-                    onClick={() =>
-                      confirmAction.type === 'delete'
-                        ? handleDeleteConfirm(branch)
-                        : handleMergeConfirm(branch)
-                    }
-                    className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                  >
-                    {confirmAction.type === 'delete' ? 'Delete' : 'Merge'}
-                  </button>
-                  <button
-                    onClick={() => setConfirmAction(null)}
-                    className="px-1.5 py-0.5 rounded text-[10px] text-muted-foreground hover:bg-muted/20"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <div
-                  key={branch}
-                  data-testid={`branch-row-${branch}`}
-                  className="px-3 py-1.5 text-[11px] hover:bg-muted/20 cursor-pointer flex items-center justify-between"
-                  onClick={() => handleCheckout(branch)}
-                  onMouseEnter={() => setHoveredBranch(branch)}
-                  onMouseLeave={() => setHoveredBranch(null)}
-                >
-                  <span className="flex items-center gap-1.5">
-                    {branch === currentBranch && (
-                      <span
-                        data-testid="green-dot"
-                        className="inline-block w-1.5 h-1.5 rounded-full bg-green-500"
-                      />
-                    )}
-                    <span className={branch === currentBranch ? 'text-primary font-bold' : 'text-foreground'}>
-                      {branch}
+            <div className="px-1">
+              {branches.map((branch) =>
+                confirmAction?.branch === branch ? (
+                  <div key={branch} data-testid={`branch-row-${branch}`} className="px-3 py-2 rounded-md bg-foreground/[0.04] flex items-center gap-2">
+                    <span className="text-[12px] text-foreground/85 truncate flex-1">
+                      {confirmAction.type === 'delete'
+                        ? <>Delete <span className="font-mono font-semibold">{branch}</span>?</>
+                        : <>Merge <span className="font-mono font-semibold">{branch}</span> → <span className="font-mono font-semibold">{currentBranch}</span>?</>}
                     </span>
-                  </span>
-                  {branch !== currentBranch && hoveredBranch === branch && (
-                    <div className="flex items-center gap-0.5">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setConfirmAction({ type: 'merge', branch })
-                        }}
-                        className="px-1 py-0.5 rounded text-[9px] text-muted-foreground hover:bg-muted/30 hover:text-foreground"
-                        title="Merge into current"
-                      >
-                        Merge
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setConfirmAction({ type: 'delete', branch })
-                        }}
-                        className="px-1 py-0.5 rounded text-[9px] text-red-400/60 hover:bg-red-500/10 hover:text-red-400"
-                        title="Delete branch"
-                      >
-                        Del
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )
-            )}
-
-            {/* Remote branches section */}
-            {remoteBranches && remoteBranches.length > 0 && (
-              <>
-                <div className="my-1 border-t border-border/20" />
-                <div className="px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">
-                  Remote Branches
-                </div>
-                {remoteBranches.map((branch) => (
+                    <button
+                      onClick={() => confirmAction.type === 'delete' ? handleDeleteConfirm(branch) : handleMergeConfirm(branch)}
+                      className={`inline-flex items-center h-6 px-2 rounded text-[10.5px] font-medium tracking-tight transition-colors ${
+                        confirmAction.type === 'delete'
+                          ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                          : 'bg-foreground text-background hover:bg-foreground/90'
+                      }`}
+                    >
+                      {confirmAction.type === 'delete' ? 'Delete' : 'Merge'}
+                    </button>
+                    <button
+                      onClick={() => setConfirmAction(null)}
+                      className="inline-flex items-center h-6 px-2 rounded text-[10.5px] font-medium text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
                   <div
                     key={branch}
-                    data-testid={`remote-branch-row-${branch}`}
-                    className="px-3 py-1.5 text-[11px] text-muted-foreground/60 hover:bg-muted/20 cursor-pointer flex items-center"
-                    onClick={() => handleCheckout(branch.replace(/^origin\//, ''))}
+                    data-testid={`branch-row-${branch}`}
+                    onClick={() => handleCheckout(branch)}
+                    onMouseEnter={() => setHoveredBranch(branch)}
+                    onMouseLeave={() => setHoveredBranch(null)}
+                    className={`group flex items-center gap-2 w-full px-2 py-1.5 rounded-md cursor-pointer transition-colors ${
+                      branch === currentBranch ? 'bg-foreground/[0.06]' : 'hover:bg-foreground/[0.04]'
+                    }`}
                   >
-                    {branch}
+                    {branch === currentBranch ? (
+                      <span data-testid="green-dot" className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    ) : (
+                      <span className="inline-block w-1.5 h-1.5 shrink-0" />
+                    )}
+                    <span className={`min-w-0 flex-1 font-mono text-[12.5px] truncate ${
+                      branch === currentBranch ? 'text-foreground font-semibold' : 'text-foreground/85'
+                    }`}>
+                      {branch}
+                    </span>
+                    {branch !== currentBranch && hoveredBranch === branch && (
+                      <span className="flex items-center gap-0.5 shrink-0">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setConfirmAction({ type: 'merge', branch }) }}
+                          className="inline-flex items-center h-6 px-1.5 rounded text-[10.5px] font-medium text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.06] transition-colors"
+                          title="Merge into current"
+                        >
+                          Merge
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setConfirmAction({ type: 'delete', branch }) }}
+                          className="inline-flex items-center h-6 px-1.5 rounded text-[10.5px] font-medium text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          title="Delete branch"
+                        >
+                          Delete
+                        </button>
+                      </span>
+                    )}
                   </div>
-                ))}
+                )
+              )}
+              {branches.length === 0 && (
+                <p className="px-2 py-1.5 text-[11.5px] text-muted-foreground/45">No local branches.</p>
+              )}
+            </div>
+
+            {/* Remote */}
+            {remoteBranches && remoteBranches.length > 0 && (
+              <>
+                <div className="px-3 pt-3 pb-1">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">Remote</span>
+                  <span className="ml-1.5 text-[10px] font-medium tabular-nums text-muted-foreground/40">{remoteBranches.length}</span>
+                </div>
+                <div className="px-1">
+                  {remoteBranches.map((branch) => (
+                    <div
+                      key={branch}
+                      data-testid={`remote-branch-row-${branch}`}
+                      onClick={() => handleCheckout(branch.replace(/^origin\//, ''))}
+                      className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md cursor-pointer text-muted-foreground/75 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                    >
+                      <span className="inline-block w-1.5 h-1.5 shrink-0" />
+                      <span className="font-mono text-[12.5px] truncate">{branch}</span>
+                    </div>
+                  ))}
+                </div>
               </>
             )}
 
-            {/* Divider + New branch */}
-            <div className="my-1 border-t border-border/20" />
-            {creating ? (
-              <div className="px-3 py-1.5">
+            {/* Create */}
+            <div className="mt-2 pt-2 border-t border-border/40 px-1">
+              {creating ? (
                 <input
                   ref={inputRef}
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handleCreate()
-                    if (e.key === 'Escape') {
-                      setCreating(false)
-                      setNewName('')
-                    }
+                    if (e.key === 'Escape') { setCreating(false); setNewName('') }
                   }}
-                  placeholder="branch name..."
-                  className="w-full rounded-md px-2 py-1 text-[10px] bg-muted/10 text-foreground border border-primary/30 outline-none focus:border-primary/60"
+                  placeholder="branch-name"
+                  className="w-full h-8 rounded-md px-2.5 text-[12.5px] font-mono bg-muted/30 text-foreground placeholder:text-muted-foreground/45 outline-none focus:ring-1 focus:ring-primary/40 transition-all"
                 />
-              </div>
-            ) : (
-              <button
-                onClick={() => setCreating(true)}
-                className="w-full text-left px-3 py-1.5 text-[11px] text-primary/60 hover:bg-muted/20 hover:text-primary"
-              >
-                + New branch
-              </button>
-            )}
+              ) : (
+                <button
+                  onClick={() => setCreating(true)}
+                  className="group flex items-center gap-2 w-full px-2 py-1.5 rounded-md hover:bg-foreground/[0.04] transition-colors text-left"
+                >
+                  <span className="text-muted-foreground/55 group-hover:text-foreground transition-colors">
+                    <Plus size={12} strokeWidth={2.5} />
+                  </span>
+                  <span className="text-[12.5px] font-medium text-muted-foreground/75 group-hover:text-foreground transition-colors">
+                    New branch
+                  </span>
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Spacer */}
-      <div className="flex-1" />
-
-      {/* Action buttons */}
-      {onFetch && (
-        <button onClick={onFetch} disabled={loading} className={actionBtnClass}>
-          Fetch
-        </button>
-      )}
-      {onPull && (
-        <button onClick={onPull} disabled={loading} className={actionBtnClass}>
-          Pull{aheadBehind && aheadBehind.behind > 0 ? ` ↓${aheadBehind.behind}` : ''}
-        </button>
-      )}
-      {onPush && (
-        <button onClick={onPush} disabled={loading} className={actionBtnClass}>
-          Push{aheadBehind && aheadBehind.ahead > 0 ? ` ↑${aheadBehind.ahead}` : ''}
-        </button>
-      )}
-
-      {/* Stash dropdown */}
-      <div className="relative shrink-0" ref={stashRef}>
-        <button
-          onClick={() => setStashOpen((v) => !v)}
-          disabled={loading}
-          className={`${actionBtnClass} flex items-center gap-1`}
-        >
-          <Archive size={10} />
-          Stash
-        </button>
-        {stashOpen && (
-          <StashPanel
-            stashes={stashes ?? []}
-            onStash={handleStash}
-            onApply={(ref) => { setStashOpen(false); onStashApply?.(ref) }}
-            onDrop={(ref) => { setStashOpen(false); onStashDrop?.(ref) }}
-            onClose={() => setStashOpen(false)}
-          />
+      {/* Compact icon actions */}
+      <div className="flex items-center">
+        {onFetch && (
+          <AppTooltip content="Fetch">
+            <button onClick={onFetch} disabled={loading} className={iconBtn}>
+              <RefreshCcw size={12} className={loading ? 'animate-spin' : ''} />
+            </button>
+          </AppTooltip>
         )}
+        {onPull && (
+          <AppTooltip content={`Pull${aheadBehind && aheadBehind.behind > 0 ? ` (${aheadBehind.behind} behind)` : ''}`}>
+            <button onClick={onPull} disabled={loading} className={iconBtn}>
+              <ArrowDownToLine size={12} />
+              {aheadBehind && aheadBehind.behind > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[14px] h-[14px] px-1 rounded-full bg-amber-500 text-[8.5px] font-bold tabular-nums text-background">
+                  {aheadBehind.behind}
+                </span>
+              )}
+            </button>
+          </AppTooltip>
+        )}
+        {onPush && (
+          <AppTooltip content={`Push${aheadBehind && aheadBehind.ahead > 0 ? ` (${aheadBehind.ahead} ahead)` : ''}`}>
+            <button onClick={onPush} disabled={loading} className={iconBtn}>
+              <ArrowUp size={12} />
+              {aheadBehind && aheadBehind.ahead > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[14px] h-[14px] px-1 rounded-full bg-emerald-500 text-[8.5px] font-bold tabular-nums text-background">
+                  {aheadBehind.ahead}
+                </span>
+              )}
+            </button>
+          </AppTooltip>
+        )}
+
+        <div className="relative shrink-0" ref={stashRef}>
+          <AppTooltip content={`Stash${stashes && stashes.length > 0 ? ` (${stashes.length})` : ''}`}>
+            <button onClick={() => setStashOpen((v) => !v)} disabled={loading} className={iconBtn}>
+              <Archive size={12} />
+              {stashes && stashes.length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[14px] h-[14px] px-1 rounded-full bg-muted-foreground/70 text-[8.5px] font-bold tabular-nums text-background">
+                  {stashes.length}
+                </span>
+              )}
+            </button>
+          </AppTooltip>
+          {stashOpen && (
+            <StashPanel
+              stashes={stashes ?? []}
+              onStash={handleStash}
+              onApply={(ref) => { setStashOpen(false); onStashApply?.(ref) }}
+              onDrop={(ref) => { setStashOpen(false); onStashDrop?.(ref) }}
+              onClose={() => setStashOpen(false)}
+            />
+          )}
+        </div>
       </div>
     </div>
   )

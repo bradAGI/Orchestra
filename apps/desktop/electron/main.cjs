@@ -404,7 +404,16 @@ function createWindow() {
       'https://api.openai.com',
       'https://api.anthropic.com',
       'https://generativelanguage.googleapis.com',
+      // Whisper voice model assets (downloaded once, cached in IndexedDB)
+      'https://huggingface.co',
+      'https://cdn-lfs.huggingface.co',
+      'https://cas-bridge.xethub.hf.co',
+      // react-grab dev tool version manifest (dev only)
+      'https://www.react-grab.com',
     ].join(' ')
+    // Google Fonts (used by some embedded panels) — split host for stylesheet vs files
+    const fontStyleHosts = 'https://fonts.googleapis.com'
+    const fontFileHosts = 'https://fonts.gstatic.com'
     const connectSrc = isDev
       ? `'self' http://127.0.0.1:* ws://127.0.0.1:* ws://localhost:* ${providerAPIs}`
       : `'self' http://127.0.0.1:* ws://127.0.0.1:* ${providerAPIs}`
@@ -414,9 +423,9 @@ function createWindow() {
         'Content-Security-Policy': [
           "default-src 'self'; " +
           `script-src ${scriptSrc}; ` +
-          "style-src 'self' 'unsafe-inline'; " +
+          `style-src 'self' 'unsafe-inline' ${fontStyleHosts}; ` +
           "img-src 'self' data: blob:; " +
-          "font-src 'self'; " +
+          `font-src 'self' ${fontFileHosts}; ` +
           `connect-src ${connectSrc}; ` +
           "media-src 'self' blob:; " +
           "worker-src 'self' blob:"
@@ -437,8 +446,33 @@ function createWindow() {
     win.webContents.setZoomLevel(0)
   })
 
-  // Intercept Ctrl+1-8 before Chromium consumes them
+  // Intercept Ctrl+1-8 before Chromium consumes them, and wire F12 / Ctrl+Shift+I
+  // for DevTools (since the menu has been removed).
   win.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return
+
+    // F12 → toggle DevTools
+    if (input.key === 'F12' && !input.control && !input.meta && !input.alt && !input.shift) {
+      event.preventDefault()
+      win.webContents.toggleDevTools()
+      return
+    }
+
+    // Ctrl+Shift+I / Cmd+Opt+I → toggle DevTools
+    if (input.shift && (input.control || input.meta) && (input.key === 'I' || input.key === 'i')) {
+      event.preventDefault()
+      win.webContents.toggleDevTools()
+      return
+    }
+
+    // Ctrl+R / Cmd+R → reload
+    if ((input.control || input.meta) && !input.shift && !input.alt && (input.key === 'R' || input.key === 'r')) {
+      event.preventDefault()
+      win.webContents.reload()
+      return
+    }
+
+    // Ctrl+1..8 → switch tab
     if ((input.control || input.meta) && !input.alt && !input.shift) {
       const num = parseInt(input.key, 10)
       if (!isNaN(num) && num >= 1 && num <= 8) {
@@ -451,6 +485,8 @@ function createWindow() {
   const devServerUrl = process.env.VITE_DEV_SERVER_URL
   if (devServerUrl) {
     win.loadURL(devServerUrl)
+    // Auto-open DevTools in dev mode for easier debugging
+    win.webContents.openDevTools({ mode: 'detach' })
   } else {
     win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
   }
@@ -608,6 +644,15 @@ ipcMain.handle('orchestra:open-path', async (_event, targetPath) => {
 ipcMain.handle('orchestra:select-folder', async () => {
   const result = await dialog.showOpenDialog({
     properties: ['openDirectory'],
+  })
+  if (result.canceled || result.filePaths.length === 0) return null
+  return result.filePaths[0]
+})
+
+ipcMain.handle('orchestra:select-file', async (_event, options) => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openFile'],
+    filters: options?.filters || undefined,
   })
   if (result.canceled || result.filePaths.length === 0) return null
   return result.filePaths[0]

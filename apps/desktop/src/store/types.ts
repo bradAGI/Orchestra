@@ -52,6 +52,47 @@ export type SearchMatch = { line: number; text: string }
 export type SearchResultGroup = { file: string; relativePath: string; matches: SearchMatch[] }
 
 // ---------------------------------------------------------------------------
+// Tab groups (Orca-style split layouts)
+// ---------------------------------------------------------------------------
+
+/** A reference to a tab — points at an editor file, browser tab, or terminal. */
+export type TabRef =
+  | { type: 'editor'; id: string }
+  | { type: 'browser'; id: string }
+  | { type: 'terminal'; id: string }
+
+/** A single tab group: its own tab strip + active tab. */
+export interface TabGroup {
+  id: string
+  tabs: TabRef[]
+  activeTabId: string | null
+}
+
+/** Recursive layout tree — leaves point at group IDs, branches are splits. */
+export type TabGroupLayoutNode =
+  | { kind: 'leaf'; groupId: string }
+  | {
+      kind: 'split'
+      direction: 'horizontal' | 'vertical' // horizontal = side-by-side, vertical = stacked
+      first: TabGroupLayoutNode
+      second: TabGroupLayoutNode
+      ratio: number // 0..1, share of the first child
+    }
+
+/**
+ * Special workspace context ID for tabs not tied to a specific project.
+ * Acts as the "Global" project tab — terminals/browsers/files opened
+ * outside any project end up here.
+ */
+export const GLOBAL_PROJECT_ID = '__global__'
+
+/**
+ * A workspace context — either a real project (id matches a Project.id)
+ * or the global context.
+ */
+export type WorkspaceContextID = string
+
+// ---------------------------------------------------------------------------
 // UI Slice
 // ---------------------------------------------------------------------------
 
@@ -68,12 +109,14 @@ export interface UISlice {
   createTaskInitialState: Record<string, unknown> | null
   createProjectDialogOpen: boolean
   settingsInitialTab: SettingsTab | undefined
+  browserHomepage: string
 
   // Actions
   setActiveSection: (section: SectionID) => void
   setSidebarCollapsed: (collapsed: boolean) => void
   toggleSidebar: () => void
   setTheme: (theme: 'light' | 'dark') => void
+  setBrowserHomepage: (url: string) => void
   setActivePeriod: (period: 'Today' | 'Week' | 'Month') => void
   setPaletteOpen: (open: boolean) => void
   togglePalette: () => void
@@ -198,7 +241,22 @@ export type ActiveWorkspaceTab = { type: 'terminal' | 'editor' | 'browser'; id: 
 
 export interface WorkspaceSlice {
   // State
-  explorerRoot: string | null
+  explorerRoot: string | null // active project's explorer root (derived)
+  projectExplorerRoots: Record<WorkspaceContextID, string | null> // per-project explorer roots
+  activeProjectId: WorkspaceContextID
+  openProjectIds: WorkspaceContextID[] // ordered list of project tabs (including GLOBAL_PROJECT_ID)
+
+  /**
+   * Tab-group state, scoped per-project. Each project has:
+   *  - groups: a flat dict of all tab groups by id
+   *  - layout: the recursive split tree (leaves reference groupIds)
+   *  - focusedGroupId: which group is "active" (where new tabs land, where shortcuts target)
+   * Created lazily — accessed via the helper actions below.
+   */
+  projectGroups: Record<WorkspaceContextID, Record<string, TabGroup>>
+  projectLayouts: Record<WorkspaceContextID, TabGroupLayoutNode>
+  projectFocusedGroupId: Record<WorkspaceContextID, string>
+
   activeLeftPanel: 'explorer' | 'search' | 'issues'
   leftSidebarOpen: boolean
   leftSidebarWidth: number
@@ -213,7 +271,10 @@ export interface WorkspaceSlice {
   activeWorkspaceTab: ActiveWorkspaceTab
 
   // Actions
-  setExplorerRoot: (root: string | null) => void
+  setExplorerRoot: (root: string | null) => void // sets root for active project
+  setActiveProjectId: (id: WorkspaceContextID) => void
+  openProjectTab: (id: WorkspaceContextID, explorerRoot?: string | null) => void
+  closeProjectTab: (id: WorkspaceContextID) => void
   setActiveLeftPanel: (panel: 'explorer' | 'search' | 'issues') => void
   setLeftSidebarOpen: (open: boolean) => void
   toggleLeftSidebar: () => void
@@ -230,6 +291,24 @@ export interface WorkspaceSlice {
   setSearchResults: (results: SearchResultGroup[]) => void
   setSearchLoading: (loading: boolean) => void
   setActiveWorkspaceTab: (tab: ActiveWorkspaceTab) => void
+
+  // ---- Tab-group actions --------------------------------------------------
+  /** Add a tab to a project's focused group (or a specific group). Activates it. */
+  addTabToGroup: (projectId: WorkspaceContextID, ref: TabRef, groupId?: string) => void
+  /** Remove a tab from its group. If the tab was active, activates the previous one. */
+  removeTabFromGroup: (projectId: WorkspaceContextID, tabId: string) => void
+  /** Activate a tab inside its group. Also focuses the containing group. */
+  activateTabInGroup: (projectId: WorkspaceContextID, tabId: string) => void
+  /** Split a group into two side-by-side / stacked groups. New group is empty + focused. */
+  splitGroup: (projectId: WorkspaceContextID, groupId: string, direction: 'horizontal' | 'vertical') => void
+  /** Close a group: removes it from the layout tree and disposes its tabs (caller decides closing the underlying resource). */
+  closeGroup: (projectId: WorkspaceContextID, groupId: string) => void
+  /** Move a tab from one group to another. */
+  moveTabBetweenGroups: (projectId: WorkspaceContextID, tabId: string, dstGroupId: string) => void
+  /** Update split ratio between siblings. nodePath is a string path of 'first'/'second' steps from the root. */
+  setGroupSplitRatio: (projectId: WorkspaceContextID, nodePath: string, ratio: number) => void
+  /** Focus a group (where new tabs land + which group is "current"). */
+  setFocusedGroup: (projectId: WorkspaceContextID, groupId: string) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -243,16 +322,22 @@ export type OpenFile = {
   language: string
   isDirty: boolean
   content: string | null // null = not yet loaded
+  loadError?: string | null
+  loading?: boolean
+  pendingReveal?: number | null // line number to scroll to on next render
+  projectId: WorkspaceContextID // GLOBAL_PROJECT_ID if not tied to a project
 }
 
 export interface EditorSlice {
   openFiles: OpenFile[]
   activeFileId: string | null
-  openFile: (filePath: string, relativePath: string) => void
+  openFile: (filePath: string, relativePath: string, revealLine?: number, projectId?: WorkspaceContextID) => void
   closeFile: (fileId: string) => void
   setActiveFile: (fileId: string) => void
   setFileDirty: (fileId: string, isDirty: boolean) => void
   setFileContent: (fileId: string, content: string) => void
+  loadFileContent: (fileId: string) => Promise<void>
+  clearPendingReveal: (fileId: string) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -266,12 +351,13 @@ export type BrowserTab = {
   loading: boolean
   canGoBack: boolean
   canGoForward: boolean
+  projectId: WorkspaceContextID
 }
 
 export interface BrowserSlice {
   browserTabs: BrowserTab[]
   activeBrowserTabId: string | null
-  openBrowserTab: (url?: string) => void
+  openBrowserTab: (url?: string, projectId?: WorkspaceContextID) => void
   closeBrowserTab: (tabId: string) => void
   setActiveBrowserTab: (tabId: string) => void
   updateBrowserTab: (tabId: string, updates: Partial<BrowserTab>) => void

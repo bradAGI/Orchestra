@@ -39,14 +39,14 @@ export function CommitTimeline({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Search */}
-      <div className="px-3 py-2 border-b border-border/40 shrink-0">
-        <div className="flex items-center gap-2 bg-muted/10 rounded-lg px-2 py-1">
-          <Search size={12} className="text-muted-foreground/50 shrink-0" />
+      <div className="px-3 py-2 shrink-0">
+        <div className="relative">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search commits..."
-            className="bg-transparent text-[11px] text-foreground placeholder:text-muted-foreground/40 outline-none flex-1"
+            placeholder="Search commits…"
+            className="w-full h-8 pl-8 pr-3 rounded-md bg-muted/30 text-[12px] font-medium placeholder:text-muted-foreground/50 outline-none focus:ring-1 focus:ring-primary/40 transition-all"
           />
         </div>
       </div>
@@ -61,36 +61,36 @@ export function CommitTimeline({
               key={hash}
               onClick={() => onSelectCommit(hash)}
               data-selected={selected}
-              className={`w-full text-left flex items-stretch gap-0 px-3 py-2 hover:bg-muted/10 transition-colors ${
-                selected ? 'bg-primary/5' : ''
+              className={`group relative w-full text-left flex items-stretch gap-0 px-3 py-2 transition-colors ${
+                selected ? 'bg-foreground/[0.06] text-foreground' : 'hover:bg-foreground/[0.03]'
               }`}
             >
+              {selected && <span className="absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-primary" />}
+
               {/* Timeline column */}
-              <div className="relative flex flex-col items-center w-5 shrink-0 mr-2.5">
-                {/* Vertical line */}
-                <div className="absolute inset-0 left-1/2 -translate-x-1/2 w-[2px] bg-primary/20" />
-                {/* Dot */}
+              <div className="relative flex flex-col items-center w-4 shrink-0 mr-2.5">
+                <div className="absolute inset-0 left-1/2 -translate-x-1/2 w-px bg-border/50" />
                 <div
                   data-testid="timeline-dot"
-                  className={`relative mt-1.5 w-2 h-2 rounded-full border-2 ${
-                    selected
-                      ? 'bg-primary border-primary'
-                      : 'bg-background border-primary/50'
+                  className={`relative mt-1.5 w-1.5 h-1.5 rounded-full ${
+                    selected ? 'bg-primary ring-2 ring-primary/30' : 'bg-muted-foreground/40'
                   }`}
                 />
               </div>
 
               {/* Content */}
               <div className="flex-1 min-w-0">
-                <div className="text-sm text-foreground truncate">{commit.message}</div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="font-mono text-[9px] bg-muted/20 rounded px-1 py-px text-muted-foreground/60">
+                <div className="text-[12.5px] font-medium tracking-tight text-foreground/90 truncate group-hover:text-foreground">
+                  {commit.message}
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="font-mono text-[10px] text-muted-foreground/70">
                     {hash.slice(0, 7)}
                   </span>
                   {commit.author && (
-                    <span className="text-[10px] text-muted-foreground/70">{commit.author}</span>
+                    <span className="text-[10.5px] text-muted-foreground/60 truncate">{commit.author}</span>
                   )}
-                  <span className="text-[9px] text-muted-foreground/40">
+                  <span className="text-[10px] text-muted-foreground/50 ml-auto shrink-0">
                     {relativeTime(commit.date)}
                   </span>
                 </div>
@@ -99,7 +99,7 @@ export function CommitTimeline({
           )
         })}
         {filtered.length === 0 && (
-          <div className="px-3 py-4 text-[10px] text-muted-foreground/50 text-center">
+          <div className="px-3 py-8 text-[11px] text-muted-foreground/50 text-center">
             {search ? 'No matching commits' : 'No commits'}
           </div>
         )}

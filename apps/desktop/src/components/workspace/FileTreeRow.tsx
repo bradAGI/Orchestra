@@ -1,6 +1,8 @@
 import { ChevronRight, ChevronDown, File, Folder } from 'lucide-react'
 import type { TreeNode } from '@/store/types'
 
+export const ORCHESTRA_FILE_MIME = 'application/x-orchestra-file'
+
 type FileTreeRowProps = {
   node: TreeNode
   isExpanded: boolean
@@ -44,6 +46,14 @@ export function FileTreeRow({
       style={{ ...style, height: 26, paddingLeft }}
       onClick={isDir ? onToggle : onClick}
       aria-expanded={isDir ? isExpanded : undefined}
+      draggable={!isDir}
+      onDragStart={(e) => {
+        if (isDir) return
+        const payload = JSON.stringify({ path: node.path, relativePath: node.relativePath })
+        e.dataTransfer.setData(ORCHESTRA_FILE_MIME, payload)
+        e.dataTransfer.setData('text/plain', node.path)
+        e.dataTransfer.effectAllowed = 'copy'
+      }}
     >
       {isDir ? (
         isExpanded ? (

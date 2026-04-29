@@ -45,6 +45,7 @@ declare global {
       openExternal: (url: string) => Promise<void>
       openPath: (targetPath: string) => Promise<void>
       selectFolder: () => Promise<string | null>
+      selectFile: (options?: { filters?: Array<{ name: string; extensions: string[] }> }) => Promise<string | null>
       getScaleFactor: () => number
       fs: {
         readDir: (dirPath: string) => Promise<Array<{ name: string; isDirectory: boolean }>>

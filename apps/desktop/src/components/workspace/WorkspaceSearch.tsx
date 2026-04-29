@@ -219,7 +219,7 @@ export function WorkspaceSearch() {
                     height: `${virtualRow.size}px`,
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
-                  onClick={() => openFile(row.file, row.relativePath)}
+                  onClick={() => openFile(row.file, row.relativePath, row.line)}
                 >
                   <span className="text-muted-foreground w-8 flex-shrink-0 text-right tabular-nums">
                     {row.line}

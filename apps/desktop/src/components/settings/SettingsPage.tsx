@@ -15,13 +15,10 @@ import {
   Globe,
   Keyboard,
   Loader2,
-  Monitor,
   Paintbrush,
   Play,
   Plus,
-  Plug,
   RefreshCcw,
-  Settings2,
   ShieldCheck,
   SignalHigh,
   Terminal,
@@ -31,7 +28,6 @@ import {
   Info,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { AppTooltip } from '@/components/ui/tooltip-wrapper'
 import {
   type BackendConfig,
   type WorkspaceMigrationResult,
@@ -41,9 +37,13 @@ import {
   fetchUnsandboxStatus,
   fetchAgentProviderKeys,
   saveAgentProviderKey,
+  fetchProjects,
+  disconnectProjectGitHub,
   type UnsandboxConfig,
   type UnsandboxStatus,
 } from '@/lib/orchestra-client'
+import type { Project } from '@/lib/orchestra-types'
+import { Github } from 'lucide-react'
 import { CHAT_PROVIDERS } from '@/components/embedded-agent/lib/types'
 import { usePlatform } from '@/hooks/use-platform'
 import { CustomDropdown } from '@/components/app-shell/shared/controls'
@@ -71,6 +71,7 @@ const SECTIONS = [
   { id: 'git', label: 'Git', icon: GitBranch },
   { id: 'appearance', label: 'Appearance', icon: Paintbrush },
   { id: 'terminal', label: 'Terminal', icon: Terminal },
+  { id: 'browser', label: 'Browser', icon: Globe },
   { id: 'editor', label: 'Editor', icon: Type },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
@@ -165,6 +166,10 @@ export function SettingsPage({
   const { isMac } = usePlatform()
   const theme = useAppStore(s => s.theme)
   const setTheme = useAppStore(s => s.setTheme)
+  const browserHomepage = useAppStore(s => s.browserHomepage)
+  const setBrowserHomepage = useAppStore(s => s.setBrowserHomepage)
+  const [homepageDraft, setHomepageDraft] = useState(browserHomepage)
+  useEffect(() => { setHomepageDraft(browserHomepage) }, [browserHomepage])
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const [activeId, setActiveId] = useState<SectionId>('general')
@@ -225,16 +230,13 @@ export function SettingsPage({
   }, [])
 
   return (
-    <div className="flex flex-1 min-h-0 overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-card via-card/98 to-muted/5 shadow-2xl shadow-primary/5">
+    <div className="flex flex-1 min-h-0 min-w-0 bg-background">
       {/* Sidebar */}
-      <nav className="w-[180px] shrink-0 border-r border-border/40 bg-muted/5 flex flex-col overflow-y-auto py-4">
-        <div className="flex items-center gap-2 px-4 mb-4">
-          <div className="rounded-xl bg-primary/10 p-1.5 text-primary shadow-inner">
-            <Settings2 className="h-3.5 w-3.5" />
-          </div>
-          <span className="text-xs font-black tracking-tight">Settings</span>
+      <nav className="w-[220px] shrink-0 border-r border-border/40 flex flex-col overflow-y-auto custom-scrollbar bg-background">
+        <div className="px-5 pt-8 pb-6">
+          <h2 className="text-[15px] font-black tracking-tight leading-none">Settings</h2>
         </div>
-        <div className="flex flex-col gap-0.5 px-2">
+        <div className="flex flex-col gap-1 px-3 pb-6">
           {SECTIONS.map((section) => {
             const Icon = section.icon
             const isActive = activeId === section.id
@@ -242,14 +244,22 @@ export function SettingsPage({
               <button
                 key={section.id}
                 onClick={() => scrollToSection(section.id)}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-bold tracking-tight transition-all duration-200 ${
+                className={`group relative flex items-center gap-3 px-3 h-10 rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
                   isActive
-                    ? 'bg-primary/10 text-primary shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                    ? 'bg-foreground/[0.06] text-foreground'
+                    : 'text-muted-foreground/80 hover:text-foreground hover:bg-foreground/[0.03]'
                 }`}
               >
-                <Icon className="h-3.5 w-3.5 shrink-0" />
-                {section.label}
+                {isActive && (
+                  <span className="absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-primary" />
+                )}
+                <Icon
+                  className={`h-[15px] w-[15px] shrink-0 transition-colors ${
+                    isActive ? 'text-primary' : 'text-muted-foreground/60 group-hover:text-foreground'
+                  }`}
+                  strokeWidth={isActive ? 2.25 : 1.75}
+                />
+                <span className="truncate text-[12.5px] font-medium tracking-tight">{section.label}</span>
               </button>
             )
           })}
@@ -258,7 +268,15 @@ export function SettingsPage({
 
       {/* Scrollable content */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar">
-        <div className="max-w-3xl mx-auto py-8 px-8 space-y-12">
+        <div className="max-w-5xl mx-auto pt-12 pb-24 px-12 space-y-14">
+          {/* Page hero */}
+          <header className="space-y-2 pb-2">
+            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary/80">Workspace</p>
+            <h1 className="text-3xl font-black tracking-tight">Settings</h1>
+            <p className="text-[12px] text-muted-foreground max-w-md">
+              Tune Orchestra to your workflow. Changes save automatically.
+            </p>
+          </header>
           {/* ── General ── */}
           <section data-settings-section="general" className="rounded-xl transition-colors duration-500 scroll-mt-4">
             <SectionHeading icon={FolderRoot} title="General" description="Workspace and startup configuration" />
@@ -322,9 +340,9 @@ export function SettingsPage({
 
           {/* ── Git ── */}
           <section data-settings-section="git" className="rounded-xl transition-colors duration-500 scroll-mt-4">
-            <SectionHeading icon={GitBranch} title="Git" description="Version control preferences" />
+            <SectionHeading icon={GitBranch} title="Git" description="Version control and GitHub connections" />
             <div className="mt-4">
-              <PlaceholderPane text="Git settings coming soon" />
+              <GitConnectionsPane config={config} />
             </div>
           </section>
 
@@ -361,6 +379,49 @@ export function SettingsPage({
             <SectionHeading icon={Terminal} title="Terminal" description="Terminal emulator preferences" />
             <div className="mt-4">
               <PlaceholderPane text="Terminal settings coming soon" />
+            </div>
+          </section>
+
+          {/* ── Browser ── */}
+          <section data-settings-section="browser" className="rounded-xl transition-colors duration-500 scroll-mt-4">
+            <SectionHeading icon={Globe} title="Browser" description="Embedded browser preferences" />
+            <div className="mt-4">
+              <div className="p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20">
+                <div className="space-y-0.5 mb-3">
+                  <p className="text-xs font-black tracking-tight">Default Homepage</p>
+                  <p className="text-[10px] text-muted-foreground">URL loaded when opening a new browser tab</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={homepageDraft}
+                    onChange={(e) => setHomepageDraft(e.target.value)}
+                    onBlur={() => {
+                      if (homepageDraft !== browserHomepage) setBrowserHomepage(homepageDraft)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.currentTarget.blur()
+                      } else if (e.key === 'Escape') {
+                        setHomepageDraft(browserHomepage)
+                        e.currentTarget.blur()
+                      }
+                    }}
+                    placeholder="https://example.com or about:blank"
+                    className="flex-1 px-3 py-2 rounded-lg bg-muted/20 border border-border/30 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setHomepageDraft('about:blank')
+                      setBrowserHomepage('about:blank')
+                    }}
+                  >
+                    Reset
+                  </Button>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -414,13 +475,13 @@ export function SettingsPage({
 
 function SectionHeading({ icon: Icon, title, description }: { icon: React.ComponentType<{ className?: string }>; title: string; description: string }) {
   return (
-    <div className="flex items-center gap-3">
-      <div className="rounded-xl bg-primary/10 p-2 text-primary shadow-inner">
+    <div className="flex items-start gap-3 pb-1 border-b border-border/30">
+      <div className="rounded-lg bg-gradient-to-br from-primary/15 to-primary/5 p-2 text-primary ring-1 ring-primary/15 mt-0.5">
         <Icon className="h-4 w-4" />
       </div>
-      <div>
-        <h2 className="text-sm font-black tracking-tight">{title}</h2>
-        <p className="text-[10px] text-muted-foreground">{description}</p>
+      <div className="flex-1 min-w-0 pb-3">
+        <h2 className="text-base font-black tracking-tight leading-tight">{title}</h2>
+        <p className="text-[11px] text-muted-foreground/80 mt-0.5">{description}</p>
       </div>
     </div>
   )
@@ -428,8 +489,164 @@ function SectionHeading({ icon: Icon, title, description }: { icon: React.Compon
 
 function PlaceholderPane({ text }: { text: string }) {
   return (
-    <div className="p-6 rounded-xl border border-dashed border-border/40 bg-muted/5 text-center">
-      <p className="text-xs text-muted-foreground/60 font-medium">{text}</p>
+    <div className="p-8 rounded-xl border border-dashed border-border/30 bg-gradient-to-b from-muted/5 to-transparent text-center">
+      <p className="text-xs text-muted-foreground/50 font-medium tracking-wide">{text}</p>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Git connections pane — central view of GitHub-linked projects
+// ---------------------------------------------------------------------------
+
+function GitConnectionsPane({ config }: { config: BackendConfig | null }) {
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [pendingId, setPendingId] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    if (!config) return
+    setLoading(true)
+    setError('')
+    try {
+      const data = await fetchProjects(config)
+      setProjects(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load projects')
+    } finally {
+      setLoading(false)
+    }
+  }, [config])
+
+  useEffect(() => { void load() }, [load])
+
+  const linked = projects.filter((p) => p.github_owner && p.github_repo)
+  const unlinked = projects.filter((p) => !(p.github_owner && p.github_repo))
+
+  const handleDisconnect = async (projectId: string) => {
+    if (!config) return
+    setPendingId(projectId)
+    setError('')
+    try {
+      await disconnectProjectGitHub(config, projectId)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Disconnect failed')
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  const openOnGitHub = (owner: string, repo: string) => {
+    const url = `https://github.com/${owner}/${repo}`
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const bridge = (window as any).orchestraDesktop
+    if (bridge && typeof bridge.openExternal === 'function') {
+      void bridge.openExternal(url)
+    } else {
+      window.open(url, '_blank')
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/55">GitHub</span>
+            <span className="text-[10px] font-medium tabular-nums text-muted-foreground/40">{linked.length}</span>
+          </div>
+          <button
+            onClick={() => void load()}
+            disabled={loading || !config}
+            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium tracking-tight text-muted-foreground/80 hover:text-foreground hover:bg-foreground/[0.04] disabled:opacity-40 transition-colors"
+          >
+            <RefreshCcw size={12} className={loading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
+
+        {error && (
+          <p className="text-[11.5px] text-destructive mb-3">{error}</p>
+        )}
+
+        {linked.length === 0 ? (
+          <div className="px-4 py-8 rounded-lg bg-foreground/[0.02] border border-border/30 text-center">
+            <Github size={20} className="mx-auto mb-2 text-muted-foreground/40" strokeWidth={1.75} />
+            <p className="text-[12px] font-medium text-foreground/70">No GitHub connections</p>
+            <p className="text-[11px] text-muted-foreground/60 mt-1">
+              Open a project and connect it from the Git → GitHub tab.
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-border/30 bg-background overflow-hidden">
+            {linked.map((project, idx) => (
+              <div
+                key={project.id}
+                className={`group relative flex items-center gap-3 px-3.5 py-2.5 hover:bg-foreground/[0.03] transition-colors ${
+                  idx > 0 ? 'border-t border-border/20' : ''
+                }`}
+              >
+                <Github size={14} className="text-muted-foreground/60 shrink-0" strokeWidth={2} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12.5px] font-medium tracking-tight text-foreground/90 truncate">
+                    {project.name}
+                  </div>
+                  <div className="font-mono text-[11px] text-muted-foreground/60 truncate">
+                    {project.github_owner}/{project.github_repo}
+                  </div>
+                </div>
+                <button
+                  onClick={() => openOnGitHub(project.github_owner!, project.github_repo!)}
+                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                >
+                  <ExternalLink size={11} />
+                  Open
+                </button>
+                <button
+                  onClick={() => void handleDisconnect(project.id)}
+                  disabled={pendingId === project.id}
+                  className="inline-flex items-center h-7 px-2.5 rounded-md text-[11px] font-medium text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 disabled:opacity-40 transition-colors"
+                >
+                  {pendingId === project.id ? 'Disconnecting…' : 'Disconnect'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {unlinked.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/55">Unlinked projects</span>
+            <span className="text-[10px] font-medium tabular-nums text-muted-foreground/40">{unlinked.length}</span>
+          </div>
+          <div className="rounded-lg border border-border/30 bg-background overflow-hidden">
+            {unlinked.map((project, idx) => (
+              <div
+                key={project.id}
+                className={`flex items-center gap-3 px-3.5 py-2.5 ${idx > 0 ? 'border-t border-border/20' : ''}`}
+              >
+                <span className="w-2 h-2 rounded-full bg-muted-foreground/20 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12.5px] font-medium tracking-tight text-foreground/85 truncate">
+                    {project.name}
+                  </div>
+                  <div className="font-mono text-[11px] text-muted-foreground/55 truncate">
+                    {project.remote_url || project.root_path}
+                  </div>
+                </div>
+                <span className="text-[10.5px] text-muted-foreground/50">Not connected</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-muted-foreground/60 mt-2.5">
+            Connect a project to GitHub from its <span className="font-medium text-foreground/80">Git → GitHub</span> tab.
+          </p>
+        </div>
+      )}
     </div>
   )
 }

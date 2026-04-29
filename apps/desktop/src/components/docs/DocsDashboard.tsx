@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import {
-    BookOpen, FileText, ChevronRight, Search,
-    Terminal, ShieldCheck,
+    FileText, ChevronRight, Search,
     RefreshCcw, Folder, FolderOpen,
-    Activity, Clock, Hash,
-    ArrowUp, ScrollText, Code as CodeIcon
+    ArrowUp, Code as CodeIcon
 } from 'lucide-react'
 import type { DocItem, BackendConfig } from '@/lib/orchestra-types'
 import { Button } from '@/components/ui/button'
@@ -350,20 +348,22 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
             if (item.is_folder) {
                 const isExpanded = expandedFolders.has(item.path)
                 return (
-                    <div key={item.path} className="space-y-0.5">
+                    <div key={item.path}>
                         <button
                             onClick={() => toggleFolder(item.path)}
-                            className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-muted-foreground/50 hover:bg-muted transition-all text-left group"
-                            style={{ paddingLeft: `${level * 12 + 8}px` }}
+                            className="group w-full flex items-center gap-2.5 h-9 rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-colors text-left"
+                            style={{ paddingLeft: `${level * 12 + 10}px`, paddingRight: '10px' }}
                         >
-                            <div className="flex items-center gap-2 flex-1 text-left">
-                                {isExpanded ? <FolderOpen size={14} className="text-primary/60" /> : <Folder size={14} className="text-muted-foreground/30" />}
-                                {getSectionNumber(item) && <span className="text-[10px] font-mono text-primary/50">{getSectionNumber(item)}</span>}
-                                <span className="text-xs font-black uppercase tracking-widest group-hover:text-muted-foreground transition-colors">{item.name}</span>
-                            </div>
-                            <ChevronRight size={12} className={`transition-transform duration-200 opacity-20 ${isExpanded ? 'rotate-90' : ''}`} />
+                            {isExpanded
+                                ? <FolderOpen size={15} strokeWidth={1.75} className="shrink-0 text-muted-foreground/60 group-hover:text-foreground transition-colors" />
+                                : <Folder size={15} strokeWidth={1.75} className="shrink-0 text-muted-foreground/60 group-hover:text-foreground transition-colors" />
+                            }
+                            <span className="flex-1 truncate text-[12.5px] font-medium tracking-tight capitalize">{item.name}</span>
+                            <ChevronRight size={12} className={`shrink-0 transition-transform duration-150 text-muted-foreground/40 ${isExpanded ? 'rotate-90' : ''}`} />
                         </button>
-                        {isExpanded && item.children && renderTree(item.children, level + 1, item.name)}
+                        {isExpanded && item.children && (
+                            <div className="mt-0.5">{renderTree(item.children, level + 1, item.name)}</div>
+                        )}
                     </div>
                 )
             }
@@ -373,17 +373,20 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
                 <button
                     key={item.path}
                     onClick={() => handleSelectDoc(item.path)}
-                    className={`w-full flex items-center gap-2.5 px-2 py-2.5 rounded-md transition-all text-left relative group ${
+                    className={`group relative w-full flex items-center gap-2.5 h-9 rounded-md transition-all duration-150 text-left ${
                         isActive
-                            ? 'bg-primary/10 text-primary border border-primary/20 shadow-sm font-bold'
-                            : 'text-muted-foreground/60 hover:bg-muted border border-transparent hover:text-foreground'
+                            ? 'bg-foreground/[0.06] text-foreground'
+                            : 'text-muted-foreground/80 hover:text-foreground hover:bg-foreground/[0.03]'
                     }`}
-                    style={{ paddingLeft: `${level * 12 + 8}px` }}
+                    style={{ paddingLeft: `${level * 12 + 10}px`, paddingRight: '10px' }}
                 >
-                    {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-0.5 bg-primary rounded-r-full" />}
-                    <FileText size={14} className={isActive ? 'text-primary' : 'text-muted-foreground/30 group-hover:text-muted-foreground/60'} />
-                    {getSectionNumber(item) && <span className="text-[10px] font-mono text-primary/40 shrink-0">{getSectionNumber(item)}</span>}
-                    <span className={`flex-1 text-sm tracking-tight truncate`}>
+                    {isActive && <span className="absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-primary" />}
+                    <FileText
+                        size={15}
+                        strokeWidth={isActive ? 2.25 : 1.75}
+                        className={`shrink-0 transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground/60 group-hover:text-foreground'}`}
+                    />
+                    <span className="flex-1 truncate text-[12.5px] font-medium tracking-tight capitalize">
                         {getDisplayName(item)}
                     </span>
                 </button>
@@ -392,115 +395,88 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
     }
 
     return (
-        <div className="flex flex-col h-full bg-background/20 overflow-hidden">
+        <div className="flex flex-col h-full bg-background overflow-hidden">
             <DiagramFullscreenOverlay />
-            <div className="flex-1 flex overflow-hidden min-h-0 relative bg-transparent">
+            <div className="flex-1 flex overflow-hidden min-h-0 relative">
                 {/* Left Sidebar (Navigation) */}
-                <div className="w-72 border-r border-border bg-muted/10 flex flex-col min-h-0 z-20 ml-3">
-                    <div className="p-3 border-b border-border shrink-0 bg-muted/5">
-                        <div className="flex items-center gap-2">
-                            <div className="relative group flex-1">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
-                                <input
-                                    type="text"
-                                    placeholder="Search docs..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full h-8 pl-9 pr-4 bg-muted/30 border-border rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                                />
-                            </div>
-                            <AppTooltip content="Force documentation scan">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={loadDocs}
-                                    disabled={loading}
-                                    className="h-8 w-8 p-0 shrink-0 border border-border hover:bg-muted"
-                                >
-                                    <RefreshCcw size={14} className={loading ? 'animate-refresh-spin' : ''} />
-                                </Button>
-                            </AppTooltip>
+                <div className="w-64 border-r border-border/40 flex flex-col min-h-0">
+                    <div className="px-4 pt-7 pb-3">
+                        <h2 className="text-[15px] font-black tracking-tight leading-none">Documentation</h2>
+                    </div>
+                    <div className="px-3 pb-3 flex items-center gap-2">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
+                            <input
+                                type="text"
+                                placeholder="Search docs..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full h-8 pl-8 pr-3 bg-muted/30 rounded-md text-[12px] font-medium placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/40 transition-all"
+                            />
                         </div>
+                        <AppTooltip content="Refresh">
+                            <button
+                                onClick={loadDocs}
+                                disabled={loading}
+                                className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.03] transition-colors disabled:opacity-50"
+                            >
+                                <RefreshCcw size={13} className={loading ? 'animate-refresh-spin' : ''} />
+                            </button>
+                        </AppTooltip>
                     </div>
                     <OverlayScrollbarsComponent
                         element="div"
                         options={osOptions}
-                        className="flex-1"
+                        className="flex-1 min-h-0"
                     >
-                        <div className="p-3 space-y-1">
+                        <div className="px-3 pb-6 flex flex-col gap-0.5">
                             {loading && docs.length === 0 ? (
-                                [1, 2, 3, 4, 5, 6, 7].map(i => <Skeleton key={i} className="h-8 w-full mb-1 rounded-lg bg-muted/30" />)
+                                [1, 2, 3, 4, 5, 6, 7].map(i => <Skeleton key={i} className="h-9 w-full rounded-md bg-muted/20" />)
                             ) : renderTree(filteredDocs)}
                         </div>
                     </OverlayScrollbarsComponent>
                 </div>
 
                 {/* Main Content Area */}
-                <div className="flex-1 flex flex-col bg-background/5 min-h-0 relative">
+                <div className="flex-1 flex flex-col min-h-0 relative">
                     <OverlayScrollbarsComponent
                         element="div"
                         options={osOptions}
-                        className="flex-1"
+                        className="flex-1 min-h-0"
                         ref={scrollRef}
                     >
-                        <div className="px-16 py-16 max-w-5xl mx-auto min-h-full flex flex-col text-left">
+                        <div className="px-10 pt-6 pb-12 max-w-4xl mx-auto flex flex-col text-left">
                             {contentLoading ? (
                                 <div className="space-y-8 animate-pulse">
-                                    <Skeleton className="h-16 w-3/4 rounded-2xl bg-muted/30" />
+                                    <Skeleton className="h-12 w-3/4 rounded-lg bg-muted/20" />
                                     <div className="space-y-3">
-                                        <Skeleton className="h-4 w-full bg-muted/30" />
-                                        <Skeleton className="h-4 w-full bg-muted/30" />
-                                        <Skeleton className="h-4 w-5/6 bg-muted/30" />
+                                        <Skeleton className="h-4 w-full bg-muted/20" />
+                                        <Skeleton className="h-4 w-full bg-muted/20" />
+                                        <Skeleton className="h-4 w-5/6 bg-muted/20" />
                                     </div>
-                                    <Skeleton className="h-96 w-full rounded-3xl bg-muted/30" />
+                                    <Skeleton className="h-64 w-full rounded-lg bg-muted/20" />
                                 </div>
                             ) : !selectedPath ? (
-                                <div className="flex-1 flex flex-col items-center justify-center opacity-20 grayscale">
-                                    <Terminal size={80} className="mb-6 text-primary" strokeWidth={1} />
-                                    <p className="text-lg font-black uppercase tracking-[0.4em]">Initialize Wiki Stream</p>
+                                <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground/40">
+                                    <FileText size={32} className="mb-4" strokeWidth={1.25} />
+                                    <p className="text-sm font-medium">Select a document</p>
                                 </div>
                             ) : (
-                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-1000 ease-out">
-                                    {/* Wiki Breadcrumbs */}
-                                    <div className="mb-10 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary/40">
-                                        <BookOpen size={12} />
-                                        <span>Wiki</span>
-                                        <ChevronRight size={10} />
-                                        <span className="text-muted-foreground/60">{selectedPath.replace('.md', '').split('/').join(' / ')}</span>
-                                    </div>
-
-                                    <article className="prose prose-invert max-w-none prose-wiki">
+                                <div className="animate-in fade-in duration-300">
+                                    <article className="prose prose-invert max-w-none prose-wiki prose-headings:tracking-tight prose-h1:mt-0 prose-h1:mb-6">
                                         <MarkdownRenderer
                                             content={content}
                                             allowHtml
                                             components={markdownComponents}
                                         />
                                     </article>
-                                    
-                                    {/* Wiki Footer */}
-                                    <div className="mt-24 pt-10 border-t border-border flex flex-wrap items-center justify-between gap-6 opacity-30">
-                                        <div className="flex items-center gap-6">
-                                            <div className="flex items-center gap-2">
-                                                <ShieldCheck size={14} className="text-primary" />
-                                                <span className="text-[10px] font-black uppercase tracking-widest">Verified Specs</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <Clock size={14} />
-                                                <span className="text-[10px] font-black uppercase tracking-widest">Auto-Synced</span>
-                                            </div>
-                                        </div>
-                                        <div className="text-[10px] font-mono flex items-center gap-2 bg-muted/30 px-3 py-1 rounded-full border border-border">
-                                            <Hash size={12} className="text-primary" />
-                                            {selectedPath}
-                                        </div>
-                                    </div>
                                 </div>
                             )}
                         </div>
                     </OverlayScrollbarsComponent>
 
-                    {/* Back to top fab */}
-                    <button 
+                    {/* Back to top */}
+                    <button
                         onClick={() => {
                             if (scrollRef.current) {
                                 const instance = scrollRef.current.osInstance()
@@ -510,42 +486,37 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
                                 }
                             }
                         }}
-                        className="absolute bottom-8 right-8 h-10 w-10 rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-2xl backdrop-blur-xl hover:bg-primary/20 transition-all z-50 group"
+                        className="absolute bottom-6 right-6 h-9 w-9 rounded-md bg-muted/40 text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 grid place-items-center transition-colors"
+                        title="Back to top"
                     >
-                        <ArrowUp size={18} className="group-hover:-translate-y-0.5 transition-transform" />
+                        <ArrowUp size={15} />
                     </button>
                 </div>
 
                 {/* Right Sidebar (Table of Contents) */}
-                <div className="w-80 border-l border-border bg-muted/10 flex flex-col min-h-0 z-20">
-                    <div className="p-6 border-b border-border shrink-0 bg-muted/5">
-                        <div className="flex items-center gap-2 mb-2">
-                            <ScrollText size={14} className="text-primary" />
-                            <h2 className="text-xs font-black uppercase tracking-widest text-foreground/80">On this page</h2>
-                        </div>
+                <div className="w-64 border-l border-border/40 flex flex-col min-h-0">
+                    <div className="px-5 pt-7 pb-3">
+                        <h2 className="text-[15px] font-black tracking-tight leading-none">On this page</h2>
                     </div>
-                    
+
                     <OverlayScrollbarsComponent
                         element="div"
                         options={osOptions}
-                        className="flex-1"
+                        className="flex-1 min-h-0"
                     >
-                        <div className="p-6 text-left">
+                        <div className="px-3 pb-6">
                             {toc.length === 0 ? (
-                                <div className="py-10 text-center opacity-20 grayscale">
-                                    <Activity size={32} className="mx-auto mb-2" />
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-center">No Headings</p>
-                                </div>
+                                <p className="px-3 py-4 text-[11px] text-muted-foreground/50">No headings</p>
                             ) : (
-                                <nav className="space-y-1">
+                                <nav className="flex flex-col gap-0.5">
                                     {toc.map((heading, i) => (
                                         <button
                                             key={`${heading.id}-${i}`}
                                             onClick={() => scrollToHeading(heading.id)}
-                                            className={`w-full text-left rounded-lg px-3 py-2 text-xs transition-all hover:bg-muted/50 ${
-                                                heading.level === 1 ? 'font-black uppercase tracking-widest text-foreground/90' : 
-                                                heading.level === 2 ? 'font-bold text-muted-foreground/80 pl-6' : 
-                                                'font-medium text-muted-foreground/60 pl-10'
+                                            className={`w-full text-left rounded-md px-3 py-1.5 text-[12px] tracking-tight transition-colors text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] ${
+                                                heading.level === 1 ? 'font-semibold' :
+                                                heading.level === 2 ? 'font-medium pl-5' :
+                                                'pl-8'
                                             }`}
                                         >
                                             {heading.text}
@@ -553,7 +524,6 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
                                     ))}
                                 </nav>
                             )}
-
                         </div>
                     </OverlayScrollbarsComponent>
                 </div>

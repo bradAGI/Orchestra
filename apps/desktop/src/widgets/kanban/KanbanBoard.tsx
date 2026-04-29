@@ -243,11 +243,11 @@ export function KanbanBoard({
   const doneItemsList = enrichedIssues.filter((i) => stateIs(i.state, 'Done')).filter(filterItem)
 
   const columns = [
-    { id: 'backlog', title: 'Backlog', items: backlogItems, icon: <div className="h-2 w-2 rounded-full border-2 border-muted-foreground/40" /> },
-    { id: 'todo', title: 'To Do', items: todoItems, icon: <div className="h-2 w-2 rounded-full border-2 border-muted-foreground" /> },
-    { id: 'progress', title: 'In Progress', items: inProgressItems, icon: <div className="h-2 w-2 rounded-full border-2 border-amber-500 bg-amber-500" /> },
-    { id: 'review', title: 'Review', items: reviewItems, icon: <div className="h-2 w-2 rounded-full border-2 border-blue-500 bg-blue-500" /> },
-    { id: 'done', title: 'Done', items: doneItemsList, icon: <div className="h-2 w-2 rounded-full bg-primary" /> },
+    { id: 'backlog', title: 'Backlog', items: backlogItems, icon: <div className="h-2 w-2 rounded-full border-2 border-muted-foreground/40" />, accent: 'bg-muted-foreground/40' },
+    { id: 'todo', title: 'To Do', items: todoItems, icon: <div className="h-2 w-2 rounded-full border-2 border-muted-foreground" />, accent: 'bg-muted-foreground/70' },
+    { id: 'progress', title: 'In Progress', items: inProgressItems, icon: <div className="h-2 w-2 rounded-full border-2 border-amber-500 bg-amber-500" />, accent: 'bg-amber-500' },
+    { id: 'review', title: 'Review', items: reviewItems, icon: <div className="h-2 w-2 rounded-full border-2 border-blue-500 bg-blue-500" />, accent: 'bg-blue-500' },
+    { id: 'done', title: 'Done', items: doneItemsList, icon: <div className="h-2 w-2 rounded-full bg-primary" />, accent: 'bg-primary' },
   ]
 
   const orderedColumns = columnOrder.map((id) => columns.find((column) => column.id === id)!)
@@ -297,68 +297,63 @@ export function KanbanBoard({
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 px-4 pt-2 pb-2 shrink-0">
+    <div className="flex-1 flex flex-col min-h-0 space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4 pb-3 shrink-0">
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="default" size="sm" onClick={() => handleCreateClick('backlog')} className="h-8 gap-1.5 bg-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 shadow-lg shadow-primary/20 px-3">
-            <Plus size={14} />
+          <button
+            onClick={() => handleCreateClick('backlog')}
+            className="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-md bg-foreground text-background hover:bg-foreground/90 text-[12px] font-semibold tracking-tight transition-colors"
+          >
+            <Plus size={13} />
             Create Task
-          </Button>
+          </button>
           {viewMode === 'list' && (
-            <div className="flex items-center gap-1.5 rounded-md border bg-muted/20 px-1.5 py-0.5">
-              <span className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/60">State</span>
-              <CustomDropdown
-                className="w-40"
-                value={stateFilter}
-                options={[
-                  { label: 'All States', value: 'all', icon: <CircleDashed className="h-3 w-3" /> },
-                  { label: 'Backlog', value: 'Backlog', icon: <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" /> },
-                  { label: 'Todo', value: 'Todo', icon: <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground" /> },
-                  { label: 'In Progress', value: 'In Progress', icon: <div className="h-1.5 w-1.5 rounded-full bg-amber-500" /> },
-                  { label: 'Review', value: 'Review', icon: <div className="h-1.5 w-1.5 rounded-full bg-blue-500" /> },
-                  { label: 'Done', value: 'Done', icon: <div className="h-1.5 w-1.5 rounded-full bg-primary" /> },
-                ]}
-                onChange={setStateFilter}
-              />
-            </div>
+            <CustomDropdown
+              className="w-40"
+              value={stateFilter}
+              options={[
+                { label: 'All States', value: 'all', icon: <CircleDashed className="h-3 w-3" /> },
+                { label: 'Backlog', value: 'Backlog', icon: <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" /> },
+                { label: 'Todo', value: 'Todo', icon: <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground" /> },
+                { label: 'In Progress', value: 'In Progress', icon: <div className="h-1.5 w-1.5 rounded-full bg-amber-500" /> },
+                { label: 'Review', value: 'Review', icon: <div className="h-1.5 w-1.5 rounded-full bg-blue-500" /> },
+                { label: 'Done', value: 'Done', icon: <div className="h-1.5 w-1.5 rounded-full bg-primary" /> },
+              ]}
+              onChange={setStateFilter}
+            />
           )}
-
-
         </div>
 
         <div className="flex items-center gap-2">
           {projects.length > 1 && (
-            <div className="flex items-center gap-1.5 rounded-md border bg-muted/20 px-1.5 py-0.5">
-              <span className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/60">Project</span>
-              <CustomDropdown
-                className="w-56"
-                value={projectFilter}
-                options={[
-                  { label: 'All Projects', value: 'all', icon: <FolderTree className="h-3 w-3" /> },
-                  ...projects.map((project) => ({ label: project.name, value: project.id, icon: <Folder className="h-3 w-3" /> })),
-                ]}
-                onChange={setProjectFilter}
-              />
-            </div>
+            <CustomDropdown
+              className="w-56"
+              value={projectFilter}
+              options={[
+                { label: 'All Projects', value: 'all', icon: <FolderTree className="h-3 w-3" /> },
+                ...projects.map((project) => ({ label: project.name, value: project.id, icon: <Folder className="h-3 w-3" /> })),
+              ]}
+              onChange={setProjectFilter}
+            />
           )}
-        <div className="flex items-center gap-1 rounded-lg border bg-muted/20 p-1">
-          <AppTooltip content="Board View">
-            <button
-              onClick={() => setViewMode('board')}
-              className={`grid h-7 w-8 place-items-center rounded-md transition-all ${viewMode === 'board' ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-            >
-              <Layout className="h-3.5 w-3.5" />
-            </button>
-          </AppTooltip>
-          <AppTooltip content="List View">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`grid h-7 w-8 place-items-center rounded-md transition-all ${viewMode === 'list' ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-            >
-              <Rows className="h-3.5 w-3.5" />
-            </button>
-          </AppTooltip>
-        </div>
+          <div className="flex items-center rounded-md bg-muted/30 p-0.5">
+            <AppTooltip content="Board view">
+              <button
+                onClick={() => setViewMode('board')}
+                className={`grid h-7 w-8 place-items-center rounded transition-colors ${viewMode === 'board' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground/60 hover:text-foreground'}`}
+              >
+                <Layout className="h-3.5 w-3.5" />
+              </button>
+            </AppTooltip>
+            <AppTooltip content="List view">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`grid h-7 w-8 place-items-center rounded transition-colors ${viewMode === 'list' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground/60 hover:text-foreground'}`}
+              >
+                <Rows className="h-3.5 w-3.5" />
+              </button>
+            </AppTooltip>
+          </div>
         </div>
       </div>
 
@@ -369,48 +364,57 @@ export function KanbanBoard({
       )}
 
       {viewMode === 'board' ? (
-        <div className="flex-1 grid grid-cols-5 gap-3 min-h-0 px-4">
+        <div className="flex-1 grid grid-cols-5 gap-3 min-h-0 px-5 pb-5">
           {orderedColumns.map((column) => (
             <div
               key={column.id}
-              className={`flex flex-col gap-3 transition-opacity min-h-0 ${draggingColumnId === column.id ? 'opacity-40' : ''}`}
+              className={`flex flex-col gap-2.5 transition-opacity min-h-0 ${draggingColumnId === column.id ? 'opacity-40' : ''}`}
               onDragOver={(e) => handleDragOver(e, column.id)}
               onDragLeave={() => setIsDraggingOver(null)}
               onDrop={(e) => handleDrop(e, column.id)}
             >
               <div
-                className="flex cursor-grab items-center justify-between px-1 active:cursor-grabbing shrink-0"
+                className="flex cursor-grab items-center justify-between px-2 py-1 active:cursor-grabbing shrink-0 group/header"
                 draggable
                 onDragStart={(e) => handleColumnDragStart(e, column.id)}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
                   {column.icon}
-                  <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{column.title}</h3>
-                  <span className="text-[11px] font-medium text-muted-foreground/50">{column.items.length}</span>
+                  <h3 className="text-[12.5px] font-semibold tracking-tight text-foreground truncate">{column.title}</h3>
+                  <span className="inline-flex items-center justify-center min-w-[20px] h-[18px] px-1.5 rounded-full bg-muted/60 text-[10px] font-bold text-muted-foreground tabular-nums">
+                    {column.items.length}
+                  </span>
                 </div>
               </div>
 
-              <OverlayScrollbarsComponent
-                element="div"
-                options={osOptions}
-                className={`flex-1 flex flex-col gap-3 rounded-xl p-1.5 transition-colors min-h-0 border border-border/40 ${isDraggingOver === column.id ? 'bg-primary/5 ring-2 ring-primary/20 ring-inset' : 'bg-muted/10'}`}
-              >
+              <div className={`relative flex-1 flex flex-col rounded-xl min-h-0 transition-all overflow-hidden ${
+                isDraggingOver === column.id
+                  ? 'bg-primary/[0.05] ring-1 ring-primary/40 ring-inset'
+                  : 'bg-muted/[0.06] ring-1 ring-border/30 ring-inset'
+              }`}>
+                <div className={`absolute top-0 left-0 right-0 h-[2px] ${column.accent} opacity-60`} />
+                <OverlayScrollbarsComponent
+                  element="div"
+                  options={osOptions}
+                  className="flex-1 flex flex-col gap-2 p-2 min-h-0"
+                >
                 {loadingState ? (
-                  Array.from({ length: 3 }).map((_, idx) => <Skeleton key={idx} className="h-28 w-full rounded-lg" />)
+                  Array.from({ length: 3 }).map((_, idx) => <Skeleton key={idx} className="h-24 w-full rounded-md" />)
                 ) : column.items.length === 0 ? (
                   column.id === 'backlog' ? (
                     <button
                       type="button"
-                      className="relative w-full min-h-full flex flex-col items-center justify-center cursor-pointer bg-gradient-to-b from-card via-card to-muted/20 border border-border/40 rounded-xl transition-all group/empty overflow-hidden hover:border-primary/30"
+                      className="w-full min-h-full flex flex-col items-center justify-center gap-2 cursor-pointer rounded-lg border border-dashed border-border/50 bg-background/40 hover:border-primary/50 hover:bg-primary/[0.04] transition-all group/empty"
                       onClick={() => handleCreateClick(column.id)}
                     >
-                      <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover/empty:opacity-100 transition-opacity duration-500" />
-                      <Plus className="h-5 w-5 text-muted-foreground/20 group-hover/empty:text-primary/40 transition-colors mb-2" />
-                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground/20 group-hover/empty:text-muted-foreground/40 transition-colors">Click to add task</p>
+                      <div className="h-7 w-7 rounded-full bg-muted/40 grid place-items-center group-hover/empty:bg-primary/15 transition-colors">
+                        <Plus className="h-3.5 w-3.5 text-muted-foreground/60 group-hover/empty:text-primary transition-colors" />
+                      </div>
+                      <p className="text-[11px] font-semibold text-muted-foreground/60 group-hover/empty:text-foreground transition-colors">Add task</p>
                     </button>
                   ) : (
-                    <div className="relative w-full min-h-full flex items-center justify-center bg-gradient-to-b from-card via-card to-muted/20 border border-border/40 rounded-xl overflow-hidden">
-                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground/15">No tasks</p>
+                    <div className="w-full min-h-full flex items-center justify-center opacity-60">
+                      <p className="text-[10px] font-medium tracking-wide text-muted-foreground/40">— empty —</p>
                     </div>
                   )
                 ) : (
@@ -420,81 +424,82 @@ export function KanbanBoard({
                         key={item.issue_id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, getActionIssueRef(item))}
-                        className="group relative cursor-grab border border-border/60 bg-gradient-to-b from-card via-card to-muted/20 p-3.5 mb-1.5 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 active:cursor-grabbing active:scale-[0.98] rounded-xl"
+                        className="group relative cursor-grab border border-border/50 bg-card p-3 transition-all hover:border-primary/30 hover:shadow-md hover:shadow-primary/5 hover:-translate-y-px active:cursor-grabbing active:translate-y-0 rounded-lg shadow-sm"
                         onClick={() => void onInspectIssue(getActionIssueRef(item))}
                       >
-                        <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                         <div className="flex items-start justify-between gap-2">
-                          <span className="font-mono text-[11px] font-black uppercase tracking-tight text-primary/80 group-hover:text-primary transition-colors">
+                          <span className="font-mono text-[10px] font-semibold tracking-tight text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
                             {item.issue_identifier}
                           </span>
-                          {item.url && typeof item.url === 'string' && item.url.includes('github.com') && (
-                            <Github size={10} className="text-muted-foreground/30" />
-                          )}
-                          <div
-                            data-no-drag="true"
-                            className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all translate-x-1 group-hover:translate-x-0"
-                          >
-                            {item.state === 'Todo' && item.assignee_id && item.assignee_id !== 'Unassigned' && onIssueUpdate && (
-                              <AppTooltip content="Launch agent session">
-                                <button
-                                  type="button"
-                                  data-no-drag="true"
-                                  className="p-1 rounded-md text-emerald-500/60 hover:text-emerald-500 hover:bg-emerald-500/10 transition-all"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    void onIssueUpdate(getActionIssueRef(item), { state: 'In Progress' })
-                                  }}
-                                >
-                                  <Play className="h-2.5 w-2.5 fill-current" />
-                                </button>
-                              </AppTooltip>
+                          <div className="flex items-center gap-1">
+                            {item.url && typeof item.url === 'string' && item.url.includes('github.com') && (
+                              <Github size={10} className="text-muted-foreground/30" />
                             )}
-                            {item.state === 'In Progress' && onStopSession && (
-                              <AppTooltip content="Stop session">
-                                <button
-                                  type="button"
-                                  data-no-drag="true"
-                                  className="p-1 rounded-md text-amber-500/60 hover:text-amber-500 hover:bg-amber-500/10 transition-all"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    void onStopSession(getActionIssueRef(item))
-                                  }}
-                                >
-                                  <Square className="h-2 w-2 fill-current" />
-                                </button>
-                              </AppTooltip>
-                            )}
-                            {onIssueDelete && (
-                              <AppTooltip content="Permanently delete">
-                                <button
-                                  type="button"
-                                  data-no-drag="true"
-                                  aria-label={`Delete task ${item.issue_identifier}`}
-                                  className="p-1 rounded-md text-muted-foreground/40 hover:text-red-500 hover:bg-red-500/10 transition-all"
+                            <div
+                              data-no-drag="true"
+                              className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              {item.state === 'Todo' && item.assignee_id && item.assignee_id !== 'Unassigned' && onIssueUpdate && (
+                                <AppTooltip content="Launch agent session">
+                                  <button
+                                    type="button"
+                                    data-no-drag="true"
+                                    className="p-1 rounded text-muted-foreground/60 hover:text-emerald-500 hover:bg-emerald-500/10 transition-colors"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      void onIssueUpdate(getActionIssueRef(item), { state: 'In Progress' })
+                                    }}
+                                  >
+                                    <Play className="h-2.5 w-2.5 fill-current" />
+                                  </button>
+                                </AppTooltip>
+                              )}
+                              {item.state === 'In Progress' && onStopSession && (
+                                <AppTooltip content="Stop session">
+                                  <button
+                                    type="button"
+                                    data-no-drag="true"
+                                    className="p-1 rounded text-muted-foreground/60 hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      void onStopSession(getActionIssueRef(item))
+                                    }}
+                                  >
+                                    <Square className="h-2 w-2 fill-current" />
+                                  </button>
+                                </AppTooltip>
+                              )}
+                              {onIssueDelete && (
+                                <AppTooltip content="Delete">
+                                  <button
+                                    type="button"
+                                    data-no-drag="true"
+                                    aria-label={`Delete task ${item.issue_identifier}`}
+                                    className="p-1 rounded text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       setDeleteTaskError('')
                                       setIssueToDelete({ identifier: getActionIssueRef(item), title: item.title })
                                       setDeleteDialogOpen(true)
                                     }}
-                                >
-                                  <Trash2 className="h-2.5 w-2.5" />
-                                </button>
-                              </AppTooltip>
-                            )}
+                                  >
+                                    <Trash2 className="h-2.5 w-2.5" />
+                                  </button>
+                                </AppTooltip>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        <p className="mt-1.5 line-clamp-2 text-[12px] font-bold leading-[1.4] text-foreground/90 group-hover:text-foreground transition-colors">
+                        <p className="mt-1.5 line-clamp-2 text-[12.5px] font-semibold leading-snug text-foreground/90 group-hover:text-foreground transition-colors">
                           {item.title || item.description || item.last_message || item.error || 'No message'}
                         </p>
                         {projects.length > 1 && item.project_id && (
-                          <span className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-muted/50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 ring-1 ring-border/30 group-hover:ring-primary/20 group-hover:text-muted-foreground transition-all">
+                          <span className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground/60">
                             <Folder className="h-2.5 w-2.5 shrink-0" />
                             <span className="truncate">{projects.find(p => p.id === item.project_id)?.name}</span>
                           </span>
                         )}
-                        <div className="mt-3 flex items-center justify-between border-t border-border/40 pt-2.5 overflow-hidden">
+                        <div className="mt-2.5 flex items-center justify-between gap-2 overflow-hidden">
                           <div data-no-drag="true" className="min-w-0">
                             <AgentSelector
                               value={item.assignee_id || ''}
@@ -509,7 +514,7 @@ export function KanbanBoard({
                           </div>
                           {item.session_id ? (
                             <AppTooltip content="Live session">
-                              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                             </AppTooltip>
                           ) : null}
                         </div>
@@ -517,7 +522,8 @@ export function KanbanBoard({
                     )
                   })
                 )}
-              </OverlayScrollbarsComponent>
+                </OverlayScrollbarsComponent>
+              </div>
             </div>
           ))}
         </div>

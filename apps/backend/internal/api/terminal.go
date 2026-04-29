@@ -22,6 +22,7 @@ func (s *Server) TerminalWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	sessionID := chi.URLParam(r, "session_id")
 	projectID := r.URL.Query().Get("project_id")
+	cwdOverride := r.URL.Query().Get("cwd")
 
 	if sessionID == "" {
 		writeJSONError(w, http.StatusBadRequest, "invalid_request", "session_id is required")
@@ -50,6 +51,14 @@ func (s *Server) TerminalWebSocket(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 			}
+		}
+	}
+
+	// Explicit cwd override takes precedence over project lookup, but only if
+	// it's an absolute path that exists as a directory.
+	if cwdOverride != "" && filepath.IsAbs(cwdOverride) {
+		if info, err := os.Stat(cwdOverride); err == nil && info.IsDir() {
+			dir = cwdOverride
 		}
 	}
 

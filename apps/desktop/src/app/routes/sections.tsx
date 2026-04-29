@@ -41,8 +41,8 @@ export const sidebarItems: SidebarItem[] = [
   },
   {
     id: 'CONSOLE',
-    label: 'Terminals',
-    description: 'Coding harnesses and development shells',
+    label: 'Development',
+    description: 'Editor, terminals, and browser preview',
     icon: Terminal,
   },
   {
@@ -130,7 +130,7 @@ const sectionMeta: Record<SectionID, { label: string; title: string }> = {
   SANDBOX: { label: 'Compute', title: 'Sandbox' },
   SETTINGS: { label: 'System', title: 'Settings' },
   DOCS: { label: 'Knowledge', title: 'Documentation' },
-  CONSOLE: { label: 'Runtime', title: 'Terminals' },
+  CONSOLE: { label: 'Workspace', title: 'Development' },
 }
 
 /**

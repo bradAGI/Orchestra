@@ -6,12 +6,12 @@ import {
   Plus,
   Search,
   RefreshCcw,
-  ArrowUpRight,
-  ArrowDownRight,
+  ArrowUp,
+  ArrowDown,
   Check,
   X,
-  ChevronDown,
-  ChevronRight,
+  Star,
+  Cloud,
 } from 'lucide-react'
 import type { BackendConfig, BranchDetail } from '@/lib/orchestra-client'
 import {
@@ -27,6 +27,8 @@ interface BranchManagerViewProps {
   config: BackendConfig
   projectId: string
 }
+
+type FilterMode = 'all' | 'local' | 'remote' | 'stale'
 
 function relativeTime(dateStr: string): string {
   if (!dateStr) return ''
@@ -45,22 +47,26 @@ function relativeTime(dateStr: string): string {
   return `${months}mo ago`
 }
 
+function ageDays(dateStr: string): number {
+  if (!dateStr) return 0
+  return (Date.now() - new Date(dateStr).getTime()) / 86400000
+}
+
 export function BranchManagerView({ config, projectId }: BranchManagerViewProps) {
   const [branches, setBranches] = useState<BranchDetail[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<FilterMode>('local')
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [mergeConfirm, setMergeConfirm] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [newBranchName, setNewBranchName] = useState('')
   const [baseBranch, setBaseBranch] = useState('')
-  const [remotesExpanded, setRemotesExpanded] = useState(true)
   const [currentBranch, setCurrentBranch] = useState('')
 
   const loadBranches = useCallback(async () => {
-    setLoading(true)
-    setError('')
+    setLoading(true); setError('')
     try {
       const data = await fetchProjectGitBranchesDetail(config, projectId)
       setBranches(data.branches || [])
@@ -68,218 +74,268 @@ export function BranchManagerView({ config, projectId }: BranchManagerViewProps)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load branches')
       setTimeout(() => setError(''), 5000)
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }, [config, projectId])
 
-  useEffect(() => {
-    loadBranches()
-  }, [loadBranches])
+  useEffect(() => { loadBranches() }, [loadBranches])
 
   const handleFetch = useCallback(async () => {
-    setLoading(true)
-    setError('')
-    try {
-      await gitFetch(config, projectId)
-      await loadBranches()
-    } catch (err) {
+    setLoading(true); setError('')
+    try { await gitFetch(config, projectId); await loadBranches() }
+    catch (err) {
       setError(err instanceof Error ? err.message : 'Fetch failed')
       setTimeout(() => setError(''), 5000)
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }, [config, projectId, loadBranches])
 
   const handleCheckout = useCallback(async (branch: string) => {
-    setLoading(true)
-    setError('')
-    try {
-      await gitCheckout(config, projectId, branch)
-      await loadBranches()
-    } catch (err) {
+    setLoading(true); setError('')
+    try { await gitCheckout(config, projectId, branch); await loadBranches() }
+    catch (err) {
       setError(err instanceof Error ? err.message : 'Checkout failed')
       setTimeout(() => setError(''), 5000)
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }, [config, projectId, loadBranches])
 
   const handleDelete = useCallback(async (branch: string) => {
-    setDeleteConfirm(null)
-    setLoading(true)
-    setError('')
-    try {
-      await gitDeleteBranch(config, projectId, branch)
-      await loadBranches()
-    } catch (err) {
+    setDeleteConfirm(null); setLoading(true); setError('')
+    try { await gitDeleteBranch(config, projectId, branch); await loadBranches() }
+    catch (err) {
       setError(err instanceof Error ? err.message : 'Delete failed')
       setTimeout(() => setError(''), 5000)
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }, [config, projectId, loadBranches])
 
   const handleMerge = useCallback(async (branch: string) => {
-    setMergeConfirm(null)
-    setLoading(true)
-    setError('')
-    try {
-      await gitMerge(config, projectId, branch)
-      await loadBranches()
-    } catch (err) {
+    setMergeConfirm(null); setLoading(true); setError('')
+    try { await gitMerge(config, projectId, branch); await loadBranches() }
+    catch (err) {
       setError(err instanceof Error ? err.message : 'Merge failed')
       setTimeout(() => setError(''), 5000)
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }, [config, projectId, loadBranches])
 
   const handleCreate = useCallback(async () => {
     const name = newBranchName.trim()
     if (!name) return
-    setLoading(true)
-    setError('')
+    setLoading(true); setError('')
     try {
-      // checkout base branch first if specified and different from current
       if (baseBranch && baseBranch !== currentBranch) {
         await gitCheckout(config, projectId, baseBranch)
       }
       await gitCreateBranch(config, projectId, name)
-      setCreateOpen(false)
-      setNewBranchName('')
-      setBaseBranch('')
+      setCreateOpen(false); setNewBranchName(''); setBaseBranch('')
       await loadBranches()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Create branch failed')
       setTimeout(() => setError(''), 5000)
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }, [config, projectId, newBranchName, baseBranch, currentBranch, loadBranches])
 
-  const localBranches = useMemo(() => {
-    const filtered = branches.filter((b) => !b.is_remote)
-    if (!search) return filtered
-    const q = search.toLowerCase()
-    return filtered.filter((b) => b.name.toLowerCase().includes(q))
-  }, [branches, search])
-
-  const remoteBranches = useMemo(() => {
-    const filtered = branches.filter((b) => b.is_remote)
-    if (!search) return filtered
-    const q = search.toLowerCase()
-    return filtered.filter((b) => b.name.toLowerCase().includes(q))
-  }, [branches, search])
-
-  const localBranchNames = useMemo(
-    () => branches.filter((b) => !b.is_remote).map((b) => b.name),
+  const current = useMemo(() => branches.find((b) => b.is_current) ?? null, [branches])
+  const localBranches = useMemo(() => branches.filter((b) => !b.is_remote), [branches])
+  const remoteBranches = useMemo(() => branches.filter((b) => b.is_remote), [branches])
+  const staleBranches = useMemo(
+    () => branches.filter((b) => !b.is_remote && !b.is_current && !b.is_default && ageDays(b.last_commit_date) > 30),
     [branches],
   )
 
+  const localBranchNames = useMemo(() => localBranches.map((b) => b.name), [localBranches])
+
+  const filtered = useMemo(() => {
+    let pool: BranchDetail[]
+    switch (filter) {
+      case 'local': pool = localBranches.filter((b) => !b.is_current); break
+      case 'remote': pool = remoteBranches; break
+      case 'stale': pool = staleBranches; break
+      case 'all':
+      default: pool = branches.filter((b) => !b.is_current); break
+    }
+    pool = [...pool].sort((a, b) => {
+      const da = new Date(a.last_commit_date).getTime() || 0
+      const db = new Date(b.last_commit_date).getTime() || 0
+      return db - da
+    })
+    if (!search) return pool
+    const q = search.toLowerCase()
+    return pool.filter((b) => b.name.toLowerCase().includes(q) || (b.last_commit_message ?? '').toLowerCase().includes(q))
+  }, [filter, branches, localBranches, remoteBranches, staleBranches, search])
+
+  const filterCounts: Record<FilterMode, number> = {
+    all: branches.filter((b) => !b.is_current).length,
+    local: localBranches.filter((b) => !b.is_current).length,
+    remote: remoteBranches.length,
+    stale: staleBranches.length,
+  }
+
+  const filterTabs: { id: FilterMode; label: string }[] = [
+    { id: 'local', label: 'Local' },
+    { id: 'remote', label: 'Remote' },
+    { id: 'stale', label: 'Stale' },
+    { id: 'all', label: 'All' },
+  ]
+
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Error banner */}
+    <Shell>
       {error && (
-        <div className="px-3 py-1.5 bg-red-500/10 border-b border-red-500/20 text-[10px] text-red-400 shrink-0 flex items-center justify-between">
+        <div className="mb-6 px-3 py-2 rounded-md bg-destructive/[0.06] border border-destructive/20 text-[11.5px] text-destructive flex items-center justify-between">
           <span>{error}</span>
-          <button onClick={() => setError('')} className="text-red-400/60 hover:text-red-400">
-            <X size={10} />
+          <button onClick={() => setError('')} className="text-destructive/70 hover:text-destructive">
+            <X size={12} />
           </button>
         </div>
       )}
 
-      {/* Header bar */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border/40 shrink-0">
-        <div className="relative flex-1">
-          <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground/40" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Filter branches..."
-            className="w-full rounded-md pl-7 pr-2 py-1.5 text-[11px] bg-muted/10 text-foreground border border-border/30 outline-none focus:border-primary/40 placeholder:text-muted-foreground/30"
-          />
-        </div>
-        <button
-          onClick={handleFetch}
-          disabled={loading}
-          className="rounded-md px-2.5 py-1.5 text-[10px] font-bold text-muted-foreground/50 bg-muted/10 border border-border/20 hover:bg-muted/30 hover:text-foreground transition-all flex items-center gap-1"
-          title="Fetch from remote"
-        >
-          <RefreshCcw size={10} className={loading ? 'animate-spin' : ''} />
-          Fetch
-        </button>
-        <button
-          onClick={() => {
-            setCreateOpen((v) => !v)
-            if (!createOpen && !baseBranch) setBaseBranch(currentBranch)
-          }}
-          disabled={loading}
-          className="rounded-md px-2.5 py-1.5 text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-all flex items-center gap-1"
-        >
-          <Plus size={10} />
-          New Branch
-        </button>
-      </div>
+      <div className="space-y-12">
+        {/* Hero — current branch */}
+        {current && (
+          <header className="space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">On branch</p>
+            <h1 className="text-4xl font-black tracking-tight font-mono truncate">{current.name}</h1>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-muted-foreground/70">
+              {current.is_default && (
+                <span className="inline-flex items-center gap-1 text-primary font-medium">
+                  <Star size={10} strokeWidth={2.5} />
+                  default
+                </span>
+              )}
+              {(current.ahead > 0 || current.behind > 0) ? (
+                <>
+                  {current.ahead > 0 && (
+                    <span className="inline-flex items-center gap-0.5 text-emerald-500 font-medium tabular-nums">
+                      <ArrowUp size={10} strokeWidth={2.5} />
+                      {current.ahead} ahead
+                    </span>
+                  )}
+                  {current.behind > 0 && (
+                    <span className="inline-flex items-center gap-0.5 text-amber-500 font-medium tabular-nums">
+                      <ArrowDown size={10} strokeWidth={2.5} />
+                      {current.behind} behind
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span>Up to date</span>
+              )}
+              {current.last_commit_date && (
+                <span className="tabular-nums">{relativeTime(current.last_commit_date)}</span>
+              )}
+            </div>
+            {current.last_commit_message && (
+              <p className="text-[12.5px] text-muted-foreground/80 truncate" title={current.last_commit_message}>
+                {current.last_commit_message}
+              </p>
+            )}
+          </header>
+        )}
 
-      {/* Create branch form */}
-      {createOpen && (
-        <div className="px-3 py-2.5 border-b border-border/40 bg-card/40 shrink-0 space-y-2">
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={newBranchName}
-              onChange={(e) => setNewBranchName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreate()
-                if (e.key === 'Escape') { setCreateOpen(false); setNewBranchName('') }
+        {/* Toolbar */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-2 px-1">
+            <div className="relative flex-1">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Filter branches…"
+                className="w-full h-8 pl-8 pr-3 rounded-md bg-muted/30 text-[12.5px] font-medium tracking-tight placeholder:text-muted-foreground/50 outline-none focus:ring-1 focus:ring-primary/40 transition-all"
+              />
+            </div>
+            <button
+              onClick={handleFetch}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-[11.5px] font-medium tracking-tight text-muted-foreground/80 hover:text-foreground hover:bg-foreground/[0.04] disabled:opacity-40 transition-colors"
+              title="Fetch from remote"
+            >
+              <RefreshCcw size={12} className={loading ? 'animate-spin' : ''} />
+              Fetch
+            </button>
+            <button
+              onClick={() => {
+                setCreateOpen((v) => !v)
+                if (!createOpen && !baseBranch) setBaseBranch(currentBranch)
               }}
-              placeholder="Branch name..."
-              autoFocus
-              className="flex-1 rounded-md px-2 py-1.5 text-[11px] bg-muted/10 text-foreground border border-primary/30 outline-none focus:border-primary/60 font-mono placeholder:text-muted-foreground/30"
-            />
-            <div className="flex items-center gap-1 text-[10px] text-muted-foreground/60">
-              <span>from</span>
-              <select
-                value={baseBranch}
-                onChange={(e) => setBaseBranch(e.target.value)}
-                className="rounded-md px-2 py-1.5 text-[11px] bg-muted/10 text-foreground border border-border/30 outline-none focus:border-primary/40"
-              >
-                {localBranchNames.map((b) => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-              </select>
-            </div>
-            <button
-              onClick={handleCreate}
-              disabled={loading || !newBranchName.trim()}
-              className="rounded-md px-3 py-1.5 text-[10px] font-bold text-primary bg-primary/15 border border-primary/20 hover:bg-primary/25 transition-all disabled:opacity-40"
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[11.5px] font-medium tracking-tight bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40 transition-colors"
             >
-              Create
-            </button>
-            <button
-              onClick={() => { setCreateOpen(false); setNewBranchName(''); setBaseBranch('') }}
-              className="rounded-md px-2 py-1.5 text-[10px] text-muted-foreground/60 hover:text-foreground hover:bg-muted/20 transition-all"
-            >
-              Cancel
+              <Plus size={12} strokeWidth={2.5} />
+              New branch
             </button>
           </div>
-        </div>
-      )}
 
-      {/* Branch list */}
-      <div className="flex-1 overflow-y-auto min-h-0">
-        {/* Local branches */}
-        {localBranches.length > 0 && (
-          <div>
-            <div className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 bg-card/20 border-b border-border/20 sticky top-0 z-10">
-              Local Branches
-              <span className="ml-1.5 text-muted-foreground/30">{localBranches.length}</span>
+          <div className="flex items-center gap-1 px-1">
+            {filterTabs.map((t) => {
+              const isActive = filter === t.id
+              const count = filterCounts[t.id]
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setFilter(t.id)}
+                  className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11.5px] font-medium tracking-tight transition-colors ${
+                    isActive
+                      ? 'bg-foreground/[0.06] text-foreground'
+                      : 'text-muted-foreground/65 hover:text-foreground hover:bg-foreground/[0.03]'
+                  }`}
+                >
+                  {t.label}
+                  <span className={`text-[10.5px] tabular-nums ${isActive ? 'text-muted-foreground/65' : 'text-muted-foreground/45'}`}>
+                    {count}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+
+          {createOpen && (
+            <div className="px-3 py-3 rounded-md bg-foreground/[0.02] border border-border/40">
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="text"
+                  value={newBranchName}
+                  onChange={(e) => setNewBranchName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCreate()
+                    if (e.key === 'Escape') { setCreateOpen(false); setNewBranchName('') }
+                  }}
+                  placeholder="branch-name"
+                  autoFocus
+                  className="flex-1 min-w-[160px] h-8 px-3 rounded-md bg-background font-mono text-[12.5px] placeholder:text-muted-foreground/50 outline-none ring-1 ring-border/60 focus:ring-primary/50 transition-all"
+                />
+                <span className="text-[11.5px] text-muted-foreground/60">from</span>
+                <select
+                  value={baseBranch}
+                  onChange={(e) => setBaseBranch(e.target.value)}
+                  className="h-8 px-2.5 rounded-md bg-background font-mono text-[11.5px] outline-none ring-1 ring-border/60 focus:ring-primary/50 transition-all"
+                >
+                  {localBranchNames.map((b) => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleCreate}
+                  disabled={loading || !newBranchName.trim()}
+                  className="inline-flex items-center h-8 px-3 rounded-md text-[11.5px] font-medium tracking-tight bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40 transition-colors"
+                >
+                  Create
+                </button>
+                <button
+                  onClick={() => { setCreateOpen(false); setNewBranchName(''); setBaseBranch('') }}
+                  className="inline-flex items-center h-8 px-2.5 rounded-md text-[11.5px] font-medium text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-            {localBranches.map((branch) => (
+          )}
+        </section>
+
+        {/* Branch list */}
+        <List label={`${filter === 'all' ? 'Branches' : filter === 'stale' ? 'Stale' : filter === 'remote' ? 'Remote' : 'Local'} · ${filtered.length}`}>
+          {filtered.length > 0 ? (
+            filtered.map((branch) => (
               <BranchRow
-                key={branch.name}
+                key={`${branch.is_remote ? 'r' : 'l'}-${branch.name}`}
                 branch={branch}
                 currentBranch={currentBranch}
                 deleteConfirm={deleteConfirm}
@@ -291,54 +347,34 @@ export function BranchManagerView({ config, projectId }: BranchManagerViewProps)
                 onDeleteConfirm={setDeleteConfirm}
                 onMergeConfirm={setMergeConfirm}
               />
-            ))}
-          </div>
-        )}
+            ))
+          ) : (
+            <p className="px-2 py-4 text-[12px] text-muted-foreground/55">
+              {search ? 'No branches match your filter.' : `No ${filter === 'all' ? 'other' : filter} branches.`}
+            </p>
+          )}
+        </List>
+      </div>
+    </Shell>
+  )
+}
 
-        {/* Remote branches */}
-        {remoteBranches.length > 0 && (
-          <div>
-            <button
-              onClick={() => setRemotesExpanded((v) => !v)}
-              className="w-full flex items-center gap-1 px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 bg-card/20 border-b border-border/20 border-t border-t-border/20 sticky top-0 z-10 hover:bg-card/30 transition-colors"
-            >
-              {remotesExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
-              Remote Branches
-              <span className="ml-1 text-muted-foreground/30">{remoteBranches.length}</span>
-            </button>
-            {remotesExpanded && remoteBranches.map((branch) => (
-              <BranchRow
-                key={branch.name}
-                branch={branch}
-                currentBranch={currentBranch}
-                deleteConfirm={deleteConfirm}
-                mergeConfirm={mergeConfirm}
-                loading={loading}
-                onCheckout={handleCheckout}
-                onDelete={handleDelete}
-                onMerge={handleMerge}
-                onDeleteConfirm={setDeleteConfirm}
-                onMergeConfirm={setMergeConfirm}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Empty state */}
-        {localBranches.length === 0 && remoteBranches.length === 0 && !loading && (
-          <div className="flex items-center justify-center h-32 text-muted-foreground/40 text-[11px]">
-            {search ? 'No branches match your filter' : 'No branches found'}
-          </div>
-        )}
-
-        {/* Loading state */}
-        {loading && branches.length === 0 && (
-          <div className="flex items-center justify-center h-32 text-muted-foreground/40 text-[11px]">
-            Loading branches...
-          </div>
-        )}
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="h-full overflow-auto bg-background">
+      <div className="min-h-full px-10 py-16">
+        <div className="w-full max-w-xl mx-auto">{children}</div>
       </div>
     </div>
+  )
+}
+
+function List({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-2">
+      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 px-1">{label}</p>
+      <div className="-mx-2">{children}</div>
+    </section>
   )
 }
 
@@ -365,28 +401,26 @@ function BranchRow({
   onDeleteConfirm: (name: string | null) => void
   onMergeConfirm: (name: string | null) => void
 }) {
-  const isCurrent = branch.is_current
   const isDefault = branch.is_default
-  const canDelete = !isCurrent && !isDefault
-  const canMerge = !isCurrent
+  const canDelete = !branch.is_current && !isDefault
+  const isStale = !branch.is_remote && !branch.is_current && !isDefault && ageDays(branch.last_commit_date) > 30
 
-  // Delete confirmation
   if (deleteConfirm === branch.name) {
     return (
-      <div className="px-3 py-2 border-b border-border/20 bg-red-500/5 flex items-center gap-2">
-        <span className="text-[11px] text-foreground flex-1">
-          Delete <span className="font-mono font-bold">{branch.name}</span>?
+      <div className="mx-2 px-3 py-2.5 rounded-md bg-destructive/[0.06] flex items-center gap-2">
+        <span className="text-[12px] text-foreground/85 flex-1">
+          Delete <span className="font-mono font-semibold">{branch.name}</span>?
         </span>
         <button
           onClick={() => onDelete(branch.name)}
           disabled={loading}
-          className="px-2 py-1 rounded text-[10px] font-bold bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+          className="inline-flex items-center h-7 px-2.5 rounded-md text-[11px] font-medium tracking-tight bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
         >
           Delete
         </button>
         <button
           onClick={() => onDeleteConfirm(null)}
-          className="px-2 py-1 rounded text-[10px] text-muted-foreground hover:bg-muted/20 transition-colors"
+          className="inline-flex items-center h-7 px-2.5 rounded-md text-[11px] font-medium text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
         >
           Cancel
         </button>
@@ -394,23 +428,22 @@ function BranchRow({
     )
   }
 
-  // Merge confirmation
   if (mergeConfirm === branch.name) {
     return (
-      <div className="px-3 py-2 border-b border-border/20 bg-primary/5 flex items-center gap-2">
-        <span className="text-[11px] text-foreground flex-1">
-          Merge <span className="font-mono font-bold">{branch.name}</span> into <span className="font-mono font-bold">{currentBranch}</span>?
+      <div className="mx-2 px-3 py-2.5 rounded-md bg-primary/[0.06] flex items-center gap-2">
+        <span className="text-[12px] text-foreground/85 flex-1">
+          Merge <span className="font-mono font-semibold">{branch.name}</span> into <span className="font-mono font-semibold">{currentBranch}</span>?
         </span>
         <button
           onClick={() => onMerge(branch.name)}
           disabled={loading}
-          className="px-2 py-1 rounded text-[10px] font-bold bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
+          className="inline-flex items-center h-7 px-2.5 rounded-md text-[11px] font-medium tracking-tight bg-foreground text-background hover:bg-foreground/90 transition-colors"
         >
           Merge
         </button>
         <button
           onClick={() => onMergeConfirm(null)}
-          className="px-2 py-1 rounded text-[10px] text-muted-foreground hover:bg-muted/20 transition-colors"
+          className="inline-flex items-center h-7 px-2.5 rounded-md text-[11px] font-medium text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
         >
           Cancel
         </button>
@@ -418,114 +451,81 @@ function BranchRow({
     )
   }
 
+  const Icon = branch.is_remote ? Cloud : GitBranch
+
   return (
     <div
-      className={`group px-3 py-2 border-b border-border/20 flex items-center gap-2 hover:bg-muted/10 transition-colors ${
-        isCurrent ? 'bg-primary/5' : ''
-      }`}
+      onDoubleClick={() => !branch.is_current && onCheckout(branch.name)}
+      className="group flex items-center gap-3 w-full px-2 py-2.5 rounded-md hover:bg-accent/50 transition-colors text-left cursor-pointer"
     >
-      {/* Current indicator */}
-      <div className="w-2 shrink-0 flex justify-center">
-        {isCurrent ? (
-          <span className="inline-block w-2 h-2 rounded-full bg-primary shadow-sm shadow-primary/30" />
-        ) : (
-          <span className="inline-block w-2 h-2 rounded-full bg-muted-foreground/10" />
-        )}
-      </div>
-
-      {/* Branch info */}
-      <div className="flex-1 min-w-0 flex items-center gap-2">
-        <GitBranch size={12} className={isCurrent ? 'text-primary shrink-0' : 'text-muted-foreground/40 shrink-0'} />
-        <span
-          className={`font-mono text-[11px] truncate ${
-            isCurrent ? 'text-primary font-bold' : 'text-foreground'
-          }`}
-        >
-          {branch.name}
+      <span className={`shrink-0 transition-colors ${
+        isStale ? 'text-amber-500/80' : 'text-muted-foreground/70 group-hover:text-foreground'
+      }`}>
+        <Icon size={13} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-baseline gap-2">
+          <span className="block text-[13px] font-semibold truncate font-mono text-foreground">{branch.name}</span>
+          {isDefault && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-primary shrink-0">
+              <Star size={9} strokeWidth={2.5} />
+              default
+            </span>
+          )}
+          {!branch.is_remote && (branch.ahead > 0 || branch.behind > 0) && (
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-medium tabular-nums shrink-0">
+              {branch.ahead > 0 && (
+                <span className="inline-flex items-center gap-0.5 text-emerald-500">
+                  <ArrowUp size={9} strokeWidth={2.5} />
+                  {branch.ahead}
+                </span>
+              )}
+              {branch.behind > 0 && (
+                <span className="inline-flex items-center gap-0.5 text-amber-500">
+                  <ArrowDown size={9} strokeWidth={2.5} />
+                  {branch.behind}
+                </span>
+              )}
+            </span>
+          )}
         </span>
-
-        {/* Badges */}
-        {isDefault && (
-          <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-primary/10 text-primary/70 border border-primary/15">
-            default
-          </span>
-        )}
-        {branch.is_remote && (
-          <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-muted/20 text-muted-foreground/50 border border-border/20">
-            remote
-          </span>
-        )}
-
-        {/* Ahead/behind - local branches only */}
-        {!branch.is_remote && (branch.ahead > 0 || branch.behind > 0) && (
-          <div className="shrink-0 flex items-center gap-1.5 text-[10px]">
-            {branch.ahead > 0 && (
-              <span className="flex items-center gap-0.5 text-primary">
-                <ArrowUpRight size={10} />
-                {branch.ahead}
-              </span>
-            )}
-            {branch.behind > 0 && (
-              <span className="flex items-center gap-0.5 text-amber-400">
-                <ArrowDownRight size={10} />
-                {branch.behind}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Commit info */}
-      <div className="hidden sm:flex items-center gap-3 shrink-0 text-[10px] text-muted-foreground/40">
         {branch.last_commit_message && (
-          <span className="max-w-[200px] truncate" title={branch.last_commit_message}>
+          <span className="block text-[10.5px] text-muted-foreground/55 truncate mt-0.5">
             {branch.last_commit_message}
+            {branch.last_commit_date && (
+              <span className="text-muted-foreground/40 tabular-nums"> · {relativeTime(branch.last_commit_date)}</span>
+            )}
           </span>
         )}
-        {branch.last_commit_author && (
-          <span className="shrink-0">{branch.last_commit_author}</span>
-        )}
-        {branch.last_commit_date && (
-          <span className="shrink-0 tabular-nums">{relativeTime(branch.last_commit_date)}</span>
-        )}
-      </div>
+      </span>
 
-      {/* Action buttons - visible on hover */}
-      <div className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-        {!isCurrent && (
+      <span className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={(e) => { e.stopPropagation(); onCheckout(branch.name) }}
+          className="inline-flex items-center h-6 w-6 justify-center rounded text-muted-foreground/70 hover:text-primary hover:bg-primary/10 transition-colors"
+          title="Checkout"
+        >
+          <Check size={12} strokeWidth={2.5} />
+        </button>
+        {!branch.is_current && !branch.is_remote && (
           <button
-            onClick={() => onCheckout(branch.name)}
-            disabled={loading}
-            className="rounded px-1.5 py-1 text-[9px] font-bold text-muted-foreground/60 hover:bg-primary/10 hover:text-primary transition-all flex items-center gap-0.5"
-            title="Checkout"
-          >
-            <Check size={10} />
-            Checkout
-          </button>
-        )}
-        {canMerge && (
-          <button
-            onClick={() => onMergeConfirm(branch.name)}
-            disabled={loading}
-            className="rounded px-1.5 py-1 text-[9px] font-bold text-muted-foreground/60 hover:bg-primary/10 hover:text-primary transition-all flex items-center gap-0.5"
+            onClick={(e) => { e.stopPropagation(); onMergeConfirm(branch.name) }}
+            className="inline-flex items-center h-6 w-6 justify-center rounded text-muted-foreground/70 hover:text-primary hover:bg-primary/10 transition-colors"
             title={`Merge into ${currentBranch}`}
           >
-            <GitMerge size={10} />
-            Merge
+            <GitMerge size={12} strokeWidth={2.5} />
           </button>
         )}
         {canDelete && (
           <button
-            onClick={() => onDeleteConfirm(branch.name)}
-            disabled={loading}
-            className="rounded px-1.5 py-1 text-[9px] font-bold text-muted-foreground/60 hover:bg-red-500/10 hover:text-red-400 transition-all flex items-center gap-0.5"
+            onClick={(e) => { e.stopPropagation(); onDeleteConfirm(branch.name) }}
+            className="inline-flex items-center h-6 w-6 justify-center rounded text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
             title="Delete branch"
           >
-            <Trash2 size={10} />
-            Delete
+            <Trash2 size={12} strokeWidth={2.25} />
           </button>
         )}
-      </div>
+      </span>
     </div>
   )
 }

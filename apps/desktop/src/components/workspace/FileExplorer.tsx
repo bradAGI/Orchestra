@@ -155,23 +155,8 @@ export function FileExplorer() {
   // ---- Empty state -----------------------------------------------------------
   if (!explorerRoot) {
     return (
-      <div className="flex flex-col gap-2 p-3">
-        <p className="text-xs text-muted-foreground">
-          No workspace folder open
-        </p>
-        <button
-          className="text-xs px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-accent-foreground w-fit"
-          onClick={async () => {
-            try {
-              const folder = await window.orchestraDesktop.selectFolder()
-              if (folder) {
-                useAppStore.getState().setExplorerRoot(folder)
-              }
-            } catch { /* user cancelled */ }
-          }}
-        >
-          Open Folder
-        </button>
+      <div className="p-4 text-center">
+        <p className="text-[11px] text-muted-foreground/60">Open a project to see its files.</p>
       </div>
     )
   }
@@ -197,6 +182,7 @@ export function FileExplorer() {
               onToggle={() => handleToggleDir(node)}
               onClick={() => {
                 if (!node.isDirectory) {
+                  console.log('[explorer] file clicked', { path: node.path, relative: node.relativePath })
                   openFile(node.path, node.relativePath)
                 }
               }}

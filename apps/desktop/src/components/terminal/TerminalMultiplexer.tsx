@@ -11,6 +11,7 @@ export type TerminalNode = {
     id: string
     title: string
     projectId?: string
+    cwd?: string
     initialCommand?: string
 }
 
@@ -45,7 +46,7 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
     onAddTerminal,
     onAddAgentTerminal,
     theme,
-    hideToolbar
+    hideToolbar,
 }) => {
     const [currentNode, setCurrentNode] = useState<MosaicNode<string> | null>(null)
     const [activeTabId, setActiveTabId] = useState<string | null>(null)
@@ -87,9 +88,9 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
             }
         }
 
-        const currentIds = currentNode ? getIdsFromNode(currentNode).sort().join(',') : ''
+        const currentIdsList = currentNode ? getIdsFromNode(currentNode) : []
+        const currentIds = currentIdsList.slice().sort().join(',')
         const activeIds = ids.slice().sort().join(',')
-
         if (currentIds !== activeIds) {
             setCurrentNode(buildBalancedTree(ids))
         }
@@ -149,10 +150,10 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
                             return (
                                 <button
                                     key={term.id}
-                                    className={`group flex items-center gap-2 px-3 h-9 cursor-pointer transition-all relative shrink-0 ${
+                                    className={`group relative inline-flex items-center gap-1.5 px-3 h-9 cursor-pointer transition-colors shrink-0 ${
                                         isActive
-                                            ? 'bg-background text-foreground'
-                                            : 'text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/30'
+                                            ? 'text-foreground'
+                                            : 'text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.03]'
                                     }`}
                                     onClick={() => {
                                         setActiveTabId(term.id)
@@ -160,10 +161,10 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
                                     }}
                                 >
                                     {isActive && (
-                                        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary" />
+                                        <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-primary" />
                                     )}
-                                    <TerminalIcon size={11} className={isActive ? 'text-primary' : 'text-muted-foreground/30'} />
-                                    <span className="text-[11px] font-semibold truncate max-w-[120px]">{term.title}</span>
+                                    <TerminalIcon size={12} className={isActive ? 'text-primary' : 'text-muted-foreground/50'} strokeWidth={isActive ? 2.25 : 2} />
+                                    <span className="text-[12px] font-medium tracking-tight truncate max-w-[140px]">{term.title}</span>
                                     <span
                                         role="button"
                                         onClick={(e) => {
@@ -260,6 +261,7 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
                             <TerminalView
                                 sessionId={term.id}
                                 projectId={term.projectId}
+                                cwd={term.cwd}
                                 baseUrl={baseUrl}
                                 apiToken={apiToken}
                                 initialCommand={term.initialCommand}
@@ -272,32 +274,30 @@ export const TerminalMultiplexer: React.FC<TerminalMultiplexerProps> = ({
                     <Mosaic<string>
                         renderTile={(id, path) => {
                             const term = activeTerminals.find(t => t.id === id)
+                            const isActive = activeTabId === id
                             return (
                                 <MosaicWindow<string>
                                     path={path}
                                     title={term?.title || id}
-                                    toolbarControls={
-                                        <div className="flex items-center gap-1">
-                                            <button
-                                                onClick={() => {
-                                                    clearInitialCommandTracking(id)
-                                                    onCloseTerminal(id)
-                                                }}
-                                                className="p-1 hover:bg-destructive/20 text-muted-foreground/60 hover:text-destructive transition-colors rounded"
-                                            >
-                                                <X size={12} />
-                                            </button>
-                                        </div>
-                                    }
+                                    className={isActive ? 'is-active' : ''}
+                                    toolbarControls={<div />}
                                 >
-                                    <TerminalView
-                                        sessionId={id}
-                                        projectId={term?.projectId}
-                                        baseUrl={baseUrl}
-                                        apiToken={apiToken}
-                                        initialCommand={term?.initialCommand}
-                                        theme={theme}
-                                    />
+                                    <div
+                                        className="w-full h-full"
+                                        onMouseDownCapture={() => {
+                                            if (activeTabId !== id) setActiveTabId(id)
+                                        }}
+                                    >
+                                        <TerminalView
+                                            sessionId={id}
+                                            projectId={term?.projectId}
+                                            cwd={term?.cwd}
+                                            baseUrl={baseUrl}
+                                            apiToken={apiToken}
+                                            initialCommand={term?.initialCommand}
+                                            theme={theme}
+                                        />
+                                    </div>
                                 </MosaicWindow>
                             )
                         }}
