@@ -19,6 +19,7 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/orchestrator"
 	"github.com/orchestra/orchestra/apps/backend/internal/staticassets"
 	"github.com/orchestra/orchestra/apps/backend/internal/terminal"
+	"github.com/orchestra/orchestra/apps/backend/internal/usage"
 	"github.com/rs/zerolog"
 )
 
@@ -34,6 +35,7 @@ type Server struct {
 	db            *db.DB
 	config        *config.Config
 	termManager   *terminal.Manager
+	usageService  *usage.Service
 }
 
 // NewRouter creates an http.Handler with the full API route table, using only
@@ -43,7 +45,7 @@ func NewRouter(
 	orchestratorService *orchestrator.Service,
 	cfg *config.Config,
 ) http.Handler {
-	return NewRouterWithPubSub(logger, orchestratorService, cfg, nil, nil, nil)
+	return NewRouterWithPubSub(logger, orchestratorService, cfg, nil, nil, nil, nil)
 }
 
 // NewRouterWithPubSub creates an http.Handler with the full API route table and
@@ -56,6 +58,7 @@ func NewRouterWithPubSub(
 	pubsub *observability.PubSub,
 	warehouseDB *db.DB,
 	termManager *terminal.Manager,
+	usageService *usage.Service,
 ) http.Handler {
 	if termManager == nil {
 		termManager = terminal.NewManager()
@@ -70,6 +73,7 @@ func NewRouterWithPubSub(
 		db:            warehouseDB,
 		config:        cfg,
 		termManager:   termManager,
+		usageService:  usageService,
 	}
 	r := chi.NewRouter()
 
@@ -189,6 +193,10 @@ func NewRouterWithPubSub(
 	protected.Delete("/api/v1/mcp/servers/{id}", server.DeleteMCPServer)
 
 	r.Get("/api/v1/terminal/{session_id}", server.TerminalWebSocket)
+
+	if usageService != nil {
+		NewUsageHandlers(usageService).Register(protected)
+	}
 
 	protected.Get("/api/v1/workspace/file", server.GetWorkspaceFile)
 	protected.Put("/api/v1/workspace/file", server.PutWorkspaceFile)

@@ -31,6 +31,7 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/telemetry"
 	"github.com/orchestra/orchestra/apps/backend/internal/terminal"
 	"github.com/orchestra/orchestra/apps/backend/internal/tools"
+	"github.com/orchestra/orchestra/apps/backend/internal/usage"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
 	trackergithub "github.com/orchestra/orchestra/apps/backend/internal/tracker/github"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker/memory"
@@ -113,7 +114,13 @@ func Run(logger zerolog.Logger) error {
 
 	logger.Info().Str("agent_provider", cfg.AgentProvider).Str("service_id", runtime.ServiceOrchestrator).Msg("agent provider configured")
 
-	router := api.NewRouterWithPubSub(logger, orchestratorService, &cfg, pubsub, warehouseDB, termManager)
+	usageService, err := usage.NewService(filepath.Join(cfg.WorkspaceRoot, ".orchestra", "usage"), nil)
+	if err != nil {
+		logger.Warn().Err(err).Msg("usage service unavailable")
+		usageService = nil
+	}
+
+	router := api.NewRouterWithPubSub(logger, orchestratorService, &cfg, pubsub, warehouseDB, termManager, usageService)
 
 	cleanupTerminalWorkspaces(orchestratorService, trackerClient, workspaceService, cfg.WorkspaceHooks, warehouseDB, logger)
 
