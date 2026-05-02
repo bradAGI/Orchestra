@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"net"
 	"net/http"
 	"os"
@@ -146,6 +147,8 @@ func Run(logger zerolog.Logger) error {
 
 	logger.Info().Str("addr", addr).Str("service_id", runtime.ServiceOrchestrator).Msg("starting orchestrad")
 
+	killStaleOrchestrad(cfg.PortString(), logger)
+
 	// Use a custom listener with SO_REUSEADDR so the port is available immediately after restart.
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -170,6 +173,20 @@ func Run(logger zerolog.Logger) error {
 	}
 
 	return nil
+}
+
+// killStaleOrchestrad kills any existing orchestrad process listening on the
+// given port. This prevents accumulation of zombie daemons after crashes or
+// unclean restarts. Best-effort: errors are logged and ignored.
+func killStaleOrchestrad(port string, logger zerolog.Logger) {
+	// fuser is available on Linux and most Unix systems.
+	if err := exec.Command("fuser", "-k", port+"/tcp").Run(); err != nil {
+		// fuser exits non-zero when no process is found — that's the normal case.
+		return
+	}
+	logger.Info().Str("port", port).Msg("killed stale orchestrad process on port")
+	// Brief pause so the port is fully released before we try to bind.
+	time.Sleep(100 * time.Millisecond)
 }
 
 // newTrackerClient builds the appropriate tracker.Client based on the configured
@@ -1204,12 +1221,15 @@ func pruneAllWorktrees(warehouseDB *db.DB, workspaceService workspace.Service, l
 	}
 }
 
-// startRefreshWorker runs a 1-second polling loop that triggers tracker refresh
+// startRefreshWorker runs a 5-second polling loop that triggers tracker refresh
 // cycles, publishes updated snapshots, and persists orchestrator state to disk.
+// Snapshots are only broadcast when state actually changed (via content hash),
+// reducing unnecessary SSE traffic during idle periods.
 func startRefreshWorker(service *orchestrator.Service, pubsub *observability.PubSub, logger zerolog.Logger) {
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
+	var lastHash uint32
 	service.QueueRefresh()
 
 	for range ticker.C {
@@ -1226,9 +1246,14 @@ func startRefreshWorker(service *orchestrator.Service, pubsub *observability.Pub
 		}
 		after := service.Snapshot()
 		publishRefreshRetryLifecycleEvents(pubsub, before, after)
-		publishSnapshot(pubsub, service)
-		if err := service.PersistStateToDB(context.Background()); err != nil {
-			logger.Warn().Err(err).Msg("failed to persist orchestrator state to DB")
+
+		newHash := snapshotContentHash(after)
+		if newHash != lastHash {
+			lastHash = newHash
+			publishSnapshot(pubsub, service)
+			if err := service.PersistStateToDB(context.Background()); err != nil {
+				logger.Warn().Err(err).Msg("failed to persist orchestrator state to DB")
+			}
 		}
 	}
 }
@@ -1239,6 +1264,30 @@ func publishSnapshot(pubsub *observability.PubSub, service *orchestrator.Service
 		return
 	}
 	pubsub.Publish(observability.Event{Type: "snapshot", Data: service.Snapshot()})
+}
+
+// snapshotContentHash hashes the snapshot payload excluding generated_at so
+// callers can detect whether state actually changed between ticks.
+func snapshotContentHash(snap orchestrator.Snapshot) uint32 {
+	type hashable struct {
+		Counts      orchestrator.SnapshotCount  `json:"counts"`
+		Running     []orchestrator.RunningEntry  `json:"running"`
+		Retrying    []orchestrator.RetryEntry    `json:"retrying"`
+		CodexTotals orchestrator.CodexTotals     `json:"codex_totals"`
+		RateLimits  any                          `json:"rate_limits"`
+		MCPServers  map[string]string            `json:"mcp_servers,omitempty"`
+	}
+	b, _ := json.Marshal(hashable{
+		Counts:      snap.Counts,
+		Running:     snap.Running,
+		Retrying:    snap.Retrying,
+		CodexTotals: snap.CodexTotals,
+		RateLimits:  snap.RateLimits,
+		MCPServers:  snap.MCPServers,
+	})
+	h := fnv.New32a()
+	_, _ = h.Write(b)
+	return h.Sum32()
 }
 
 // publishLifecycleEvent broadcasts a named lifecycle event (e.g. RUN_STARTED,
