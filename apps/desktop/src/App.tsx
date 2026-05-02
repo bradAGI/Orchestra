@@ -5,16 +5,15 @@ import {
   CreateTaskDialog,
   CreateProjectDialog,
   SettingsPage,
-} from '@/components/app-shell/panels'
+} from '@layout/panels'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '@/components/ui/dialog'
-import { Skeleton } from '@/components/ui/skeleton'
-import { type TimelineItem } from '@/components/app-shell/types'
+} from '@ui/dialog'
+import { Skeleton } from '@ui/skeleton'
 import {
   fetchAgentConfig,
   fetchAgents,
@@ -45,37 +44,37 @@ import {
   type IssueCreatePayload,
   type IssueUpdatePayload,
   type IssueListItem,
-} from '@/lib/orchestra-client'
-import { startRuntimeSync } from '@/lib/runtime-sync'
-import { appendTimelineEvent, applySnapshotUpdate } from '@/lib/runtime-store'
-import type { GlobalStats, Project, ProjectStats, SessionDetail, SessionSummary, SnapshotPayload } from '@/lib/orchestra-types'
-import { ProjectGrid } from '@/components/projects/ProjectGrid'
-import { ProjectDetailView } from '@/components/projects/ProjectDetailView'
-import { UsagePage } from '@/components/usage/UsagePage'
-import { UsageStatusBar } from '@/components/usage/UsageStatusBar'
-import { SessionDetailView } from '@/components/usage/SessionDetailView'
-import { AgentsDashboard } from '@/components/agents/AgentsDashboard'
-import { DocsDashboard } from '@/components/docs/DocsDashboard'
-import { SandboxDashboard } from '@/components/sandbox/SandboxDashboard'
-import { TerminalMultiplexer, type TerminalNode } from '@/components/terminal/TerminalMultiplexer'
-import { AppShell } from '@app/layout/AppShell'
+} from '@core/api/client'
+import { startRuntimeSync } from '@core/sync/runtime-sync'
+import { applySnapshotUpdate } from '@core/sync/runtime-store'
+import type { Project, ProjectStats, SessionDetail, SessionSummary } from '@core/api/types'
+import { ProjectGrid } from '@features/projects/ProjectGrid'
+import { ProjectDetailView } from '@features/projects/ProjectDetailView'
+import { UsagePage } from '@features/usage/UsagePage'
+import { UsageStatusBar } from '@features/usage/UsageStatusBar'
+import { SessionDetailView } from '@features/usage/SessionDetailView'
+import { AgentsDashboard } from '@features/agents/AgentsDashboard'
+import { DocsDashboard } from '@features/docs/DocsDashboard'
+import { SandboxDashboard } from '@features/sandbox/SandboxDashboard'
+import { TerminalMultiplexer } from '@features/terminal/TerminalMultiplexer'
+import { AppShell } from '@layout/AppShell'
 import {
   getCurrentSectionMeta,
   getSectionVisibility,
   isSectionID,
   sidebarItems,
   type SectionID,
-} from '@app/routes/sections'
-import { KanbanBoard } from '@widgets/kanban'
-import type { IssueDetailResult, ToolSummary } from '@widgets/issue-detail/types'
+} from '@layout/sections'
+import { KanbanBoard } from '@features/kanban'
+import type { IssueDetailResult } from '@features/issue-detail/types'
 import { Command } from 'cmdk'
-import type { BackendConfig } from '@/lib/orchestra-client'
-import { AppTooltipProvider } from '@/components/ui/tooltip-wrapper'
-import { SectionErrorBoundary } from '@/components/ui/section-error-boundary'
-import { EmbeddedAgentWidget } from '@/components/embedded-agent'
+import type { BackendConfig } from '@core/api/client'
+import { AppTooltipProvider } from '@ui/tooltip-wrapper'
+import { SectionErrorBoundary } from '@ui/section-error-boundary'
+import { EmbeddedAgentWidget } from '@features/embedded-agent'
 import { useBackendConfig, useNotifications, useIssueLookup, useWorkspaceMigration } from '@/hooks'
-import { useAppStore } from '@/store'
-import { WorkspaceLayout } from '@/components/workspace/WorkspaceLayout'
+import { useAppStore } from '@core/store'
+import { WorkspaceLayout } from '@features/workspace/WorkspaceLayout'
 
 /** Root application component that manages backend sync, navigation, and top-level UI state. */
 export default function App() {
@@ -159,8 +158,6 @@ export default function App() {
   const openTerminals = useAppStore(s => s.openTerminals)
   const setOpenTerminals = useAppStore(s => s.setOpenTerminals)
 
-  // createTaskInitialState: store uses Record<string, unknown> | null, but component
-  // needs a string. We store it wrapped and unwrap at the usage site.
   const createTaskInitialState = useAppStore(s => s.createTaskInitialState)
 
   // ---------------------------------------------------------------------------
@@ -322,7 +319,7 @@ export default function App() {
 
   const handleCloneSession = (session: SessionSummary) => {
     setSelectedProjectID(session.project_id || null)
-    useAppStore.getState().openCreateTaskDialog({ state: 'Todo' } as Record<string, unknown>)
+    useAppStore.getState().openCreateTaskDialog({ state: 'Todo' })
     setActiveSection('ISSUES')
   }
 
@@ -335,24 +332,8 @@ export default function App() {
     overflow: { x: 'hidden' as const, y: 'scroll' as const }
   }), [])
 
-  useEffect(() => {
-    const root = document.documentElement
-    if (theme === 'dark') {
-      root.classList.add('dark')
-    } else {
-      root.classList.remove('dark')
-    }
-    window.localStorage.setItem('orchestra-theme', theme)
-  }, [theme])
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    const handleChange = (e: MediaQueryListEvent) => {
-      setTheme(e.matches ? 'dark' : 'light')
-    }
-    mediaQuery.addEventListener('change', handleChange)
-    return () => mediaQuery.removeEventListener('change', handleChange)
-  }, [setTheme])
+  // Note: dark-class toggling and OS theme tracking are handled by reapplyTheme() above.
+  // The duplicate effects that were here created an infinite update loop.
 
   useEffect(() => {
     if (!config) return
@@ -727,7 +708,7 @@ export default function App() {
   }
 
   const handleCreateIssue = (initialState: string) => {
-    useAppStore.getState().openCreateTaskDialog({ state: initialState } as Record<string, unknown>)
+    useAppStore.getState().openCreateTaskDialog({ state: initialState })
   }
 
   const handleTaskSubmit = async (payload: IssueCreatePayload) => {
@@ -1092,7 +1073,7 @@ export default function App() {
   }
 
   // Extract initial state string from store's Record<string, unknown> | null
-  const createTaskInitialStateStr = (createTaskInitialState as Record<string, string> | null)?.state ?? 'Backlog'
+  const createTaskInitialStateStr = createTaskInitialState?.state ?? 'Backlog'
 
   return (
     <AppTooltipProvider>

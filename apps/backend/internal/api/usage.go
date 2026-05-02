@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -9,6 +8,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/orchestra/orchestra/apps/backend/internal/usage"
 )
+
+// Per-endpoint cap on `?limit=` to keep the wire payload bounded.
+const usageSessionsMaxLimit = 200
 
 // UsageHandlers translates the IPC contract Orca exposes to its renderer
 // into REST endpoints under /api/v1/usage/{provider}/...
@@ -40,7 +42,7 @@ func (h *UsageHandlers) Register(r chi.Router) {
 func (h *UsageHandlers) parseProvider(w http.ResponseWriter, r *http.Request) (usage.Provider, bool) {
 	p := usage.Provider(chi.URLParam(r, "provider"))
 	if !p.Valid() {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid provider"})
+		writeJSONError(w, http.StatusBadRequest, "invalid_provider", "invalid provider")
 		return "", false
 	}
 	return p, true
@@ -71,7 +73,7 @@ func (h *UsageHandlers) getScanState(w http.ResponseWriter, r *http.Request) {
 	}
 	state, err := h.svc.ScanState(p)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSONError(w, http.StatusInternalServerError, "scan_state_failed", err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, state)
@@ -86,12 +88,12 @@ func (h *UsageHandlers) setEnabled(w http.ResponseWriter, r *http.Request) {
 		Enabled bool `json:"enabled"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
+		writeJSONError(w, http.StatusBadRequest, "invalid_body", "invalid body")
 		return
 	}
 	state, err := h.svc.SetEnabled(r.Context(), p, body.Enabled)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSONError(w, http.StatusInternalServerError, "set_enabled_failed", err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, state)
@@ -108,7 +110,10 @@ func (h *UsageHandlers) refresh(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&body)
 	state, err := h.svc.Refresh(r.Context(), p, body.Force)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error(), "state": state})
+		// Refresh is the one endpoint where partial state is meaningful even
+		// on failure (e.g., scanner started, then a single file errored), so
+		// we attach the in-progress state under a stable key.
+		writeJSONErrorWithDetails(w, http.StatusInternalServerError, "refresh_failed", err.Error(), map[string]any{"state": state})
 		return
 	}
 	writeJSON(w, http.StatusOK, state)
@@ -121,12 +126,12 @@ func (h *UsageHandlers) getSummary(w http.ResponseWriter, r *http.Request) {
 	}
 	scope, rng, ok2 := h.parseScopeAndRange(r)
 	if !ok2 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid scope or range"})
+		writeJSONError(w, http.StatusBadRequest, "invalid_scope_or_range", "invalid scope or range")
 		return
 	}
 	summary, err := h.svc.Summary(p, scope, rng)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSONError(w, http.StatusInternalServerError, "summary_failed", err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, summary)
@@ -139,12 +144,12 @@ func (h *UsageHandlers) getDaily(w http.ResponseWriter, r *http.Request) {
 	}
 	scope, rng, ok2 := h.parseScopeAndRange(r)
 	if !ok2 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid scope or range"})
+		writeJSONError(w, http.StatusBadRequest, "invalid_scope_or_range", "invalid scope or range")
 		return
 	}
 	points, err := h.svc.Daily(p, scope, rng)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSONError(w, http.StatusInternalServerError, "daily_failed", err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, points)
@@ -157,7 +162,7 @@ func (h *UsageHandlers) getBreakdown(w http.ResponseWriter, r *http.Request) {
 	}
 	scope, rng, ok2 := h.parseScopeAndRange(r)
 	if !ok2 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid scope or range"})
+		writeJSONError(w, http.StatusBadRequest, "invalid_scope_or_range", "invalid scope or range")
 		return
 	}
 	kind := usage.BreakdownKind(r.URL.Query().Get("kind"))
@@ -165,12 +170,12 @@ func (h *UsageHandlers) getBreakdown(w http.ResponseWriter, r *http.Request) {
 		kind = usage.BreakdownByModel
 	}
 	if !kind.Valid() {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid kind"})
+		writeJSONError(w, http.StatusBadRequest, "invalid_kind", "invalid kind")
 		return
 	}
 	rows, err := h.svc.Breakdown(p, scope, rng, kind)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSONError(w, http.StatusInternalServerError, "breakdown_failed", err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, rows)
@@ -183,18 +188,21 @@ func (h *UsageHandlers) getSessions(w http.ResponseWriter, r *http.Request) {
 	}
 	scope, rng, ok2 := h.parseScopeAndRange(r)
 	if !ok2 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid scope or range"})
+		writeJSONError(w, http.StatusBadRequest, "invalid_scope_or_range", "invalid scope or range")
 		return
 	}
 	limit := 25
 	if v := r.URL.Query().Get("limit"); v != "" {
-		if parsed, err := strconv.Atoi(v); err == nil {
+		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
 			limit = parsed
 		}
 	}
+	if limit > usageSessionsMaxLimit {
+		limit = usageSessionsMaxLimit
+	}
 	rows, err := h.svc.Sessions(p, scope, rng, limit)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSONError(w, http.StatusInternalServerError, "sessions_failed", err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, rows)
@@ -210,6 +218,3 @@ func (h *UsageHandlers) refreshRateLimits(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, state)
 }
 
-// helper used elsewhere in this package; redeclared here for completeness if
-// not exported. We rely on the existing util — check api/util.go.
-var _ = context.Background

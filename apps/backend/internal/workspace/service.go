@@ -29,7 +29,7 @@ type Hooks struct {
 }
 
 // RunBeforeRunHook executes the before_run hook script in the given workspace directory.
-func (s Service) RunBeforeRunHook(workspacePath string, hooks Hooks) (HookResult, error) {
+func (s *Service) RunBeforeRunHook(workspacePath string, hooks Hooks) (HookResult, error) {
 	if hooks.BeforeRun == "" {
 		return HookResult{}, nil
 	}
@@ -38,7 +38,7 @@ func (s Service) RunBeforeRunHook(workspacePath string, hooks Hooks) (HookResult
 
 // RunAfterRunHook executes the after_run hook script in the given workspace directory.
 // Failures are intentionally swallowed so that after-run hooks never block the pipeline.
-func (s Service) RunAfterRunHook(workspacePath string, hooks Hooks) (HookResult, error) {
+func (s *Service) RunAfterRunHook(workspacePath string, hooks Hooks) (HookResult, error) {
 	if hooks.AfterRun == "" {
 		return HookResult{}, nil
 	}
@@ -48,7 +48,7 @@ func (s Service) RunAfterRunHook(workspacePath string, hooks Hooks) (HookResult,
 
 // ListArtifacts returns relative paths of all files in the workspace for the given issue,
 // excluding .git directories and the .orchestra marker file.
-func (s Service) ListArtifacts(issueIdentifier string, provider string) ([]string, error) {
+func (s *Service) ListArtifacts(issueIdentifier string, provider string) ([]string, error) {
 	path, err := WorkspacePath(s.Root, issueIdentifier, provider)
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func (s Service) ListArtifacts(issueIdentifier string, provider string) ([]strin
 
 // GetArtifactContent reads and returns the content of a file at the given relative path
 // within the issue workspace, validating that the path does not escape the workspace root.
-func (s Service) GetArtifactContent(issueIdentifier string, provider string, relPath string) ([]byte, error) {
+func (s *Service) GetArtifactContent(issueIdentifier string, provider string, relPath string) ([]byte, error) {
 	root, err := WorkspacePath(s.Root, issueIdentifier, provider)
 	if err != nil {
 		return nil, err
@@ -104,7 +104,7 @@ func (s Service) GetArtifactContent(issueIdentifier string, provider string, rel
 
 // GetDiff returns the git diff of changes in the workspace for the given issue.
 // Returns an empty string if the workspace is not a git repository.
-func (s Service) GetDiff(issueIdentifier string, provider string) (string, error) {
+func (s *Service) GetDiff(issueIdentifier string, provider string) (string, error) {
 	path, err := WorkspacePath(s.Root, issueIdentifier, provider)
 	if err != nil {
 		return "", err
@@ -137,7 +137,7 @@ func (s Service) GetDiff(issueIdentifier string, provider string) (string, error
 }
 
 // WorktreePath returns the deterministic worktree path for a project and branch.
-func (s Service) WorktreePath(projectID, branchName string) string {
+func (s *Service) WorktreePath(projectID, branchName string) string {
 	return filepath.Join(s.Root, projectID, branchName)
 }
 
@@ -145,7 +145,7 @@ func (s Service) WorktreePath(projectID, branchName string) string {
 // Returns (worktreePath, baseSHA, created, error).
 // If the worktree already exists, returns (path, "", false, nil).
 // If new, captures base SHA from project repo HEAD before creating.
-func (s Service) EnsureWorktree(projectRoot, projectID, branchName string, hooks Hooks) (string, string, bool, error) {
+func (s *Service) EnsureWorktree(projectRoot, projectID, branchName string, hooks Hooks) (string, string, bool, error) {
 	wtPath := s.WorktreePath(projectID, branchName)
 
 	// If directory already exists, reuse it but still return the merge-base SHA.
@@ -181,7 +181,7 @@ func (s Service) EnsureWorktree(projectRoot, projectID, branchName string, hooks
 }
 
 // RemoveWorktree removes a git worktree, running the before_remove hook first.
-func (s Service) RemoveWorktree(projectRoot, wtPath string, hooks Hooks) error {
+func (s *Service) RemoveWorktree(projectRoot, wtPath string, hooks Hooks) error {
 	if !exists(wtPath) {
 		return nil
 	}
@@ -199,7 +199,7 @@ func (s Service) RemoveWorktree(projectRoot, wtPath string, hooks Hooks) error {
 
 // CleanupWorktree removes a worktree directory, prunes stale references, and
 // deletes the associated branch (best-effort). Use this when an issue moves to Done.
-func (s Service) CleanupWorktree(projectRoot, projectID, branchName string) error {
+func (s *Service) CleanupWorktree(projectRoot, projectID, branchName string) error {
 	wtPath := s.WorktreePath(projectID, branchName)
 	ctx := context.Background()
 
@@ -218,12 +218,12 @@ func (s Service) CleanupWorktree(projectRoot, projectID, branchName string) erro
 }
 
 // PruneWorktrees cleans up stale worktree references for the given project repo.
-func (s Service) PruneWorktrees(projectRoot string) error {
+func (s *Service) PruneWorktrees(projectRoot string) error {
 	ctx := context.Background()
 	return git.WorktreePrune(ctx, projectRoot)
 }
 
-func (s Service) timeoutOrDefault() time.Duration {
+func (s *Service) timeoutOrDefault() time.Duration {
 	if s.HookTimeout <= 0 {
 		return 60 * time.Second
 	}

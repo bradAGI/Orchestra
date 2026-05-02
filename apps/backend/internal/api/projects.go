@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -394,7 +395,7 @@ func (s *Server) DeleteProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.db.DeleteProject(r.Context(), projectID); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
 			return
 		}
