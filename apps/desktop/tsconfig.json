@@ -10,14 +10,12 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@app/*": ["src/app/*"],
-      "@pages/*": ["src/pages/*"],
-      "@widgets/*": ["src/widgets/*"],
+      "@core/*": ["src/core/*"],
       "@features/*": ["src/features/*"],
-      "@entities/*": ["src/entities/*"],
-      "@shared/*": ["src/shared/*"]
+      "@ui/*": ["src/ui/*"],
+      "@layout/*": ["src/layout/*"]
     }
   },
   "include": ["src", "vite.config.ts"],
-  "exclude": ["src/lib/pcm-processor.worklet.ts"]
+  "exclude": ["src/lib/pcm-processor.worklet.ts", "src/workers/pcm-processor.worklet.ts"]
 }
