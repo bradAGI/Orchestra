@@ -132,36 +132,41 @@ export function BrowserPane() {
   return (
     <div className="flex flex-col h-full">
       {/* Tab bar */}
-      <div className="flex items-center border-b border-border bg-background">
-        {browserTabs.map((tab) => (
-          <button
-            key={tab.id}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs border-r border-border max-w-[180px] ${
-              tab.id === activeBrowserTabId
-                ? 'bg-background text-foreground'
-                : 'bg-muted/30 text-muted-foreground hover:text-foreground'
-            }`}
-            onClick={() => setActiveBrowserTab(tab.id)}
-          >
-            <Globe size={12} className="flex-shrink-0" />
-            <span className="truncate">{tab.title || 'New Tab'}</span>
-            <span
-              className="ml-auto opacity-60 hover:opacity-100"
-              onClick={(e) => {
-                e.stopPropagation()
-                closeBrowserTab(tab.id)
-              }}
+      <div className="flex items-center border-b border-border/30 bg-background overflow-x-auto">
+        {browserTabs.map((tab) => {
+          const isActive = tab.id === activeBrowserTabId
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveBrowserTab(tab.id)}
+              className={`group relative inline-flex items-center gap-1.5 px-3 h-9 max-w-[200px] shrink-0 transition-colors ${
+                isActive ? 'text-foreground' : 'text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.03]'
+              }`}
             >
-              <X size={10} />
-            </span>
-          </button>
-        ))}
+              {isActive && (
+                <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-primary" />
+              )}
+              <Globe size={12} className={isActive ? 'text-primary shrink-0' : 'text-muted-foreground/60 shrink-0'} strokeWidth={isActive ? 2.25 : 2} />
+              <span className="text-[12px] font-medium tracking-tight truncate">{tab.title || 'New tab'}</span>
+              <span
+                role="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  closeBrowserTab(tab.id)
+                }}
+                className="inline-flex items-center justify-center w-4 h-4 -mr-1 rounded text-muted-foreground/50 opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-foreground/[0.06] transition-all"
+              >
+                <X size={11} />
+              </span>
+            </button>
+          )
+        })}
         <button
           onClick={() => openBrowserTab()}
-          className="p-1.5 text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center justify-center h-9 w-9 text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.03] transition-colors shrink-0"
           title="New tab"
         >
-          <Plus size={14} />
+          <Plus size={13} strokeWidth={2.25} />
         </button>
       </div>
 

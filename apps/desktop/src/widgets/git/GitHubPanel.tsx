@@ -193,9 +193,9 @@ export function GitHubPanel({
   }
 
   function prStatusStyle(pr: GitHubPR): string {
-    if (pr.merged_at) return 'bg-purple-500/20 text-purple-400'
-    if (pr.state === 'closed') return 'bg-red-500/20 text-red-400'
-    return 'bg-green-500/20 text-green-400'
+    if (pr.merged_at) return 'text-purple-400'
+    if (pr.state === 'closed') return 'text-destructive'
+    return 'text-emerald-500'
   }
 
   function prStatusLabel(pr: GitHubPR): string {
@@ -204,52 +204,49 @@ export function GitHubPanel({
   }
 
   return (
-    <div className={forceTab ? 'h-full flex flex-col' : 'border-t border-border/40'}>
-      {/* Header — hidden when parent controls the tab */}
+    <div className={forceTab ? 'h-full flex flex-col bg-background' : ''}>
       {!forceTab && (
         <button
           onClick={() => setCollapsed((v) => !v)}
-          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/10"
+          className="w-full flex items-center gap-2 px-3 h-9 hover:bg-foreground/[0.03] transition-colors border-b border-border/30"
         >
-          {collapsed ? <ChevronRight size={14} className="text-muted-foreground" /> : <ChevronDown size={14} className="text-muted-foreground" />}
-          <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">GitHub</span>
-          <span className="text-[9px] text-muted-foreground/50 ml-1">
-            {issues.length} issues / {prs.length} PRs
+          {collapsed ? <ChevronRight size={13} className="text-muted-foreground/60" /> : <ChevronDown size={13} className="text-muted-foreground/60" />}
+          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60">GitHub</span>
+          <span className="text-[11px] text-muted-foreground/50 ml-1 tabular-nums">
+            {issues.length} issues · {prs.length} PRs
           </span>
         </button>
       )}
 
       {(forceTab || !collapsed) && (
-        <div className={forceTab ? 'flex-1 overflow-auto px-3 py-3' : 'px-3 pb-3'}>
-          {/* Error state */}
+        <div className={forceTab ? 'flex-1 overflow-auto px-5 py-4' : 'px-3 pb-3'}>
           {loadError && (
-            <div className="mb-2 p-2 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <p className="text-[11px] text-red-400 font-medium">{loadError.summary}</p>
+            <div className="mb-3 px-3 py-2 rounded-md bg-destructive/10 text-[11px] text-destructive">
+              <p className="font-medium">{loadError.summary}</p>
               <details className="mt-1">
-                <summary className="text-[9px] text-red-400/60 cursor-pointer">Details</summary>
-                <pre className="text-[9px] text-red-400/50 mt-1 whitespace-pre-wrap break-all">{loadError.detail}</pre>
+                <summary className="text-[10px] text-destructive/70 cursor-pointer">Details</summary>
+                <pre className="text-[10px] text-destructive/60 mt-1 whitespace-pre-wrap break-all">{loadError.detail}</pre>
               </details>
             </div>
           )}
 
-          {/* Sub-tabs — hidden when parent controls the tab */}
           {!forceTab && (
-            <div className="flex gap-2 mb-2">
+            <div className="flex gap-1 mb-3">
               <button
                 onClick={() => setTab('issues')}
-                className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded ${
-                  tab === 'issues' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'
+                className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11.5px] font-medium tracking-tight transition-colors ${
+                  tab === 'issues' ? 'bg-foreground/[0.06] text-foreground' : 'text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04]'
                 }`}
               >
-                <CircleDot size={10} /> Issues
+                <CircleDot size={11} /> Issues
               </button>
               <button
                 onClick={() => setTab('prs')}
-                className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded ${
-                  tab === 'prs' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'
+                className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11.5px] font-medium tracking-tight transition-colors ${
+                  tab === 'prs' ? 'bg-foreground/[0.06] text-foreground' : 'text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04]'
                 }`}
               >
-                <GitPullRequest size={10} /> PRs
+                <GitPullRequest size={11} /> PRs
               </button>
             </div>
           )}
@@ -257,61 +254,65 @@ export function GitHubPanel({
           {/* Issues tab */}
           {tab === 'issues' && (
             <div>
-              <div className="flex items-center gap-1 mb-2">
-                {(['open', 'closed', 'all'] as IssueFilter[]).map((f) => (
-                  <button
-                    key={f}
-                    onClick={() => setIssueFilter(f)}
-                    className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest rounded ${
-                      issueFilter === f ? 'bg-primary/10 text-primary' : 'text-muted-foreground/60 hover:text-muted-foreground'
-                    }`}
-                  >
-                    {f}
-                  </button>
-                ))}
+              <div className="flex items-center gap-1 mb-3">
+                <div className="flex items-center rounded-md bg-muted/30 p-0.5">
+                  {(['open', 'closed', 'all'] as IssueFilter[]).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setIssueFilter(f)}
+                      className={`px-2.5 h-6 rounded text-[10.5px] font-medium tracking-tight transition-colors capitalize ${
+                        issueFilter === f ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground/60 hover:text-foreground'
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
                 <button
                   onClick={() => setShowCreateIssue((v) => !v)}
-                  className="ml-auto text-muted-foreground hover:text-foreground"
+                  className="ml-auto h-7 w-7 grid place-items-center rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                  title={showCreateIssue ? 'Cancel' : 'New issue'}
                 >
-                  {showCreateIssue ? <X size={12} /> : <Plus size={12} />}
+                  {showCreateIssue ? <X size={13} /> : <Plus size={13} />}
                 </button>
               </div>
 
               {showCreateIssue && (
-                <div className="mb-2 p-2 bg-muted/10 rounded-xl space-y-1.5">
+                <div className="mb-3 p-3 rounded-md bg-muted/20 space-y-2">
                   <input
                     value={newIssueTitle}
                     onChange={(e) => setNewIssueTitle(e.target.value)}
                     placeholder="Issue title"
-                    className="w-full bg-transparent border border-border/40 rounded-lg px-2 py-1 text-[11px] text-foreground outline-none focus:border-primary/60"
+                    className="w-full h-8 px-3 rounded-md bg-background text-[12px] font-medium placeholder:text-muted-foreground/50 outline-none focus:ring-1 focus:ring-primary/40 transition-all"
                   />
                   <textarea
                     value={newIssueBody}
                     onChange={(e) => setNewIssueBody(e.target.value)}
                     placeholder="Description (optional)"
-                    rows={2}
-                    className="w-full bg-transparent border border-border/40 rounded-lg px-2 py-1 text-[11px] text-foreground outline-none focus:border-primary/60 resize-none"
+                    rows={3}
+                    className="w-full px-3 py-2 rounded-md bg-background text-[12px] placeholder:text-muted-foreground/50 outline-none focus:ring-1 focus:ring-primary/40 resize-none transition-all"
                   />
                   <button
                     onClick={handleCreateIssue}
                     disabled={!newIssueTitle.trim() || loading}
-                    className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-40"
+                    className="inline-flex items-center h-8 px-3 rounded-md bg-foreground text-background hover:bg-foreground/90 text-[11.5px] font-semibold tracking-tight disabled:opacity-40 transition-colors"
                   >
-                    Create Issue
+                    Create issue
                   </button>
                 </div>
               )}
 
-              <div className="max-h-[200px] overflow-y-auto space-y-0.5">
+              <div className="flex flex-col">
                 {issues.map((issue) => (
                   <div key={issue.number}>
                     <div
-                      className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/10 cursor-pointer"
+                      className="group flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-foreground/[0.03] cursor-pointer transition-colors"
                       onClick={() => setExpandedIssue(expandedIssue === issue.number ? null : issue.number)}
                     >
-                      <CircleDot size={10} className={issue.state === 'open' ? 'text-green-400' : 'text-red-400'} />
-                      <span className="text-[11px] text-foreground truncate flex-1">
-                        #{issue.number} {issue.title}
+                      <CircleDot size={11} className={issue.state === 'open' ? 'text-emerald-500 shrink-0' : 'text-destructive shrink-0'} />
+                      <span className="text-[12px] text-foreground/90 truncate flex-1">
+                        <span className="font-mono text-muted-foreground/60 mr-1.5">#{issue.number}</span>
+                        {issue.title}
                       </span>
                       <button
                         onClick={(e) => {
@@ -320,36 +321,36 @@ export function GitHubPanel({
                           if (bridge?.openExternal) { void bridge.openExternal(issue.html_url) }
                           else { window.open(issue.html_url, '_blank') }
                         }}
-                        className="text-muted-foreground/40 hover:text-muted-foreground"
+                        className="opacity-0 group-hover:opacity-100 text-muted-foreground/50 hover:text-foreground transition-all p-0.5"
                       >
-                        <ExternalLink size={10} />
+                        <ExternalLink size={11} />
                       </button>
                     </div>
                     {expandedIssue === issue.number && (
-                      <div className="ml-6 px-2 py-1 text-[10px] text-muted-foreground">
-                        <p className="mb-1 whitespace-pre-wrap">{issue.body || 'No description'}</p>
+                      <div className="ml-6 px-2 py-1.5 text-[11.5px] text-muted-foreground/85">
+                        <p className="mb-2 whitespace-pre-wrap leading-relaxed">{issue.body || 'No description'}</p>
                         <button
                           onClick={() => handleToggleIssueState(issue)}
                           disabled={loading}
-                          className="text-[9px] font-bold uppercase tracking-widest text-primary hover:text-primary/80"
+                          className="text-[10.5px] font-medium text-primary hover:text-primary/80 transition-colors"
                         >
-                          {issue.state === 'open' ? 'Close' : 'Reopen'}
+                          {issue.state === 'open' ? 'Close issue' : 'Reopen issue'}
                         </button>
                       </div>
                     )}
                   </div>
                 ))}
                 {issues.length === 0 && !loadError && (
-                  <div className="text-[10px] text-muted-foreground/50 text-center py-2">No issues</div>
+                  <div className="text-[11px] text-muted-foreground/50 text-center py-6">No issues</div>
                 )}
               </div>
               {issueHasMore && (
                 <button
                   onClick={() => void loadMoreIssues()}
                   disabled={loadingMore}
-                  className="w-full mt-1 py-1 text-[10px] font-bold uppercase tracking-widest text-primary hover:text-primary/80 disabled:opacity-40"
+                  className="w-full mt-2 h-8 text-[11px] font-medium text-primary hover:text-primary/80 disabled:opacity-40 transition-colors"
                 >
-                  {loadingMore ? 'Loading...' : 'Load more...'}
+                  {loadingMore ? 'Loading…' : 'Load more'}
                 </button>
               )}
             </div>
@@ -358,35 +359,36 @@ export function GitHubPanel({
           {/* PRs tab */}
           {tab === 'prs' && (
             <div>
-              <div className="flex items-center mb-2">
+              <div className="flex items-center mb-3">
                 <button
                   onClick={() => setShowCreatePR((v) => !v)}
-                  className="ml-auto text-muted-foreground hover:text-foreground"
+                  className="ml-auto h-7 w-7 grid place-items-center rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                  title={showCreatePR ? 'Cancel' : 'New PR'}
                 >
-                  {showCreatePR ? <X size={12} /> : <Plus size={12} />}
+                  {showCreatePR ? <X size={13} /> : <Plus size={13} />}
                 </button>
               </div>
 
               {showCreatePR && (
-                <div className="mb-2 p-2 bg-muted/10 rounded-xl space-y-1.5">
+                <div className="mb-3 p-3 rounded-md bg-muted/20 space-y-2">
                   <input
                     value={newPRTitle}
                     onChange={(e) => setNewPRTitle(e.target.value)}
                     placeholder="PR title"
-                    className="w-full bg-transparent border border-border/40 rounded-lg px-2 py-1 text-[11px] text-foreground outline-none focus:border-primary/60"
+                    className="w-full h-8 px-3 rounded-md bg-background text-[12px] font-medium placeholder:text-muted-foreground/50 outline-none focus:ring-1 focus:ring-primary/40 transition-all"
                   />
                   <textarea
                     value={newPRBody}
                     onChange={(e) => setNewPRBody(e.target.value)}
                     placeholder="Description"
-                    rows={2}
-                    className="w-full bg-transparent border border-border/40 rounded-lg px-2 py-1 text-[11px] text-foreground outline-none focus:border-primary/60 resize-none"
+                    rows={3}
+                    className="w-full px-3 py-2 rounded-md bg-background text-[12px] placeholder:text-muted-foreground/50 outline-none focus:ring-1 focus:ring-primary/40 resize-none transition-all"
                   />
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <select
                       value={newPRHead}
                       onChange={(e) => setNewPRHead(e.target.value)}
-                      className="flex-1 bg-card border border-border/40 rounded-lg px-2 py-1 text-[11px] text-foreground outline-none"
+                      className="h-8 px-2 rounded-md bg-background text-[11.5px] outline-none focus:ring-1 focus:ring-primary/40"
                     >
                       <option value="">Head branch</option>
                       {branches.map((b) => <option key={b} value={b}>{b}</option>)}
@@ -394,7 +396,7 @@ export function GitHubPanel({
                     <select
                       value={newPRBase}
                       onChange={(e) => setNewPRBase(e.target.value)}
-                      className="flex-1 bg-card border border-border/40 rounded-lg px-2 py-1 text-[11px] text-foreground outline-none"
+                      className="h-8 px-2 rounded-md bg-background text-[11.5px] outline-none focus:ring-1 focus:ring-primary/40"
                     >
                       <option value="">Base branch</option>
                       {branches.map((b) => <option key={b} value={b}>{b}</option>)}
@@ -403,43 +405,44 @@ export function GitHubPanel({
                   <button
                     onClick={handleCreatePR}
                     disabled={!newPRTitle.trim() || !newPRHead || !newPRBase || loading}
-                    className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-40"
+                    className="inline-flex items-center h-8 px-3 rounded-md bg-foreground text-background hover:bg-foreground/90 text-[11.5px] font-semibold tracking-tight disabled:opacity-40 transition-colors"
                   >
                     Create PR
                   </button>
                 </div>
               )}
 
-              <div className="max-h-[200px] overflow-y-auto space-y-0.5">
+              <div className="flex flex-col">
                 {prs.map((pr) => (
                   <button
                     key={pr.number}
                     onClick={() => onOpenPR(pr)}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/10 text-left"
+                    className="group flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-foreground/[0.03] text-left transition-colors"
                   >
-                    <GitPullRequest size={10} className="text-muted-foreground shrink-0" />
-                    <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${prStatusStyle(pr)}`}>
+                    <GitPullRequest size={11} className={`shrink-0 ${prStatusStyle(pr)}`} />
+                    <span className={`text-[10px] font-semibold uppercase tracking-tight shrink-0 ${prStatusStyle(pr)}`}>
                       {prStatusLabel(pr)}
                     </span>
-                    <span className="text-[11px] text-foreground truncate flex-1">
-                      #{pr.number} {pr.title}
+                    <span className="text-[12px] text-foreground/90 truncate flex-1">
+                      <span className="font-mono text-muted-foreground/60 mr-1.5">#{pr.number}</span>
+                      {pr.title}
                     </span>
-                    <span className="text-[9px] text-muted-foreground/40 font-mono">
-                      {pr.base.ref} &larr; {pr.head.ref}
+                    <span className="text-[10px] text-muted-foreground/50 font-mono shrink-0">
+                      {pr.base.ref} ← {pr.head.ref}
                     </span>
                   </button>
                 ))}
                 {prs.length === 0 && !loadError && (
-                  <div className="text-[10px] text-muted-foreground/50 text-center py-2">No pull requests</div>
+                  <div className="text-[11px] text-muted-foreground/50 text-center py-6">No pull requests</div>
                 )}
               </div>
               {prHasMore && (
                 <button
                   onClick={() => void loadMorePRs()}
                   disabled={loadingMore}
-                  className="w-full mt-1 py-1 text-[10px] font-bold uppercase tracking-widest text-primary hover:text-primary/80 disabled:opacity-40"
+                  className="w-full mt-2 h-8 text-[11px] font-medium text-primary hover:text-primary/80 disabled:opacity-40 transition-colors"
                 >
-                  {loadingMore ? 'Loading...' : 'Load more...'}
+                  {loadingMore ? 'Loading…' : 'Load more'}
                 </button>
               )}
             </div>

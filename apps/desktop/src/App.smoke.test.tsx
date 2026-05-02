@@ -85,6 +85,7 @@ function setupDesktopBridge(overrides?: {
       }
     }),
     selectFolder: vi.fn(async () => '/mock/selected/path'),
+    selectFile: vi.fn(async () => '/mock/selected/file.md'),
     openExternal: vi.fn(async () => {}),
     openPath: vi.fn(async () => {}),
     getScaleFactor: vi.fn(() => 1),
@@ -1067,16 +1068,17 @@ describe('App smoke render', () => {
       })
     })
 
-    it('shows refresh status', async () => {
+    it('triggers a refresh request when clicked', async () => {
       setupDesktopBridge()
-      setupFetch(defaultSnapshot())
+      const fetchMock = setupFetch(defaultSnapshot())
 
       render(<App />)
 
-      fireEvent.click(await screen.findByRole('button', { name: 'Sync Data' }))
+      fireEvent.click(await screen.findByRole('button', { name: /refresh/i }))
 
       await waitFor(() => {
-        expect(screen.getByText(/Refresh queued successfully/i)).toBeTruthy()
+        const calls = fetchMock.mock.calls.map(c => String(c[0]))
+        expect(calls.some(u => u.includes('/api/v1/refresh'))).toBe(true)
       })
     })
 
@@ -1093,7 +1095,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(await screen.findByRole('button', { name: 'Sync Data' }))
+      fireEvent.click(await screen.findByRole('button', { name: /refresh/i }))
 
       await waitFor(() => {
         expect(screen.getByText(/refresh failed/i)).toBeTruthy()

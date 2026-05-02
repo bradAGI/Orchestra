@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ChevronDown, ChevronRight, Clock, Loader2, Play, Terminal, Globe, RefreshCcw, KeyRound, Settings2, Trash2, Zap } from 'lucide-react'
-import { SandboxIcon } from '@/app/routes/sections'
+import { ChevronDown, ChevronRight, Clock, Loader2, Play, Terminal, Globe, RefreshCcw, Settings2, Trash2, Zap } from 'lucide-react'
 import { CustomDropdown } from '@/components/app-shell/shared/controls'
-import { Button } from '@/components/ui/button'
 import type { BackendConfig } from '@/lib/orchestra-client'
 import {
   fetchUnsandboxSessions,
@@ -187,10 +185,12 @@ export function SandboxDashboard({ config, onOpenSettings }: { config: BackendCo
       setCurrentJobStatus('pending')
       setProgressStatus(`${jobId.slice(0, 12)} pending...`)
 
-      // Step 2: Poll until done
+      // Step 2: Poll until done. Backoff from 1s up to 5s so we don't hammer
+      // the backend for long-running jobs.
       const pollUrl = new URL(`/api/v1/unsandbox/jobs/${jobId}`, config.baseUrl)
+      let pollDelay = 1000
       while (!controller.signal.aborted) {
-        await new Promise((r) => setTimeout(r, 2000))
+        await new Promise((r) => setTimeout(r, pollDelay))
         if (controller.signal.aborted) break
 
         const pollResp = await fetch(pollUrl.toString(), { headers, signal: controller.signal })
@@ -215,6 +215,7 @@ export function SandboxDashboard({ config, onOpenSettings }: { config: BackendCo
 
         setCurrentJobStatus(status)
         setProgressStatus(`${status}... (${jobId.slice(0, 12)})`)
+        pollDelay = Math.min(pollDelay * 1.5, 5000)
       }
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
@@ -223,6 +224,12 @@ export function SandboxDashboard({ config, onOpenSettings }: { config: BackendCo
     } finally {
       abortRef.current = null
       setExecuting(false)
+      // Clear ghost status if we exited via abort — controller.signal.aborted is set
+      // when the user cancels, leaving stale "pending"/"running" badges otherwise.
+      if (controller.signal.aborted) {
+        setCurrentJobStatus('')
+        setProgressStatus('')
+      }
     }
   }
 
@@ -237,339 +244,336 @@ export function SandboxDashboard({ config, onOpenSettings }: { config: BackendCo
 
   if (!config) {
     return (
-      <div className="p-6 text-sm text-muted-foreground">
+      <div className="p-8 text-sm text-muted-foreground">
         No backend connected.
       </div>
     )
   }
 
-  return (
-    <div className="flex flex-col gap-6 p-6 h-full overflow-auto">
-      {/* Status bar */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <SandboxIcon className="h-5 w-5 text-muted-foreground" size={20} />
-          <div>
-            <h2 className="text-sm font-bold">Sandbox</h2>
-            <p className="text-[10px] text-muted-foreground">Remote code execution</p>
+  if (!isConfigured) {
+    return (
+      <div className="h-full overflow-auto bg-background">
+        <div className="min-h-full flex items-center justify-center px-10 py-20">
+          <div className="w-full max-w-xl space-y-8 text-center">
+            <header className="space-y-3">
+              <h1 className="text-4xl font-black tracking-tight">Sandbox</h1>
+              <p className="text-sm text-muted-foreground">Connect your Unsandbox API keys to run code remotely.</p>
+            </header>
+            {onOpenSettings && (
+              <button
+                onClick={onOpenSettings}
+                className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-md bg-foreground text-background hover:bg-foreground/90 text-[12px] font-semibold tracking-tight transition-colors"
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+                Open Settings
+              </button>
+            )}
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {isConfigured ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-500">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Connected
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/30 border border-border/30 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Not configured
-            </span>
-          )}
         </div>
       </div>
+    )
+  }
 
-      {/* Unconfigured empty state */}
-      {!isConfigured && (
-        <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border/20 bg-muted/5 p-10">
-          <div className="rounded-full bg-muted/20 p-4">
-            <KeyRound className="h-8 w-8 text-muted-foreground/50" />
+  return (
+    <div className="h-full overflow-auto bg-background">
+      <div className="max-w-3xl mx-auto px-10 pt-10 pb-16 space-y-10">
+        {/* Hero */}
+        <header className="flex items-end justify-between gap-4">
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">Remote</p>
+            <h1 className="text-4xl font-black tracking-tight">Sandbox</h1>
           </div>
-          <div className="text-center space-y-1.5">
-            <p className="text-sm font-medium text-foreground/80">Unsandbox credentials required</p>
-            <p className="text-xs text-muted-foreground max-w-sm">
-              Add your API keys in Settings to enable remote code execution across 42+ languages.
-            </p>
-          </div>
-          {onOpenSettings && (
-            <button
-              onClick={onOpenSettings}
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              <Settings2 className="h-3 w-3" />
-              Open Integration Settings
-            </button>
-          )}
-        </div>
-      )}
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-500">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            Connected
+          </span>
+        </header>
 
-      {/* Execute panel */}
-      {isConfigured && (
-        <>
-          <div className="rounded-xl border border-border/20 bg-muted/10 p-4 space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="space-y-1 flex-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Language</label>
+        {/* Execute */}
+        <section className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Language">
                 <CustomDropdown
                   className="w-full"
                   value={language}
                   options={LANGUAGES.map((l) => ({ label: l, value: l }))}
                   onChange={setLanguage}
                 />
-              </div>
-              <div className="space-y-1 flex-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Network</label>
+              </Field>
+              <Field label="Network">
                 <CustomDropdown
                   className="w-full"
                   value={network}
                   options={NETWORKS.map((n) => ({ label: n, value: n }))}
                   onChange={setNetwork}
                 />
-              </div>
+              </Field>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Code</label>
+            <Field label="Code">
               <textarea
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={language === 'bash' ? 'echo "hello from unsandbox"' : `print("hello from unsandbox")`}
-                rows={8}
-                className="w-full rounded-lg border border-border/40 bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground/40 focus:border-primary focus:outline-none resize-y"
+                rows={10}
+                className="w-full rounded-md bg-muted/20 px-3 py-2.5 text-[13px] font-mono placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/40 resize-y transition-all"
               />
-            </div>
+            </Field>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <button
                 onClick={handleExecute}
                 disabled={executing || !code.trim()}
-                className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-foreground text-background hover:bg-foreground/90 text-[12px] font-semibold tracking-tight disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                {executing ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <Play className="h-3 w-3" />}
+                {executing ? <Loader2 className="h-3.5 w-3.5 animate-spin-smooth" /> : <Play className="h-3.5 w-3.5" />}
                 Execute
               </button>
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-[11px] text-muted-foreground/70 font-mono">
                 {navigator.platform.includes('Mac') ? '\u2318' : 'Ctrl'}+Enter
               </span>
             </div>
-          </div>
 
-          {/* Progress */}
-          {executing && progressStatus && (
-            <div className="flex items-center gap-2 rounded-xl border border-border/20 bg-muted/10 px-4 py-3">
-              <Loader2 className="h-3.5 w-3.5 animate-spin-smooth text-primary" />
-              <span className="text-xs font-mono text-muted-foreground">{progressStatus}</span>
-            </div>
-          )}
-
-          {/* Session Log (JSONL snoop) */}
-          {sessionLog.length > 0 && (
-            <div className="rounded-xl border border-border/20 bg-muted/10 p-4 space-y-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Session Activity ({sessionLog.length})
-              </p>
-              <div className="max-h-[300px] overflow-auto space-y-1 scroll-smooth">
-                {sessionLog.map((entry, i) => (
-                  <div key={i} className="flex gap-2 text-[11px] font-mono">
-                    <span className="text-muted-foreground shrink-0">{entry.ts}</span>
-                    <span className={`shrink-0 font-bold uppercase tracking-wider ${
-                      entry.type === 'assistant' ? 'text-primary' :
-                      entry.type === 'result' ? 'text-emerald-500' :
-                      'text-muted-foreground'
-                    }`}>
-                      {entry.type.slice(0, 8).padEnd(8)}
-                    </span>
-                    <span className="text-foreground/80 break-all">{entry.message}</span>
-                  </div>
-                ))}
-                <div ref={logEndRef} />
+            {/* Progress */}
+            {executing && progressStatus && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/20 text-[12px] font-mono text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin-smooth text-primary" />
+                {progressStatus}
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Result */}
-          {(result || execError) && (
-            <div className="rounded-xl border border-border/20 bg-muted/10 p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Output</p>
-                {result && (
-                  <div className="flex items-center gap-3 text-[10px]">
-                    <span className={`font-bold uppercase ${result.status === 'completed' ? 'text-emerald-500' : 'text-amber-500'}`}>
+            {/* Session Log */}
+            {sessionLog.length > 0 && (
+              <SectionBlock label={`Session Activity (${sessionLog.length})`}>
+                <div className="max-h-[280px] overflow-auto space-y-1 scroll-smooth font-mono text-[11px]">
+                  {sessionLog.map((entry, i) => (
+                    <div key={i} className="flex gap-2">
+                      <span className="text-muted-foreground/50 shrink-0">{entry.ts}</span>
+                      <span className={`shrink-0 font-semibold ${
+                        entry.type === 'assistant' ? 'text-primary' :
+                        entry.type === 'result' ? 'text-emerald-500' :
+                        'text-muted-foreground/70'
+                      }`}>
+                        {entry.type.slice(0, 8).padEnd(8)}
+                      </span>
+                      <span className="text-foreground/80 break-all">{entry.message}</span>
+                    </div>
+                  ))}
+                  <div ref={logEndRef} />
+                </div>
+              </SectionBlock>
+            )}
+
+            {/* Result */}
+            {(result || execError) && (
+              <SectionBlock
+                label="Output"
+                trailing={result && (
+                  <div className="flex items-center gap-3 text-[11px]">
+                    <span className={`font-semibold ${result.status === 'completed' ? 'text-emerald-500' : 'text-amber-500'}`}>
                       {result.status}
                     </span>
                     {result.job_id && (
-                      <span className="font-mono text-muted-foreground">{result.job_id}</span>
+                      <span className="font-mono text-muted-foreground/60">{result.job_id}</span>
                     )}
                   </div>
                 )}
-              </div>
-              {execError && (
-                <pre className="rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-sm font-mono text-red-500 whitespace-pre-wrap overflow-auto max-h-[300px]">
-                  {execError}
-                </pre>
-              )}
-              {result?.output && (
-                <pre className="rounded-lg bg-background border border-border/20 p-3 text-sm font-mono whitespace-pre-wrap overflow-auto max-h-[400px]">
-                  {result.output}
-                </pre>
-              )}
-              {result?.error && (
-                <pre className="rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-sm font-mono text-red-500 whitespace-pre-wrap overflow-auto max-h-[200px]">
-                  {result.error}
-                </pre>
-              )}
-            </div>
-          )}
-        </>
-      )}
+              >
+                {execError && (
+                  <pre className="rounded-md bg-destructive/5 border border-destructive/20 p-3 text-[12px] font-mono text-destructive whitespace-pre-wrap overflow-auto max-h-[280px]">
+                    {execError}
+                  </pre>
+                )}
+                {result?.output && (
+                  <pre className="rounded-md bg-muted/20 p-3 text-[12px] font-mono whitespace-pre-wrap overflow-auto max-h-[400px]">
+                    {result.output}
+                  </pre>
+                )}
+                {result?.error && (
+                  <pre className="rounded-md bg-destructive/5 border border-destructive/20 p-3 text-[12px] font-mono text-destructive whitespace-pre-wrap overflow-auto max-h-[200px]">
+                    {result.error}
+                  </pre>
+                )}
+              </SectionBlock>
+            )}
+          </section>
 
-      {/* History */}
-      {history.length > 0 && (
-        <div className="rounded-xl border border-border/20 bg-muted/10 p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              History ({history.length})
-            </p>
-            <button
-              onClick={() => { setHistory([]); saveHistory([]) }}
-              className="text-[10px] text-muted-foreground hover:text-red-500 transition-colors"
-              title="Clear history"
-            >
-              <Trash2 size={12} />
-            </button>
-          </div>
-          <div className="space-y-1 max-h-[400px] overflow-auto">
-            {history.map((entry) => (
-              <div key={entry.id} className="rounded-lg bg-background/50 border border-border/10 text-[11px]">
-                <button
-                  onClick={() => setExpandedHistoryId(expandedHistoryId === entry.id ? '' : entry.id)}
-                  className="flex items-center justify-between w-full px-3 py-1.5 text-left hover:bg-muted/20 transition-colors"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    {expandedHistoryId === entry.id
-                      ? <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
-                      : <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />}
-                    <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
-                    <span className="text-muted-foreground shrink-0">
-                      {new Date(entry.ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+        {/* History */}
+        {history.length > 0 && (
+          <SectionBlock
+            label={`History \u00b7 ${history.length}`}
+            trailing={
+              <button
+                onClick={() => { setHistory([]); saveHistory([]) }}
+                className="text-muted-foreground/50 hover:text-destructive transition-colors"
+                title="Clear history"
+              >
+                <Trash2 size={13} />
+              </button>
+            }
+          >
+            <div className="flex flex-col divide-y divide-border/40 max-h-[400px] overflow-auto">
+              {history.map((entry) => (
+                <div key={entry.id}>
+                  <button
+                    onClick={() => setExpandedHistoryId(expandedHistoryId === entry.id ? '' : entry.id)}
+                    className="flex items-center justify-between w-full px-2 py-2 text-left hover:bg-foreground/[0.03] rounded-sm transition-colors"
+                  >
+                    <div className="flex items-center gap-2 min-w-0 text-[11px]">
+                      {expandedHistoryId === entry.id
+                        ? <ChevronDown className="h-3 w-3 text-muted-foreground/60 shrink-0" />
+                        : <ChevronRight className="h-3 w-3 text-muted-foreground/60 shrink-0" />}
+                      <Clock className="h-3 w-3 text-muted-foreground/50 shrink-0" />
+                      <span className="text-muted-foreground/70 shrink-0 tabular-nums">
+                        {new Date(entry.ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <span className="text-muted-foreground/70 shrink-0">{entry.language}</span>
+                      <span className="font-mono truncate text-foreground/80">{entry.code.slice(0, 60)}</span>
+                    </div>
+                    <span className={`text-[10px] font-semibold shrink-0 ml-2 ${
+                      entry.status === 'completed' ? 'text-emerald-500' :
+                      entry.status === 'failed' ? 'text-destructive' : 'text-muted-foreground/60'
+                    }`}>
+                      {entry.status}
                     </span>
-                    <span className="text-muted-foreground shrink-0">{entry.language}</span>
-                    <span className="font-mono truncate text-foreground/70">{entry.code.slice(0, 60)}</span>
-                  </div>
-                  <span className={`font-bold uppercase tracking-wider shrink-0 ml-2 ${
-                    entry.status === 'completed' ? 'text-emerald-500' :
-                    entry.status === 'failed' ? 'text-red-500' : 'text-muted-foreground'
-                  }`}>
-                    {entry.status}
-                  </span>
-                </button>
-                {expandedHistoryId === entry.id && (
-                  <div className="px-3 pb-2 space-y-2">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => { setCode(entry.code); setLanguage(entry.language); setNetwork(entry.network) }}
-                        className="text-[10px] text-primary hover:underline"
-                      >
-                        Load into editor
-                      </button>
-                      {entry.job_id && (
-                        <span className="text-[10px] font-mono text-muted-foreground">{entry.job_id}</span>
+                  </button>
+                  {expandedHistoryId === entry.id && (
+                    <div className="px-2 pb-2 space-y-2">
+                      <div className="flex gap-2 items-center">
+                        <button
+                          onClick={() => { setCode(entry.code); setLanguage(entry.language); setNetwork(entry.network) }}
+                          className="text-[11px] text-primary hover:underline font-medium"
+                        >
+                          Load into editor
+                        </button>
+                        {entry.job_id && (
+                          <span className="text-[10px] font-mono text-muted-foreground/50">{entry.job_id}</span>
+                        )}
+                      </div>
+                      <pre className="rounded-md bg-muted/20 p-2 text-[11px] font-mono whitespace-pre-wrap overflow-auto max-h-[120px]">
+                        {entry.code}
+                      </pre>
+                      {entry.output && (
+                        <pre className="rounded-md bg-muted/10 p-2 text-[11px] font-mono whitespace-pre-wrap overflow-auto max-h-[200px]">
+                          {entry.output}
+                        </pre>
+                      )}
+                      {entry.error && (
+                        <pre className="rounded-md bg-destructive/5 border border-destructive/20 p-2 text-[11px] font-mono text-destructive whitespace-pre-wrap overflow-auto max-h-[100px]">
+                          {entry.error}
+                        </pre>
                       )}
                     </div>
-                    <pre className="rounded-lg bg-muted/20 border border-border/10 p-2 text-[10px] font-mono whitespace-pre-wrap overflow-auto max-h-[120px]">
-                      {entry.code}
-                    </pre>
-                    {entry.output && (
-                      <pre className="rounded-lg bg-background border border-border/10 p-2 text-[10px] font-mono whitespace-pre-wrap overflow-auto max-h-[200px]">
-                        {entry.output}
-                      </pre>
-                    )}
-                    {entry.error && (
-                      <pre className="rounded-lg bg-red-500/10 border border-red-500/20 p-2 text-[10px] font-mono text-red-500 whitespace-pre-wrap overflow-auto max-h-[100px]">
-                        {entry.error}
-                      </pre>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+                  )}
+                </div>
+              ))}
+            </div>
+          </SectionBlock>
+        )}
 
-      {/* Sessions & Services */}
-      <div className="rounded-xl border border-border/20 bg-muted/10 p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Active Resources</p>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={refreshResources}
-            disabled={loadingSessions}
-            className="h-8 w-8 p-0 shrink-0 border border-border hover:bg-muted"
-          >
-            <RefreshCcw
-              size={14}
-              className={spinning ? 'animate-refresh-spin' : ''}
-              onAnimationIteration={handleAnimationIteration}
-            />
-          </Button>
-        </div>
-
-        {currentJobId && (
-          <div className="space-y-1">
-            <p className="text-[10px] font-bold text-muted-foreground">Current Job</p>
-            <div className="flex items-center justify-between rounded-lg bg-background/50 border border-border/10 px-3 py-1.5 text-[11px]">
-              <div className="flex items-center gap-2">
-                <Zap className={`h-3 w-3 ${currentJobStatus === 'running' || currentJobStatus === 'pending' ? 'text-primary animate-pulse' : 'text-muted-foreground'}`} />
-                <span className="font-mono">{currentJobId.slice(0, 12)}</span>
-                <span className="text-muted-foreground">{language}</span>
-              </div>
-              <span className={`font-bold uppercase tracking-wider ${
+        {/* Active Resources */}
+        <SectionBlock
+          label="Active Resources"
+          trailing={
+            <button
+              onClick={refreshResources}
+              disabled={loadingSessions}
+              className="h-7 w-7 grid place-items-center rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.03] transition-colors disabled:opacity-40"
+              title="Refresh"
+            >
+              <RefreshCcw
+                size={13}
+                className={spinning ? 'animate-refresh-spin' : ''}
+                onAnimationIteration={handleAnimationIteration}
+              />
+            </button>
+          }
+        >
+          {currentJobId && (
+            <ResourceRow
+              icon={<Zap className={`h-3.5 w-3.5 ${currentJobStatus === 'running' || currentJobStatus === 'pending' ? 'text-primary animate-pulse' : 'text-muted-foreground/60'}`} />}
+              label="Current job"
+              id={currentJobId.slice(0, 12)}
+              meta={language}
+              statusLabel={currentJobStatus}
+              statusColor={
                 currentJobStatus === 'completed' ? 'text-emerald-500' :
-                currentJobStatus === 'failed' ? 'text-red-500' :
+                currentJobStatus === 'failed' ? 'text-destructive' :
                 currentJobStatus === 'running' ? 'text-primary' :
                 'text-amber-500'
-              }`}>
-                {currentJobStatus}
-              </span>
-            </div>
-          </div>
-        )}
+              }
+            />
+          )}
 
-        {sessions.length > 0 && (
-          <div className="space-y-1">
-            <p className="text-[10px] font-bold text-muted-foreground">Sessions ({sessions.length})</p>
-            <div className="space-y-1">
-              {sessions.map((s) => (
-                <div key={s.id} className="flex items-center justify-between rounded-lg bg-background/50 border border-border/10 px-3 py-1.5 text-[11px]">
-                  <div className="flex items-center gap-2">
-                    <Terminal className="h-3 w-3 text-muted-foreground" />
-                    <span className="font-mono">{s.id.slice(0, 12)}</span>
-                    <span className="text-muted-foreground">{s.language}</span>
-                  </div>
-                  <span className={`font-bold uppercase tracking-wider ${s.status === 'active' ? 'text-emerald-500' : 'text-muted-foreground'}`}>
-                    {s.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+          {sessions.map((s) => (
+            <ResourceRow
+              key={s.id}
+              icon={<Terminal className="h-3.5 w-3.5 text-muted-foreground/60" />}
+              id={s.id.slice(0, 12)}
+              meta={s.language}
+              statusLabel={s.status}
+              statusColor={s.status === 'active' ? 'text-emerald-500' : 'text-muted-foreground/60'}
+            />
+          ))}
 
-        {services.length > 0 && (
-          <div className="space-y-1">
-            <p className="text-[10px] font-bold text-muted-foreground">Services ({services.length})</p>
-            <div className="space-y-1">
-              {services.map((s) => (
-                <div key={s.id} className="flex items-center justify-between rounded-lg bg-background/50 border border-border/10 px-3 py-1.5 text-[11px]">
-                  <div className="flex items-center gap-2">
-                    <Globe className="h-3 w-3 text-muted-foreground" />
-                    <span className="font-mono">{s.id.slice(0, 12)}</span>
-                  </div>
-                  <span className={`font-bold uppercase tracking-wider ${s.status === 'active' ? 'text-emerald-500' : 'text-muted-foreground'}`}>
-                    {s.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+          {services.map((s) => (
+            <ResourceRow
+              key={s.id}
+              icon={<Globe className="h-3.5 w-3.5 text-muted-foreground/60" />}
+              id={s.id.slice(0, 12)}
+              statusLabel={s.status}
+              statusColor={s.status === 'active' ? 'text-emerald-500' : 'text-muted-foreground/60'}
+            />
+          ))}
 
-        {sessions.length === 0 && services.length === 0 && !loadingSessions && (
-          <p className="text-[11px] text-muted-foreground">No active sessions or services.</p>
-        )}
+          {sessions.length === 0 && services.length === 0 && !currentJobId && !loadingSessions && (
+            <p className="text-[11px] text-muted-foreground/60 px-2 py-2">No active sessions or services.</p>
+          )}
+        </SectionBlock>
       </div>
+    </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-[10px] font-semibold tracking-tight text-muted-foreground/70">{label}</label>
+      {children}
+    </div>
+  )
+}
+
+function SectionBlock({ label, trailing, children }: { label: string; trailing?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center justify-between px-1">
+        <h3 className="text-[10px] font-bold tracking-[0.18em] uppercase text-muted-foreground/60">{label}</h3>
+        {trailing}
+      </div>
+      <div className="space-y-2">{children}</div>
+    </section>
+  )
+}
+
+function ResourceRow({ icon, label, id, meta, statusLabel, statusColor }: {
+  icon: React.ReactNode
+  label?: string
+  id: string
+  meta?: string
+  statusLabel: string
+  statusColor: string
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-3 h-9 rounded-md hover:bg-foreground/[0.03] transition-colors">
+      <div className="flex items-center gap-2.5 min-w-0 text-[11.5px]">
+        {icon}
+        {label && <span className="text-muted-foreground/70">{label}</span>}
+        <span className="font-mono text-foreground/80 truncate">{id}</span>
+        {meta && <span className="text-muted-foreground/60">{meta}</span>}
+      </div>
+      <span className={`text-[10px] font-semibold shrink-0 ${statusColor}`}>{statusLabel}</span>
     </div>
   )
 }

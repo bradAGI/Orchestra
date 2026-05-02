@@ -195,7 +195,7 @@ func (r *CodexAppServerRunner) RunTurn(ctx context.Context, request TurnRequest,
 				_ = write(map[string]any{"id": id, "result": map[string]any{"success": false, "error": "tool executor unavailable"}})
 				return
 			}
-			result := request.ToolExecutor(strings.TrimSpace(toolName), arguments)
+			result := request.ToolExecutor(ctx, strings.TrimSpace(toolName), arguments)
 			if result == nil {
 				result = map[string]any{"success": false, "error": "tool executor returned nil"}
 			}

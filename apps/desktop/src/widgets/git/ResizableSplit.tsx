@@ -82,7 +82,7 @@ export function ResizableSplit({
       <div
         role="separator"
         aria-orientation="vertical"
-        className="w-1.5 shrink-0 bg-border/30 hover:bg-primary/30 cursor-col-resize"
+        className="w-px shrink-0 bg-border/40 hover:bg-primary/40 cursor-col-resize transition-colors"
         onMouseDown={onMouseDown}
       />
 

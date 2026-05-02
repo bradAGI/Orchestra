@@ -1,7 +1,7 @@
 // apps/desktop/src/widgets/agents/AgentsDashboard.tsx
 import { useEffect, useState, useMemo } from 'react'
 import { AlertCircle } from 'lucide-react'
-import type { BackendConfig, SnapshotPayload } from '@/lib/orchestra-types'
+import type { BackendConfig } from '@/lib/orchestra-types'
 import type { ProviderFileEntry } from '@/lib/orchestra-client'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ProviderHeader } from './ProviderHeader'
@@ -43,7 +43,6 @@ import type { Provider, CategoryId, Scope } from './types'
 
 interface AgentsDashboardProps {
   config: BackendConfig | null
-  snapshot: SnapshotPayload | null
 }
 
 export function AgentsDashboard({ config }: AgentsDashboardProps) {

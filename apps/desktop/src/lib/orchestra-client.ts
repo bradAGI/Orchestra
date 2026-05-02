@@ -1,15 +1,8 @@
-import type { APIErrorEnvelope, EventEnvelope, GlobalStats, Project, ProjectStats, SnapshotPayload, AgentConfig, DocItem, Issue, SessionDetail, SessionSummary } from '@/lib/orchestra-types'
-import type { DailyStats, CostRecord, CostOptimization, PerformanceRecord, ProductivityRecord, BudgetRecord, ExternalReconciliation, ExternalStatus } from '@/components/analytics/useAnalyticsData'
+import type { APIErrorEnvelope, BackendConfig, EventEnvelope, GlobalStats, Project, ProjectStats, SnapshotPayload, AgentConfig, DocItem, Issue, SessionDetail, SessionSummary } from '@/lib/orchestra-types'
 
-/** Runtime connection configuration for the orchestrator backend. */
-export type BackendConfig = {
-  /** Base URL of the orchestrator HTTP server. */
-  baseUrl: string
-  /** Bearer token used for API authentication. */
-  apiToken: string
-  /** Optional map of MCP server names to their connection URIs. */
-  mcpServers?: Record<string, string>
-}
+// Re-exported so existing `import { BackendConfig } from '@/lib/orchestra-client'`
+// callers keep working. Canonical definition lives in orchestra-types.ts.
+export type { BackendConfig }
 
 /** A tool exposed by an MCP (Model Context Protocol) server. */
 export type MCPTool = {
@@ -2197,127 +2190,164 @@ export async function saveAgentProviderKey(
   })
 }
 
-// ---------------------------------------------------------------------------
-// Analytics API
-// ---------------------------------------------------------------------------
 
-function analyticsParams(since?: string, extra?: Record<string, string>): string {
-  const params = new URLSearchParams()
-  if (since) params.set('since', since)
-  if (extra) {
-    for (const [k, v] of Object.entries(extra)) {
-      if (v) params.set(k, v)
-    }
-  }
-  const qs = params.toString()
-  return qs ? `?${qs}` : ''
+// ===========================================================================
+// Usage tracking — per-provider session/cost analytics from local CLI logs.
+// Mirrors Orca's claude-usage / codex-usage IPC surface as REST.
+// ===========================================================================
+
+export type UsageProvider = 'claude' | 'codex' | 'gemini' | 'opencode'
+export type UsageScope = 'orchestra' | 'all'
+export type UsageRange = '7d' | '30d' | '90d' | 'all'
+export type UsageBreakdownKind = 'model' | 'project'
+
+export type UsageScanState = {
+  provider: UsageProvider
+  enabled: boolean
+  is_scanning: boolean
+  last_scan_started_at?: number
+  last_scan_completed_at?: number
+  last_scan_error?: string
+  has_any_data: boolean
+  source_path_exists: boolean
+  source_path?: string
 }
 
-/**
- * Fetches daily aggregated analytics (sessions, tokens, cost per day).
- */
-export async function fetchAnalyticsDaily(config: BackendConfig, since?: string): Promise<DailyStats[]> {
-  const res = await requestJSON<DailyStats[] | null>(config, `/api/v1/analytics/daily${analyticsParams(since)}`)
-  return res ?? []
+export type UsageSummary = {
+  provider: UsageProvider
+  scope: UsageScope
+  range: UsageRange
+  sessions: number
+  turns: number
+  zero_cache_read_turns: number
+  input_tokens: number
+  cached_input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  cache_write_tokens: number
+  reasoning_tokens: number
+  total_tokens: number
+  cache_reuse_rate?: number
+  estimated_cost_usd?: number
+  top_model?: string
+  top_project?: string
+  has_any_data: boolean
+  has_inferred_pricing: boolean
 }
 
-/**
- * Fetches cost breakdown, optionally grouped by model or project.
- * Backend returns `{ groups, daily, group_by, ... }` — we unwrap to the groups array.
- */
-export async function fetchAnalyticsCost(config: BackendConfig, since?: string, groupBy?: string): Promise<CostRecord[]> {
-  const res = await requestJSON<{ groups?: CostRecord[] }>(config, `/api/v1/analytics/cost${analyticsParams(since, groupBy ? { group_by: groupBy } : undefined)}`)
-  return res?.groups ?? []
+export type UsageDailyPoint = {
+  day: string
+  input_tokens: number
+  cached_input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  cache_write_tokens: number
+  reasoning_tokens: number
 }
 
-/**
- * Fetches cost optimization data (cache hit rate, thinking ratio, anomalies, downgrades).
- * Backend returns maps keyed by provider/model — we average them into single numbers.
- */
-export async function fetchAnalyticsCostOptimization(config: BackendConfig): Promise<CostOptimization> {
-  type BackendOpt = {
-    cache_hit_rate?: Record<string, number>
-    thinking_ratio?: Record<string, number>
-    total_spend_cents?: number
-    projected_monthly_cents?: number
-  }
-  const res = await requestJSON<BackendOpt>(config, '/api/v1/analytics/cost/optimization')
-
-  const avgMap = (m?: Record<string, number>): number => {
-    if (!m) return 0
-    const vals = Object.values(m)
-    return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
-  }
-
-  return {
-    cache_hit_rate: avgMap(res?.cache_hit_rate),
-    thinking_token_ratio: avgMap(res?.thinking_ratio),
-    model_downgrades: [],
-    anomalies: [],
-  }
+export type UsageBreakdownRow = {
+  key: string
+  label: string
+  sessions: number
+  turns: number
+  input_tokens: number
+  cached_input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  cache_write_tokens: number
+  reasoning_tokens: number
+  total_tokens: number
+  estimated_cost_usd?: number
+  has_inferred_pricing: boolean
 }
 
-/**
- * Fetches provider performance metrics (latency percentiles, success/error rates).
- * Backend returns `{ provider_health, ... }` — we unwrap and remap field names.
- */
-export async function fetchAnalyticsPerformance(config: BackendConfig, since?: string, provider?: string): Promise<PerformanceRecord[]> {
-  type BackendHealth = {
-    provider: string; avg_latency_ms: number; p50_latency_ms: number; p95_latency_ms: number; p99_latency_ms: number
-    error_rate: number; success_rate: number; request_count: number; session_count: number; error_breakdown?: Record<string, number>
-  }
-  const res = await requestJSON<{ provider_health?: BackendHealth[]; error_breakdown?: Record<string, number> }>(config, `/api/v1/analytics/performance${analyticsParams(since, provider ? { provider } : undefined)}`)
-  return (res?.provider_health ?? []).map((h) => ({
-    provider: h.provider,
-    p50_latency: h.p50_latency_ms,
-    p95_latency: h.p95_latency_ms,
-    p99_latency: h.p99_latency_ms,
-    success_rate: h.success_rate,
-    error_rate: h.error_rate,
-    error_breakdown: h.error_breakdown ?? res?.error_breakdown ?? {},
-    total_requests: h.request_count,
-  }))
+export type UsageSessionRow = {
+  provider: UsageProvider
+  session_id: string
+  last_active_at: string
+  duration_minutes: number
+  project_label: string
+  branch?: string
+  model?: string
+  turns: number
+  input_tokens: number
+  cached_input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  cache_write_tokens: number
+  reasoning_tokens: number
+  estimated_cost_usd?: number
+  has_inferred_pricing: boolean
 }
 
-/**
- * Fetches current rate limit status across providers.
- */
-export async function fetchAnalyticsRateLimits(config: BackendConfig): Promise<unknown> {
-  const res = await requestJSON<{ rate_limits?: unknown }>(config, '/api/v1/analytics/rate-limits')
-  return res?.rate_limits ?? []
+export type RateLimitWindow = {
+  used_percent: number
+  window_minutes: number
+  resets_at?: number
+  reset_description?: string
 }
 
-/**
- * Fetches productivity metrics per provider (avg cost, lines changed, tokens, success rate).
- * Backend returns `{ agent_comparison, ... }` — we unwrap.
- */
-export async function fetchAnalyticsProductivity(config: BackendConfig, since?: string, provider?: string): Promise<ProductivityRecord[]> {
-  const res = await requestJSON<{ agent_comparison?: ProductivityRecord[] } & Record<string, unknown>>(config, `/api/v1/analytics/productivity${analyticsParams(since, provider ? { provider } : undefined)}`)
-  return res?.agent_comparison ?? []
+export type ProviderRateLimits = {
+  provider: UsageProvider
+  session?: RateLimitWindow
+  weekly?: RateLimitWindow
+  updated_at: number
+  status: 'idle' | 'fetching' | 'ok' | 'error' | 'unavailable'
+  error?: string
 }
 
-/**
- * Fetches configured budget records.
- * Backend returns `{ budgets }` — we unwrap.
- */
-export async function fetchAnalyticsBudgets(config: BackendConfig): Promise<BudgetRecord[]> {
-  const res = await requestJSON<{ budgets?: BudgetRecord[] }>(config, '/api/v1/analytics/budgets')
-  return res?.budgets ?? []
+export type RateLimitState = {
+  claude?: ProviderRateLimits
+  codex?: ProviderRateLimits
+  gemini?: ProviderRateLimits
+  opencode?: ProviderRateLimits
 }
 
-/**
- * Fetches external cost reconciliation data.
- * Backend returns `{ reconciliation, since }` — we unwrap.
- */
-export async function fetchExternalReconcile(config: BackendConfig, since?: string): Promise<ExternalReconciliation> {
-  const res = await requestJSON<{ reconciliation?: ExternalReconciliation['discrepancies']; since?: string }>(config, `/api/v1/external/reconcile${analyticsParams(since)}`)
-  return { discrepancies: res?.reconciliation ?? [] } as ExternalReconciliation
+function usageQS(scope: UsageScope, range: UsageRange, extra: Record<string, string> = {}): string {
+  const params = new URLSearchParams({ scope, range, ...extra })
+  return `?${params.toString()}`
 }
 
-/**
- * Fetches external cost sync status (enabled, provider, last sync time).
- * Backend returns `{ enabled, providers }` — we pass through as-is.
- */
-export async function fetchExternalStatus(config: BackendConfig): Promise<ExternalStatus> {
-  return requestJSON<ExternalStatus>(config, '/api/v1/external/status')
+export async function fetchUsageScanState(config: BackendConfig, provider: UsageProvider): Promise<UsageScanState> {
+  return requestJSON<UsageScanState>(config, `/api/v1/usage/${provider}/scan-state`)
+}
+
+export async function setUsageEnabled(config: BackendConfig, provider: UsageProvider, enabled: boolean): Promise<UsageScanState> {
+  return requestJSON<UsageScanState>(config, `/api/v1/usage/${provider}/enabled`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+  })
+}
+
+export async function refreshUsage(config: BackendConfig, provider: UsageProvider, force = false): Promise<UsageScanState> {
+  return requestJSON<UsageScanState>(config, `/api/v1/usage/${provider}/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ force }),
+  })
+}
+
+export async function fetchUsageSummary(config: BackendConfig, provider: UsageProvider, scope: UsageScope, range: UsageRange): Promise<UsageSummary> {
+  return requestJSON<UsageSummary>(config, `/api/v1/usage/${provider}/summary${usageQS(scope, range)}`)
+}
+
+export async function fetchUsageDaily(config: BackendConfig, provider: UsageProvider, scope: UsageScope, range: UsageRange): Promise<UsageDailyPoint[]> {
+  return requestJSON<UsageDailyPoint[]>(config, `/api/v1/usage/${provider}/daily${usageQS(scope, range)}`) ?? []
+}
+
+export async function fetchUsageBreakdown(config: BackendConfig, provider: UsageProvider, scope: UsageScope, range: UsageRange, kind: UsageBreakdownKind): Promise<UsageBreakdownRow[]> {
+  return requestJSON<UsageBreakdownRow[]>(config, `/api/v1/usage/${provider}/breakdown${usageQS(scope, range, { kind })}`) ?? []
+}
+
+export async function fetchUsageSessions(config: BackendConfig, provider: UsageProvider, scope: UsageScope, range: UsageRange, limit = 25): Promise<UsageSessionRow[]> {
+  return requestJSON<UsageSessionRow[]>(config, `/api/v1/usage/${provider}/sessions${usageQS(scope, range, { limit: String(limit) })}`) ?? []
+}
+
+export async function fetchRateLimits(config: BackendConfig): Promise<RateLimitState> {
+  return requestJSON<RateLimitState>(config, '/api/v1/usage/rate-limits')
+}
+
+export async function refreshRateLimits(config: BackendConfig): Promise<RateLimitState> {
+  return requestJSON<RateLimitState>(config, '/api/v1/usage/rate-limits/refresh', { method: 'POST' })
 }

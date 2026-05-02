@@ -1,8 +1,19 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { Trash2 } from 'lucide-react'
 import { useAppStore } from '@/store'
 import type { TreeNode } from '@/store/types'
 import { FileTreeRow } from './FileTreeRow'
+import { FileContextMenu, type FileContextAction } from './FileContextMenu'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 export function FileExplorer() {
   const explorerRoot = useAppStore((s) => s.explorerRoot)
@@ -152,33 +163,269 @@ export function FileExplorer() {
     }
   }
 
+  // ---- Context menu ----------------------------------------------------------
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; node: TreeNode } | null>(null)
+  const [promptDialog, setPromptDialog] = useState<{
+    kind: 'newFile' | 'newFolder' | 'rename'
+    node: TreeNode
+    initial: string
+    error?: string
+  } | null>(null)
+  const [promptValue, setPromptValue] = useState('')
+  const [promptPending, setPromptPending] = useState(false)
+  const [confirmDialog, setConfirmDialog] = useState<{ node: TreeNode; error?: string } | null>(null)
+  const [confirmPending, setConfirmPending] = useState(false)
+  const [statusToast, setStatusToast] = useState<string | null>(null)
+  const closeFile = useAppStore((s) => s.closeFile)
+
+  // Auto-clear the small status toast (used for "Path copied" feedback).
+  useEffect(() => {
+    if (!statusToast) return
+    const id = window.setTimeout(() => setStatusToast(null), 1600)
+    return () => window.clearTimeout(id)
+  }, [statusToast])
+
+  // Refresh a directory's cached children from the backend after an edit.
+  const refreshDir = useCallback(
+    async (dirPath: string, parentDepth: number, parentRel: string) => {
+      if (!config) return
+      try {
+        const url = `${config.baseUrl}/api/v1/workspace/tree?path=${encodeURIComponent(dirPath)}`
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${config.apiToken}` } })
+        if (!res.ok) return
+        const tree: Array<{ name: string; path: string; is_dir: boolean }> = await res.json()
+        const children: TreeNode[] = tree.map((entry) => ({
+          name: entry.name,
+          path: `${dirPath}/${entry.name}`,
+          relativePath: parentRel ? `${parentRel}/${entry.name}` : entry.name,
+          isDirectory: entry.is_dir,
+          depth: parentDepth + 1,
+        }))
+        setDirChildren(dirPath, children)
+      } catch { /* best-effort */ }
+    },
+    [config, setDirChildren],
+  )
+
+  const apiHeaders = useMemo(() => {
+    const h: Record<string, string> = {}
+    if (config?.apiToken) h['Authorization'] = `Bearer ${config.apiToken}`
+    return h
+  }, [config?.apiToken])
+
+  // Clipboard with fallback for environments where Clipboard API is denied.
+  const copyText = useCallback(async (text: string): Promise<boolean> => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text)
+        return true
+      }
+    } catch { /* fall through */ }
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.setAttribute('readonly', '')
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      const ok = document.execCommand('copy')
+      document.body.removeChild(ta)
+      return ok
+    } catch {
+      return false
+    }
+  }, [])
+
+  // Resolve the parent (target dir for New File/Folder, parent for rename).
+  const splitPath = (node: TreeNode) => {
+    const parentPath = node.isDirectory
+      ? node.path
+      : node.path.replace(/\/[^/]+$/, '')
+    const parentRel = node.isDirectory
+      ? node.relativePath
+      : (node.relativePath.includes('/') ? node.relativePath.replace(/\/[^/]+$/, '') : '')
+    const parentDepth = node.isDirectory ? node.depth : node.depth - 1
+    return { parentPath, parentRel, parentDepth }
+  }
+
+  const handleContextAction = useCallback(
+    async (action: FileContextAction, node: TreeNode) => {
+      switch (action) {
+        case 'copyPath': {
+          const ok = await copyText(node.path)
+          setStatusToast(ok ? 'Path copied' : 'Copy failed')
+          return
+        }
+        case 'copyRelativePath': {
+          const ok = await copyText(node.relativePath)
+          setStatusToast(ok ? 'Relative path copied' : 'Copy failed')
+          return
+        }
+        case 'openContaining': {
+          const { parentPath } = splitPath(node)
+          try {
+            await window.orchestraDesktop?.openPath?.(parentPath)
+          } catch (err) {
+            console.warn('[fs] openPath failed', err)
+            setStatusToast('Open failed')
+          }
+          return
+        }
+        case 'newFile':
+        case 'newFolder': {
+          setPromptValue('')
+          setPromptDialog({ kind: action, node, initial: '' })
+          return
+        }
+        case 'rename': {
+          const oldName = node.path.split('/').pop() ?? ''
+          setPromptValue(oldName)
+          setPromptDialog({ kind: 'rename', node, initial: oldName })
+          return
+        }
+        case 'delete': {
+          setConfirmDialog({ node })
+          return
+        }
+      }
+    },
+    [copyText],
+  )
+
+  const submitPrompt = useCallback(async () => {
+    if (!promptDialog || !config) return
+    const { kind, node } = promptDialog
+    const name = promptValue.trim()
+    if (!name) {
+      setPromptDialog((d) => (d ? { ...d, error: 'Name is required' } : d))
+      return
+    }
+    if (/[\\/]/.test(name)) {
+      setPromptDialog((d) => (d ? { ...d, error: 'Name cannot contain "/" or "\\"' } : d))
+      return
+    }
+
+    setPromptPending(true)
+    try {
+      if (kind === 'rename') {
+        const { parentPath, parentRel, parentDepth } = splitPath(node)
+        if (name === (node.path.split('/').pop() ?? '')) {
+          setPromptDialog(null)
+          return
+        }
+        const target = `${parentPath}/${name}`
+        const res = await fetch(`${config.baseUrl}/api/v1/workspace/rename`, {
+          method: 'POST',
+          headers: { ...apiHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ from: node.path, to: target }),
+        })
+        if (!res.ok) {
+          const errText = await res.text().catch(() => '')
+          setPromptDialog((d) => (d ? { ...d, error: `Rename failed: ${errText.slice(0, 200) || res.status}` } : d))
+          return
+        }
+        if (!node.isDirectory) closeFile(node.path)
+        await refreshDir(parentPath, parentDepth, parentRel)
+        setPromptDialog(null)
+        return
+      }
+
+      // newFile / newFolder
+      const { parentPath, parentRel, parentDepth } = splitPath(node)
+      const isFile = kind === 'newFile'
+      const target = `${parentPath}/${name}`
+      const newRel = parentRel ? `${parentRel}/${name}` : name
+      const url = isFile
+        ? `${config.baseUrl}/api/v1/workspace/file?path=${encodeURIComponent(target)}`
+        : `${config.baseUrl}/api/v1/workspace/dir?path=${encodeURIComponent(target)}`
+      const res = await fetch(url, {
+        method: isFile ? 'PUT' : 'POST',
+        headers: isFile ? { ...apiHeaders, 'Content-Type': 'text/plain' } : apiHeaders,
+        body: isFile ? '' : undefined,
+      })
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '')
+        setPromptDialog((d) =>
+          d ? { ...d, error: `Create failed: ${errText.slice(0, 200) || res.status}` } : d,
+        )
+        return
+      }
+      await refreshDir(parentPath, parentDepth, parentRel)
+      if (isFile) openFile(target, newRel)
+      setPromptDialog(null)
+    } catch (err) {
+      setPromptDialog((d) =>
+        d ? { ...d, error: `Failed: ${(err as Error).message}` } : d,
+      )
+    } finally {
+      setPromptPending(false)
+    }
+  }, [promptDialog, promptValue, config, apiHeaders, refreshDir, closeFile, openFile])
+
+  const submitConfirm = useCallback(async () => {
+    if (!confirmDialog || !config) return
+    const { node } = confirmDialog
+    setConfirmPending(true)
+    try {
+      const res = await fetch(
+        `${config.baseUrl}/api/v1/workspace/path?path=${encodeURIComponent(node.path)}`,
+        { method: 'DELETE', headers: apiHeaders },
+      )
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '')
+        setConfirmDialog((d) =>
+          d ? { ...d, error: `Delete failed: ${errText.slice(0, 200) || res.status}` } : d,
+        )
+        return
+      }
+      if (!node.isDirectory) closeFile(node.path)
+      const { parentPath, parentRel, parentDepth } = splitPath(node)
+      await refreshDir(parentPath, parentDepth, parentRel)
+      setConfirmDialog(null)
+    } catch (err) {
+      setConfirmDialog((d) =>
+        d ? { ...d, error: `Failed: ${(err as Error).message}` } : d,
+      )
+    } finally {
+      setConfirmPending(false)
+    }
+  }, [confirmDialog, config, apiHeaders, refreshDir, closeFile])
+
+
   // ---- Empty state -----------------------------------------------------------
   if (!explorerRoot) {
     return (
-      <div className="flex flex-col gap-2 p-3">
-        <p className="text-xs text-muted-foreground">
-          No workspace folder open
-        </p>
-        <button
-          className="text-xs px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-accent-foreground w-fit"
-          onClick={async () => {
-            try {
-              const folder = await window.orchestraDesktop.selectFolder()
-              if (folder) {
-                useAppStore.getState().setExplorerRoot(folder)
-              }
-            } catch { /* user cancelled */ }
-          }}
-        >
-          Open Folder
-        </button>
+      <div className="p-4 text-center">
+        <p className="text-[11px] text-muted-foreground/60">Open a project to see its files.</p>
       </div>
     )
   }
 
   // ---- Render ----------------------------------------------------------------
   return (
-    <div ref={parentRef} className="h-full overflow-auto" role="tree">
+    <div
+      ref={parentRef}
+      className="h-full overflow-auto"
+      role="tree"
+      onContextMenu={(e) => {
+        // Only fire when the right-click is on the container itself (i.e. the
+        // empty area below the rows) — row clicks already call setCtxMenu.
+        if (e.target !== e.currentTarget && (e.target as HTMLElement).closest('[role="treeitem"]')) {
+          return
+        }
+        if (!explorerRoot) return
+        e.preventDefault()
+        const rootNode: TreeNode = {
+          name: explorerRoot.split('/').pop() ?? explorerRoot,
+          path: explorerRoot,
+          relativePath: '',
+          isDirectory: true,
+          depth: -1,
+        }
+        setCtxMenu({ x: e.clientX, y: e.clientY, node: rootNode })
+      }}
+    >
       <div
         style={{
           height: virtualizer.getTotalSize(),
@@ -200,6 +447,7 @@ export function FileExplorer() {
                   openFile(node.path, node.relativePath)
                 }
               }}
+              onContextMenu={(e, n) => setCtxMenu({ x: e.clientX, y: e.clientY, node: n })}
               style={{
                 position: 'absolute',
                 top: 0,
@@ -212,6 +460,131 @@ export function FileExplorer() {
           )
         })}
       </div>
+      {ctxMenu && (
+        <FileContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          variant={ctxMenu.node.depth < 0 ? 'root' : 'item'}
+          onAction={(a) => void handleContextAction(a, ctxMenu.node)}
+          onClose={() => setCtxMenu(null)}
+        />
+      )}
+
+      <Dialog
+        open={!!promptDialog}
+        onOpenChange={(open) => {
+          if (!open && !promptPending) setPromptDialog(null)
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {promptDialog?.kind === 'newFile'
+                ? 'New file'
+                : promptDialog?.kind === 'newFolder'
+                  ? 'New folder'
+                  : 'Rename'}
+            </DialogTitle>
+            <DialogDescription>
+              {promptDialog?.kind === 'rename'
+                ? `Rename "${promptDialog.initial}".`
+                : `Will be created under ${
+                    promptDialog ? splitPath(promptDialog.node).parentRel || explorerRoot : ''
+                  }.`}
+            </DialogDescription>
+          </DialogHeader>
+          <input
+            autoFocus
+            type="text"
+            value={promptValue}
+            onChange={(e) => setPromptValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !promptPending) {
+                e.preventDefault()
+                void submitPrompt()
+              }
+            }}
+            placeholder={
+              promptDialog?.kind === 'newFile'
+                ? 'filename.ts'
+                : promptDialog?.kind === 'newFolder'
+                  ? 'folder-name'
+                  : ''
+            }
+            className="w-full mt-1 h-9 px-2.5 rounded-md bg-background border border-border/70 text-sm text-foreground focus:outline-none focus:border-primary/60"
+          />
+          {promptDialog?.error && (
+            <p className="mt-2 text-xs text-destructive">{promptDialog.error}</p>
+          )}
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setPromptDialog(null)}
+              disabled={promptPending}
+            >
+              Cancel
+            </Button>
+            <Button onClick={() => void submitPrompt()} disabled={promptPending || !promptValue.trim()}>
+              {promptPending
+                ? 'Saving…'
+                : promptDialog?.kind === 'rename'
+                  ? 'Rename'
+                  : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!confirmDialog}
+        onOpenChange={(open) => {
+          if (!open && !confirmPending) setConfirmDialog(null)
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" /> Delete
+            </DialogTitle>
+            <DialogDescription>
+              {confirmDialog?.node.isDirectory
+                ? 'This folder and everything inside will be permanently deleted.'
+                : 'This file will be permanently deleted.'}
+            </DialogDescription>
+          </DialogHeader>
+          {confirmDialog && (
+            <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
+              <p className="font-mono text-xs text-foreground">{confirmDialog.node.relativePath}</p>
+            </div>
+          )}
+          {confirmDialog?.error && (
+            <p className="mt-2 text-xs text-destructive">{confirmDialog.error}</p>
+          )}
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmDialog(null)}
+              disabled={confirmPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void submitConfirm()}
+              disabled={confirmPending}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              {confirmPending ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {statusToast && (
+        <div className="pointer-events-none fixed bottom-10 left-1/2 -translate-x-1/2 z-[10000] rounded-md border border-border/60 bg-popover px-3 py-1.5 text-[12px] font-medium text-foreground shadow-lg">
+          {statusToast}
+        </div>
+      )}
     </div>
   )
 }

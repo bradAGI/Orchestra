@@ -45,7 +45,7 @@ function WidgetInner({ onOpenSettings }: { onOpenSettings?: () => void }) {
         <button
           type="button"
           onClick={togglePanel}
-          className={`agent-fab-enter fixed bottom-6 right-6 z-50 grid h-14 w-14 place-items-center rounded-full border border-primary/20 bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition-all duration-300 hover:scale-110 hover:shadow-xl hover:shadow-primary/30 active:scale-95 ${
+          className={`agent-fab-enter fixed bottom-6 right-6 z-50 grid h-14 w-14 place-items-center rounded-full border border-white/30 bg-white text-black shadow-lg shadow-black/25 transition-all duration-300 hover:scale-110 hover:bg-white/90 hover:shadow-xl hover:shadow-black/30 active:scale-95 ${
             isStreaming ? 'agent-fab-streaming' : ''
           }`}
           title="Orchestra Agent (Ctrl+.)"

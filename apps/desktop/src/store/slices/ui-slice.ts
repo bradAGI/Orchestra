@@ -34,6 +34,28 @@ function applyTheme(theme: 'light' | 'dark'): void {
   }
 }
 
+const HOMEPAGE_KEY = 'orchestra-browser-homepage'
+const DEFAULT_HOMEPAGE = 'about:blank'
+
+function normalizeHomepage(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return DEFAULT_HOMEPAGE
+  if (trimmed.startsWith('about:') || trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('file://')) {
+    return trimmed
+  }
+  return `https://${trimmed}`
+}
+
+function getInitialHomepage(): string {
+  try {
+    const stored = localStorage.getItem(HOMEPAGE_KEY)
+    if (stored && stored.trim()) return stored
+  } catch {
+    // localStorage not available
+  }
+  return DEFAULT_HOMEPAGE
+}
+
 // ---------------------------------------------------------------------------
 // Slice factory
 // ---------------------------------------------------------------------------
@@ -51,6 +73,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   createTaskInitialState: null,
   createProjectDialogOpen: false,
   settingsInitialTab: undefined,
+  browserHomepage: getInitialHomepage(),
 
   // ---- Actions --------------------------------------------------------------
   setActiveSection: (section) => set({ activeSection: section }),
@@ -62,6 +85,12 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   setTheme: (theme) => {
     applyTheme(theme)
     set({ theme })
+    // Bridge to the new theme slice so re-applying the active theme picks up
+    // the mode change. setMode handles the actual CSS-var work.
+    try {
+      const setMode = (get() as AppState).setMode
+      if (typeof setMode === 'function') setMode(theme)
+    } catch { /* ignore — slice may not be attached yet during first init */ }
   },
 
   setActivePeriod: (period) => set({ activePeriod: period }),
@@ -83,4 +112,10 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   setCreateProjectDialogOpen: (open) => set({ createProjectDialogOpen: open }),
 
   setSettingsInitialTab: (tab) => set({ settingsInitialTab: tab }),
+
+  setBrowserHomepage: (url) => {
+    const normalized = normalizeHomepage(url)
+    try { localStorage.setItem(HOMEPAGE_KEY, normalized) } catch { /* unavailable in tests */ }
+    set({ browserHomepage: normalized })
+  },
 })

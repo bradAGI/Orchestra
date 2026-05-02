@@ -4,6 +4,8 @@ export type BackendConfig = {
   baseUrl: string
   /** Bearer token used to authenticate API requests. */
   apiToken: string
+  /** Optional map of MCP server names to their connection URIs. */
+  mcpServers?: Record<string, string>
 }
 
 /** A named backend connection profile persisted by the desktop bridge. */
@@ -160,7 +162,12 @@ export type IssueDetailPayload = {
   tracked: Record<string, unknown>
 }
 
-/** A registered project (local workspace) managed by the orchestrator. */
+/** A registered project (local workspace) managed by the orchestrator.
+ *
+ * `github_token` is redacted by the backend: it is either an empty string
+ * ("not connected") or a fixed sentinel ("<set>") indicating a token is
+ * configured server-side. Treat as opaque truthy/falsy only — never as the
+ * actual secret. */
 export type Project = {
   id: string
   name: string

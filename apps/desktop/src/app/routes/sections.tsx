@@ -41,8 +41,8 @@ export const sidebarItems: SidebarItem[] = [
   },
   {
     id: 'CONSOLE',
-    label: 'Terminals',
-    description: 'Coding harnesses and development shells',
+    label: 'Development',
+    description: 'Editor, terminals, and browser preview',
     icon: Terminal,
   },
   {
@@ -53,8 +53,8 @@ export const sidebarItems: SidebarItem[] = [
   },
   {
     id: 'WAREHOUSE',
-    label: 'Analytics',
-    description: 'Token usage and session archives',
+    label: 'Usage',
+    description: 'Per-agent tokens, cost, and sessions',
     icon: Database,
   },
   {
@@ -126,11 +126,11 @@ const sectionMeta: Record<SectionID, { label: string; title: string }> = {
   ISSUES: { label: 'Tracker', title: 'Tasks' },
   PROJECTS: { label: 'Workspace', title: 'Projects' },
   AGENTS: { label: 'Compute', title: 'Agents' },
-  WAREHOUSE: { label: 'Analytics', title: 'Analytics' },
+  WAREHOUSE: { label: 'Usage', title: 'Usage' },
   SANDBOX: { label: 'Compute', title: 'Sandbox' },
   SETTINGS: { label: 'System', title: 'Settings' },
   DOCS: { label: 'Knowledge', title: 'Documentation' },
-  CONSOLE: { label: 'Runtime', title: 'Terminals' },
+  CONSOLE: { label: 'Workspace', title: 'Development' },
 }
 
 /**

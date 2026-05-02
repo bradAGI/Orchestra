@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { X, Check, AlertTriangle, ChevronDown } from 'lucide-react'
+import { X, Check, AlertTriangle, ChevronDown, GitMerge } from 'lucide-react'
 import type { BackendConfig, GitHubPR } from '@/lib/orchestra-client'
 import { fetchProjectGitHubPullDiff, fetchPRReviews, submitPRReview, mergePR } from '@/lib/orchestra-client'
 import { DiffViewer } from './DiffViewer'
@@ -15,19 +15,19 @@ type Review = {
   submitted_at?: string
 }
 
-function reviewStateBadge(state: string): string {
+function reviewStateStyle(state: string): { dot: string; label: string } {
   switch (state.toLowerCase()) {
-    case 'approved': return 'bg-green-500/20 text-green-400'
-    case 'changes_requested': return 'bg-amber-500/20 text-amber-400'
-    case 'commented': return 'bg-blue-500/20 text-blue-400'
-    default: return 'bg-muted/20 text-muted-foreground'
+    case 'approved': return { dot: 'bg-emerald-500', label: 'text-emerald-500' }
+    case 'changes_requested': return { dot: 'bg-amber-500', label: 'text-amber-500' }
+    case 'commented': return { dot: 'bg-blue-500', label: 'text-blue-500' }
+    default: return { dot: 'bg-muted-foreground/40', label: 'text-muted-foreground' }
   }
 }
 
-function prStatusBadge(pr: GitHubPR): { style: string; label: string } {
-  if (pr.merged_at) return { style: 'bg-purple-500/20 text-purple-400', label: 'merged' }
-  if (pr.state === 'closed') return { style: 'bg-red-500/20 text-red-400', label: 'closed' }
-  return { style: 'bg-green-500/20 text-green-400', label: 'open' }
+function prStatus(pr: GitHubPR): { dot: string; label: string; text: string } {
+  if (pr.merged_at) return { dot: 'bg-purple-500', label: 'merged', text: 'text-purple-500' }
+  if (pr.state === 'closed') return { dot: 'bg-destructive', label: 'closed', text: 'text-destructive' }
+  return { dot: 'bg-emerald-500', label: 'open', text: 'text-emerald-500' }
 }
 
 export function PRReviewView({
@@ -91,44 +91,47 @@ export function PRReviewView({
     }
   }
 
-  const status = prStatusBadge(pr)
+  const status = prStatus(pr)
+  const tabClass = (active: boolean) =>
+    `relative h-9 px-3 text-[12px] font-medium tracking-tight transition-colors ${
+      active ? 'text-foreground' : 'text-muted-foreground/60 hover:text-foreground/80'
+    }`
 
   return (
-    <div className="absolute inset-0 bg-card z-30 flex flex-col overflow-hidden rounded-xl">
+    <div className="absolute inset-0 bg-background z-30 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40 shrink-0">
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-          <X size={16} />
+      <div className="flex items-center gap-3 px-4 h-12 border-b border-border/30 shrink-0">
+        <button
+          onClick={onClose}
+          className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+        >
+          <X size={14} />
         </button>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-foreground truncate">{pr.title}</span>
-            <span className="text-[10px] text-muted-foreground/60 font-mono">#{pr.number}</span>
-            <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${status.style}`}>{status.label}</span>
+          <div className="flex items-center gap-2.5">
+            <span className="font-mono text-[11px] text-muted-foreground/60">#{pr.number}</span>
+            <span className="text-[13px] font-medium tracking-tight text-foreground/90 truncate">{pr.title}</span>
+            <span className="inline-flex items-center gap-1.5 shrink-0">
+              <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+              <span className={`text-[10.5px] font-medium tracking-tight ${status.text}`}>{status.label}</span>
+            </span>
           </div>
-          <div className="text-[10px] text-muted-foreground/50 mt-0.5">
-            {pr.base.ref} &larr; {pr.head.ref}
+          <div className="font-mono text-[10.5px] text-muted-foreground/50 mt-0.5 truncate">
+            {pr.head.ref} → {pr.base.ref}
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 px-4 py-2 border-b border-border/40 shrink-0">
-        <button
-          onClick={() => setTab('files')}
-          className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded ${
-            tab === 'files' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
+      <div className="flex items-center gap-0 px-3 border-b border-border/30 shrink-0">
+        <button onClick={() => setTab('files')} className={tabClass(tab === 'files')}>
           Files Changed
+          {tab === 'files' && <span className="absolute left-2 right-2 bottom-0 h-[2px] rounded-full bg-primary" />}
         </button>
-        <button
-          onClick={() => setTab('reviews')}
-          className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded ${
-            tab === 'reviews' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Reviews ({reviews.length})
+        <button onClick={() => setTab('reviews')} className={tabClass(tab === 'reviews')}>
+          Reviews
+          <span className="ml-1.5 tabular-nums text-muted-foreground/50">{reviews.length}</span>
+          {tab === 'reviews' && <span className="absolute left-2 right-2 bottom-0 h-[2px] rounded-full bg-primary" />}
         </button>
       </div>
 
@@ -137,63 +140,77 @@ export function PRReviewView({
         {tab === 'files' ? (
           <DiffViewer filePath={`PR #${pr.number}: ${pr.title}`} diff={diffText || null} mode={diffMode} onModeChange={setDiffMode} />
         ) : (
-          <div className="overflow-y-auto h-full p-4 space-y-3">
-            {reviews.map((review, i) => (
-              <div key={review.id ?? i} className="bg-muted/10 rounded-xl p-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[11px] font-medium text-foreground">{review.user?.login ?? 'unknown'}</span>
-                  <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${reviewStateBadge(review.state)}`}>
-                    {review.state.replace('_', ' ')}
-                  </span>
+          <div className="overflow-y-auto h-full px-4 py-4 space-y-3">
+            {reviews.map((review, i) => {
+              const style = reviewStateStyle(review.state)
+              return (
+                <div key={review.id ?? i} className="bg-foreground/[0.02] border border-border/30 rounded-lg px-3.5 py-3">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-[12px] font-medium text-foreground/90">{review.user?.login ?? 'unknown'}</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
+                      <span className={`text-[10.5px] font-medium tracking-tight ${style.label}`}>{review.state.replace('_', ' ').toLowerCase()}</span>
+                    </span>
+                  </div>
+                  {review.body && (
+                    <p className="text-[12px] text-foreground/75 leading-relaxed whitespace-pre-wrap">{review.body}</p>
+                  )}
                 </div>
-                {review.body && (
-                  <p className="text-[11px] text-muted-foreground whitespace-pre-wrap">{review.body}</p>
-                )}
-              </div>
-            ))}
+              )
+            })}
             {reviews.length === 0 && (
-              <div className="text-[10px] text-muted-foreground/50 text-center py-4">No reviews yet</div>
+              <div className="text-[11.5px] text-muted-foreground/50 text-center py-8">No reviews yet</div>
             )}
           </div>
         )}
       </div>
 
       {/* Action bar */}
-      <div className="flex items-center gap-2 px-4 py-3 border-t border-border/40 shrink-0">
+      <div className="flex items-center gap-2 px-4 py-3 border-t border-border/30 shrink-0 bg-background">
         <textarea
           value={reviewBody}
           onChange={(e) => setReviewBody(e.target.value)}
-          placeholder="Review comment..."
+          placeholder="Leave a review comment…"
           rows={1}
-          className="flex-1 bg-muted/10 border border-border/40 rounded-lg px-3 py-1.5 text-[11px] text-foreground placeholder:text-muted-foreground/40 resize-none outline-none focus:border-primary/60"
+          className="flex-1 h-8 bg-muted/30 rounded-md px-3 py-1.5 text-[12px] font-medium tracking-tight placeholder:text-muted-foreground/50 outline-none focus:ring-1 focus:ring-primary/40 resize-none transition-all"
         />
         <button
           onClick={() => handleReview('APPROVE')}
           disabled={loading}
-          className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 disabled:opacity-40"
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[11.5px] font-medium tracking-tight text-emerald-500 hover:bg-emerald-500/10 disabled:opacity-40 transition-colors"
         >
-          <Check size={10} /> Approve
+          <Check size={12} strokeWidth={2.5} />
+          Approve
         </button>
         <button
           onClick={() => handleReview('REQUEST_CHANGES')}
           disabled={loading}
-          className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 disabled:opacity-40"
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[11.5px] font-medium tracking-tight text-amber-500 hover:bg-amber-500/10 disabled:opacity-40 transition-colors"
         >
-          <AlertTriangle size={10} /> Changes
+          <AlertTriangle size={12} strokeWidth={2.5} />
+          Request changes
         </button>
         <div className="relative">
           <button
             onClick={() => setMergeOpen((v) => !v)}
             disabled={loading}
-            className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[11.5px] font-medium tracking-tight bg-primary text-primary-foreground shadow-sm shadow-primary/20 hover:bg-primary/90 disabled:opacity-40 transition-colors"
           >
-            Merge <ChevronDown size={10} />
+            <GitMerge size={12} strokeWidth={2.5} />
+            Merge
+            <ChevronDown size={11} className="opacity-70" />
           </button>
           {mergeOpen && (
-            <div className="absolute bottom-full right-0 mb-1 bg-card border border-border/40 rounded-xl shadow-lg z-20 py-1 min-w-[120px]">
-              <button onClick={() => handleMerge('merge')} className="w-full text-left px-3 py-1.5 text-[11px] text-foreground hover:bg-muted/20">Merge</button>
-              <button onClick={() => handleMerge('squash')} className="w-full text-left px-3 py-1.5 text-[11px] text-foreground hover:bg-muted/20">Squash</button>
-              <button onClick={() => handleMerge('rebase')} className="w-full text-left px-3 py-1.5 text-[11px] text-foreground hover:bg-muted/20">Rebase</button>
+            <div className="absolute bottom-full right-0 mb-1.5 bg-popover border border-border/60 rounded-lg shadow-xl z-20 py-1 min-w-[140px]">
+              {(['merge', 'squash', 'rebase'] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => handleMerge(m)}
+                  className="w-full text-left px-3 py-1.5 text-[12px] font-medium tracking-tight text-foreground/85 hover:bg-foreground/[0.04] transition-colors capitalize"
+                >
+                  {m === 'merge' ? 'Create merge commit' : m === 'squash' ? 'Squash and merge' : 'Rebase and merge'}
+                </button>
+              ))}
             </div>
           )}
         </div>

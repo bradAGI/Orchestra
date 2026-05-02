@@ -51,8 +51,9 @@ import { appendTimelineEvent, applySnapshotUpdate } from '@/lib/runtime-store'
 import type { GlobalStats, Project, ProjectStats, SessionDetail, SessionSummary, SnapshotPayload } from '@/lib/orchestra-types'
 import { ProjectGrid } from '@/components/projects/ProjectGrid'
 import { ProjectDetailView } from '@/components/projects/ProjectDetailView'
-import { AnalyticsDashboard } from '@/components/analytics/AnalyticsDashboard'
-import { SessionDetailView } from '@/components/analytics/SessionDetailView'
+import { UsagePage } from '@/components/usage/UsagePage'
+import { UsageStatusBar } from '@/components/usage/UsageStatusBar'
+import { SessionDetailView } from '@/components/usage/SessionDetailView'
 import { AgentsDashboard } from '@/components/agents/AgentsDashboard'
 import { DocsDashboard } from '@/components/docs/DocsDashboard'
 import { SandboxDashboard } from '@/components/sandbox/SandboxDashboard'
@@ -83,6 +84,25 @@ export default function App() {
   // ---------------------------------------------------------------------------
   const theme = useAppStore(s => s.theme)
   const setTheme = useAppStore(s => s.setTheme)
+  const reapplyTheme = useAppStore(s => s.reapply)
+  const activeThemeId = useAppStore(s => s.activeThemeId)
+  const modeOverride = useAppStore(s => s.modeOverride)
+  // Apply the active theme on mount and whenever the active id or mode flips.
+  useEffect(() => {
+    reapplyTheme()
+  }, [reapplyTheme, activeThemeId, modeOverride])
+  // Follow OS theme changes when mode is `auto`.
+  useEffect(() => {
+    if (modeOverride !== 'auto') return
+    try {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)')
+      const onChange = () => reapplyTheme()
+      mq.addEventListener('change', onChange)
+      return () => mq.removeEventListener('change', onChange)
+    } catch {
+      return undefined
+    }
+  }, [modeOverride, reapplyTheme])
   const activeSection = useAppStore(s => s.activeSection)
   const setActiveSection = useAppStore(s => s.setActiveSection)
   const sidebarCollapsed = useAppStore(s => s.sidebarCollapsed)
@@ -306,7 +326,7 @@ export default function App() {
     setActiveSection('ISSUES')
   }
 
-  const sidebarWidth = sidebarCollapsed ? 76 : 320
+  const sidebarWidth = sidebarCollapsed ? 64 : 248
   const sectionVisibility = getSectionVisibility(activeSection)
   const currentSectionMeta = getCurrentSectionMeta(activeSection)
 
@@ -1084,7 +1104,8 @@ export default function App() {
         onToggleCollapsed={() => useAppStore.getState().toggleSidebar()}
         sidebarWidth={sidebarWidth}
         osOptions={osOptions}
-        flushContent={sectionVisibility.showDocs || activeSection === 'CONSOLE'}
+        flushContent={sectionVisibility.showDocs || sectionVisibility.showSettings || activeSection === 'CONSOLE'}
+        bottomBar={<UsageStatusBar config={config} />}
         topBarProps={{
           sectionLabel: currentSectionMeta.label,
           sectionTitle: currentSectionMeta.title,
@@ -1146,22 +1167,15 @@ export default function App() {
               {sectionVisibility.showAgents ? (
                 <SectionErrorBoundary name="Agents">
                 <section className="flex-1 flex flex-col min-h-0">
-                  <AgentsDashboard config={config} snapshot={snapshot} />
+                  <AgentsDashboard config={config} />
                 </section>
                 </SectionErrorBoundary>
               ) : null}
 
               {sectionVisibility.showWarehouse ? (
-                <SectionErrorBoundary name="Analytics">
+                <SectionErrorBoundary name="Usage">
                 <section className="flex-1 flex flex-col min-h-0">
-                  <AnalyticsDashboard
-                    stats={warehouseStats}
-                    loading={dataLoading}
-                    config={config}
-                    projects={projects}
-                    onInspectSession={handleInspectSession}
-                    onCloneSession={handleCloneSession}
-                  />
+                  <UsagePage config={config} />
                 </section>
                 </SectionErrorBoundary>
               ) : null}
@@ -1188,7 +1202,7 @@ export default function App() {
 
               {sectionVisibility.showDocs ? (
                 <SectionErrorBoundary name="Documentation">
-                <section className="flex-1 flex flex-col min-h-0 -mt-8 -mx-4 -mb-4">
+                <section className="flex-1 flex flex-col min-h-0">
                   <DocsDashboard config={config} theme={theme} />
                 </section>
                 </SectionErrorBoundary>
@@ -1199,7 +1213,22 @@ export default function App() {
                 <section className="flex-1 flex flex-col min-h-0">
                   <WorkspaceLayout
                     onAddTerminal={() => {
-                      setOpenTerminals([...useAppStore.getState().openTerminals, { id: `shell-${Date.now()}`, title: 'Shell' }])
+                      const state = useAppStore.getState()
+                      const projectId = state.activeProjectId
+                      const proj = state.projects.find(p => p.id === projectId)
+                      const title = proj ? `${proj.name} Shell` : 'Shell'
+                      const realProjectId = proj ? projectId : undefined
+                      const cwd = proj?.root_path ?? undefined
+                      const initialCommand = cwd
+                        ? `cd "${cwd.replace(/"/g, '\\"')}" && clear`
+                        : undefined
+                      const id = `shell-${Date.now()}`
+                      setOpenTerminals([
+                        ...state.openTerminals,
+                        { id, title, projectId: realProjectId, cwd, initialCommand },
+                      ])
+                      // Register with the project's focused tab group
+                      state.addTabToGroup(projectId, { type: 'terminal', id })
                     }}
                     centerContent={
                       <TerminalMultiplexer
@@ -1213,19 +1242,18 @@ export default function App() {
                           if (!projectId) return
                           const proj = projects.find(p => p.id === projectId)
                           const name = proj?.name ?? 'Shell'
-                          setOpenTerminals([...useAppStore.getState().openTerminals, { id: `shell-${Date.now()}`, title: `${name} Shell`, projectId }])
-                          if (proj?.root_path) {
-                            useAppStore.getState().setExplorerRoot(proj.root_path)
-                          }
+                          const id = `shell-${Date.now()}`
+                          useAppStore.getState().openProjectTab(projectId, proj?.root_path ?? null)
+                          setOpenTerminals([...useAppStore.getState().openTerminals, { id, title: `${name} Shell`, projectId }])
+                          useAppStore.getState().addTabToGroup(projectId, { type: 'terminal', id })
                         }}
                         onAddAgentTerminal={(id, title, command, projectId) => {
-                          setOpenTerminals([...useAppStore.getState().openTerminals, { id, title, projectId, initialCommand: command }])
                           if (projectId) {
                             const proj = projects.find(p => p.id === projectId)
-                            if (proj?.root_path) {
-                              useAppStore.getState().setExplorerRoot(proj.root_path)
-                            }
+                            useAppStore.getState().openProjectTab(projectId, proj?.root_path ?? null)
                           }
+                          setOpenTerminals([...useAppStore.getState().openTerminals, { id, title, projectId, initialCommand: command }])
+                          if (projectId) useAppStore.getState().addTabToGroup(projectId, { type: 'terminal', id })
                         }}
                         theme={theme}
                       />
@@ -1407,7 +1435,7 @@ export default function App() {
               onSelect={() => { setActiveSection('CONSOLE'); setPaletteOpen(false) }}
               className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
             >
-              <Terminal className="h-4 w-4" /> Go to Terminals
+              <Terminal className="h-4 w-4" /> Go to Development
             </Command.Item>
             <Command.Item
               onSelect={() => { setActiveSection('AGENTS'); setPaletteOpen(false) }}
@@ -1419,7 +1447,7 @@ export default function App() {
               onSelect={() => { setActiveSection('WAREHOUSE'); setPaletteOpen(false) }}
               className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
             >
-              <Database className="h-4 w-4" /> Go to Analytics
+              <Database className="h-4 w-4" /> Go to Usage
             </Command.Item>
             <Command.Item
               onSelect={() => { setActiveSection('SETTINGS'); setPaletteOpen(false) }}

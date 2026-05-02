@@ -2,6 +2,8 @@ import { FileText } from 'lucide-react'
 
 import { AppTooltip } from '@/components/ui/tooltip-wrapper'
 
+type Tab = 'overview' | 'changes' | 'logs' | 'artifacts' | 'activity'
+
 export function IssueDetailTabBar({
   reportContent,
   activeTab,
@@ -9,63 +11,48 @@ export function IssueDetailTabBar({
   localState,
 }: {
   reportContent: string | null
-  activeTab: 'overview' | 'changes' | 'logs' | 'artifacts' | 'activity'
-  setActiveTab: (tab: 'overview' | 'changes' | 'logs' | 'artifacts' | 'activity') => void
+  activeTab: Tab
+  setActiveTab: (tab: Tab) => void
   localState: string
 }) {
+  const items: { id: Tab; label: string; icon?: React.ReactNode; tooltip: string }[] = [
+    { id: 'overview', label: 'Overview', tooltip: 'Task metadata, agent configuration, and runtime pulse' },
+    { id: 'changes', label: 'Changes', tooltip: 'Workspace diff and file-level modifications' },
+    { id: 'logs', label: localState === 'In Progress' ? 'Live logs' : 'Logs', tooltip: localState === 'In Progress' ? 'Connect to live PTY session' : 'View historical agent execution logs' },
+    { id: 'artifacts', label: 'Artifacts', tooltip: 'Review generated documentation, code, and session assets' },
+    { id: 'activity', label: 'Activity', tooltip: 'Full chronological audit trail of all session events' },
+  ]
+
   return (
-    <div className="flex items-center gap-1 rounded-lg bg-muted/20 p-1 shrink-0">
+    <div className="flex items-center gap-0 px-3 border-b border-border/30 shrink-0">
       {reportContent && (
         <AppTooltip content="Executive summary and autonomous verification report">
           <button
             onClick={() => setActiveTab('artifacts')}
-            className="flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-all bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 shadow-lg shadow-primary/5"
+            className="relative inline-flex items-center gap-1.5 px-3 h-9 text-[12px] font-medium tracking-tight text-primary hover:text-primary/90 transition-colors"
           >
-            <FileText size={12} strokeWidth={3} />
-            REPORT
+            <FileText size={12} strokeWidth={2.5} />
+            Report
           </button>
         </AppTooltip>
       )}
-      <AppTooltip content="Task metadata, agent configuration, and runtime pulse">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${activeTab === 'overview' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-        >
-          Overview
-        </button>
-      </AppTooltip>
-      <AppTooltip content="Workspace diff and file-level modifications">
-        <button
-          onClick={() => setActiveTab('changes')}
-          className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${activeTab === 'changes' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-        >
-          Changes
-        </button>
-      </AppTooltip>
-      <AppTooltip content={localState === 'In Progress' ? 'Connect to live PTY session' : 'View historical agent execution logs'}>
-        <button
-          onClick={() => setActiveTab('logs')}
-          className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${activeTab === 'logs' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-        >
-          {localState === 'In Progress' ? 'Live Logs' : 'Logs'}
-        </button>
-      </AppTooltip>
-      <AppTooltip content="Review generated documentation, code, and session assets">
-        <button
-          onClick={() => setActiveTab('artifacts')}
-          className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${activeTab === 'artifacts' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-        >
-          Artifacts
-        </button>
-      </AppTooltip>
-      <AppTooltip content="Full chronological audit trail of all session events">
-        <button
-          onClick={() => setActiveTab('activity')}
-          className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${activeTab === 'activity' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-        >
-          Activity
-        </button>
-      </AppTooltip>
+      {items.map((tab) => {
+        const isActive = activeTab === tab.id
+        return (
+          <AppTooltip key={tab.id} content={tab.tooltip}>
+            <button
+              onClick={() => setActiveTab(tab.id)}
+              className={`relative inline-flex items-center gap-1.5 px-3 h-9 text-[12px] font-medium tracking-tight transition-colors ${
+                isActive ? 'text-foreground' : 'text-muted-foreground/70 hover:text-foreground'
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+              {isActive && <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-primary" />}
+            </button>
+          </AppTooltip>
+        )
+      })}
     </div>
   )
 }

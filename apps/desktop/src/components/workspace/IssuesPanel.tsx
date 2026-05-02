@@ -78,10 +78,10 @@ export function IssuesPanel() {
         </div>
       )}
 
-      {/* Terminals */}
+      {/* Sessions */}
       {openTerminals.length > 0 && (
         <div className="px-2 pt-2 pb-1">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">Terminals</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">Sessions</p>
           {openTerminals.map((t) => (
             <div
               key={t.id}
@@ -115,7 +115,7 @@ export function IssuesPanel() {
       )}
 
       {allBoardIssues.length === 0 && openTerminals.length === 0 && (
-        <p className="text-xs text-muted-foreground p-3">No tasks or terminals</p>
+        <p className="text-xs text-muted-foreground p-3">No tasks or sessions</p>
       )}
     </div>
   )

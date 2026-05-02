@@ -133,7 +133,7 @@ export function DiffViewer({
 
   if (filePath === null || diff === null) {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+      <div className="flex items-center justify-center h-full text-[12px] text-muted-foreground/50">
         Select a file to view its diff
       </div>
     )
@@ -142,19 +142,23 @@ export function DiffViewer({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border/40 bg-card sticky top-0 z-10 shrink-0">
+      <div className="flex items-center justify-between px-3 h-9 border-b border-border/30 sticky top-0 z-10 shrink-0 bg-background">
         {filePath && (
-          <span className="font-mono text-[11px] text-foreground truncate mr-4">{filePath}</span>
+          <span className="font-mono text-[11.5px] text-foreground/85 truncate mr-4">{filePath}</span>
         )}
-        <div className="flex gap-1 ml-auto">
+        <div className="flex items-center rounded-md bg-muted/30 p-0.5 ml-auto">
           <button
-            className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded ${mode === 'split' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+            className={`px-2.5 h-6 rounded text-[10.5px] font-medium tracking-tight transition-colors ${
+              mode === 'split' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground/60 hover:text-foreground'
+            }`}
             onClick={() => onModeChange('split')}
           >
             Split
           </button>
           <button
-            className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded ${mode === 'unified' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+            className={`px-2.5 h-6 rounded text-[10.5px] font-medium tracking-tight transition-colors ${
+              mode === 'unified' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground/60 hover:text-foreground'
+            }`}
             onClick={() => onModeChange('unified')}
           >
             Unified

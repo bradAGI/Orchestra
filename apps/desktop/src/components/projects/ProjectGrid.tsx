@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react'
 import {
   Folder, GitBranch, Search, Plus, Trash2,
-  Zap, History, ArrowUpDown, ArrowUp, ArrowDown,
+  ArrowUpDown, ArrowUp, ArrowDown,
 } from 'lucide-react'
 import type { Project, ProjectStats } from '@/lib/orchestra-types'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -58,7 +58,9 @@ function SortHeader({ label, sortKey, currentKey, currentDir, onSort }: {
     <button
       type="button"
       onClick={() => onSort(sortKey)}
-      className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-muted-foreground/50 hover:text-foreground transition-colors"
+      className={`flex items-center gap-1 text-[10px] font-bold tracking-tight transition-colors ${
+        active ? 'text-foreground' : 'text-muted-foreground/50 hover:text-foreground'
+      }`}
     >
       {label}
       {active ? (
@@ -158,48 +160,51 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-full bg-transparent">
-      {/* Header bar */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-border/40 sticky top-0 bg-background/80 backdrop-blur-xl z-20">
-        <div className="flex items-center gap-4">
-          <Button variant="default" size="sm" onClick={onAddProject} className="h-8 gap-1.5 bg-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 shadow-lg shadow-primary/20 px-3">
-            <Plus size={14} />
-            Add Project
-          </Button>
-          <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/30">
-            {sorted.length} project{sorted.length !== 1 ? 's' : ''}
-          </span>
-        </div>
+    <div className="flex flex-col h-full bg-background">
+      {/* Header */}
+      <div className="px-8 pt-10 pb-6">
+        <h1 className="text-3xl font-black tracking-tight">Projects</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          {sorted.length} {sorted.length === 1 ? 'project' : 'projects'}
+        </p>
+      </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
+      {/* Toolbar */}
+      <div className="px-8 pb-4 flex items-center gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
           <input
             type="text"
             placeholder="Search projects..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-64 pl-9 pr-4 h-9 bg-muted/30 border border-border/40 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all placeholder:text-muted-foreground/30"
+            className="w-full h-9 pl-9 pr-3 bg-muted/30 rounded-md text-[12px] font-medium placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/40 transition-all"
           />
         </div>
+        <button
+          onClick={onAddProject}
+          className="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-md bg-foreground text-background hover:bg-foreground/90 text-[12px] font-semibold tracking-tight transition-colors"
+        >
+          <Plus size={13} />
+          Add Project
+        </button>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-auto min-h-0">
         {sorted.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-32 text-center">
-            <div className="p-6 rounded-2xl bg-muted/10 border border-border/20 mb-6">
-              <Folder size={48} className="text-muted-foreground/15" strokeWidth={1.5} />
-            </div>
-            <h2 className="text-lg font-black tracking-tight mb-1">{search ? 'No matches' : 'No Projects'}</h2>
-            <p className="text-muted-foreground/40 max-w-xs text-xs">
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <Folder size={28} className="text-muted-foreground/40 mb-3" strokeWidth={1.5} />
+            <h2 className="text-base font-bold tracking-tight mb-1">{search ? 'No matches' : 'No projects yet'}</h2>
+            <p className="text-muted-foreground/60 max-w-xs text-xs">
               {search ? `Nothing matched "${search}"` : 'Add a local repository to get started.'}
             </p>
           </div>
         ) : (
-          <div className="flex flex-col">
+          <div className="px-5">
             {/* Table header */}
-            <div className="group/header flex items-center gap-3 px-4 py-2 border-b border-border/20 sticky top-0 bg-background/80 backdrop-blur-xl z-10">
-              <div className="w-8" />
+            <div className="group/header flex items-center gap-3 px-3 h-8 text-muted-foreground/50">
+              <div className="w-6" />
               <div className="flex-1 min-w-0">
                 <SortHeader label="Name" sortKey="name" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
               </div>
@@ -219,66 +224,60 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
             </div>
 
             {/* Rows */}
-            {sorted.map((project) => {
-              const s = stats[project.id]
-              const totalTokens = (s?.total_input || 0) + (s?.total_output || 0)
-              const hasGit = !!project.remote_url
-              return (
-                <div
-                  key={project.id}
-                  onClick={() => onProjectClick(project.id)}
-                  className="group flex items-center gap-3 px-4 py-2.5 border-b border-border/10 cursor-pointer transition-colors hover:bg-muted/10"
-                >
-                  <div className="h-8 w-8 rounded-lg bg-primary/8 border border-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:border-primary group-hover:text-primary-foreground transition-all duration-300">
-                    <Folder className="w-4 h-4 text-primary group-hover:text-primary-foreground" strokeWidth={2} />
-                  </div>
+            <div className="flex flex-col">
+              {sorted.map((project) => {
+                const s = stats[project.id]
+                const totalTokens = (s?.total_input || 0) + (s?.total_output || 0)
+                const hasGit = !!project.remote_url
+                return (
+                  <div
+                    key={project.id}
+                    onClick={() => onProjectClick(project.id)}
+                    className="group flex items-center gap-3 px-3 h-12 rounded-md cursor-pointer border border-border/30 bg-card/40 transition-colors hover:bg-foreground/[0.03] hover:border-border/60"
+                  >
+                    <Folder className="w-[15px] h-[15px] shrink-0 text-muted-foreground/60 group-hover:text-foreground transition-colors" strokeWidth={1.75} />
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold truncate group-hover:text-primary transition-colors">{project.name}</span>
-                      {hasGit && <GitBranch className="h-3 w-3 shrink-0 text-muted-foreground/30" />}
+                    <div className="flex-1 min-w-0 flex items-center gap-2">
+                      <span className="text-[13px] font-semibold tracking-tight truncate text-foreground/90 group-hover:text-foreground">{project.name}</span>
+                      {hasGit && <GitBranch className="h-3 w-3 shrink-0 text-muted-foreground/40" />}
                       {project.github_token ? (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary border border-primary/20">
-                          GitHub Connected
-                        </span>
+                        <span className="text-[10px] font-medium text-primary/80">GitHub</span>
                       ) : project.github_owner ? (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                          GitHub Detected
-                        </span>
+                        <span className="text-[10px] font-medium text-amber-500/80">GitHub Detected</span>
                       ) : null}
                     </div>
-                  </div>
 
-                  <div className="w-48 hidden lg:block">
-                    <span className="text-[10px] font-mono text-muted-foreground/40 truncate block">{project.root_path}</span>
-                  </div>
+                    <div className="w-48 hidden lg:block">
+                      <span className="text-[11px] font-mono text-muted-foreground/50 truncate block">{project.root_path}</span>
+                    </div>
 
-                  <div className="w-20 text-right">
-                    <span className="text-xs font-bold tabular-nums text-muted-foreground/60">{s?.total_sessions || 0}</span>
-                  </div>
+                    <div className="w-20 text-right">
+                      <span className="text-[12px] font-medium tabular-nums text-muted-foreground/70">{s?.total_sessions || 0}</span>
+                    </div>
 
-                  <div className="w-20 text-right">
-                    <span className="text-xs font-bold tabular-nums text-muted-foreground/60">{formatTokens(totalTokens)}</span>
-                  </div>
+                    <div className="w-20 text-right">
+                      <span className="text-[12px] font-medium tabular-nums text-muted-foreground/70">{formatTokens(totalTokens)}</span>
+                    </div>
 
-                  <div className="w-20 text-right">
-                    <span className="text-[10px] text-muted-foreground/40">{relativeTime(s?.last_active || '')}</span>
-                  </div>
+                    <div className="w-20 text-right">
+                      <span className="text-[11px] text-muted-foreground/50">{relativeTime(s?.last_active || '')}</span>
+                    </div>
 
-                  <div className="w-7 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0 text-muted-foreground/30 hover:text-red-500"
-                      data-testid="project-delete-btn"
-                      onClick={(e) => { e.stopPropagation(); setProjectToDelete(project) }}
-                    >
-                      <Trash2 size={12} />
-                    </Button>
+                    <div className="w-7 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        className="h-6 w-6 grid place-items-center rounded text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        data-testid="project-delete-btn"
+                        onClick={(e) => { e.stopPropagation(); setProjectToDelete(project) }}
+                        title="Remove project"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
         )}
       </div>

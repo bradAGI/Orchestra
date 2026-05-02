@@ -25,7 +25,7 @@ export function MessageList({ messages, isStreaming, onAction, hasApiKey, onOpen
       <div className="flex flex-1 flex-col justify-between p-5">
         {/* Top */}
         <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center">
-          <p className="text-sm font-bold text-foreground">Orchestra Agent</p>
+          <p className="text-3xl font-black tracking-tight bg-gradient-to-b from-foreground to-foreground/60 bg-clip-text text-transparent">Maestro</p>
           {hasApiKey ? (
             <p className="text-xs text-foreground/50 max-w-[260px]">
               Ask me to create tasks, check running agents, navigate the app, or anything else.

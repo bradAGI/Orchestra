@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw } from 'lucide-react'
+import { AppTooltip } from '@/components/ui/tooltip-wrapper'
 import type { Project } from '@/lib/orchestra-types'
 import type { BackendConfig, GitCommit, GitStatusEntry, GitHubPR, StashEntry, ConflictStatus } from '@/lib/orchestra-client'
 import {
@@ -33,7 +34,6 @@ import { GitHubPanel } from './GitHubPanel'
 import { PRReviewView } from './PRReviewView'
 import { ResizableSplit } from './ResizableSplit'
 import { CreateRepoDialog } from './CreateRepoDialog'
-import { StashPanel } from './StashPanel'
 import { ConflictBanner } from './ConflictBanner'
 
 type SubTab = 'changes' | 'history' | 'branches' | 'prs' | 'issues'
@@ -294,53 +294,59 @@ export function GitTab({
   const hasGitHub = !!(project.github_owner && project.github_repo)
 
   return (
-    <div className="flex flex-col h-full overflow-hidden relative">
-      {/* Branch bar */}
-      <div className="flex items-center border-b border-border/40 shrink-0 bg-card/30">
-        <div className="flex-1 min-w-0 overflow-visible">
-          <BranchBar
-            projectId={project.id}
-            config={config}
-            currentBranch={currentBranch}
-            branches={branches}
-            remoteBranches={remoteBranches}
-            aheadBehind={aheadBehind}
-            onBranchChange={loadAll}
-            onPush={handlePush}
-            onPull={handlePull}
-            onFetch={handleFetch}
-            onMerge={handleMerge}
-            onDeleteBranch={handleDeleteBranch}
-            stashes={stashes}
-            onStashApply={handleStashApply}
-            onStashDrop={handleStashDrop}
-          />
-        </div>
-        <button
-          onClick={loadAll}
-          disabled={refreshing}
-          className="shrink-0 px-3 py-2.5 text-muted-foreground/40 hover:text-foreground transition-colors"
-          title="Refresh"
-        >
-          <RefreshCw size={14} className={refreshing ? 'animate-refresh-spin' : ''} />
-        </button>
-      </div>
+    <div className="flex flex-col h-full overflow-hidden relative bg-background">
+      {/* Unified strip: branch + actions (left) · sub-tabs (right) */}
+      <div className="flex items-center h-9 border-b border-border/30 shrink-0">
+        <BranchBar
+          projectId={project.id}
+          config={config}
+          currentBranch={currentBranch}
+          branches={branches}
+          remoteBranches={remoteBranches}
+          aheadBehind={aheadBehind}
+          onBranchChange={loadAll}
+          onPush={handlePush}
+          onPull={handlePull}
+          onFetch={handleFetch}
+          onMerge={handleMerge}
+          onDeleteBranch={handleDeleteBranch}
+          stashes={stashes}
+          onStashApply={handleStashApply}
+          onStashDrop={handleStashDrop}
+        />
 
-      {/* Sub-tabs */}
-      <div className="flex items-center gap-1 px-3 py-1.5 border-b border-border/40 shrink-0 bg-card/20">
-        {subTabs.map((tab) => (
+        <div className="w-px h-4 bg-border/40 mx-1.5 shrink-0" />
+
+        <AppTooltip content="Refresh">
           <button
-            key={tab.key}
-            onClick={() => setActiveSubTab(tab.key)}
-            className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-md transition-all ${
-              activeSubTab === tab.key
-                ? 'bg-primary/15 text-primary border border-primary/20'
-                : 'text-muted-foreground/60 hover:text-foreground hover:bg-muted/20'
-            }`}
+            onClick={loadAll}
+            disabled={refreshing}
+            className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors disabled:opacity-40"
           >
-            {tab.label}
+            <RefreshCw size={12} className={refreshing ? 'animate-refresh-spin' : ''} />
           </button>
-        ))}
+        </AppTooltip>
+
+        <div className="flex-1" />
+
+        {/* Sub-tabs aligned right */}
+        <div className="flex items-center gap-0 pr-2 shrink-0">
+          {subTabs.map((tab) => {
+            const isActive = activeSubTab === tab.key
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveSubTab(tab.key)}
+                className={`relative inline-flex items-center px-3 h-9 text-[12px] font-medium tracking-tight transition-colors ${
+                  isActive ? 'text-foreground' : 'text-muted-foreground/65 hover:text-foreground'
+                }`}
+              >
+                {tab.label}
+                {isActive && <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-primary" />}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Changes tab */}
@@ -350,6 +356,12 @@ export function GitTab({
         <ResizableSplit
           left={
             <div className="flex flex-col h-full">
+              <CommitBar
+                stagedCount={staged.length}
+                aheadCount={aheadBehind.ahead}
+                onCommit={handleCommit}
+                onPush={handlePush}
+              />
               <StagingArea
                 unstaged={unstaged}
                 staged={staged}
@@ -359,12 +371,6 @@ export function GitTab({
                 onUnstage={handleUnstage}
                 onStageAll={handleStageAll}
                 onUnstageAll={handleUnstageAll}
-              />
-              <CommitBar
-                stagedCount={staged.length}
-                aheadCount={aheadBehind.ahead}
-                onCommit={handleCommit}
-                onPush={handlePush}
               />
             </div>
           }
@@ -421,10 +427,10 @@ export function GitTab({
             />
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center space-y-3">
-              <p className="text-muted-foreground text-sm">No GitHub repository connected</p>
-              <p className="text-[10px] text-muted-foreground/50">Connect GitHub in project settings to view pull requests</p>
+          <div className="flex-1 flex items-center justify-center px-6">
+            <div className="text-center space-y-2">
+              <p className="text-sm font-semibold text-foreground">No GitHub repository connected</p>
+              <p className="text-[11px] text-muted-foreground/70">Connect GitHub in the project header to view pull requests.</p>
             </div>
           </div>
         )
@@ -443,10 +449,10 @@ export function GitTab({
             />
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center space-y-3">
-              <p className="text-muted-foreground text-sm">No GitHub repository connected</p>
-              <p className="text-[10px] text-muted-foreground/50">Connect GitHub in project settings to view issues</p>
+          <div className="flex-1 flex items-center justify-center px-6">
+            <div className="text-center space-y-2">
+              <p className="text-sm font-semibold text-foreground">No GitHub repository connected</p>
+              <p className="text-[11px] text-muted-foreground/70">Connect GitHub in the project header to view issues.</p>
             </div>
           </div>
         )

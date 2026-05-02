@@ -10,18 +10,14 @@ import {
   Eye,
   EyeOff,
   FlaskConical,
-  FolderRoot,
   GitBranch,
   Globe,
   Keyboard,
   Loader2,
-  Monitor,
   Paintbrush,
   Play,
   Plus,
-  Plug,
   RefreshCcw,
-  Settings2,
   ShieldCheck,
   SignalHigh,
   Terminal,
@@ -31,7 +27,6 @@ import {
   Info,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { AppTooltip } from '@/components/ui/tooltip-wrapper'
 import {
   type BackendConfig,
   type WorkspaceMigrationResult,
@@ -41,13 +36,19 @@ import {
   fetchUnsandboxStatus,
   fetchAgentProviderKeys,
   saveAgentProviderKey,
+  fetchProjects,
+  disconnectProjectGitHub,
   type UnsandboxConfig,
   type UnsandboxStatus,
 } from '@/lib/orchestra-client'
+import type { Project } from '@/lib/orchestra-types'
+import { Github } from 'lucide-react'
 import { CHAT_PROVIDERS } from '@/components/embedded-agent/lib/types'
 import { usePlatform } from '@/hooks/use-platform'
 import { CustomDropdown } from '@/components/app-shell/shared/controls'
 import { useAppStore } from '@/store'
+import { resolveMode } from '@/themes/applyTheme'
+import type { Theme, ThemeMode } from '@/themes/types'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -65,12 +66,12 @@ type BackendProfile = {
 // ---------------------------------------------------------------------------
 
 const SECTIONS = [
-  { id: 'general', label: 'General', icon: FolderRoot },
   { id: 'connections', label: 'Connections', icon: Database },
-  { id: 'agents', label: 'Agents', icon: Cpu },
+  { id: 'agents', label: 'Maestro', icon: Cpu },
   { id: 'git', label: 'Git', icon: GitBranch },
   { id: 'appearance', label: 'Appearance', icon: Paintbrush },
   { id: 'terminal', label: 'Terminal', icon: Terminal },
+  { id: 'browser', label: 'Browser', icon: Globe },
   { id: 'editor', label: 'Editor', icon: Type },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
@@ -165,9 +166,19 @@ export function SettingsPage({
   const { isMac } = usePlatform()
   const theme = useAppStore(s => s.theme)
   const setTheme = useAppStore(s => s.setTheme)
+  const browserHomepage = useAppStore(s => s.browserHomepage)
+  const setBrowserHomepage = useAppStore(s => s.setBrowserHomepage)
+  const builtinThemes = useAppStore(s => s.builtinThemes)
+  const customThemes = useAppStore(s => s.customThemes)
+  const activeThemeId = useAppStore(s => s.activeThemeId)
+  const modeOverride = useAppStore(s => s.modeOverride)
+  const setActiveTheme = useAppStore(s => s.setActiveTheme)
+  const setMode = useAppStore(s => s.setMode)
+  const [homepageDraft, setHomepageDraft] = useState(browserHomepage)
+  useEffect(() => { setHomepageDraft(browserHomepage) }, [browserHomepage])
 
   const scrollRef = useRef<HTMLDivElement>(null)
-  const [activeId, setActiveId] = useState<SectionId>('general')
+  const [activeId, setActiveId] = useState<SectionId>('connections')
 
   useEffect(() => {
     ensureFlashStyle()
@@ -225,16 +236,13 @@ export function SettingsPage({
   }, [])
 
   return (
-    <div className="flex flex-1 min-h-0 overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-card via-card/98 to-muted/5 shadow-2xl shadow-primary/5">
+    <div className="flex flex-1 min-h-0 min-w-0 bg-background">
       {/* Sidebar */}
-      <nav className="w-[180px] shrink-0 border-r border-border/40 bg-muted/5 flex flex-col overflow-y-auto py-4">
-        <div className="flex items-center gap-2 px-4 mb-4">
-          <div className="rounded-xl bg-primary/10 p-1.5 text-primary shadow-inner">
-            <Settings2 className="h-3.5 w-3.5" />
-          </div>
-          <span className="text-xs font-black tracking-tight">Settings</span>
+      <nav className="w-[220px] shrink-0 border-r border-border/40 flex flex-col overflow-y-auto custom-scrollbar bg-background">
+        <div className="px-5 pt-8 pb-6">
+          <h2 className="text-[15px] font-black tracking-tight leading-none">Settings</h2>
         </div>
-        <div className="flex flex-col gap-0.5 px-2">
+        <div className="flex flex-col gap-1 px-3 pb-6">
           {SECTIONS.map((section) => {
             const Icon = section.icon
             const isActive = activeId === section.id
@@ -242,14 +250,22 @@ export function SettingsPage({
               <button
                 key={section.id}
                 onClick={() => scrollToSection(section.id)}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-bold tracking-tight transition-all duration-200 ${
+                className={`group relative flex items-center gap-3 px-3 h-10 rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
                   isActive
-                    ? 'bg-primary/10 text-primary shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                    ? 'bg-foreground/[0.06] text-foreground'
+                    : 'text-muted-foreground/80 hover:text-foreground hover:bg-foreground/[0.03]'
                 }`}
               >
-                <Icon className="h-3.5 w-3.5 shrink-0" />
-                {section.label}
+                {isActive && (
+                  <span className="absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-primary" />
+                )}
+                <Icon
+                  className={`h-[15px] w-[15px] shrink-0 transition-colors ${
+                    isActive ? 'text-primary' : 'text-muted-foreground/60 group-hover:text-foreground'
+                  }`}
+                  strokeWidth={isActive ? 2.25 : 1.75}
+                />
+                <span className="truncate text-[12.5px] font-medium tracking-tight">{section.label}</span>
               </button>
             )
           })}
@@ -258,37 +274,15 @@ export function SettingsPage({
 
       {/* Scrollable content */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar">
-        <div className="max-w-3xl mx-auto py-8 px-8 space-y-12">
-          {/* ── General ── */}
-          <section data-settings-section="general" className="rounded-xl transition-colors duration-500 scroll-mt-4">
-            <SectionHeading icon={FolderRoot} title="General" description="Workspace and startup configuration" />
-            <div className="mt-4 space-y-4">
-              <div className="p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20">
-                <div className="space-y-0.5">
-                  <p className="text-xs font-black tracking-tight">Workspace Root</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    Set via <code className="text-[10px] font-mono bg-muted/30 px-1 rounded">ORCHESTRA_WORKSPACE_ROOT</code> environment variable
-                  </p>
-                </div>
-                <div className="mt-2 px-3 py-2 rounded-lg bg-muted/20 border border-border/20 text-xs font-mono text-muted-foreground select-all">
-                  {config?.baseUrl ? '(configured via backend)' : 'Not set'}
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <p className="text-xs font-black tracking-tight">Backend Auto-Start</p>
-                    <p className="text-[10px] text-muted-foreground">Automatically launch orchestrad when the app starts</p>
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
-                    Managed by Electron
-                  </span>
-                </div>
-              </div>
-            </div>
-          </section>
-
+        <div className="max-w-5xl mx-auto pt-12 pb-24 px-12 space-y-14">
+          {/* Page hero */}
+          <header className="space-y-2 pb-2">
+            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary/80">Workspace</p>
+            <h1 className="text-3xl font-black tracking-tight">Settings</h1>
+            <p className="text-[12px] text-muted-foreground max-w-md">
+              Tune Orchestra to your workflow. Changes save automatically.
+            </p>
+          </header>
           {/* ── Connections ── */}
           <section data-settings-section="connections" className="rounded-xl transition-colors duration-500 scroll-mt-4">
             <SectionHeading icon={Database} title="Connections" description="Backend profiles and API connection" />
@@ -313,7 +307,7 @@ export function SettingsPage({
 
           {/* ── Agents ── */}
           <section data-settings-section="agents" className="rounded-xl transition-colors duration-500 scroll-mt-4">
-            <SectionHeading icon={Cpu} title="Agents" description="LLM provider and embedded agent configuration" />
+            <SectionHeading icon={Cpu} title="Maestro" description="LLM provider and embedded agent configuration" />
             <div className="mt-4 space-y-6">
               <EmbeddedAgentConfigForm config={config} disabled={savingConfig || loadingConfig} />
               <UnsandboxConfigForm config={config} disabled={savingConfig || loadingConfig} />
@@ -322,37 +316,32 @@ export function SettingsPage({
 
           {/* ── Git ── */}
           <section data-settings-section="git" className="rounded-xl transition-colors duration-500 scroll-mt-4">
-            <SectionHeading icon={GitBranch} title="Git" description="Version control preferences" />
+            <SectionHeading icon={GitBranch} title="Git" description="Version control and GitHub connections" />
             <div className="mt-4">
-              <PlaceholderPane text="Git settings coming soon" />
+              <GitConnectionsPane config={config} />
             </div>
           </section>
 
           {/* ── Appearance ── */}
           <section data-settings-section="appearance" className="rounded-xl transition-colors duration-500 scroll-mt-4">
             <SectionHeading icon={Paintbrush} title="Appearance" description="Theme and visual preferences" />
-            <div className="mt-4">
-              <div className="p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20">
-                <div className="space-y-0.5 mb-3">
-                  <p className="text-xs font-black tracking-tight">Theme</p>
-                  <p className="text-[10px] text-muted-foreground">Choose your preferred color scheme</p>
-                </div>
-                <div className="flex gap-2">
-                  {(['light', 'dark'] as const).map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setTheme(t)}
-                      className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
-                        theme === t
-                          ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
-                          : 'bg-muted/30 text-muted-foreground hover:bg-muted/50'
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <div className="mt-4 space-y-4">
+              <AppearanceModePane
+                modeOverride={modeOverride}
+                onModeChange={(m) => {
+                  setMode(m)
+                  // Keep legacy `theme` slice in sync so anything still reading
+                  // it gets a concrete light/dark value.
+                  const resolved = m === 'auto' ? resolveMode('auto') : m
+                  if (resolved !== theme) setTheme(resolved)
+                }}
+              />
+              <ThemePresetPane
+                themes={[...builtinThemes, ...customThemes]}
+                activeThemeId={activeThemeId}
+                modeOverride={modeOverride}
+                onSelect={setActiveTheme}
+              />
             </div>
           </section>
 
@@ -361,6 +350,49 @@ export function SettingsPage({
             <SectionHeading icon={Terminal} title="Terminal" description="Terminal emulator preferences" />
             <div className="mt-4">
               <PlaceholderPane text="Terminal settings coming soon" />
+            </div>
+          </section>
+
+          {/* ── Browser ── */}
+          <section data-settings-section="browser" className="rounded-xl transition-colors duration-500 scroll-mt-4">
+            <SectionHeading icon={Globe} title="Browser" description="Embedded browser preferences" />
+            <div className="mt-4">
+              <div className="p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20">
+                <div className="space-y-0.5 mb-3">
+                  <p className="text-xs font-black tracking-tight">Default Homepage</p>
+                  <p className="text-[10px] text-muted-foreground">URL loaded when opening a new browser tab</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={homepageDraft}
+                    onChange={(e) => setHomepageDraft(e.target.value)}
+                    onBlur={() => {
+                      if (homepageDraft !== browserHomepage) setBrowserHomepage(homepageDraft)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.currentTarget.blur()
+                      } else if (e.key === 'Escape') {
+                        setHomepageDraft(browserHomepage)
+                        e.currentTarget.blur()
+                      }
+                    }}
+                    placeholder="https://example.com or about:blank"
+                    className="flex-1 px-3 py-2 rounded-lg bg-muted/20 border border-border/30 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setHomepageDraft('about:blank')
+                      setBrowserHomepage('about:blank')
+                    }}
+                  >
+                    Reset
+                  </Button>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -414,13 +446,13 @@ export function SettingsPage({
 
 function SectionHeading({ icon: Icon, title, description }: { icon: React.ComponentType<{ className?: string }>; title: string; description: string }) {
   return (
-    <div className="flex items-center gap-3">
-      <div className="rounded-xl bg-primary/10 p-2 text-primary shadow-inner">
+    <div className="flex items-start gap-3 pb-1 border-b border-border/30">
+      <div className="rounded-lg bg-gradient-to-br from-primary/15 to-primary/5 p-2 text-primary ring-1 ring-primary/15 mt-0.5">
         <Icon className="h-4 w-4" />
       </div>
-      <div>
-        <h2 className="text-sm font-black tracking-tight">{title}</h2>
-        <p className="text-[10px] text-muted-foreground">{description}</p>
+      <div className="flex-1 min-w-0 pb-3">
+        <h2 className="text-base font-black tracking-tight leading-tight">{title}</h2>
+        <p className="text-[11px] text-muted-foreground/80 mt-0.5">{description}</p>
       </div>
     </div>
   )
@@ -428,8 +460,303 @@ function SectionHeading({ icon: Icon, title, description }: { icon: React.Compon
 
 function PlaceholderPane({ text }: { text: string }) {
   return (
-    <div className="p-6 rounded-xl border border-dashed border-border/40 bg-muted/5 text-center">
-      <p className="text-xs text-muted-foreground/60 font-medium">{text}</p>
+    <div className="p-8 rounded-xl border border-dashed border-border/30 bg-gradient-to-b from-muted/5 to-transparent text-center">
+      <p className="text-xs text-muted-foreground/50 font-medium tracking-wide">{text}</p>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Appearance — Mode picker (Light / Dark / Auto)
+// ---------------------------------------------------------------------------
+
+function AppearanceModePane({
+  modeOverride,
+  onModeChange,
+}: {
+  modeOverride: ThemeMode
+  onModeChange: (mode: ThemeMode) => void
+}) {
+  const modes: Array<{ id: ThemeMode; label: string }> = [
+    { id: 'light', label: 'Light' },
+    { id: 'dark', label: 'Dark' },
+    { id: 'auto', label: 'Auto' },
+  ]
+  return (
+    <div className="p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20">
+      <div className="space-y-0.5 mb-3">
+        <p className="text-xs font-black tracking-tight">Mode</p>
+        <p className="text-[10px] text-muted-foreground">
+          Light, dark, or follow your system. Active theme adapts to the chosen mode.
+        </p>
+      </div>
+      <div className="flex gap-2">
+        {modes.map((m) => (
+          <button
+            key={m.id}
+            onClick={() => onModeChange(m.id)}
+            className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
+              modeOverride === m.id
+                ? 'bg-white text-black shadow-lg shadow-black/20'
+                : 'bg-muted/30 text-muted-foreground hover:bg-muted/50'
+            }`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Appearance — Theme preset picker
+// ---------------------------------------------------------------------------
+
+function ThemePresetPane({
+  themes,
+  activeThemeId,
+  modeOverride,
+  onSelect,
+}: {
+  themes: Theme[]
+  activeThemeId: string
+  modeOverride: ThemeMode
+  onSelect: (id: string) => void
+}) {
+  const resolved: 'light' | 'dark' = modeOverride === 'auto' ? resolveMode('auto') : modeOverride
+  return (
+    <div className="p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20">
+      <div className="space-y-0.5 mb-3">
+        <p className="text-xs font-black tracking-tight">Theme</p>
+        <p className="text-[10px] text-muted-foreground">
+          Pick a preset. Custom themes can be created in the Theme Studio (coming soon).
+        </p>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {themes.map((t) => (
+          <ThemeSwatchCard
+            key={t.id}
+            theme={t}
+            mode={resolved}
+            active={t.id === activeThemeId}
+            onClick={() => onSelect(t.id)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ThemeSwatchCard({
+  theme,
+  mode,
+  active,
+  onClick,
+}: {
+  theme: Theme
+  mode: 'light' | 'dark'
+  active: boolean
+  onClick: () => void
+}) {
+  const roles = theme.roles[mode]
+  const bg = `hsl(${roles.background})`
+  const surface = `hsl(${roles.surface})`
+  const surfaceRaised = `hsl(${roles.surfaceRaised})`
+  const text = `hsl(${roles.text})`
+  const accent = `hsl(${roles.accent})`
+  const border = `hsl(${roles.border})`
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative rounded-xl overflow-hidden text-left transition-all border ${
+        active
+          ? 'border-white/80 ring-2 ring-white/40 shadow-lg shadow-black/20'
+          : 'border-border/40 hover:border-border/70'
+      }`}
+      aria-pressed={active}
+    >
+      {/* Mini preview */}
+      <div className="p-2.5 flex flex-col gap-1.5" style={{ background: bg }}>
+        <div className="flex gap-1.5">
+          <div className="h-2 w-2 rounded-full" style={{ background: accent }} />
+          <div className="h-2 w-2 rounded-full opacity-60" style={{ background: text }} />
+          <div className="h-2 w-2 rounded-full opacity-30" style={{ background: text }} />
+        </div>
+        <div
+          className="h-6 rounded-md flex items-center px-1.5 gap-1"
+          style={{ background: surface, border: `1px solid ${border}` }}
+        >
+          <div className="h-1 w-3 rounded-full opacity-80" style={{ background: text }} />
+          <div className="h-1 w-5 rounded-full opacity-40" style={{ background: text }} />
+        </div>
+        <div
+          className="h-3 rounded-sm"
+          style={{ background: surfaceRaised, border: `1px solid ${border}` }}
+        />
+      </div>
+      {/* Label */}
+      <div className="px-2.5 py-2 flex items-center justify-between gap-2 bg-card/60 backdrop-blur border-t border-border/30">
+        <span className="text-[11px] font-bold tracking-tight truncate">{theme.name}</span>
+        {active && <Check className="h-3 w-3 text-white shrink-0" />}
+      </div>
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Git connections pane — central view of GitHub-linked projects
+// ---------------------------------------------------------------------------
+
+function GitConnectionsPane({ config }: { config: BackendConfig | null }) {
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [pendingId, setPendingId] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    if (!config) return
+    setLoading(true)
+    setError('')
+    try {
+      const data = await fetchProjects(config)
+      setProjects(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load projects')
+    } finally {
+      setLoading(false)
+    }
+  }, [config])
+
+  useEffect(() => { void load() }, [load])
+
+  const linked = projects.filter((p) => p.github_owner && p.github_repo)
+  const unlinked = projects.filter((p) => !(p.github_owner && p.github_repo))
+
+  const handleDisconnect = async (projectId: string) => {
+    if (!config) return
+    setPendingId(projectId)
+    setError('')
+    try {
+      await disconnectProjectGitHub(config, projectId)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Disconnect failed')
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  const openOnGitHub = (owner: string, repo: string) => {
+    const url = `https://github.com/${owner}/${repo}`
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const bridge = (window as any).orchestraDesktop
+    if (bridge && typeof bridge.openExternal === 'function') {
+      void bridge.openExternal(url)
+    } else {
+      window.open(url, '_blank')
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/55">GitHub</span>
+            <span className="text-[10px] font-medium tabular-nums text-muted-foreground/40">{linked.length}</span>
+          </div>
+          <button
+            onClick={() => void load()}
+            disabled={loading || !config}
+            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium tracking-tight text-muted-foreground/80 hover:text-foreground hover:bg-foreground/[0.04] disabled:opacity-40 transition-colors"
+          >
+            <RefreshCcw size={12} className={loading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
+
+        {error && (
+          <p className="text-[11.5px] text-destructive mb-3">{error}</p>
+        )}
+
+        {linked.length === 0 ? (
+          <div className="px-4 py-8 rounded-lg bg-foreground/[0.02] border border-border/30 text-center">
+            <Github size={20} className="mx-auto mb-2 text-muted-foreground/40" strokeWidth={1.75} />
+            <p className="text-[12px] font-medium text-foreground/70">No GitHub connections</p>
+            <p className="text-[11px] text-muted-foreground/60 mt-1">
+              Open a project and connect it from the Git → GitHub tab.
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-border/30 bg-background overflow-hidden">
+            {linked.map((project, idx) => (
+              <div
+                key={project.id}
+                className={`group relative flex items-center gap-3 px-3.5 py-2.5 hover:bg-foreground/[0.03] transition-colors ${
+                  idx > 0 ? 'border-t border-border/20' : ''
+                }`}
+              >
+                <Github size={14} className="text-muted-foreground/60 shrink-0" strokeWidth={2} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12.5px] font-medium tracking-tight text-foreground/90 truncate">
+                    {project.name}
+                  </div>
+                  <div className="font-mono text-[11px] text-muted-foreground/60 truncate">
+                    {project.github_owner}/{project.github_repo}
+                  </div>
+                </div>
+                <button
+                  onClick={() => openOnGitHub(project.github_owner!, project.github_repo!)}
+                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                >
+                  <ExternalLink size={11} />
+                  Open
+                </button>
+                <button
+                  onClick={() => void handleDisconnect(project.id)}
+                  disabled={pendingId === project.id}
+                  className="inline-flex items-center h-7 px-2.5 rounded-md text-[11px] font-medium text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 disabled:opacity-40 transition-colors"
+                >
+                  {pendingId === project.id ? 'Disconnecting…' : 'Disconnect'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {unlinked.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/55">Unlinked projects</span>
+            <span className="text-[10px] font-medium tabular-nums text-muted-foreground/40">{unlinked.length}</span>
+          </div>
+          <div className="rounded-lg border border-border/30 bg-background overflow-hidden">
+            {unlinked.map((project, idx) => (
+              <div
+                key={project.id}
+                className={`flex items-center gap-3 px-3.5 py-2.5 ${idx > 0 ? 'border-t border-border/20' : ''}`}
+              >
+                <span className="w-2 h-2 rounded-full bg-muted-foreground/20 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12.5px] font-medium tracking-tight text-foreground/85 truncate">
+                    {project.name}
+                  </div>
+                  <div className="font-mono text-[11px] text-muted-foreground/55 truncate">
+                    {project.remote_url || project.root_path}
+                  </div>
+                </div>
+                <span className="text-[10.5px] text-muted-foreground/50">Not connected</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-muted-foreground/60 mt-2.5">
+            Connect a project to GitHub from its <span className="font-medium text-foreground/80">Git → GitHub</span> tab.
+          </p>
+        </div>
+      )}
     </div>
   )
 }
@@ -462,16 +789,16 @@ function NotificationsPane({
           <p className="text-[10px] text-muted-foreground">Disable notification sounds when agents complete</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`text-[9px] font-bold uppercase tracking-widest ${!notifMuted ? 'text-primary' : 'text-muted-foreground/30'}`}>On</span>
+          <span className={`text-[9px] font-bold uppercase tracking-widest ${!notifMuted ? 'text-foreground' : 'text-muted-foreground/30'}`}>On</span>
           <button
             onClick={() => {
               const next = !notifMuted
               onNotifMutedChange?.(next)
               localStorage.setItem('orchestra_notif_muted', String(next))
             }}
-            className={`h-8 w-14 rounded-full transition-colors ${notifMuted ? 'bg-muted' : 'bg-primary'} relative`}
+            className={`h-8 w-14 rounded-full transition-colors ${notifMuted ? 'bg-muted' : 'bg-white'} relative`}
           >
-            <div className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${notifMuted ? 'left-7' : 'left-1'}`} />
+            <div className={`absolute top-1 h-6 w-6 rounded-full ${notifMuted ? 'bg-white' : 'bg-black'} shadow transition-transform ${notifMuted ? 'left-7' : 'left-1'}`} />
           </button>
           <span className={`text-[9px] font-bold uppercase tracking-widest ${notifMuted ? 'text-red-400' : 'text-muted-foreground/30'}`}>Mute</span>
         </div>
@@ -516,7 +843,7 @@ function NotificationsPane({
                 osc.onended = () => ctx.close()
               } catch { /* ignore */ }
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-white/10 text-foreground border border-white/20 hover:bg-white/20 transition-colors"
           >
             <Play size={10} />
             Test
@@ -536,7 +863,7 @@ function NotificationsPane({
               }}
               className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
                 notifSound === s.id
-                  ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                  ? 'bg-white text-black shadow-lg shadow-black/20'
                   : 'bg-muted/30 text-muted-foreground hover:bg-muted/50'
               }`}
             >
@@ -655,6 +982,11 @@ function BackendConfigForm({
   const [newProfileName, setNewProfileName] = useState('')
   const [showToken, setShowToken] = useState(false)
 
+  const baseUrlTrimmed = baseUrl.trim()
+  const baseUrlInvalid = baseUrlTrimmed !== '' && (() => {
+    try { new URL(baseUrlTrimmed); return false } catch { return true }
+  })()
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setBaseUrl(config?.baseUrl ?? '')
@@ -708,7 +1040,9 @@ function BackendConfigForm({
                   disabled={disabled || backendProfiles.length <= 1 || activeProfileId === ''}
                   onClick={(e) => {
                     e.preventDefault()
-                    if (activeProfileId !== '') {
+                    if (activeProfileId === '') return
+                    const name = backendProfiles.find((p) => p.id === activeProfileId)?.name ?? activeProfileId
+                    if (window.confirm(`Delete backend profile "${name}"? This cannot be undone.`)) {
                       void onDeleteProfile(activeProfileId)
                     }
                   }}
@@ -732,7 +1066,7 @@ function BackendConfigForm({
                   variant="outline"
                   size="sm"
                   aria-label="Create"
-                  className="h-9 px-3 rounded-lg bg-primary/5 border-primary/20 text-primary hover:bg-primary hover:text-primary-foreground"
+                  className="h-9 px-3 rounded-lg bg-white/5 border-white/20 text-foreground hover:bg-white hover:text-black"
                   disabled={disabled || newProfileName.trim() === ''}
                   onClick={() => {
                     void onCreateProfile(newProfileName.trim())
@@ -760,13 +1094,17 @@ function BackendConfigForm({
                   <Globe className="h-3 w-3" />
                 </div>
                 <input
-                  className="h-9 w-full rounded-lg border border-border bg-background pl-8 pr-3 text-xs font-mono focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+                  className={`h-9 w-full rounded-lg border bg-background pl-8 pr-3 text-xs font-mono focus:ring-2 transition-all shadow-sm ${baseUrlInvalid ? 'border-destructive/60 focus:ring-destructive/20 focus:border-destructive' : 'border-border focus:ring-primary/20 focus:border-primary'}`}
                   value={baseUrl}
                   onChange={(event) => setBaseUrl(event.target.value)}
                   placeholder="http://127.0.0.1:4010"
                   disabled={disabled}
+                  aria-invalid={baseUrlInvalid || undefined}
                 />
               </div>
+              {baseUrlInvalid && (
+                <span className="block text-[10px] text-destructive px-1">Must be a valid absolute URL (http:// or https://)</span>
+              )}
             </label>
 
             <label className="space-y-1.5 block">
@@ -815,9 +1153,9 @@ function BackendConfigForm({
           </div>
         </div>
         <Button
-          onClick={() => void onSaveBackendConfig({ baseUrl: baseUrl.trim(), apiToken: apiToken.trim() })}
-          disabled={disabled || baseUrl.trim() === ''}
-          className="px-6 shadow-lg shadow-primary/20 font-black uppercase tracking-widest text-[9px] h-9 rounded-lg"
+          onClick={() => void onSaveBackendConfig({ baseUrl: baseUrlTrimmed, apiToken: apiToken.trim() })}
+          disabled={disabled || baseUrlTrimmed === '' || baseUrlInvalid}
+          className="px-6 shadow-lg shadow-black/20 font-black uppercase tracking-widest text-[9px] h-9 rounded-lg"
         >
           {savingConfig ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : 'Save Backend Config'}
         </Button>
@@ -1141,7 +1479,7 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
             <button
               onClick={handleSave}
               disabled={disabled || saving || !apiKey.trim()}
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-black hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {saving ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <Check className="h-3 w-3" />}
               Save
@@ -1350,7 +1688,7 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
           <button
             onClick={handleSave}
             disabled={disabled || saving || !publicKey.trim() || (!secretKey.trim() && !isConfigured)}
-            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-black hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {saving ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <Check className="h-3 w-3" />}
             Save Keys

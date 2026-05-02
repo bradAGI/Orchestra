@@ -14,6 +14,7 @@ import { PRCreateDialog } from './PRCreateDialog'
 import { extractOperationalPlanItems, extractPlanFromText, parseDiff, type DiffFile, type PlanItem } from './IssueDetailUtils'
 import { getCachedPlan, setCachedPlan, clearCachedPlan } from './planCache'
 import { SessionTimeline } from './SessionTimeline'
+import { useAppStore } from '@/store'
 
 function DescriptionEditor({ value, onChange, onBlur, theme }: {
   value: string
@@ -130,6 +131,13 @@ export function IssueDetailView({
   const projectName = (typed.project_name as string) || ''
   const provider = (typed.provider as string) || ''
 
+  const openBrowserTab = useAppStore((s) => s.openBrowserTab)
+  const setActiveSection = useAppStore((s) => s.setActiveSection)
+  const openInInternalBrowser = (url: string) => {
+    setActiveSection('CONSOLE')
+    openBrowserTab(url, projectId || undefined)
+  }
+
   const [localState, setLocalState] = useState((typed.state as string) || 'Todo')
   const [localAssignee, setLocalAssignee] = useState((typed.assignee_id as string) || '')
   const [localTitle, setLocalTitle] = useState(title)
@@ -143,7 +151,6 @@ export function IssueDetailView({
   const isEditable = localState === 'Backlog'
 
   const [issueHistory, setIssueHistory] = useState<IssueHistoryEntry[]>([])
-  const [_historyLoading, setHistoryLoading] = useState(false)
   const [logs, setLogs] = useState('')
   const [logsLoading, setLogsLoading] = useState(localState !== 'Backlog')
   const [diffFiles, setDiffFiles] = useState<DiffFile[]>([])
@@ -198,11 +205,9 @@ export function IssueDetailView({
       setIssueHistory([])
       return
     }
-    setHistoryLoading(true)
     fetchIssueHistory(config, identifier)
       .then(setIssueHistory)
       .catch(() => setIssueHistory([]))
-      .finally(() => setHistoryLoading(false))
 
     // Poll history every 15s while agent is running so plan updates live
     if (!isRunning) return
@@ -318,14 +323,10 @@ export function IssueDetailView({
           {localState === 'Review' && config && projectId && onUpdate && (
             <>
               {prUrl ? (
-                <AppTooltip content="Open pull request in browser" side="bottom">
+                <AppTooltip content="Open pull request in internal browser" side="bottom">
                   <button
                     className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg shadow-emerald-600/20 transition-all"
-                    onClick={() => {
-                      const bridge = (window as any).orchestraDesktop
-                      if (bridge?.openExternal) { void bridge.openExternal(prUrl) }
-                      else { window.open(prUrl, '_blank') }
-                    }}
+                    onClick={() => openInInternalBrowser(prUrl)}
                   >
                     <GitPullRequest size={14} />
                     View PR
@@ -523,14 +524,7 @@ export function IssueDetailView({
                       </div>
                       {prUrl && (
                         <button
-                          onClick={() => {
-                            const bridge = (window as any).orchestraDesktop
-                            if (bridge?.openExternal) {
-                              void bridge.openExternal(prUrl)
-                            } else {
-                              window.open(prUrl, '_blank')
-                            }
-                          }}
+                          onClick={() => openInInternalBrowser(prUrl)}
                           className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/5 border border-primary/10 hover:bg-primary/10 transition-colors w-full text-left"
                         >
                           <GitPullRequest size={12} className="text-primary shrink-0" />
@@ -575,14 +569,7 @@ export function IssueDetailView({
                 <div className="px-4 py-3 border-b border-border/20">
                   <label className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground/30 mb-1.5 block">GitHub</label>
                   <button
-                    onClick={() => {
-                      const bridge = window.orchestraDesktop
-                      if (bridge && typeof bridge.openExternal === 'function') {
-                        void bridge.openExternal(typed.url as string)
-                      } else {
-                        window.open(typed.url as string, '_blank')
-                      }
-                    }}
+                    onClick={() => openInInternalBrowser(typed.url as string)}
                     className="text-[11px] text-primary/60 hover:text-primary flex items-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <Github size={12} />

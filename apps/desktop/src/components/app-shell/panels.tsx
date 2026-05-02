@@ -1,5 +1,4 @@
 export { DashboardOverview, MetricCard } from '@/components/dashboard/DashboardOverview'
-export { SettingsCard } from '@/components/settings/SettingsCard'
 export { SettingsPage } from '@/components/settings/SettingsPage'
 export { CreateProjectDialog } from '@/components/projects/CreateProjectDialog'
 export { CreateTaskDialog } from '@/components/tasks/CreateTaskDialog'

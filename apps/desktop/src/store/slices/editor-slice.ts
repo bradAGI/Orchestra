@@ -3,7 +3,8 @@
  */
 
 import type { StateCreator } from 'zustand'
-import type { AppState, EditorSlice, OpenFile } from '../types'
+import { GLOBAL_PROJECT_ID } from '../types'
+import type { AppState, EditorSlice, OpenFile, WorkspaceContextID } from '../types'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -47,11 +48,29 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
   activeFileId: null,
 
   // ---- Actions --------------------------------------------------------------
-  openFile: (filePath: string, relativePath: string) => {
-    const { openFiles, config } = get()
+  openFile: (filePath: string, relativePath: string, revealLine?: number, projectId?: WorkspaceContextID) => {
+    const state = get()
+    const { openFiles, config, activeProjectId } = state
+    const targetProjectId = projectId ?? activeProjectId ?? GLOBAL_PROJECT_ID
+    console.log('[editor] openFile', { filePath, relativePath, revealLine, projectId: targetProjectId, hasConfig: !!config?.baseUrl })
     const existing = openFiles.find((f) => f.filePath === filePath)
     if (existing) {
-      set({ activeFileId: existing.id, activeWorkspaceTab: { type: 'editor', id: existing.id } })
+      set({
+        activeFileId: existing.id,
+        activeWorkspaceTab: { type: 'editor', id: existing.id },
+        // If the file lives in a different project tab, switch to that project
+        activeProjectId: existing.projectId,
+        openFiles: openFiles.map((f) =>
+          f.id === existing.id ? { ...f, pendingReveal: revealLine ?? f.pendingReveal ?? null } : f,
+        ),
+      })
+      // Make sure the tab is reflected in some group of the project (and active).
+      // The fn is part of WorkspaceSlice — guard for slice-isolated tests.
+      get().addTabToGroup?.(existing.projectId, { type: 'editor', id: existing.id })
+      if (existing.content === null && !existing.loading) {
+        console.log('[editor] reactivating tab with null content, retrying load', filePath)
+        get().loadFileContent(existing.id)
+      }
       return
     }
     const newFile: OpenFile = {
@@ -61,35 +80,100 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
       language: detectLanguage(filePath),
       isDirty: false,
       content: null,
+      loading: false,
+      loadError: null,
+      pendingReveal: revealLine ?? null,
+      projectId: targetProjectId,
     }
     set({ openFiles: [...openFiles, newFile], activeFileId: newFile.id, activeWorkspaceTab: { type: 'editor', id: newFile.id } })
+    // Register with the project's focused tab group (guard for slice-isolated tests)
+    get().addTabToGroup?.(targetProjectId, { type: 'editor', id: newFile.id })
+    get().loadFileContent(newFile.id)
+  },
 
-    // Eagerly load file content via backend API
-    if (config?.baseUrl) {
-      const url = `${config.baseUrl}/api/v1/workspace/file?path=${encodeURIComponent(filePath)}`
+  clearPendingReveal: (fileId: string) =>
+    set((s) => ({
+      openFiles: s.openFiles.map((f) => (f.id === fileId ? { ...f, pendingReveal: null } : f)),
+    })),
+
+  loadFileContent: async (fileId: string) => {
+    const state = get()
+    const file = state.openFiles.find((f) => f.id === fileId)
+    if (!file) {
+      console.warn('[editor] loadFileContent: file not in openFiles', fileId)
+      return
+    }
+    if (file.loading) {
+      console.log('[editor] loadFileContent: already loading, skipping', fileId)
+      return
+    }
+    if (file.content !== null) {
+      console.log('[editor] loadFileContent: content already loaded, skipping', fileId)
+      return
+    }
+
+    const config = state.config
+    if (!config?.baseUrl) {
+      console.warn('[editor] loadFileContent: no backend config, trying Electron fallback', fileId)
+      // Config not yet ready — leave content null so EditorContent can retry
+      // when config becomes available. Optionally try Electron fs fallback.
+      const desktopFs = (globalThis as unknown as { window?: { orchestraDesktop?: { fs?: { readFile?: (p: string) => Promise<string> } } } }).window?.orchestraDesktop?.fs
+      if (desktopFs?.readFile) {
+        set((s) => ({
+          openFiles: s.openFiles.map((f) =>
+            f.id === fileId ? { ...f, loading: true, loadError: null } : f,
+          ),
+        }))
+        try {
+          const content = await desktopFs.readFile(file.filePath)
+          set((s) => ({
+            openFiles: s.openFiles.map((f) =>
+              f.id === fileId ? { ...f, content, loading: false, loadError: null } : f,
+            ),
+          }))
+        } catch (err) {
+          set((s) => ({
+            openFiles: s.openFiles.map((f) =>
+              f.id === fileId ? { ...f, loading: false, loadError: (err as Error).message } : f,
+            ),
+          }))
+        }
+      }
+      return
+    }
+
+    set((s) => ({
+      openFiles: s.openFiles.map((f) =>
+        f.id === fileId ? { ...f, loading: true, loadError: null } : f,
+      ),
+    }))
+
+    const url = `${config.baseUrl}/api/v1/workspace/file?path=${encodeURIComponent(file.filePath)}`
+    console.log('[editor] fetching', url)
+    try {
       const headers: Record<string, string> = {}
       if (config.apiToken) headers['Authorization'] = `Bearer ${config.apiToken}`
-      fetch(url, { headers })
-        .then((res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`)
-          return res.text()
-        })
-        .then((content) => {
-          const state = get()
-          set({
-            openFiles: state.openFiles.map((f) =>
-              f.id === filePath ? { ...f, content } : f,
-            ),
-          })
-        })
-        .catch((err) => {
-          const state = get()
-          set({
-            openFiles: state.openFiles.map((f) =>
-              f.id === filePath ? { ...f, content: `// Error: ${err.message}\n// File: ${filePath}` } : f,
-            ),
-          })
-        })
+      const res = await fetch(url, { headers })
+      console.log('[editor] fetch response', { status: res.status, ok: res.ok, url })
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '')
+        throw new Error(`HTTP ${res.status}: ${errText.slice(0, 200)}`)
+      }
+      const content = await res.text()
+      console.log('[editor] fetch success', { fileId, bytes: content.length })
+      set((s) => ({
+        openFiles: s.openFiles.map((f) =>
+          f.id === fileId ? { ...f, content, loading: false, loadError: null } : f,
+        ),
+      }))
+    } catch (err) {
+      const message = (err as Error).message
+      console.error('[editor] fetch failed', { fileId, url, error: message })
+      set((s) => ({
+        openFiles: s.openFiles.map((f) =>
+          f.id === fileId ? { ...f, content: `// Error loading file: ${message}\n// Path: ${file.filePath}`, loading: false, loadError: message } : f,
+        ),
+      }))
     }
   },
 
@@ -103,7 +187,6 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
       if (next.length === 0) {
         nextActive = null
       } else {
-        // Activate the previous tab, or the first if closing the first
         const prevIdx = Math.max(0, idx - 1)
         nextActive = next[prevIdx].id
       }

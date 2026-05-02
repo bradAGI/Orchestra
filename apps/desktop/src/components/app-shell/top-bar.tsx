@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Loader2, Moon, Search, Settings2, Sun, Activity, Download, AlertTriangle, RefreshCcw } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Loader2, Moon, Search, Settings2, Sun, Download, AlertTriangle, RefreshCcw } from 'lucide-react'
 import { AppTooltip } from '@/components/ui/tooltip-wrapper'
 import { periodFilters } from '@/components/app-shell/types'
 import { usePlatform } from '@/hooks/use-platform'
@@ -26,7 +25,7 @@ export function TopBar({
   usePolling,
   onDownloadDiagnostics,
   onTogglePolling,
-  flush: _flush,
+  flush,
 }: {
   sectionLabel: string
   sectionTitle: string
@@ -95,8 +94,8 @@ export function TopBar({
   }, [searchQuery, onSearch])
 
   return (
-    <div className="mb-4 space-y-2">
-      <header className="flex h-14 w-full items-center justify-between border-b border-border/40 bg-background/80 px-4 backdrop-blur-xl transition-all duration-300">
+    <div className={flush ? 'space-y-2' : 'mb-4 space-y-2'}>
+      <header className="flex h-14 w-full items-center justify-between bg-background/80 px-4 backdrop-blur-xl transition-all duration-300">
         <div className="flex items-center gap-4 min-w-0 flex-1">
           <div className="shrink-0 flex flex-col justify-center">
             <h1 className="text-base font-black tracking-tight text-foreground leading-none">{sectionTitle}</h1>
@@ -111,34 +110,8 @@ export function TopBar({
             </div>
           </div>
 
-          <div className="h-6 w-[1px] bg-border/40 mx-1 shrink-0" />
-
-          {onTogglePolling !== undefined && usePolling !== undefined && (
-            <AppTooltip content={usePolling ? 'Switch to live stream (SSE)' : 'Switch to manual polling'}>
-              <button
-                onClick={onTogglePolling}
-                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 transition-all duration-300 ${
-                  usePolling 
-                    ? 'border-amber-500/20 bg-amber-500/5 text-amber-500' 
-                    : 'border-primary/20 bg-primary/5 text-primary shadow-[0_0_10px_rgba(var(--primary),0.1)]'
-                }`}
-              >
-                <div className={`h-1.5 w-1.5 rounded-full ${usePolling ? 'bg-amber-500' : 'bg-primary animate-pulse shadow-[0_0_8px_rgba(var(--primary),0.6)]'}`} />
-                <span className="text-[9px] font-black uppercase tracking-widest">
-                  {usePolling ? 'Polling' : 'Live'}
-                </span>
-              </button>
-            </AppTooltip>
-          )}
-
           <div className="flex-1 flex items-center px-4 overflow-hidden min-w-0">
-            {statusMessage && (
-              <div className="flex items-center gap-2.5 bg-primary/5 border border-primary/10 rounded-lg px-3 py-1.5 text-[10px] font-bold text-primary animate-in fade-in slide-in-from-left-2 duration-500 shadow-sm" role="status" aria-live="polite">
-                <Activity className="h-3 w-3 shrink-0" />
-                <span className="truncate tracking-tight">{statusMessage}</span>
-              </div>
-            )}
-            {errorMessage && !statusMessage && (
+            {errorMessage && (
               <div className="flex items-center gap-2.5 bg-red-500/5 border border-red-500/10 rounded-lg px-3 py-1.5 text-[10px] font-bold text-red-500 animate-in fade-in slide-in-from-left-2 duration-500 shadow-sm truncate" role="alert" aria-live="assertive">
                 <AlertTriangle className="h-3 w-3 shrink-0" />
                 <span className="truncate tracking-tight">{errorMessage}</span>
@@ -220,22 +193,13 @@ export function TopBar({
               title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             />
-            <Button
+            <IconButton
+              icon={refreshPending
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin-smooth" />
+                : <RefreshCcw className="h-3.5 w-3.5" />}
+              title={refreshPending ? 'Syncing…' : 'Refresh'}
               onClick={onRefresh}
-              disabled={refreshPending}
-              className={`h-8 rounded-xl px-4 font-black uppercase tracking-[0.1em] text-[9px] shadow-lg transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 ${
-                refreshPending 
-                  ? 'bg-muted text-muted-foreground' 
-                  : 'bg-primary text-primary-foreground shadow-primary/20 hover:shadow-primary/30 hover:bg-primary/90'
-              }`}
-            >
-              {refreshPending ? (
-                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin-smooth" />
-              ) : (
-                <RefreshCcw className="mr-2 h-3.5 w-3.5" />
-              )}
-              {refreshPending ? 'Syncing...' : 'Sync Data'}
-            </Button>
+            />
           </div>
         </div>
       </header>

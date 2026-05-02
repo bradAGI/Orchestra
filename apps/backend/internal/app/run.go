@@ -31,6 +31,7 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/telemetry"
 	"github.com/orchestra/orchestra/apps/backend/internal/terminal"
 	"github.com/orchestra/orchestra/apps/backend/internal/tools"
+	"github.com/orchestra/orchestra/apps/backend/internal/usage"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
 	trackergithub "github.com/orchestra/orchestra/apps/backend/internal/tracker/github"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker/memory"
@@ -113,7 +114,13 @@ func Run(logger zerolog.Logger) error {
 
 	logger.Info().Str("agent_provider", cfg.AgentProvider).Str("service_id", runtime.ServiceOrchestrator).Msg("agent provider configured")
 
-	router := api.NewRouterWithPubSub(logger, orchestratorService, &cfg, pubsub, warehouseDB, termManager)
+	usageService, err := usage.NewService(filepath.Join(cfg.WorkspaceRoot, ".orchestra", "usage"), nil)
+	if err != nil {
+		logger.Warn().Err(err).Msg("usage service unavailable")
+		usageService = nil
+	}
+
+	router := api.NewRouterWithPubSub(logger, orchestratorService, &cfg, pubsub, warehouseDB, termManager, usageService)
 
 	cleanupTerminalWorkspaces(orchestratorService, trackerClient, workspaceService, cfg.WorkspaceHooks, warehouseDB, logger)
 
@@ -511,21 +518,22 @@ func processExecutionTick(
 		allResourceSpecs = append(allResourceSpecs, mcpResources...)
 	}
 
-	// Create a tool executor that can route to MCP
-	mcpAwareExecutor := func(tool string, args map[string]any) map[string]any {
-		// Check if it's an MCP tool (prefixed with server name)
+	// Tool executor that first tries MCP routing, then falls back to the
+	// tracker / linear executor. Context flows from the active turn so a
+	// cancelled run cleanly aborts in-flight tracker / MCP calls.
+	mcpAwareExecutor := func(ctx context.Context, tool string, args map[string]any) map[string]any {
 		if mcpReg := service.GetMCPRegistry(); mcpReg != nil {
 			if strings.Contains(tool, "_") {
 				parts := strings.SplitN(tool, "_", 2)
 				serverName := parts[0]
 				toolName := parts[1]
-				res, err := mcpReg.ExecuteTool(context.Background(), serverName, toolName, args)
+				res, err := mcpReg.ExecuteTool(ctx, serverName, toolName, args)
 				if err == nil {
 					return res
 				}
 			}
 		}
-		return toolExecutor(tool, args)
+		return toolExecutor(ctx, tool, args)
 	}
 
 	sessionID := fmt.Sprintf("%s-%d", entry.IssueIdentifier, time.Now().UnixNano())

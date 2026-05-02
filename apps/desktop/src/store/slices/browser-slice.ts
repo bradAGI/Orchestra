@@ -3,7 +3,8 @@
  */
 
 import type { StateCreator } from 'zustand'
-import type { AppState, BrowserSlice } from '../types'
+import { GLOBAL_PROJECT_ID } from '../types'
+import type { AppState, BrowserSlice, WorkspaceContextID } from '../types'
 
 // ---------------------------------------------------------------------------
 // Slice factory
@@ -15,21 +16,26 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
   activeBrowserTabId: null,
 
   // ---- Actions --------------------------------------------------------------
-  openBrowserTab: (url?: string) => {
+  openBrowserTab: (url?: string, projectId?: WorkspaceContextID) => {
     const id = crypto.randomUUID()
+    const state = get()
+    const targetProjectId = projectId ?? state.activeProjectId ?? GLOBAL_PROJECT_ID
+    const homepage = state.browserHomepage || 'about:blank'
     const newTab = {
       id,
-      url: url || 'about:blank',
+      url: url || homepage,
       title: 'New Tab',
       loading: false,
       canGoBack: false,
       canGoForward: false,
+      projectId: targetProjectId,
     }
     set((s) => ({
       browserTabs: [...s.browserTabs, newTab],
       activeBrowserTabId: id,
       activeWorkspaceTab: { type: 'browser' as const, id },
     }))
+    get().addTabToGroup?.(targetProjectId, { type: 'browser', id })
   },
 
   closeBrowserTab: (tabId: string) => {

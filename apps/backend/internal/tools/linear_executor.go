@@ -68,8 +68,13 @@ func NewLinearToolExecutor(client tracker.Client) *LinearToolExecutor {
 }
 
 // Execute dispatches a tool call by name with the given arguments and returns
-// a response map indicating success or failure with content items.
-func (e *LinearToolExecutor) Execute(tool string, arguments map[string]any) map[string]any {
+// a response map indicating success or failure with content items. The
+// caller's context is propagated through to all tracker operations so
+// cancellation and deadlines are honored.
+func (e *LinearToolExecutor) Execute(ctx context.Context, tool string, arguments map[string]any) map[string]any {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	name := strings.TrimSpace(tool)
 	if name == "" {
 		return map[string]any{"success": false, "error": "tool name missing"}
@@ -97,7 +102,7 @@ func (e *LinearToolExecutor) Execute(tool string, arguments map[string]any) map[
 			updates["priority"] = int(priority)
 		}
 
-		issue, err := e.tracker.UpdateIssue(context.Background(), identifier, updates)
+		issue, err := e.tracker.UpdateIssue(ctx, identifier, updates)
 		if err != nil {
 			return failureResponse(map[string]any{"error": map[string]any{"message": "issue update failed", "reason": err.Error()}})
 		}
@@ -122,7 +127,7 @@ func (e *LinearToolExecutor) Execute(tool string, arguments map[string]any) map[
 			"assignee_id": "agent-" + strings.ToLower(provider),
 		}
 
-		issue, err := e.tracker.UpdateIssue(context.Background(), identifier, updates)
+		issue, err := e.tracker.UpdateIssue(ctx, identifier, updates)
 		if err != nil {
 			return failureResponse(map[string]any{"error": map[string]any{"message": "handoff failed", "reason": err.Error()}})
 		}
@@ -133,34 +138,32 @@ func (e *LinearToolExecutor) Execute(tool string, arguments map[string]any) map[
 			"note":   "The orchestrator will switch to the new provider on the next turn cycle.",
 		})
 	case "tracker_query":
-		arguments := arguments
-
 		mode, _ := arguments["mode"].(string)
 		switch strings.TrimSpace(mode) {
 		case "issue_states_by_ids":
 			ids := toStringSlice(arguments["issue_ids"])
-			states, err := e.tracker.FetchIssueStatesByIDs(context.Background(), ids)
+			states, err := e.tracker.FetchIssueStatesByIDs(ctx, ids)
 			if err != nil {
 				return failureResponse(map[string]any{"error": map[string]any{"message": "issue state lookup failed", "reason": err.Error()}})
 			}
 			return successResponse(map[string]any{"states": states})
 		case "issues_by_ids":
 			ids := toStringSlice(arguments["issue_ids"])
-			issues, err := e.tracker.FetchIssuesByIDs(context.Background(), ids)
+			issues, err := e.tracker.FetchIssuesByIDs(ctx, ids)
 			if err != nil {
 				return failureResponse(map[string]any{"error": map[string]any{"message": "issues by ids lookup failed", "reason": err.Error()}})
 			}
 			return successResponse(map[string]any{"issues": issues})
 		case "issues_by_states":
 			states := toStringSlice(arguments["states"])
-			issues, err := e.tracker.FetchIssuesByStates(context.Background(), states)
+			issues, err := e.tracker.FetchIssuesByStates(ctx, states)
 			if err != nil {
 				return failureResponse(map[string]any{"error": map[string]any{"message": "issues by states lookup failed", "reason": err.Error()}})
 			}
 			return successResponse(map[string]any{"issues": issues})
 		default:
 			activeStates := toStringSlice(arguments["active_states"])
-			issues, err := e.tracker.FetchCandidateIssues(context.Background(), activeStates)
+			issues, err := e.tracker.FetchCandidateIssues(ctx, activeStates)
 			if err != nil {
 				return failureResponse(map[string]any{"error": map[string]any{"message": "candidate issue lookup failed", "reason": err.Error()}})
 			}
