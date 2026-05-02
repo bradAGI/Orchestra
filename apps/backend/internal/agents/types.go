@@ -21,6 +21,8 @@ const (
 	ProviderOpenCode Provider = "OPENCODE"
 	// ProviderGemini identifies the Google Gemini agent.
 	ProviderGemini Provider = "GEMINI"
+	// Provider8gent identifies the 8gent Code open-source agent.
+	Provider8gent Provider = "8GENT"
 )
 
 // NormalizeProvider normalizes a provider string to UPPERCASE for backward compatibility.
@@ -85,8 +87,9 @@ type TurnResult struct {
 type EventHandler func(Event)
 
 // ToolExecutor is a callback that executes a named tool with the given arguments
-// and returns the result as a JSON-compatible map.
-type ToolExecutor func(tool string, arguments map[string]any) map[string]any
+// and returns the result as a JSON-compatible map. The context is propagated
+// from the active turn so cancellation reaches the underlying tracker / IO.
+type ToolExecutor func(ctx context.Context, tool string, arguments map[string]any) map[string]any
 
 // Runner is the interface that all agent backends must implement. RunTurn
 // executes a single agent turn, streaming events via onEvent and returning

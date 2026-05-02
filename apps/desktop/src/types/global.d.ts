@@ -18,6 +18,20 @@ type BackendProfilesPayload = {
 }
 
 declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      webview: React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLElement> & {
+          src?: string
+          partition?: string
+          preload?: string
+          nodeintegration?: string
+        },
+        HTMLElement
+      >
+    }
+  }
+
   interface Window {
     orchestraDesktop: {
       getBackendConfig: () => Promise<BackendConfig>
@@ -31,7 +45,17 @@ declare global {
       openExternal: (url: string) => Promise<void>
       openPath: (targetPath: string) => Promise<void>
       selectFolder: () => Promise<string | null>
+      selectFile: (options?: { filters?: Array<{ name: string; extensions: string[] }> }) => Promise<string | null>
       getScaleFactor: () => number
+      fs: {
+        readDir: (dirPath: string) => Promise<Array<{ name: string; isDirectory: boolean }>>
+        readFile: (filePath: string) => Promise<{ content: string; isBinary: boolean; tooLarge?: boolean }>
+        writeFile: (filePath: string, content: string) => Promise<void>
+        stat: (filePath: string) => Promise<{ isDirectory: boolean; size: number; mtime: number }>
+        deletePath: (filePath: string) => Promise<void>
+        gitStatus: (worktreePath: string) => Promise<Record<string, string>>
+        search: (worktreePath: string, query: string, options?: { caseSensitive?: boolean; wholeWord?: boolean; regex?: boolean; includeGlob?: string; excludeGlob?: string }) => Promise<Array<{ file: string; relativePath: string; matches: Array<{ line: number; text: string }> }>>
+      }
     }
   }
 }

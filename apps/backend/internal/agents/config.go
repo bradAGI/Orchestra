@@ -72,6 +72,13 @@ var AgentMeta = map[string]struct {
 		GlobalSkillPaths: []string{".config/opencode/agents", ".config/opencode/skills", ".config/opencode/command", ".config/opencode/commands"},
 		LocalSkillPaths:  []string{".opencode/agents", ".opencode/skills", ".opencode/command", ".opencode/commands"},
 	},
+	"8gent": {
+		GlobalPaths:      []string{".8gent/config.json"},
+		LocalPaths:       []string{".8gent/config.json"},
+		Format:           "json",
+		GlobalSkillPaths: []string{".8gent/skills", ".8gent/agents", ".8gent/memory"},
+		LocalSkillPaths:  []string{".8gent/skills", ".8gent/agents", ".8gent/memory"},
+	},
 }
 
 // GetHomeDir returns the current user's home directory, or an empty string if

@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { BridgeProfilesPayload, SnapshotPayload } from '@/lib/orchestra-types'
+import type { BridgeProfilesPayload, SnapshotPayload } from '@core/api/types'
 
-vi.mock('@/components/terminal/TerminalView', () => ({
+vi.mock('@features/terminal/TerminalView', () => ({
   TerminalView: () => <div data-testid="terminal-view-mock" />,
 }))
 
 import App from './App'
+import { resetAppStore } from '@core/store'
 
 // Mock Electron bridge
 const defaultProfiles: BridgeProfilesPayload = {
@@ -84,9 +85,19 @@ function setupDesktopBridge(overrides?: {
       }
     }),
     selectFolder: vi.fn(async () => '/mock/selected/path'),
+    selectFile: vi.fn(async () => '/mock/selected/file.md'),
     openExternal: vi.fn(async () => {}),
     openPath: vi.fn(async () => {}),
     getScaleFactor: vi.fn(() => 1),
+    fs: {
+      readDir: vi.fn(async () => []),
+      readFile: vi.fn(async () => ({ content: '', isBinary: false })),
+      writeFile: vi.fn(async () => {}),
+      stat: vi.fn(async () => ({ isDirectory: false, size: 0, mtime: 0 })),
+      deletePath: vi.fn(async () => {}),
+      gitStatus: vi.fn(async () => ({})),
+      search: vi.fn(async () => []),
+    },
   }
 
   window.orchestraDesktop = bridge
@@ -264,6 +275,7 @@ describe('App smoke render', () => {
 
   afterEach(() => {
     cleanup()
+    resetAppStore()
     vi.unstubAllGlobals()
   })
 
@@ -350,7 +362,7 @@ describe('App smoke render', () => {
 
       // Agent auto-selected from availableAgents, project auto-selected since only one exists
       const submitButton = screen.getAllByRole('button').find(
-        (btn) => btn.textContent === 'Create' && (btn as HTMLButtonElement).type === 'submit',
+        (btn) => btn.textContent === 'Create task' && (btn as HTMLButtonElement).type === 'submit',
       )
       expect(submitButton).toBeTruthy()
       fireEvent.click(submitButton!)
@@ -593,7 +605,7 @@ describe('App smoke render', () => {
 
       // Create button should be disabled: no project selected
       const submitButton = screen.getAllByRole('button').find(
-        (btn) => btn.textContent === 'Create' && (btn as HTMLButtonElement).type === 'submit',
+        (btn) => btn.textContent === 'Create task' && (btn as HTMLButtonElement).type === 'submit',
       )
       expect(submitButton).toBeTruthy()
       expect((submitButton as HTMLButtonElement).disabled).toBe(true)
@@ -662,7 +674,7 @@ describe('App smoke render', () => {
       fireEvent.click(await screen.findByTestId('sidebar-nav-PROJECTS'))
 
       // Wait for the empty state or projects to load
-      await screen.findByText(/No Projects/i)
+      await screen.findByText(/No projects yet/i)
       fireEvent.click(screen.getByRole('button', { name: /Add Project/i }))
 
       // Click the browse button
@@ -836,7 +848,7 @@ describe('App smoke render', () => {
       await user.click(screen.getByRole('button', { name: 'Save Backend Config' }))
 
       await waitFor(() => {
-        expect(screen.getByText(/base URL must be a valid absolute URL/i)).toBeTruthy()
+        expect(screen.getByText(/must be a valid absolute URL/i)).toBeTruthy()
       })
     })
 
@@ -964,6 +976,9 @@ describe('App smoke render', () => {
         expect(bridge.setActiveBackendProfile).toHaveBeenCalledWith('staging')
       })
 
+      // Mock window.confirm to return true so the delete proceeds
+      vi.spyOn(window, 'confirm').mockReturnValue(true)
+
       const deleteButton = screen.getByRole('button', { name: 'Delete' })
       fireEvent.click(deleteButton)
 
@@ -1056,16 +1071,17 @@ describe('App smoke render', () => {
       })
     })
 
-    it('shows refresh status', async () => {
+    it('triggers a refresh request when clicked', async () => {
       setupDesktopBridge()
-      setupFetch(defaultSnapshot())
+      const fetchMock = setupFetch(defaultSnapshot())
 
       render(<App />)
 
-      fireEvent.click(await screen.findByRole('button', { name: 'Sync Data' }))
+      fireEvent.click(await screen.findByRole('button', { name: /refresh/i }))
 
       await waitFor(() => {
-        expect(screen.getByText(/Refresh queued successfully/i)).toBeTruthy()
+        const calls = fetchMock.mock.calls.map(c => String(c[0]))
+        expect(calls.some(u => u.includes('/api/v1/refresh'))).toBe(true)
       })
     })
 
@@ -1082,7 +1098,7 @@ describe('App smoke render', () => {
 
       render(<App />)
 
-      fireEvent.click(await screen.findByRole('button', { name: 'Sync Data' }))
+      fireEvent.click(await screen.findByRole('button', { name: /refresh/i }))
 
       await waitFor(() => {
         expect(screen.getByText(/refresh failed/i)).toBeTruthy()

@@ -20,6 +20,7 @@ graph LR
 | `ProviderClaude` | `"CLAUDE"` | Anthropic Claude Code CLI |
 | `ProviderOpenCode` | `"OPENCODE"` | OpenCode CLI agent |
 | `ProviderGemini` | `"GEMINI"` | Google Gemini CLI agent |
+| `Provider8gent` | `"8GENT"` | 8gent Code open-source agent (see [3.2.1 8gent Integration](agents-8gent.md)) |
 
 `NormalizeProvider(s string)` uppercases and trims a provider string for backward compatibility.
 
@@ -145,6 +146,10 @@ Thin wrapper around `CommandRunner` with `ProviderOpenCode`. Event extraction lo
 #### GeminiRunner
 
 Wrapper with a default command of `gemini --output-format stream-json {{prompt}}` when no command is provided. Event extraction uses `type` and `event` fields.
+
+#### EightgentRunner
+
+Thin wrapper around `CommandRunner` with `Provider8gent` set. 8gent emits one JSON object per line with `type` of `session_start`, `assistant`, `tool_use`, `tool_result`, or `result`. The generic `parseLineToEvent` path picks up `type` as the event kind and the nested `usage` object for token accounting. Completion fires on `result` events because they carry both `type:"result"` and a `session_id` field. See [3.2.1 8gent Integration](agents-8gent.md) for the full event shape, sample config, and troubleshooting.
 
 #### CodexAppServerRunner
 

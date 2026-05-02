@@ -1,0 +1,5 @@
+export { applyTheme } from './apply'
+export { deriveRoles } from './derive-surface'
+export { BUILTIN_THEMES, DEFAULT_THEME_ID, findBuiltin, normalizeTheme } from './defaults'
+export type { NormalizedTheme } from './defaults'
+export type * from './types'

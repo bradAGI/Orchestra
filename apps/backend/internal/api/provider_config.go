@@ -59,7 +59,7 @@ func (s *Server) GetProviderPermissions(w http.ResponseWriter, r *http.Request) 
 	var perms ProviderPermissions
 
 	switch provider {
-	case "claude":
+	case "claude", "8gent":
 		perms = readClaudePermissions(homeDir)
 	case "codex":
 		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
@@ -87,8 +87,8 @@ func (s *Server) GetProviderPermissions(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Enrich Claude permissions with project-scoped allowedTools and enabledPlugins
-	if provider == "claude" {
+	// Enrich Claude/8gent permissions with project-scoped allowedTools and enabledPlugins
+	if provider == "claude" || provider == "8gent" {
 		// Read enabledPlugins from settings.json
 		settingsCfg, settingsErr := readClaudeSettings(homeDir)
 		if settingsErr == nil {
@@ -140,7 +140,7 @@ func (s *Server) PostProviderPermissions(w http.ResponseWriter, r *http.Request)
 	}
 
 	switch provider {
-	case "claude":
+	case "claude", "8gent":
 		err = writeClaudePermissions(homeDir, perms)
 	case "codex":
 		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
@@ -193,7 +193,7 @@ func (s *Server) GetProviderModel(w http.ResponseWriter, r *http.Request) {
 	var model ProviderModelConfig
 
 	switch provider {
-	case "claude":
+	case "claude", "8gent":
 		model = readClaudeModel(homeDir)
 	case "codex":
 		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
@@ -240,7 +240,7 @@ func (s *Server) PostProviderModel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch provider {
-	case "claude":
+	case "claude", "8gent":
 		err = writeClaudeModel(homeDir, model)
 	case "codex":
 		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
@@ -293,7 +293,7 @@ func (s *Server) GetProviderHooks(w http.ResponseWriter, r *http.Request) {
 	var hooks []ProviderHook
 
 	switch provider {
-	case "claude":
+	case "claude", "8gent":
 		hooks = readClaudeHooks(homeDir)
 	case "codex":
 		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)
@@ -339,7 +339,7 @@ func (s *Server) PostProviderHooks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch provider {
-	case "claude":
+	case "claude", "8gent":
 		err = writeClaudeHooks(homeDir, hooks)
 	case "codex":
 		scope, _, projectRoot, scopeErr := s.resolveProviderScope(r)

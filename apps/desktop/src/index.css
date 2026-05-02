@@ -29,10 +29,14 @@
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
 
+  /* Typography */
+  --font-sans: var(--app-font-sans);
+  --font-mono: var(--app-font-mono);
+
   /* Border radius */
-  --radius-lg: 0.75rem;
-  --radius-md: 0.5rem;
-  --radius-sm: 0.375rem;
+  --radius-lg: var(--app-radius-lg);
+  --radius-md: var(--app-radius-md);
+  --radius-sm: var(--app-radius-sm);
 }
 
 :root {
@@ -60,28 +64,60 @@
   --chart-3: 200 70% 50%;
   --chart-4: 340 65% 55%;
   --chart-5: 30 80% 55%;
+  --app-font-sans: "IBM Plex Sans", "Inter", "Segoe UI", sans-serif;
+  --app-font-mono: "JetBrains Mono", "Fira Code", "SFMono-Regular", monospace;
+  --app-text-base: 14px;
+  --app-line-height: 1.5;
+  --app-heading-scale: 1.25;
+  --app-letter-spacing-body: 0em;
+  --app-letter-spacing-heading: -0.015em;
+  --app-letter-spacing-code: -0.01em;
+  --app-font-weight-body: 450;
+  --app-font-weight-medium: 500;
+  --app-font-weight-strong: 600;
+  --app-font-weight-heading: 700;
+  --app-font-weight-code: 500;
+  --app-spacing-scale: 1;
+  --app-control-height-sm: 32px;
+  --app-control-height-md: 36px;
+  --app-control-height-lg: 44px;
+  --app-border-width: 1px;
+  --app-radius-sm: 0.375rem;
+  --app-radius-md: 0.5rem;
+  --app-radius-lg: 0.75rem;
+  --app-radius-xl: 1rem;
+  --app-shadow-surface: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --app-shadow-overlay: 0 18px 48px rgba(0, 0, 0, 0.18);
+  --app-motion-scale: 1;
+  --app-motion-duration-fast: 150ms;
+  --app-motion-duration-base: 250ms;
+  --app-motion-duration-slow: 400ms;
+  --app-backdrop-blur: 16px;
 }
 
 .dark {
-  --background: 160 10% 4%;
+  /* Page background is the dark teal-tinted shade that used to live in
+     `--card`. Cards/muted/border each lift one notch from the new base so
+     the surface hierarchy stays the same — just no more near-black. */
+  --background: 160 10% 8%;
   --foreground: 160 20% 98%;
-  --card: 160 10% 7%;
+  --card: 160 10% 11%;
   --card-foreground: 160 20% 98%;
   --primary: 161 72% 45%;
   --primary-foreground: 160 10% 3%;
-  --muted: 160 10% 12%;
+  --muted: 160 10% 16%;
   --muted-foreground: 160 5% 65%;
-  --border: 160 10% 15%;
-  --popover: 160 10% 9%;
+  --border: 160 10% 19%;
+  --popover: 160 10% 13%;
   --popover-foreground: 160 20% 98%;
   --destructive: 0 63% 45%;
   --destructive-foreground: 0 0% 98%;
-  --secondary: 160 10% 12%;
+  --secondary: 160 10% 16%;
   --secondary-foreground: 160 20% 98%;
-  --accent: 160 10% 12%;
+  --accent: 160 10% 16%;
   --accent-foreground: 160 20% 98%;
   --ring: 161 72% 45%;
-  --input: 160 10% 15%;
+  --input: 160 10% 19%;
   --chart-1: 161 72% 45%;
   --chart-2: 280 65% 60%;
   --chart-3: 200 80% 55%;
@@ -91,6 +127,65 @@
 
 * {
   border-color: var(--color-border);
+}
+
+html {
+  font-size: var(--app-text-base);
+}
+
+body {
+  font-family: var(--app-font-sans);
+  font-size: 1rem;
+  line-height: var(--app-line-height);
+  font-weight: var(--app-font-weight-body);
+  letter-spacing: var(--app-letter-spacing-body);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: var(--app-font-weight-heading);
+  letter-spacing: var(--app-letter-spacing-heading);
+  line-height: 1.1;
+}
+
+h1 { font-size: calc(1rem * var(--app-heading-scale) * var(--app-heading-scale) * var(--app-heading-scale)); }
+h2 { font-size: calc(1rem * var(--app-heading-scale) * var(--app-heading-scale)); }
+h3 { font-size: calc(1rem * var(--app-heading-scale)); }
+h4 { font-size: 1rem; }
+h5 { font-size: calc(1rem / var(--app-heading-scale)); }
+h6 { font-size: calc(1rem / var(--app-heading-scale) / var(--app-heading-scale)); }
+
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--app-font-mono);
+  font-weight: var(--app-font-weight-code);
+  letter-spacing: var(--app-letter-spacing-code);
+}
+
+/* ── Canonical Orchestra surface ───────────────────────────────────────────
+   The signature Orchestra card: rounded-xl, real border at 40% opacity,
+   top-down gradient from `--card` to `--muted/20`, heavy soft drop-shadow.
+   Matches the SettingsPage cards exactly. Use `surface` (or `surface p-4`)
+   anywhere we previously reached for a flat panel.                       */
+.surface {
+  border-radius: var(--app-radius-lg);
+  border: var(--app-border-width) solid hsl(var(--border) / 0.4);
+  background-image: linear-gradient(
+    to bottom,
+    hsl(var(--card)),
+    hsl(var(--card)),
+    hsl(var(--muted) / 0.2)
+  );
+  background-color: hsl(var(--card));
+  box-shadow: var(--app-shadow-surface);
+  transition-duration: var(--app-motion-duration-base);
+}
+/* Inner sub-panel (used for nested rows inside a surface) */
+.surface-sub {
+  border-radius: var(--app-radius-md);
+  border: var(--app-border-width) solid hsl(var(--border) / 0.7);
+  background-color: hsl(var(--muted) / 0.5);
 }
 
 /* Restore cursor:pointer on interactive elements (removed in Tailwind v4) */
@@ -159,6 +254,15 @@ body {
   height: 100vh;
   width: 100vw;
   overflow: hidden;
+}
+
+[data-theme-motion="reduce"] *,
+[data-theme-motion="reduce"] *::before,
+[data-theme-motion="reduce"] *::after {
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 1ms !important;
+  scroll-behavior: auto !important;
 }
 
 #root {
@@ -396,68 +500,70 @@ body {
 }
 
 .prose-wiki h1 {
-  font-size: var(--text-4xl);
+  font-size: var(--text-3xl);
   font-weight: 900;
-  letter-spacing: -0.05em;
-  margin-bottom: 2.5rem;
-  padding-bottom: 1.5rem;
+  letter-spacing: -0.04em;
+  margin-top: 0;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
   border-bottom: 1px solid hsl(var(--border) / 0.4);
   color: var(--color-foreground);
 }
 
 .prose-wiki h2 {
-  font-size: var(--text-2xl);
-  font-weight: 700;
+  font-size: var(--text-xl);
+  font-weight: 800;
   letter-spacing: -0.025em;
-  margin-top: 4rem;
-  margin-bottom: 1.5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  color: hsl(var(--foreground) / 0.9);
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  color: hsl(var(--foreground) / 0.95);
 }
 
 .prose-wiki h3 {
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
   font-weight: 700;
-  letter-spacing: -0.025em;
-  margin-top: 2.5rem;
-  margin-bottom: 1rem;
-  color: hsl(var(--foreground) / 0.8);
+  letter-spacing: -0.02em;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: hsl(var(--foreground) / 0.85);
 }
 
 .prose-wiki p {
-  line-height: 1.625;
-  font-size: 15px;
-  margin-bottom: 1.5rem;
+  line-height: 1.6;
+  font-size: 14px;
+  margin-bottom: 0.875rem;
   color: hsl(var(--foreground) / 0.75);
 }
 
 .prose-wiki ul, .prose-wiki ol {
-  margin-top: 1.5rem;
-  margin-bottom: 1.5rem;
-  margin-left: 1.5rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.875rem;
+  margin-left: 1.25rem;
 }
 
 .prose-wiki ul > * + *, .prose-wiki ol > * + * {
-  margin-top: 0.5rem;
+  margin-top: 0.25rem;
 }
 
 .prose-wiki li {
   color: hsl(var(--foreground) / 0.75);
+  line-height: 1.55;
 }
 
 .prose-wiki blockquote {
-  font-style: italic;
-  border-left: 4px solid hsl(var(--primary) / 0.4);
-  padding-left: 2rem;
-  margin-top: 2.5rem;
-  margin-bottom: 2.5rem;
-  padding-top: 1rem;
-  padding-bottom: 1rem;
-  background: hsl(var(--primary) / 0.05);
-  border-radius: 0 1rem 1rem 0;
-  color: hsl(var(--foreground) / 0.8);
+  border-left: 3px solid hsl(var(--primary) / 0.4);
+  padding-left: 1.25rem;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  background: hsl(var(--primary) / 0.04);
+  border-radius: 0 0.5rem 0.5rem 0;
+  color: hsl(var(--foreground) / 0.85);
+}
+
+.prose-wiki hr {
+  display: none;
 }
 
 .prose-wiki strong {

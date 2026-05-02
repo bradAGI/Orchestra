@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -393,7 +395,7 @@ func (s *Server) DeleteProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.db.DeleteProject(r.Context(), projectID); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			writeJSONError(w, http.StatusNotFound, "project_not_found", "project not found")
 			return
 		}
@@ -584,6 +586,229 @@ func walkTree(root, rel string, maxDepth int) ([]FileNode, error) {
 	})
 
 	return nodes, nil
+}
+
+// maxWorkspaceFileBytes caps how much content a single PutWorkspaceFile call
+// can write, preventing memory-exhaustion via unbounded request bodies.
+const maxWorkspaceFileBytes int64 = 32 * 1024 * 1024 // 32 MiB
+
+// resolveWorkspaceFilePath rejects relative paths, symlink escapes, and any
+// candidate that doesn't live inside a registered project root or under the
+// configured workspace/worktree roots. Returns the canonical absolute path on
+// success.
+func (s *Server) resolveWorkspaceFilePath(r *http.Request, candidate string) (string, error) {
+	if candidate == "" || !filepath.IsAbs(candidate) {
+		return "", fmt.Errorf("absolute path required")
+	}
+	abs, err := filepath.Abs(candidate)
+	if err != nil {
+		return "", fmt.Errorf("resolve path: %w", err)
+	}
+
+	roots := []string{}
+	if s.workspaceRoot != "" {
+		roots = append(roots, s.workspaceRoot)
+	}
+	if s.worktreeRoot != "" && s.worktreeRoot != s.workspaceRoot {
+		roots = append(roots, s.worktreeRoot)
+	}
+	if s.db != nil {
+		projects, err := s.db.GetProjects(r.Context())
+		if err == nil {
+			for _, p := range projects {
+				if strings.TrimSpace(p.RootPath) != "" {
+					roots = append(roots, p.RootPath)
+				}
+			}
+		}
+	}
+
+	for _, root := range roots {
+		absRoot, err := filepath.Abs(root)
+		if err != nil {
+			continue
+		}
+		if abs == absRoot {
+			return abs, nil
+		}
+		rel, err := filepath.Rel(absRoot, abs)
+		if err != nil {
+			continue
+		}
+		if rel == "." || (!strings.HasPrefix(rel, "..") && rel != "..") {
+			return abs, nil
+		}
+	}
+	return "", fmt.Errorf("path not allowed: outside registered project or workspace roots")
+}
+
+// GetWorkspaceFile reads a file confined to a registered project / workspace root.
+func (s *Server) GetWorkspaceFile(w http.ResponseWriter, r *http.Request) {
+	absPath, err := s.resolveWorkspaceFilePath(r, r.URL.Query().Get("path"))
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_path", err.Error())
+		return
+	}
+	content, err := os.ReadFile(absPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			writeJSONError(w, http.StatusNotFound, "file_not_found", "file not found")
+			return
+		}
+		writeJSONError(w, http.StatusInternalServerError, "read_failed", "failed to read file")
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Write(content)
+}
+
+// PutWorkspaceFile writes file content, bounded to a registered root and a
+// per-request size cap to prevent memory-exhaustion DoS.
+func (s *Server) PutWorkspaceFile(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	absPath, err := s.resolveWorkspaceFilePath(r, r.URL.Query().Get("path"))
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_path", err.Error())
+		return
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxWorkspaceFileBytes+1))
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "read_failed", "failed to read body")
+		return
+	}
+	if int64(len(body)) > maxWorkspaceFileBytes {
+		writeJSONError(w, http.StatusRequestEntityTooLarge, "body_too_large", fmt.Sprintf("file body exceeds %d bytes", maxWorkspaceFileBytes))
+		return
+	}
+	if err := os.WriteFile(absPath, body, 0o644); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "write_failed", "failed to write file")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "bytes": len(body)})
+}
+
+// PostWorkspaceMkdir creates a directory (and parents) inside a registered root.
+func (s *Server) PostWorkspaceMkdir(w http.ResponseWriter, r *http.Request) {
+	absPath, err := s.resolveWorkspaceFilePath(r, r.URL.Query().Get("path"))
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_path", err.Error())
+		return
+	}
+	if _, err := os.Stat(absPath); err == nil {
+		writeJSONError(w, http.StatusConflict, "path_exists", "path already exists")
+		return
+	}
+	if err := os.MkdirAll(absPath, 0o755); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "mkdir_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// PostWorkspaceRename moves a file or directory.
+// Body: {"from": "...abs...", "to": "...abs..."}
+func (s *Server) PostWorkspaceRename(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		From string `json:"from"`
+		To   string `json:"to"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_body", "invalid JSON body")
+		return
+	}
+	fromAbs, err := s.resolveWorkspaceFilePath(r, body.From)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_path", "from: "+err.Error())
+		return
+	}
+	toAbs, err := s.resolveWorkspaceFilePath(r, body.To)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_path", "to: "+err.Error())
+		return
+	}
+	if _, err := os.Stat(fromAbs); err != nil {
+		writeJSONError(w, http.StatusNotFound, "source_not_found", "source path not found")
+		return
+	}
+	if _, err := os.Stat(toAbs); err == nil {
+		writeJSONError(w, http.StatusConflict, "destination_exists", "destination path already exists")
+		return
+	}
+	if err := os.Rename(fromAbs, toAbs); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "rename_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// DeleteWorkspacePath removes a file or directory inside a registered root.
+func (s *Server) DeleteWorkspacePath(w http.ResponseWriter, r *http.Request) {
+	absPath, err := s.resolveWorkspaceFilePath(r, r.URL.Query().Get("path"))
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_path", err.Error())
+		return
+	}
+	info, err := os.Stat(absPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			writeJSONError(w, http.StatusNotFound, "path_not_found", "path not found")
+			return
+		}
+		writeJSONError(w, http.StatusInternalServerError, "stat_failed", err.Error())
+		return
+	}
+	if info.IsDir() {
+		if err := os.RemoveAll(absPath); err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "remove_failed", err.Error())
+			return
+		}
+	} else {
+		if err := os.Remove(absPath); err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "remove_failed", err.Error())
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// GetWorkspaceTree lists directory contents inside a registered root.
+func (s *Server) GetWorkspaceTree(w http.ResponseWriter, r *http.Request) {
+	absPath, err := s.resolveWorkspaceFilePath(r, r.URL.Query().Get("path"))
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid_path", err.Error())
+		return
+	}
+	entries, err := os.ReadDir(absPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			writeJSONError(w, http.StatusNotFound, "path_not_found", "directory not found")
+			return
+		}
+		writeJSONError(w, http.StatusInternalServerError, "read_failed", "failed to read directory")
+		return
+	}
+	var nodes []FileNode
+	for _, entry := range entries {
+		name := entry.Name()
+		if name == ".git" || name == "node_modules" || name == ".DS_Store" {
+			continue
+		}
+		nodes = append(nodes, FileNode{
+			Name:  name,
+			Path:  name,
+			IsDir: entry.IsDir(),
+		})
+	}
+	sort.Slice(nodes, func(i, j int) bool {
+		if nodes[i].IsDir && !nodes[j].IsDir {
+			return true
+		}
+		if !nodes[i].IsDir && nodes[j].IsDir {
+			return false
+		}
+		return nodes[i].Name < nodes[j].Name
+	})
+	writeJSON(w, http.StatusOK, nodes)
 }
 
 func (s *Server) GetProjectGitStatus(w http.ResponseWriter, r *http.Request) {

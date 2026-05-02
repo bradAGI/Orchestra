@@ -19,6 +19,7 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/orchestrator"
 	"github.com/orchestra/orchestra/apps/backend/internal/staticassets"
 	"github.com/orchestra/orchestra/apps/backend/internal/terminal"
+	"github.com/orchestra/orchestra/apps/backend/internal/usage"
 	"github.com/rs/zerolog"
 )
 
@@ -34,6 +35,7 @@ type Server struct {
 	db            *db.DB
 	config        *config.Config
 	termManager   *terminal.Manager
+	usageService  *usage.Service
 }
 
 // NewRouter creates an http.Handler with the full API route table, using only
@@ -43,7 +45,7 @@ func NewRouter(
 	orchestratorService *orchestrator.Service,
 	cfg *config.Config,
 ) http.Handler {
-	return NewRouterWithPubSub(logger, orchestratorService, cfg, nil, nil, nil)
+	return NewRouterWithPubSub(logger, orchestratorService, cfg, nil, nil, nil, nil)
 }
 
 // NewRouterWithPubSub creates an http.Handler with the full API route table and
@@ -56,6 +58,7 @@ func NewRouterWithPubSub(
 	pubsub *observability.PubSub,
 	warehouseDB *db.DB,
 	termManager *terminal.Manager,
+	usageService *usage.Service,
 ) http.Handler {
 	if termManager == nil {
 		termManager = terminal.NewManager()
@@ -70,6 +73,7 @@ func NewRouterWithPubSub(
 		db:            warehouseDB,
 		config:        cfg,
 		termManager:   termManager,
+		usageService:  usageService,
 	}
 	r := chi.NewRouter()
 
@@ -190,6 +194,16 @@ func NewRouterWithPubSub(
 
 	r.Get("/api/v1/terminal/{session_id}", server.TerminalWebSocket)
 
+	if usageService != nil {
+		NewUsageHandlers(usageService).Register(protected)
+	}
+
+	protected.Get("/api/v1/workspace/file", server.GetWorkspaceFile)
+	protected.Put("/api/v1/workspace/file", server.PutWorkspaceFile)
+	protected.Get("/api/v1/workspace/tree", server.GetWorkspaceTree)
+	protected.Post("/api/v1/workspace/dir", server.PostWorkspaceMkdir)
+	protected.Post("/api/v1/workspace/rename", server.PostWorkspaceRename)
+	protected.Delete("/api/v1/workspace/path", server.DeleteWorkspacePath)
 	protected.Get("/api/v1/projects", server.GetProjects)
 	protected.Post("/api/v1/projects", server.CreateProject)
 	protected.Get("/api/v1/projects/{project_id}/file", server.GetProjectFileContent)
@@ -239,24 +253,9 @@ func NewRouterWithPubSub(
 	protected.Get("/api/v1/warehouse/stats", server.GetWarehouseStats)
 	protected.Get("/api/v1/telemetry/health", server.GetTelemetryHealth)
 
-	// Analytics endpoints
-	protected.Get("/api/v1/analytics/daily", server.GetAnalyticsDaily)
-	protected.Get("/api/v1/analytics/cost", server.GetAnalyticsCost)
-	protected.Get("/api/v1/analytics/cost/optimization", server.GetCostOptimization)
-	protected.Get("/api/v1/analytics/performance", server.GetAnalyticsPerformance)
-	protected.Get("/api/v1/analytics/rate-limits", server.GetRateLimits)
-	protected.Get("/api/v1/analytics/productivity", server.GetAnalyticsProductivity)
-	protected.Get("/api/v1/analytics/productivity/sessions", server.GetProductivitySessions)
-	protected.Get("/api/v1/analytics/budgets", server.GetBudgets)
-	protected.Post("/api/v1/analytics/budgets", server.PostBudget)
-	protected.Delete("/api/v1/analytics/budgets/{id}", server.DeleteBudget)
-	protected.Post("/api/v1/analytics/external/sync", server.PostExternalSync)
-	protected.Get("/api/v1/analytics/external/status", server.GetExternalStatus)
-	protected.Get("/api/v1/analytics/external/reconcile", server.GetExternalReconcile)
-
-	// External analytics — frontend uses shorter paths
-	protected.Get("/api/v1/external/status", server.GetExternalStatus)
-	protected.Get("/api/v1/external/reconcile", server.GetExternalReconcile)
+	// Legacy analytics endpoints — replaced by /api/v1/usage/*. The handlers
+	// were removed; the routes are intentionally absent so callers fail fast
+	// instead of getting cost-heuristic guesses.
 	oauthRateLimited := r.With(RateLimit(5, 10))
 	oauthRateLimited.Get("/api/v1/github/login", server.HandleGitHubLogin)
 	oauthRateLimited.Get("/api/v1/github/callback", server.HandleGitHubCallback)
@@ -372,14 +371,26 @@ func contentTypeGuard(next http.Handler) http.Handler {
 // writeJSONError writes a structured JSON error response with the given HTTP
 // status code, machine-readable error code, and human-readable message.
 func writeJSONError(w http.ResponseWriter, status int, code string, message string) {
+	writeJSONErrorWithDetails(w, status, code, message, nil)
+}
+
+// writeJSONErrorWithDetails is the same as writeJSONError but attaches an
+// arbitrary `details` object alongside the error envelope. Use sparingly —
+// only when the client genuinely needs partial state (e.g., refresh that
+// completed for some files and failed for others).
+func writeJSONErrorWithDetails(w http.ResponseWriter, status int, code, message string, details map[string]any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(map[string]any{
+	envelope := map[string]any{
 		"error": map[string]string{
 			"code":    code,
 			"message": message,
 		},
-	}); err != nil {
+	}
+	if details != nil {
+		envelope["details"] = details
+	}
+	if err := json.NewEncoder(w).Encode(envelope); err != nil {
 		// Response already started; nothing else to do but log would be ideal.
 		// Caller's logger is unavailable here; this is a best-effort path.
 		_, _ = w.Write([]byte(`{"error":{"code":"encode_error","message":"failed to encode error response"}}`))

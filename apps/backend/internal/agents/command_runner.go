@@ -351,7 +351,11 @@ func (r *CommandRunner) runInPTY(
 	// but for an active turn, we only care about the new output triggered by our prompt.
 	// However, parsing logic expects full SSE streams.
 
-	done := make(chan bool)
+	// Buffered: handler may signal completion multiple times (multiple match
+	// patterns can fire for the same logical end-of-turn). The select-default
+	// at the send site already drops extras; the buffer guarantees the first
+	// signal never blocks even if no reader has parked yet.
+	done := make(chan bool, 1)
 	var streamErr error
 	var streamErrMu sync.Mutex
 
@@ -675,6 +679,20 @@ func extractKind(provider Provider, source string, payload map[string]any) strin
 	if provider == ProviderGemini {
 		if eventType := firstString(payload, "type", "event"); eventType != "" {
 			return eventType
+		}
+	}
+
+	if provider == Provider8gent {
+		if eventType := firstString(payload, "type"); eventType != "" {
+			switch eventType {
+			case "session_start", "assistant", "tool_use", "tool_result":
+				return eventType
+			case "result", "error":
+				if subtype := firstString(payload, "subtype"); subtype != "" {
+					return eventType + "/" + subtype
+				}
+				return eventType
+			}
 		}
 	}
 

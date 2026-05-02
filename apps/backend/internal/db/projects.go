@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -206,6 +207,11 @@ func (db *DB) GetUnifiedHistory(ctx context.Context, issueID string) ([]map[stri
 }
 
 // Project represents a registered codebase with optional GitHub integration credentials.
+//
+// GitHubToken is intentionally tagged with `json:"-"` so the raw secret never
+// ships to API clients. MarshalJSON below emits a fixed sentinel ("<set>" /
+// "") so callers can still tell whether the project is GitHub-connected
+// without seeing the token value.
 type Project struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -213,8 +219,36 @@ type Project struct {
 	RemoteURL   string `json:"remote_url"`
 	GitHubOwner string `json:"github_owner"`
 	GitHubRepo  string `json:"github_repo"`
-	GitHubToken string `json:"github_token"`
+	GitHubToken string `json:"-"`
 	PathExists  bool   `json:"path_exists"`
+}
+
+// GitHubTokenRedactedSentinel is what API clients see in place of a configured
+// GitHub token. Treat as opaque and truthy ("connected") only; never as the
+// real secret.
+const GitHubTokenRedactedSentinel = "<set>"
+
+// MarshalJSON serializes Project to the wire format expected by API clients,
+// replacing GitHubToken with a redacted sentinel.
+func (p Project) MarshalJSON() ([]byte, error) {
+	type wire struct {
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		RootPath    string `json:"root_path"`
+		RemoteURL   string `json:"remote_url"`
+		GitHubOwner string `json:"github_owner"`
+		GitHubRepo  string `json:"github_repo"`
+		GitHubToken string `json:"github_token"`
+		PathExists  bool   `json:"path_exists"`
+	}
+	w := wire{
+		ID: p.ID, Name: p.Name, RootPath: p.RootPath, RemoteURL: p.RemoteURL,
+		GitHubOwner: p.GitHubOwner, GitHubRepo: p.GitHubRepo, PathExists: p.PathExists,
+	}
+	if p.GitHubToken != "" {
+		w.GitHubToken = GitHubTokenRedactedSentinel
+	}
+	return json.Marshal(w)
 }
 
 // ProjectStats holds aggregate telemetry metrics for a project.

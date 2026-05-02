@@ -176,17 +176,18 @@ func (s *Service) DeregisterCancel(issueID string, provider string) {
 }
 
 // StopSession cancels the active run for the given issue, returning true if a
-// cancellation was triggered.
+// cancellation was triggered. Both the lookup and the cancel() call happen
+// under the mutex so a concurrent DeregisterCancel can't drop the func before
+// we invoke it. cancel() itself is non-blocking (it just signals the context).
 func (s *Service) StopSession(issueID string, provider string) bool {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	cancel, ok := s.cancels[issueID]
-	s.mu.Unlock()
-
-	if ok && cancel != nil {
-		cancel()
-		return true
+	if !ok || cancel == nil {
+		return false
 	}
-	return false
+	cancel()
+	return true
 }
 
 // StopAllSessionsForIssue cancels every active session for the given issue and
