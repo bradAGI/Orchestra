@@ -23,6 +23,7 @@ export function useContextSuggestions(
   activeSection: string,
   selectedIssueId?: string,
   selectedProjectId?: string,
+  isPanelOpen = false,
 ) {
   const [suggestions, setSuggestions] = useState<ContextSuggestion[]>([])
   const [enabled, setEnabled] = useState(() => {
@@ -52,7 +53,7 @@ export function useContextSuggestions(
   }, [])
 
   useEffect(() => {
-    if (!enabled || !config) return
+    if (!enabled || !config || !isPanelOpen) return
     if (activeSection === lastSectionRef.current) return
 
     const now = Date.now()
@@ -148,7 +149,7 @@ export function useContextSuggestions(
     }
 
     void generateSuggestions()
-  }, [enabled, config, activeSection, selectedProjectId])
+  }, [enabled, config, isPanelOpen, activeSection, selectedProjectId])
 
   const visibleSuggestions = suggestions.filter((s) => !s.dismissed)
 

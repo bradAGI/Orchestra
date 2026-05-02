@@ -209,16 +209,19 @@ export function IssueDetailView({
     fetchIssueHistory(config, identifier)
       .then(setIssueHistory)
       .catch(() => setIssueHistory([]))
+  }, [config, identifier, localState])
 
-    // Poll history every 15s while agent is running so plan updates live
-    if (!isRunning) return
-    const interval = setInterval(() => {
+  // Refresh history when orchestrator data changes (SSE-driven, no polling)
+  useEffect(() => {
+    const handler = () => {
+      if (!config || !identifier || localState === 'Backlog') return
       fetchIssueHistory(config, identifier)
         .then(setIssueHistory)
         .catch(() => {})
-    }, 15000)
-    return () => clearInterval(interval)
-  }, [config, identifier, isRunning, localState])
+    }
+    window.addEventListener('orchestra-data-changed', handler)
+    return () => window.removeEventListener('orchestra-data-changed', handler)
+  }, [config, identifier, localState])
 
   // Fetch tab-specific data
   useEffect(() => {

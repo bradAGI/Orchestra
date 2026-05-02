@@ -8,7 +8,6 @@ import type { DocItem, BackendConfig } from '@core/api/types'
 import { Button } from '@ui/button'
 import { Skeleton } from '@ui/skeleton'
 import { fetchDocs, fetchDocContent } from '@core/api/client'
-import { OverlayScrollbarsComponent, type OverlayScrollbarsComponentRef } from 'overlayscrollbars-react'
 import { MarkdownRenderer } from '@ui/MarkdownRenderer'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -50,12 +49,7 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['plans', 'specs']))
     const [toc, setToc] = useState<{ id: string, text: string, level: number }[]>([])
     
-    const scrollRef = useRef<OverlayScrollbarsComponentRef<'div'> | null>(null)
-
-    const osOptions = useMemo(() => ({
-        scrollbars: { autoHide: 'move' as const, theme: 'os-theme-custom' },
-        overflow: { x: 'hidden' as const, y: 'scroll' as const }
-    }), [])
+    const scrollRef = useRef<HTMLDivElement | null>(null)
 
     const loadDocs = async () => {
         if (!config) return
@@ -105,13 +99,7 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
             setContent(text)
             generateToc(text)
             // Scroll to top
-            if (scrollRef.current) {
-                const instance = scrollRef.current.osInstance()
-                if (instance) {
-                    const { viewport } = instance.elements()
-                    viewport.scrollTo({ top: 0, behavior: 'smooth' })
-                }
-            }
+            scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
         } catch (_err) {
             setContent('# Error\nFailed to load document content.')
         } finally {
@@ -424,11 +412,7 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
                             </button>
                         </AppTooltip>
                     </div>
-                    <OverlayScrollbarsComponent
-                        element="div"
-                        options={osOptions}
-                        className="flex-1 min-h-0"
-                    >
+                    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
                         <div className="px-3 pb-6 flex flex-col gap-0.5">
                             {loading && docs.length === 0 ? (
                                 [1, 2, 3, 4, 5, 6, 7].map(i => <Skeleton key={i} className="h-9 w-full rounded-md bg-muted/20" />)
@@ -440,15 +424,13 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
                                 </div>
                             ) : renderTree(filteredDocs)}
                         </div>
-                    </OverlayScrollbarsComponent>
+                    </div>
                 </div>
 
                 {/* Main Content Area */}
                 <div className="flex-1 flex flex-col min-h-0 relative">
-                    <OverlayScrollbarsComponent
-                        element="div"
-                        options={osOptions}
-                        className="flex-1 min-h-0"
+                    <div
+                        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
                         ref={scrollRef}
                     >
                         <div className="px-10 pt-6 pb-12 max-w-4xl mx-auto flex flex-col text-left">
@@ -479,18 +461,12 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
                                 </div>
                             )}
                         </div>
-                    </OverlayScrollbarsComponent>
+                    </div>
 
                     {/* Back to top */}
                     <button
                         onClick={() => {
-                            if (scrollRef.current) {
-                                const instance = scrollRef.current.osInstance()
-                                if (instance) {
-                                    const { viewport } = instance.elements()
-                                    viewport.scrollTo({ top: 0, behavior: 'smooth' })
-                                }
-                            }
+                            scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
                         }}
                         className="absolute bottom-6 right-6 h-9 w-9 rounded-md bg-muted/40 text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 grid place-items-center transition-colors"
                         title="Back to top"
@@ -505,11 +481,7 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
                         <h2 className="text-[15px] font-black tracking-tight leading-none">On this page</h2>
                     </div>
 
-                    <OverlayScrollbarsComponent
-                        element="div"
-                        options={osOptions}
-                        className="flex-1 min-h-0"
-                    >
+                    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
                         <div className="px-3 pb-6">
                             {toc.length === 0 ? (
                                 <p className="px-3 py-4 text-[11px] text-muted-foreground/50">No headings</p>
@@ -531,7 +503,7 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
                                 </nav>
                             )}
                         </div>
-                    </OverlayScrollbarsComponent>
+                    </div>
                 </div>
             </div>
         </div>

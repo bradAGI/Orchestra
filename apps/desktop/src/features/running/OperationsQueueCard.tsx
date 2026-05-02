@@ -1,6 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Activity, AppWindow, Circle, CircleDashed, Cpu, RefreshCcw } from 'lucide-react'
-import { OverlayScrollbarsComponent } from 'overlayscrollbars-react'
 
 import { CustomDropdown } from '@layout/shared/controls'
 import { AppTooltip } from '@ui/tooltip-wrapper'
@@ -76,10 +75,6 @@ export function OperationsQueueCard({
     return laneMatch && stateMatch
   })
 
-  const osOptions = useMemo(() => ({
-    scrollbars: { autoHide: 'move' as const, theme: 'os-theme-custom' },
-    overflow: { x: 'hidden' as const, y: 'scroll' as const },
-  }), [])
 
   return (
     <Card className="group relative border bg-gradient-to-b from-card via-card to-muted/20 shadow-lg flex flex-col h-full overflow-hidden">
@@ -138,11 +133,7 @@ export function OperationsQueueCard({
         </div>
       </CardHeader>
       <CardContent className="flex-1 min-h-0 pb-4">
-        <OverlayScrollbarsComponent
-          element="div"
-          options={osOptions}
-          className="rounded-xl border border-border/40 bg-muted/5 shadow-inner h-full custom-scrollbar"
-        >
+        <div className="rounded-xl border border-border/40 bg-muted/5 shadow-inner h-full overflow-y-auto overflow-x-hidden custom-scrollbar">
           <Table className="relative">
             <TableHeader className="bg-muted/30 sticky top-0 z-10">
               <TableRow className="hover:bg-transparent">
@@ -220,7 +211,7 @@ export function OperationsQueueCard({
                   ))}
             </TableBody>
           </Table>
-        </OverlayScrollbarsComponent>
+        </div>
       </CardContent>
     </Card>
   )

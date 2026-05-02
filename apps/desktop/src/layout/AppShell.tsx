@@ -1,5 +1,4 @@
 import type { ComponentProps, ReactNode } from 'react'
-import { OverlayScrollbarsComponent } from 'overlayscrollbars-react'
 import { SidebarNav } from '@layout/sidebar-nav'
 import { TopBar } from '@layout/top-bar'
 import type { SidebarItem } from '@layout/types'
@@ -11,7 +10,6 @@ type AppShellProps = {
   sidebarCollapsed: boolean
   sidebarWidth: number
   onToggleCollapsed: () => void
-  osOptions: ComponentProps<typeof OverlayScrollbarsComponent>['options']
   topBarProps: ComponentProps<typeof TopBar>
   flushContent?: boolean
   bottomBar?: ReactNode
@@ -25,7 +23,6 @@ export function AppShell({
   sidebarCollapsed,
   sidebarWidth,
   onToggleCollapsed,
-  osOptions,
   topBarProps,
   flushContent,
   bottomBar,
@@ -46,11 +43,7 @@ export function AppShell({
           sidebarWidth={sidebarWidth}
         />
 
-        <OverlayScrollbarsComponent
-          element="main"
-          options={osOptions}
-          className="min-w-0 flex-1 bg-background h-full flex flex-col"
-        >
+        <main className="min-w-0 flex-1 bg-background h-full flex flex-col overflow-y-auto overflow-x-hidden">
           {fullBleed ? (
             <div className="w-full flex flex-col h-full min-h-0">
               {children}
@@ -63,7 +56,7 @@ export function AppShell({
               </div>
             </div>
           )}
-        </OverlayScrollbarsComponent>
+        </main>
       </div>
       {bottomBar}
     </div>

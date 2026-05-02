@@ -33,7 +33,7 @@ export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selec
   const sendMessageRef = useRef<((text: string) => Promise<void>) | null>(null)
 
   // Tier 3: Watch mode
-  const watchMode = useWatchMode(config)
+  const watchMode = useWatchMode(config, isPanelOpen)
 
   // Tier 3: Scheduler
   const scheduler = useScheduler(
@@ -48,7 +48,7 @@ export function EmbeddedAgentProvider({ config, onNavigate, activeSection, selec
   )
 
   // Tier 3: Context-aware suggestions
-  const contextSuggestions = useContextSuggestions(config, activeSection || '', undefined, selectedProjectId)
+  const contextSuggestions = useContextSuggestions(config, activeSection || '', undefined, selectedProjectId, isPanelOpen)
 
   const tools = useMemo(() => {
     const orchestraTools = config ? createOrchestraTools(config) : {}

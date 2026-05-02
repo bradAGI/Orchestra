@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   CircleDashed,
   Folder,
@@ -12,7 +12,6 @@ import {
   ClipboardList,
   Trash2,
 } from 'lucide-react'
-import { OverlayScrollbarsComponent } from 'overlayscrollbars-react'
 
 import { Button } from '@ui/button'
 import { Card } from '@ui/card'
@@ -92,10 +91,6 @@ export function KanbanBoard({
   const [columnOrder, setColumnOrder] = useState<string[]>(['backlog', 'todo', 'progress', 'review', 'done'])
   const [draggingColumnId, setDraggingColumnId] = useState<string | null>(null)
 
-  const osOptions = useMemo(() => ({
-    scrollbars: { autoHide: 'move' as const, theme: 'os-theme-custom' },
-    overflow: { x: 'hidden' as const, y: 'scroll' as const },
-  }), [])
 
   useEffect(() => {
     if (projects.length === 1) {
@@ -435,11 +430,7 @@ export function KanbanBoard({
                   : 'surface'
               }`}>
                 <div className={`absolute top-0 left-0 right-0 h-[3px] ${column.accent}`} />
-                <OverlayScrollbarsComponent
-                  element="div"
-                  options={osOptions}
-                  className="flex-1 flex flex-col gap-2 p-2 min-h-0"
-                >
+                <div className="flex-1 flex flex-col gap-2 p-2 min-h-0 overflow-y-auto overflow-x-hidden">
                 {loadingState ? (
                   Array.from({ length: 3 }).map((_, idx) => <Skeleton key={idx} className="h-24 w-full rounded-md" />)
                 ) : column.items.length === 0 ? (
@@ -565,7 +556,7 @@ export function KanbanBoard({
                     )
                   })
                 )}
-                </OverlayScrollbarsComponent>
+                </div>
               </div>
             </div>
           ))}

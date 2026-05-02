@@ -1,61 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, Cpu, Database, FileText, FolderTree, ListTodo, Settings2, Terminal } from 'lucide-react'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 import {
-  IssueDetailView,
-  CreateTaskDialog,
-  CreateProjectDialog,
-  SettingsPage,
-} from '@layout/panels'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@ui/dialog'
-import { Skeleton } from '@ui/skeleton'
-import {
-  fetchAgentConfig,
-  fetchAgents,
-  fetchIssues,
-  fetchProjectStats,
-  fetchProjects,
-  fetchState,
-  fetchWarehouseStats,
-  isUnauthorizedError,
-  normalizeEventEnvelope,
-  normalizeSnapshotPayload,
-  postRefresh,
-  updateAgentConfig,
-  patchAgentConfig,
   searchIssues,
-  stopIssueSession,
   toDisplayError,
-  updateIssue,
-  createProject,
-  createIssue,
-  deleteProject,
-  deleteIssue,
-  fetchSessionDetail,
-  fetchMCPTools,
-  fetchProjectGitHubIssues,
-  createProjectGitHubIssue,
-  updateProjectGitHubIssue,
-  type IssueCreatePayload,
-  type IssueUpdatePayload,
-  type IssueListItem,
+  isUnauthorizedError,
+  type BackendConfig,
 } from '@core/api/client'
-import { startRuntimeSync } from '@core/sync/runtime-sync'
-import { applySnapshotUpdate } from '@core/sync/runtime-store'
-import type { Project, ProjectStats, SessionDetail, SessionSummary } from '@core/api/types'
+import type { SessionSummary } from '@core/api/types'
 import { ProjectGrid } from '@features/projects/ProjectGrid'
 import { ProjectDetailView } from '@features/projects/ProjectDetailView'
 import { UsagePage } from '@features/usage/UsagePage'
 import { UsageStatusBar } from '@features/usage/UsageStatusBar'
-import { SessionDetailView } from '@features/usage/SessionDetailView'
-import { AgentsDashboard } from '@features/agents/AgentsDashboard'
-import { DocsDashboard } from '@features/docs/DocsDashboard'
-import { SandboxDashboard } from '@features/sandbox/SandboxDashboard'
 import { TerminalMultiplexer } from '@features/terminal/TerminalMultiplexer'
 import { AppShell } from '@layout/AppShell'
 import {
@@ -66,15 +20,33 @@ import {
   type SectionID,
 } from '@layout/sections'
 import { KanbanBoard } from '@features/kanban'
-import type { IssueDetailResult } from '@features/issue-detail/types'
-import { Command } from 'cmdk'
-import type { BackendConfig } from '@core/api/client'
 import { AppTooltipProvider } from '@ui/tooltip-wrapper'
 import { SectionErrorBoundary } from '@ui/section-error-boundary'
 import { EmbeddedAgentWidget } from '@features/embedded-agent'
-import { useBackendConfig, useNotifications, useIssueLookup, useWorkspaceMigration } from '@/hooks'
+import { AppCommandPalette } from '@layout/AppCommandPalette'
+import { AppDialogs } from '@layout/AppDialogs'
+import {
+  useBackendConfig,
+  useNotifications,
+  useIssueLookup,
+  useWorkspaceMigration,
+  useAppSync,
+  useIssueActions,
+  useProjectActions,
+  useBackendProfiles,
+} from '@/hooks'
 import { useAppStore } from '@core/store'
-import { WorkspaceLayout } from '@features/workspace/WorkspaceLayout'
+
+// Lazy-loaded heavy sections
+const AgentsDashboard = lazy(() => import('@features/agents/AgentsDashboard').then(m => ({ default: m.AgentsDashboard })))
+const DocsDashboard = lazy(() => import('@features/docs/DocsDashboard').then(m => ({ default: m.DocsDashboard })))
+const SettingsPage = lazy(() => import('@layout/panels').then(m => ({ default: m.SettingsPage })))
+const WorkspaceLayout = lazy(() => import('@features/workspace/WorkspaceLayout').then(m => ({ default: m.WorkspaceLayout })))
+const SandboxDashboard = lazy(() => import('@features/sandbox/SandboxDashboard').then(m => ({ default: m.SandboxDashboard })))
+
+const SectionLoader = () => (
+  <div className="flex-1 grid place-items-center text-muted-foreground text-sm">Loading…</div>
+)
 
 /** Root application component that manages backend sync, navigation, and top-level UI state. */
 export default function App() {
@@ -102,18 +74,10 @@ export default function App() {
       return undefined
     }
   }, [modeOverride, reapplyTheme])
+
   const activeSection = useAppStore(s => s.activeSection)
   const setActiveSection = useAppStore(s => s.setActiveSection)
   const sidebarCollapsed = useAppStore(s => s.sidebarCollapsed)
-  const setSidebarCollapsed = useAppStore(s => s.setSidebarCollapsed)
-  const paletteOpen = useAppStore(s => s.paletteOpen)
-  const setPaletteOpen = useAppStore(s => s.setPaletteOpen)
-  const inspectDialogOpen = useAppStore(s => s.inspectDialogOpen)
-  const setInspectDialogOpen = useAppStore(s => s.setInspectDialogOpen)
-  const sessionInspectDialogOpen = useAppStore(s => s.sessionInspectDialogOpen)
-  const setSessionInspectDialogOpen = useAppStore(s => s.setSessionInspectDialogOpen)
-  const createTaskDialogOpen = useAppStore(s => s.createTaskDialogOpen)
-  const createProjectDialogOpen = useAppStore(s => s.createProjectDialogOpen)
   const setCreateProjectDialogOpen = useAppStore(s => s.setCreateProjectDialogOpen)
   const settingsInitialTab = useAppStore(s => s.settingsInitialTab)
   const setSettingsInitialTab = useAppStore(s => s.setSettingsInitialTab)
@@ -121,44 +85,25 @@ export default function App() {
   const setActivePeriod = useAppStore(s => s.setActivePeriod)
 
   const snapshot = useAppStore(s => s.snapshot)
-  const setSnapshot = useAppStore(s => s.setSnapshot)
   const timeline = useAppStore(s => s.timeline)
   const loadingState = useAppStore(s => s.loadingState)
-  const setLoadingState = useAppStore(s => s.setLoadingState)
   const statusMessage = useAppStore(s => s.statusMessage)
-  const setStatusMessage = useAppStore(s => s.setStatusMessage)
   const usePolling = useAppStore(s => s.usePolling)
-  const setUsePolling = useAppStore(s => s.setUsePolling)
   const refreshPending = useAppStore(s => s.refreshPending)
-  const setRefreshPending = useAppStore(s => s.setRefreshPending)
 
   const boardIssues = useAppStore(s => s.boardIssues)
-  const setBoardIssues = useAppStore(s => s.setBoardIssues)
-  const setGithubBacklogIssues = useAppStore(s => s.setGithubBacklogIssues)
   const allBoardIssues = useAppStore(s => s.allBoardIssues)
 
   const projects = useAppStore(s => s.projects)
-  const setProjects = useAppStore(s => s.setProjects)
   const projectStats = useAppStore(s => s.projectStats)
-  const setProjectStats = useAppStore(s => s.setProjectStats)
-  const warehouseStats = useAppStore(s => s.warehouseStats)
-  const setWarehouseStats = useAppStore(s => s.setWarehouseStats)
   const selectedProjectID = useAppStore(s => s.selectedProjectID)
   const setSelectedProjectID = useAppStore(s => s.setSelectedProjectID)
   const dataLoading = useAppStore(s => s.dataLoading)
-  const setDataLoading = useAppStore(s => s.setDataLoading)
 
   const agentConfig = useAppStore(s => s.agentConfig)
-  const setAgentConfig = useAppStore(s => s.setAgentConfig)
   const availableAgents = useAppStore(s => s.availableAgents)
-  const setAvailableAgents = useAppStore(s => s.setAvailableAgents)
-  const allTools = useAppStore(s => s.allTools)
-  const setAllTools = useAppStore(s => s.setAllTools)
-
   const openTerminals = useAppStore(s => s.openTerminals)
   const setOpenTerminals = useAppStore(s => s.setOpenTerminals)
-
-  const createTaskInitialState = useAppStore(s => s.createTaskInitialState)
 
   // ---------------------------------------------------------------------------
   // Custom hooks (bridged to store where needed)
@@ -185,15 +130,14 @@ export default function App() {
     storeSetConfig(cfg)
   }
 
+  const setStatusMessage = useAppStore(s => s.setStatusMessage)
+
   const {
     notifSound, setNotifSound,
     notifMuted, setNotifMuted,
     notifVolume, setNotifVolume,
     playNotification,
   } = useNotifications()
-
-  const syncControls = useRef<{ startPolling: () => void; stopPolling: () => void } | null>(null)
-  const lastIssueFetchRef = useRef(0)
 
   const setOperatorError = (prefix: string, err: unknown) => {
     const message = toDisplayError(err)
@@ -220,12 +164,69 @@ export default function App() {
     handleMigrationApply,
   } = useWorkspaceMigration(config, setStatusMessage, setOperatorError)
 
-  const [sessionLookupResult, setSessionLookupResult] = useState<SessionDetail | null>(null)
-  const [sessionLookupPending, setSessionLookupPending] = useState(false)
-  const [sessionLookupError, setSessionLookupError] = useState('')
+  // ---------------------------------------------------------------------------
+  // Extracted hooks
+  // ---------------------------------------------------------------------------
+  const { handleRefresh, handleTogglePolling, generatedAt } = useAppSync(config, {
+    issueLookupId,
+    executeIssueLookup,
+    playNotification,
+    setErrorMessage,
+  })
 
-  const handleRefreshRef = useRef<(() => Promise<void>) | null>(null)
+  // Keep a ref so keyboard shortcuts can always call the latest handleRefresh
+  const handleRefreshRef = useRef(handleRefresh)
+  handleRefreshRef.current = handleRefresh
 
+  const {
+    handleIssueUpdate,
+    handleStopSession,
+    handleCreateIssue,
+    handleTaskSubmit,
+    handleIssueDelete,
+    handleInspectIssueFromList,
+    handleInspectSession,
+    sessionLookupResult,
+    sessionLookupPending,
+    sessionLookupError,
+  } = useIssueActions(config, {
+    onRefresh: handleRefresh,
+    executeIssueLookup,
+    issueLookupId,
+    setIssueLookupId,
+    setIssueLookupResult,
+    setIssueLookupError,
+    setIssueLookupPending,
+    setErrorMessage,
+    setStatusMessage,
+  })
+
+  const { handleAddProject, handleDeleteProject, refreshProjectsAndStats } = useProjectActions(
+    config,
+    activeSection,
+    { setErrorMessage, setStatusMessage },
+  )
+
+  const {
+    handleBackendConfigSave,
+    handleSetActiveProfile,
+    handleCreateProfile,
+    handleDeleteProfile,
+    handleAgentConfigSave,
+  } = useBackendProfiles(config, {
+    setConfig,
+    setErrorMessage,
+    setStatusMessage,
+    savingConfig,
+    setSavingConfig,
+    setBackendProfiles,
+    setActiveProfileId,
+    setProfilesPending,
+  })
+
+  // ---------------------------------------------------------------------------
+  // Keyboard shortcuts
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
@@ -240,37 +241,31 @@ export default function App() {
         e.preventDefault()
         useAppStore.getState().toggleSidebar()
       }
-      // Cmd+Shift+B — open browser tab
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'b') {
         e.preventDefault()
         useAppStore.getState().openBrowserTab()
         return
       }
-      // Cmd+Shift+E — switch to explorer panel
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'e') {
         e.preventDefault()
         useAppStore.getState().setActiveLeftPanel('explorer')
         return
       }
-      // Cmd+Shift+F — switch to search panel
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
         e.preventDefault()
         useAppStore.getState().setActiveLeftPanel('search')
         return
       }
-      // Cmd+B — toggle left sidebar (when in CONSOLE section)
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'b') {
         e.preventDefault()
         useAppStore.getState().toggleLeftSidebar()
         return
       }
-      // Cmd+L — toggle right sidebar
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'l') {
         e.preventDefault()
         useAppStore.getState().toggleRightSidebar()
         return
       }
-      // Ctrl+1-8 tab switching (fallback for non-Electron)
       if (e.ctrlKey && !e.altKey && !e.shiftKey) {
         const num = parseInt(e.key, 10)
         if (!isNaN(num) && num >= 1 && num <= sidebarItems.length) {
@@ -295,8 +290,9 @@ export default function App() {
     }
   }, [])
 
-  // Projects & Warehouse State — now from store
-
+  // ---------------------------------------------------------------------------
+  // Terminal handlers
+  // ---------------------------------------------------------------------------
   const handleCloseTerminal = (id: string) => {
     setOpenTerminals(openTerminals.filter(t => t.id !== id))
   }
@@ -311,9 +307,7 @@ export default function App() {
   }
 
   const handleSectionChange = (section: string) => {
-    if (!isSectionID(section)) {
-      return
-    }
+    if (!isSectionID(section)) return
     setActiveSection(section)
   }
 
@@ -323,744 +317,17 @@ export default function App() {
     setActiveSection('ISSUES')
   }
 
-  const sidebarWidth = sidebarCollapsed ? 64 : 248
-  const sectionVisibility = getSectionVisibility(activeSection)
-  const currentSectionMeta = getCurrentSectionMeta(activeSection)
-
-  const osOptions = useMemo(() => ({
-    scrollbars: { autoHide: 'move' as const, theme: 'os-theme-custom' },
-    overflow: { x: 'hidden' as const, y: 'scroll' as const }
-  }), [])
-
-  // Note: dark-class toggling and OS theme tracking are handled by reapplyTheme() above.
-  // The duplicate effects that were here created an infinite update loop.
-
-  useEffect(() => {
-    if (!config) return
-
-    let mounted = true
-
-    // Non-blocking metadata fetches
-    fetchAgentConfig(config)
-      .then(cfg => mounted && setAgentConfig(cfg))
-      .catch(() => mounted && setAgentConfig(null))
-    if (config) {
-      fetchAgents(config)
-        .then(agents => mounted && setAvailableAgents(agents))
-        .catch(() => mounted && setAvailableAgents([]))
-
-      fetchMCPTools(config)
-        .then(tools => mounted && setAllTools(tools))
-        .catch(() => mounted && setAllTools([]))
-    }
-    // Section-specific data loading with global loading state
-    const loadRequiredData = async () => {
-      // Always fetch projects if we have none yet
-      // Always load projects - needed for task inspector project name resolution
-      const needsProjects = true
-      const needsWarehouse = activeSection === 'WAREHOUSE'
-
-      if (!needsProjects && !needsWarehouse) return
-
-      setDataLoading(true)
-      try {
-        if (needsProjects) {
-          const projs = await fetchProjects(config)
-          if (!mounted) return
-          setProjects(projs)
-
-          // Fetch stats for projects that don't have them yet
-          const statsMap: Record<string, ProjectStats> = { ...projectStats }
-          let statsUpdated = false
-          for (const p of projs) {
-            if (statsMap[p.id]) continue
-            try {
-              const s = await fetchProjectStats(config, p.id)
-              statsMap[p.id] = s
-              statsUpdated = true
-            } catch (e) {
-              console.error(`failed to fetch stats for project ${p.id}`, e)
-            }
-          }
-          if (mounted && statsUpdated) setProjectStats(statsMap)
-        }
-
-        if (needsWarehouse) {
-          const stats = await fetchWarehouseStats(config)
-          if (mounted) setWarehouseStats(stats)
-        }
-      } catch (err) {
-        if (mounted) setOperatorError('failed to fetch section data', err)
-      } finally {
-        if (mounted) setDataLoading(false)
-      }
-    }
-
-    loadRequiredData()
-
-    return () => {
-      mounted = false
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config, activeSection])
-
-  // Fetch GitHub issues for connected projects → Kanban backlog
-  useEffect(() => {
-    if (!config || projects.length === 0) return
-    let mounted = true
-    const connected = projects.filter(p => p.github_token)
-    if (connected.length === 0) { setGithubBacklogIssues([]); return }
-
-    Promise.all(connected.map(async (p) => {
-      try {
-        const ghData = await fetchProjectGitHubIssues(config, p.id)
-        return (ghData?.issues ?? []).map(gh => ({
-          id: `github-${gh.number}`, issue_id: `github-${gh.number}`,
-          identifier: `GH-${gh.number}`, issue_identifier: `GH-${gh.number}`,
-          title: gh.title, description: gh.body, state: 'Backlog',
-          project_id: p.id, url: gh.html_url,
-        } as IssueListItem))
-      } catch { return [] as IssueListItem[] }
-    })).then(results => {
-      if (!mounted) return
-      setGithubBacklogIssues(results.flat())
-    })
-    return () => { mounted = false }
-  }, [config, projects, setGithubBacklogIssues])
-
-  // allBoardIssues is now computed by the store's issues slice — no useMemo needed
-
-  const handleAgentConfigSave = async (nextAgentConfig: { commands: Record<string, string>; agent_provider: string; max_turns: number }) => {
-    if (!config) return
-    setSavingConfig(true)
-    try {
-      await updateAgentConfig(config, { commands: nextAgentConfig.commands, agent_provider: nextAgentConfig.agent_provider })
-      await patchAgentConfig(config, { max_turns: nextAgentConfig.max_turns })
-      setAgentConfig(nextAgentConfig)
-      setStatusMessage('Agent configuration updated.')
-    } catch (err) {
-      setOperatorError('save agent config failed', err)
-    } finally {
-      setSavingConfig(false)
-    }
-  }
-
-  useEffect(() => {
-    if (!config) {
-      return
-    }
-
-    const sync = startRuntimeSync(
-      config,
-      {
-        onSnapshot: (next) => {
-          const store = useAppStore.getState()
-          store.setSnapshot(applySnapshotUpdate(store.snapshot, next))
-          store.setLoadingState(false)
-          setErrorMessage('')
-          // Fetch board issues to populate the Kanban board persistence (throttled)
-          const now = Date.now()
-          if (now - lastIssueFetchRef.current > 10000) {
-            lastIssueFetchRef.current = now
-            fetchIssues(config).then(issues => useAppStore.getState().setBoardIssues(issues)).catch(() => {})
-            // Also refresh the open issue detail so plan/state update live
-            const currentIssueLookupId = issueLookupId
-            if (currentIssueLookupId) {
-              void executeIssueLookup(currentIssueLookupId)
-            }
-          }
-        },
-        onTimelineEvent: (eventType, envelope) => {
-          useAppStore.getState().addTimelineEvent({ type: envelope.type, at: envelope.timestamp, data: envelope.data })
-          if (eventType === 'RUN_SUCCEEDED') {
-            const issueIdentifier = (envelope.data.issue_identifier as string) || ''
-            // Don't optimistically set state — the backend auto-advances (Todo→InProgress or InProgress→Review)
-            // Just force a refresh to pick up whatever state the backend set
-            fetchIssues(config).then((issues) => {
-              useAppStore.getState().setBoardIssues(issues)
-              // Only notify when issue reaches Review (not after every turn)
-              const issue = issues.find(i => (i.identifier || i.issue_identifier) === issueIdentifier)
-              if (issue && issue.state === 'Review') {
-                playNotification(issueIdentifier)
-              }
-            }).catch(() => {})
-            lastIssueFetchRef.current = Date.now()
-            // Re-fetch the issue detail so the inspector shows updated plan/state
-            if (issueIdentifier) {
-              void executeIssueLookup(issueIdentifier)
-            }
-          }
-        },
-        onStatus: (message) => {
-          useAppStore.getState().setStatusMessage(message)
-        },
-        onError: (message) => {
-          setErrorMessage(message)
-          if (isUnauthorizedError(message) || message.includes('unauthorized:')) {
-            useAppStore.getState().setStatusMessage('Protected host detected. Add bearer token in Settings -> Backend Configuration.')
-          }
-          useAppStore.getState().setLoadingState(false)
-        },
-        onGitHubChange: (_eventType, _projectId) => {
-          // Refresh project list when GitHub connection status changes via SSE
-          fetchProjects(config).then(projs => useAppStore.getState().setProjects(projs)).catch(() => {})
-        },
-      },
-      {
-        fetchSnapshot: fetchState,
-        normalizeSnapshot: normalizeSnapshotPayload,
-        normalizeEnvelope: normalizeEventEnvelope,
-        createEventSource: (url) => new EventSource(url),
-        setIntervalFn: (cb, ms) => window.setInterval(cb, ms),
-        clearIntervalFn: (id) => window.clearInterval(id),
-        setTimeoutFn: (cb, ms) => window.setTimeout(cb, ms),
-        clearTimeoutFn: (id) => window.clearTimeout(id),
-      },
-    )
-
-    syncControls.current = { startPolling: sync.startPolling, stopPolling: sync.stopPolling }
-
-    return () => {
-      sync.stop()
-      syncControls.current = null
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config])
-
-  // Listen for data mutations from the embedded agent and refresh the board
-  useEffect(() => {
-    if (!config) return
-    const handler = () => {
-      fetchIssues(config).then(issues => useAppStore.getState().setBoardIssues(issues)).catch(() => {})
-    }
-    window.addEventListener('orchestra-data-changed', handler)
-    return () => window.removeEventListener('orchestra-data-changed', handler)
-  }, [config])
-
-  const _metrics = useMemo(() => {
-    if (!snapshot) {
-      return {
-        running: '0',
-        retrying: '0',
-        totalTokens: '0',
-      }
-    }
-
-    const _remaining = typeof snapshot.rate_limits?.remaining === 'number' ? String(snapshot.rate_limits.remaining) : ''
-    const total = snapshot.codex_totals?.total_tokens ?? 0
-    return {
-      running: String(snapshot.counts.running ?? 0),
-      retrying: String(snapshot.counts.retrying ?? 0),
-      totalTokens: total > 10000 ? `${(total / 1000).toFixed(1)}k` : String(total),
-    }
-  }, [snapshot])
-
-  const generatedAt = snapshot?.generated_at ? new Date(snapshot.generated_at).toLocaleString() : 'waiting for first snapshot'
-
-  const handleRefresh = async () => {
-    if (!config) {
-      return
-    }
-    setRefreshPending(true)
-    setStatusMessage('')
-    setErrorMessage('')
-    try {
-      await postRefresh(config)
-      const [updatedIssues, updatedProjects] = await Promise.all([
-        fetchIssues(config),
-        fetchProjects(config),
-      ])
-      setBoardIssues(updatedIssues)
-      setProjects(updatedProjects)
-      setGithubBacklogIssues([])
-      setStatusMessage('Refresh queued successfully.')
-    } catch (err) {
-      setOperatorError('refresh failed', err)
-    } finally {
-      setRefreshPending(false)
-    }
-  }
-
-  handleRefreshRef.current = handleRefresh
-
-  const handleIssueUpdate = async (identifier: string, updates: IssueUpdatePayload) => {
-    if (!config) return
-    try {
-      // If this is a GitHub backlog issue, promote to local task linked to the SAME GitHub issue
-      if (identifier.startsWith('GH-')) {
-        const currentAllBoardIssues = useAppStore.getState().allBoardIssues
-        const ghIssue = currentAllBoardIssues.find(i =>
-          i.identifier === identifier || i.issue_identifier === identifier
-        )
-        if (ghIssue) {
-          const updatesRec = updates as Record<string, unknown>
-          // Create local task linked to the existing GitHub issue
-          const newIssue = await createIssue(config, {
-            title: updatesRec.title as string || ghIssue.title || '',
-            description: updatesRec.description as string || ghIssue.description || '',
-            state: updatesRec.state as string || 'Backlog',
-            assignee_id: updatesRec.assignee_id as string || '',
-            project_id: ghIssue.project_id || '',
-            provider: updatesRec.provider as string || '',
-          })
-          // Link to the EXISTING GitHub issue — don't create a new one
-          const ghUrl = ghIssue.url || ''
-          if (newIssue?.identifier && ghUrl) {
-            await updateIssue(config, newIssue.identifier, { url: ghUrl } as IssueUpdatePayload)
-          }
-          setStatusMessage(`${identifier} linked to ${newIssue?.identifier || 'local task'}`)
-          const updatedIssues = await fetchIssues(config)
-          setBoardIssues(updatedIssues)
-          await handleRefresh()
-          if (newIssue?.identifier) {
-            setIssueLookupId(newIssue.identifier)
-            await executeIssueLookup(newIssue.identifier)
-          }
-          return
-        }
-      }
-
-      await updateIssue(config, identifier, updates)
-
-      // If title/description changed and project is GitHub-connected, sync to GitHub
-      const updatesRec = updates as Record<string, unknown>
-      if (updatesRec.title || updatesRec.description) {
-        const currentAllBoardIssues = useAppStore.getState().allBoardIssues
-        const issue = currentAllBoardIssues.find(i =>
-          i.identifier === identifier || i.issue_identifier === identifier
-        )
-        if (issue?.project_id && issue.url?.includes('github.com')) {
-          const currentProjects = useAppStore.getState().projects
-          const project = currentProjects.find(p => p.id === issue.project_id)
-          if (project?.github_token) {
-            // Extract GH issue number from URL (e.g. .../issues/22)
-            const ghMatch = issue.url.match(/\/issues\/(\d+)$/)
-            if (ghMatch) {
-              const ghNumber = parseInt(ghMatch[1], 10)
-              try {
-                await updateProjectGitHubIssue(config, project.id, ghNumber, {
-                  ...(updatesRec.title ? { title: updatesRec.title as string } : {}),
-                  ...(updatesRec.description ? { body: updatesRec.description as string } : {}),
-                })
-              } catch {
-                // GitHub sync failed silently — local update still succeeded
-              }
-            }
-          }
-        }
-      }
-
-      // If state changed, sync open/closed to GitHub
-      if (updatesRec.state) {
-        const currentAllBoardIssues = useAppStore.getState().allBoardIssues
-        const issue = currentAllBoardIssues.find(i =>
-          i.identifier === identifier || i.issue_identifier === identifier
-        )
-        if (issue?.project_id && issue.url?.includes('github.com')) {
-          const currentProjects = useAppStore.getState().projects
-          const proj = currentProjects.find(p => p.id === issue.project_id)
-          if (proj?.github_token) {
-            const ghMatch = issue.url.match(/\/issues\/(\d+)$/)
-            if (ghMatch) {
-              const ghNumber = parseInt(ghMatch[1], 10)
-              const ghState = updatesRec.state === 'Done' ? 'closed' : 'open'
-              // Only sync if transitioning to/from Done
-              const previousState = issue.state
-              if (updatesRec.state === 'Done' || previousState === 'Done') {
-                try {
-                  await updateProjectGitHubIssue(config, proj.id, ghNumber, { state: ghState })
-                } catch {
-                  // GitHub sync failed silently — local update still succeeded
-                }
-              }
-            }
-          }
-        }
-      }
-
-      // Instantly update the board issues for snappy drag-and-drop
-      const updatedIssues = await fetchIssues(config)
-      setBoardIssues(updatedIssues)
-
-      // Refetch state immediately to show updates in Kanban/lists
-      await handleRefresh()
-      // Also refetch the specific issue to update the detail view if it's open
-      await executeIssueLookup(identifier)
-    } catch (err) {
-      setErrorMessage(`update issue failed: ${toDisplayError(err)}`)
-    }
-  }
-
-  const handleStopSession = async (identifier: string, provider?: string) => {
-    if (!config) return
-    try {
-      await stopIssueSession(config, identifier, provider)
-      // Move task back to Todo when stopped
-      await updateIssue(config, identifier, { state: 'Todo' })
-      setStatusMessage(`Session for ${identifier} stopped. Task moved to Todo.`)
-      const updatedIssues = await fetchIssues(config)
-      setBoardIssues(updatedIssues)
-      await handleRefresh()
-      await executeIssueLookup(identifier)
-    } catch (err) {
-      setErrorMessage(`stop session failed: ${toDisplayError(err)}`)
-    }
-  }
-
-  const handleCreateIssue = (initialState: string) => {
-    useAppStore.getState().openCreateTaskDialog({ state: initialState })
-  }
-
-  const handleTaskSubmit = async (payload: IssueCreatePayload) => {
-    if (!config) return
-    try {
-      const localIssue = await createIssue(config, payload)
-
-      // If project is GitHub-connected, also create a GitHub issue and link it
-      const project = projects.find(p => p.id === payload.project_id)
-      if (project?.github_token && project.github_owner && project.github_repo) {
-        try {
-          const ghIssue = await createProjectGitHubIssue(config, project.id, {
-            title: payload.title,
-            body: payload.description || '',
-          })
-          // Link the local task to the GitHub issue via url field
-          const issueId = localIssue?.identifier || localIssue?.issue_identifier || ''
-          if (issueId && ghIssue.html_url) {
-            await updateIssue(config, issueId, { url: ghIssue.html_url } as IssueUpdatePayload)
-          }
-        } catch {
-          // GitHub create failed — local task still exists
-        }
-      }
-
-      setStatusMessage(`Task "${payload.title}" created.`)
-
-      // Instantly update the board issues so it appears without waiting for an SSE cycle
-      const updatedIssues = await fetchIssues(config)
-      setBoardIssues(updatedIssues)
-
-      // Refetch GitHub issues for the project so the new linked issue shows up immediately
-      if (project?.github_token) {
-        try {
-          const ghIssues = await fetchProjectGitHubIssues(config, project.id, 'open')
-          void ghIssues // triggers githubBacklogIssues effect via setBoardIssues above
-        } catch {
-          // non-critical
-        }
-      }
-
-      void handleRefresh()
-    } catch (err) {
-      setErrorMessage(`create task failed: ${toDisplayError(err)}`)
-    }
-  }
-
-  const handleIssueDelete = async (identifier: string) => {
-    if (!config) return
-
-    try {
-      // Backend DeleteIssue handler stops sessions automatically — no need to call stopIssueSession here
-      // (calling it would reset state to Todo via DeleteIssueSession, breaking the delete)
-
-      // Close the linked GitHub issue before deleting locally
-      const currentAllBoardIssues = useAppStore.getState().allBoardIssues
-      const issueToClose = currentAllBoardIssues.find(i =>
-        i.identifier === identifier || i.issue_identifier === identifier
-      )
-      if (issueToClose?.project_id && issueToClose.url?.includes('github.com')) {
-        const currentProjects = useAppStore.getState().projects
-        const proj = currentProjects.find(p => p.id === issueToClose.project_id)
-        if (proj?.github_token) {
-          const ghMatch = issueToClose.url.match(/\/issues\/(\d+)$/)
-          if (ghMatch) {
-            const ghNumber = parseInt(ghMatch[1], 10)
-            try {
-              await updateProjectGitHubIssue(config, proj.id, ghNumber, { state: 'closed' })
-            } catch {
-              // GitHub close failed silently — proceed with local delete
-            }
-          }
-        }
-      }
-
-      // GH- prefixed issues are virtual (from GitHub sync) — not in local tracker
-      if (identifier.startsWith('GH-')) {
-        // Just remove from board and close on GitHub (already handled above)
-        setBoardIssues(useAppStore.getState().boardIssues.filter((issue) => {
-          const candidate = typeof issue.identifier === 'string' ? issue.identifier : issue.issue_identifier
-          return candidate !== identifier
-        }))
-        setStatusMessage(`GitHub issue ${identifier} dismissed from board.`)
-      } else {
-        await deleteIssue(config, identifier)
-        setStatusMessage(`Task ${identifier} deleted.`)
-      }
-
-      // Remove from board immediately so UI reflects deletion even if follow-up refresh fails.
-      setBoardIssues(useAppStore.getState().boardIssues.filter((issue) => {
-        const candidate = typeof issue.identifier === 'string' ? issue.identifier : issue.issue_identifier
-        return candidate !== identifier
-      }))
-
-      // Optimistically remove from snapshot
-      const currentSnapshot = useAppStore.getState().snapshot
-      if (currentSnapshot) {
-        setSnapshot({
-          ...currentSnapshot,
-          running: currentSnapshot.running.filter(r => r.issue_identifier !== identifier),
-          retrying: currentSnapshot.retrying.filter(r => r.issue_identifier !== identifier)
-        })
-      }
-
-      // Close issue-specific terminal if currently open.
-      setOpenTerminals(useAppStore.getState().openTerminals.filter((terminal) => terminal.id !== `issue-${identifier}`))
-
-      // Instantly update the board issues
-      const updatedIssues = await fetchIssues(config)
-      setBoardIssues(updatedIssues)
-
-      void handleRefresh()
-      if (issueLookupId === identifier) {
-        setIssueLookupResult(null)
-        setIssueLookupId('')
-      }
-    } catch (err) {
-      setErrorMessage(`delete issue failed: ${toDisplayError(err)}`)
-      throw err
-    }
-  }
-
-  const handleInspectIssueFromList = async (issueIdentifier: string) => {
-    setIssueLookupId(issueIdentifier)
-    setIssueLookupError('')
-    setIssueLookupPending(false)
-    setInspectDialogOpen(true)
-
-    // For GitHub backlog issues, populate directly from cached data instead of API
-    if (issueIdentifier.startsWith('GH-')) {
-      const currentAllBoardIssues = useAppStore.getState().allBoardIssues
-      const ghIssue = currentAllBoardIssues.find(i =>
-        i.identifier === issueIdentifier ||
-        i.issue_identifier === issueIdentifier ||
-        i.id === issueIdentifier
-      )
-      if (ghIssue) {
-        const currentProjects = useAppStore.getState().projects
-        setIssueLookupResult({
-          ...ghIssue,
-          project_name: currentProjects.find(p => p.id === ghIssue.project_id)?.name || '',
-        } as IssueDetailResult)
-        return
-      }
-    }
-
-    await executeIssueLookup(issueIdentifier)
-  }
-
-  const handleInspectSession = async (sessionId: string) => {
-    if (!config) return
-    setSessionInspectDialogOpen(true)
-    setSessionLookupPending(true)
-    setSessionLookupError('')
-    try {
-      const result = await fetchSessionDetail(config, sessionId)
-      setSessionLookupResult(result)
-    } catch (err) {
-      setSessionLookupError(toDisplayError(err))
-    } finally {
-      setSessionLookupPending(false)
-    }
-  }
-
-  const handleBackendConfigSave = async (nextConfig: BackendConfig) => {
-    const desktopBridge = window.orchestraDesktop
-    if (!desktopBridge || typeof desktopBridge.setBackendConfig !== 'function') {
-      setErrorMessage('desktop bridge unavailable: cannot save backend config')
-      return
-    }
-
-    try {
-      new URL(nextConfig.baseUrl)
-    } catch {
-      setErrorMessage('backend config save failed: base URL must be a valid absolute URL')
-      return
-    }
-
-    setSavingConfig(true)
-    setErrorMessage('')
-    try {
-      const saved = await desktopBridge.setBackendConfig(nextConfig)
-      setConfig(saved)
-      if (typeof desktopBridge.getBackendProfiles === 'function') {
-        const payload = await desktopBridge.getBackendProfiles()
-        setBackendProfiles(payload.profiles)
-        setActiveProfileId(payload.activeProfileId)
-      }
-      setStatusMessage('Backend configuration saved.')
-    } catch (err) {
-      setOperatorError('backend config save failed', err)
-    } finally {
-      setSavingConfig(false)
-    }
-  }
-
-  const handleSetActiveProfile = async (profileId: string) => {
-    const desktopBridge = window.orchestraDesktop
-    if (!desktopBridge || typeof desktopBridge.setActiveBackendProfile !== 'function') {
-      setErrorMessage('desktop bridge unavailable: cannot change active profile')
-      return
-    }
-
-    setProfilesPending(true)
-    setErrorMessage('')
-    try {
-      const nextConfig = await desktopBridge.setActiveBackendProfile(profileId)
-      setConfig(nextConfig)
-      if (typeof desktopBridge.getBackendProfiles === 'function') {
-        const payload = await desktopBridge.getBackendProfiles()
-        setBackendProfiles(payload.profiles)
-        setActiveProfileId(payload.activeProfileId)
-      }
-      setStatusMessage('Active backend profile switched.')
-    } catch (err) {
-      setErrorMessage(`switch profile failed: ${toDisplayError(err)}`)
-    } finally {
-      setProfilesPending(false)
-    }
-  }
-
-  const handleCreateProfile = async (name: string) => {
-    const desktopBridge = window.orchestraDesktop
-    if (!desktopBridge || typeof desktopBridge.saveBackendProfile !== 'function') {
-      setErrorMessage('desktop bridge unavailable: cannot save profile')
-      return
-    }
-
-    const fromConfig = config ?? { baseUrl: 'http://127.0.0.1:4010', apiToken: 'dev-token' }
-    setProfilesPending(true)
-    setErrorMessage('')
-    try {
-      const payload = await desktopBridge.saveBackendProfile({
-        name: name.trim(),
-        baseUrl: fromConfig.baseUrl,
-        apiToken: fromConfig.apiToken,
-        makeActive: true,
-      })
-      setBackendProfiles(payload.profiles)
-      setActiveProfileId(payload.activeProfileId)
-      const active = payload.profiles.find((profile) => profile.id === payload.activeProfileId)
-      if (active) {
-        setConfig({ baseUrl: active.baseUrl, apiToken: active.apiToken })
-      }
-      setStatusMessage('Backend profile created and activated.')
-    } catch (err) {
-      setErrorMessage(`create profile failed: ${toDisplayError(err)}`)
-    } finally {
-      setProfilesPending(false)
-    }
-  }
-
-  const handleDeleteProfile = async (profileId: string) => {
-    const desktopBridge = window.orchestraDesktop
-    if (!desktopBridge || typeof desktopBridge.deleteBackendProfile !== 'function') {
-      setErrorMessage('desktop bridge unavailable: cannot delete profile')
-      return
-    }
-
-    setProfilesPending(true)
-    setErrorMessage('')
-    try {
-      const payload = await desktopBridge.deleteBackendProfile(profileId)
-      setBackendProfiles(payload.profiles)
-      setActiveProfileId(payload.activeProfileId)
-      const active = payload.profiles.find((profile) => profile.id === payload.activeProfileId)
-      if (active) {
-        setConfig({ baseUrl: active.baseUrl, apiToken: active.apiToken })
-      }
-      setStatusMessage('Backend profile deleted.')
-    } catch (err) {
-      setErrorMessage(`delete profile failed: ${toDisplayError(err)}`)
-    } finally {
-      setProfilesPending(false)
-    }
-  }
-
-  const refreshProjectsAndStats = async () => {
-    if (!config) return
-
-    const projs = await fetchProjects(config)
-    setProjects(projs)
-
-    const currentProjectStats = useAppStore.getState().projectStats
-    const statsMap: Record<string, ProjectStats> = { ...currentProjectStats }
-    let statsChanged = false
-    for (const p of projs) {
-      if (statsMap[p.id]) continue
-      try {
-        const s = await fetchProjectStats(config, p.id)
-        statsMap[p.id] = s
-        statsChanged = true
-      } catch (e) {
-        console.error(`failed to fetch stats for project ${p.id}`, e)
-      }
-    }
-    if (statsChanged) {
-      setProjectStats(statsMap)
-    }
-  }
-
-  const handleAddProject = async (path: string) => {
-    if (!path || !config) return
-
-    try {
-      await createProject(config, path)
-      setStatusMessage(`Project at ${path} added successfully.`)
-      await refreshProjectsAndStats()
-    } catch (err) {
-      setErrorMessage(`failed to add project: ${toDisplayError(err)}`)
-    }
-  }
-
-  const handleDeleteProject = async (projectId: string) => {
-    if (!config) {
-      throw new Error('backend configuration unavailable')
-    }
-    try {
-      await deleteProject(config, projectId)
-      setStatusMessage('Project removed.')
-      setProjects(useAppStore.getState().projects.filter(p => p.id !== projectId))
-      setSelectedProjectID(null)
-    } catch (err) {
-      setErrorMessage(`failed to delete project: ${toDisplayError(err)}`)
-      throw err
-    }
-  }
-
-  const handleTogglePolling = () => {
-    if (!syncControls.current) return
-    if (usePolling) {
-      syncControls.current.stopPolling()
-      setStatusMessage('Switched to SSE live stream.')
-    } else {
-      syncControls.current.startPolling()
-      setStatusMessage('Switched to high-frequency polling.')
-    }
-    setUsePolling(!usePolling)
-  }
-
+  // ---------------------------------------------------------------------------
+  // Diagnostics
+  // ---------------------------------------------------------------------------
   const handleDownloadDiagnostics = () => {
     const data = {
       app: 'orchestra-desktop',
       timestamp: new Date().toISOString(),
-      config: {
-        baseUrl: config?.baseUrl,
-        activeProfileId,
-      },
+      config: { baseUrl: config?.baseUrl, activeProfileId },
       snapshot,
       timeline,
     }
-
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -1072,9 +339,9 @@ export default function App() {
     URL.revokeObjectURL(url)
   }
 
-  // Extract initial state string from store's Record<string, unknown> | null
-  const createTaskInitialStateStr = createTaskInitialState?.state ?? 'Backlog'
-
+  const sidebarWidth = sidebarCollapsed ? 64 : 248
+  const sectionVisibility = getSectionVisibility(activeSection)
+  const currentSectionMeta = getCurrentSectionMeta(activeSection)
   return (
     <AppTooltipProvider>
       <AppShell
@@ -1084,7 +351,6 @@ export default function App() {
         sidebarCollapsed={sidebarCollapsed}
         onToggleCollapsed={() => useAppStore.getState().toggleSidebar()}
         sidebarWidth={sidebarWidth}
-        osOptions={osOptions}
         flushContent={sectionVisibility.showDocs || sectionVisibility.showSettings || activeSection === 'CONSOLE'}
         bottomBar={<UsageStatusBar config={config} />}
         topBarProps={{
@@ -1109,89 +375,94 @@ export default function App() {
         }}
       >
         <div className="mt-4 flex flex-col flex-1 min-w-0 min-h-0 h-full">
-              {sectionVisibility.showProjects ? (
-                <SectionErrorBoundary name="Projects">
-                <section className="flex-1 flex flex-col min-h-0">
-                  {selectedProjectID && projects.find(p => p.id === selectedProjectID) ? (
-                    <ProjectDetailView
-                      project={projects.find(p => p.id === selectedProjectID)!}
-                      stats={projectStats[selectedProjectID]}
-                      config={config}
-                      snapshot={snapshot}
-                      boardIssues={boardIssues}
-                      availableAgents={availableAgents}
-                      loadingState={loadingState}
-                      onBack={() => setSelectedProjectID(null)}
-                      onInspectIssue={handleInspectIssueFromList}
-                      onJumpToTerminal={handleJumpToTerminal}
-                      onIssueUpdate={handleIssueUpdate}
-                      onIssueDelete={handleIssueDelete}
-                      onStopSession={handleStopSession}
-                      onCreateIssue={handleCreateIssue}
-                      onDeleteProject={handleDeleteProject}
-                      onRefreshProjects={refreshProjectsAndStats}
-                    />
-                  ) : (
-                    <ProjectGrid
-                      projects={projects}
-                      stats={projectStats}
-                      loading={dataLoading}
-                      onProjectClick={(id) => setSelectedProjectID(id)}
-                      onAddProject={() => setCreateProjectDialogOpen(true)}
-                      onDeleteProject={handleDeleteProject}
-                    />
-                  )}
-                </section>
-                </SectionErrorBoundary>
-              ) : null}
-
-              {sectionVisibility.showAgents ? (
-                <SectionErrorBoundary name="Agents">
-                <section className="flex-1 flex flex-col min-h-0">
-                  <AgentsDashboard config={config} />
-                </section>
-                </SectionErrorBoundary>
-              ) : null}
-
-              {sectionVisibility.showWarehouse ? (
-                <SectionErrorBoundary name="Usage">
-                <section className="flex-1 flex flex-col min-h-0">
-                  <UsagePage config={config} />
-                </section>
-                </SectionErrorBoundary>
-              ) : null}
-
-              {sectionVisibility.showIssueBoard ? (
-                <SectionErrorBoundary name="Kanban Board">
-                <section className="flex-1 flex flex-col min-h-0">
-                  <KanbanBoard
-                    loadingState={loadingState}
+          {sectionVisibility.showProjects ? (
+            <SectionErrorBoundary name="Projects">
+              <section className="flex-1 flex flex-col min-h-0">
+                {selectedProjectID && projects.find(p => p.id === selectedProjectID) ? (
+                  <ProjectDetailView
+                    project={projects.find(p => p.id === selectedProjectID)!}
+                    stats={projectStats[selectedProjectID]}
+                    config={config}
                     snapshot={snapshot}
-                    boardIssues={allBoardIssues}
-                    projects={projects}
+                    boardIssues={boardIssues}
                     availableAgents={availableAgents}
+                    loadingState={loadingState}
+                    onBack={() => setSelectedProjectID(null)}
                     onInspectIssue={handleInspectIssueFromList}
                     onJumpToTerminal={handleJumpToTerminal}
                     onIssueUpdate={handleIssueUpdate}
                     onIssueDelete={handleIssueDelete}
                     onStopSession={handleStopSession}
                     onCreateIssue={handleCreateIssue}
+                    onDeleteProject={handleDeleteProject}
+                    onRefreshProjects={refreshProjectsAndStats}
                   />
-                </section>
-                </SectionErrorBoundary>
-              ) : null}
+                ) : (
+                  <ProjectGrid
+                    projects={projects}
+                    stats={projectStats}
+                    loading={dataLoading}
+                    onProjectClick={(id) => setSelectedProjectID(id)}
+                    onAddProject={() => setCreateProjectDialogOpen(true)}
+                    onDeleteProject={handleDeleteProject}
+                  />
+                )}
+              </section>
+            </SectionErrorBoundary>
+          ) : null}
 
-              {sectionVisibility.showDocs ? (
-                <SectionErrorBoundary name="Documentation">
-                <section className="flex-1 flex flex-col min-h-0">
+          {sectionVisibility.showAgents ? (
+            <SectionErrorBoundary name="Agents">
+              <section className="flex-1 flex flex-col min-h-0">
+                <Suspense fallback={<SectionLoader />}>
+                  <AgentsDashboard config={config} />
+                </Suspense>
+              </section>
+            </SectionErrorBoundary>
+          ) : null}
+
+          {sectionVisibility.showWarehouse ? (
+            <SectionErrorBoundary name="Usage">
+              <section className="flex-1 flex flex-col min-h-0">
+                <UsagePage config={config} />
+              </section>
+            </SectionErrorBoundary>
+          ) : null}
+
+          {sectionVisibility.showIssueBoard ? (
+            <SectionErrorBoundary name="Kanban Board">
+              <section className="flex-1 flex flex-col min-h-0">
+                <KanbanBoard
+                  loadingState={loadingState}
+                  snapshot={snapshot}
+                  boardIssues={allBoardIssues}
+                  projects={projects}
+                  availableAgents={availableAgents}
+                  onInspectIssue={handleInspectIssueFromList}
+                  onJumpToTerminal={handleJumpToTerminal}
+                  onIssueUpdate={handleIssueUpdate}
+                  onIssueDelete={handleIssueDelete}
+                  onStopSession={handleStopSession}
+                  onCreateIssue={handleCreateIssue}
+                />
+              </section>
+            </SectionErrorBoundary>
+          ) : null}
+
+          {sectionVisibility.showDocs ? (
+            <SectionErrorBoundary name="Documentation">
+              <section className="flex-1 flex flex-col min-h-0">
+                <Suspense fallback={<SectionLoader />}>
                   <DocsDashboard config={config} theme={theme} />
-                </section>
-                </SectionErrorBoundary>
-              ) : null}
+                </Suspense>
+              </section>
+            </SectionErrorBoundary>
+          ) : null}
 
-              {sectionVisibility.showConsole && config ? (
-                <SectionErrorBoundary name="Console">
-                <section className="flex-1 flex flex-col min-h-0">
+          {sectionVisibility.showConsole && config ? (
+            <SectionErrorBoundary name="Console">
+              <section className="flex-1 flex flex-col min-h-0">
+                <Suspense fallback={<SectionLoader />}>
                   <WorkspaceLayout
                     onAddTerminal={() => {
                       const state = useAppStore.getState()
@@ -1208,7 +479,6 @@ export default function App() {
                         ...state.openTerminals,
                         { id, title, projectId: realProjectId, cwd, initialCommand },
                       ])
-                      // Register with the project's focused tab group
                       state.addTabToGroup(projectId, { type: 'terminal', id })
                     }}
                     centerContent={
@@ -1240,21 +510,25 @@ export default function App() {
                       />
                     }
                   />
-                </section>
-                </SectionErrorBoundary>
-              ) : null}
+                </Suspense>
+              </section>
+            </SectionErrorBoundary>
+          ) : null}
 
-              {sectionVisibility.showSandbox ? (
-                <SectionErrorBoundary name="Sandbox">
-                <section className="col-span-12 flex flex-col">
+          {sectionVisibility.showSandbox ? (
+            <SectionErrorBoundary name="Sandbox">
+              <section className="col-span-12 flex flex-col">
+                <Suspense fallback={<SectionLoader />}>
                   <SandboxDashboard config={config} onOpenSettings={() => { setSettingsInitialTab('integrations'); setActiveSection('SETTINGS') }} />
-                </section>
-                </SectionErrorBoundary>
-              ) : null}
+                </Suspense>
+              </section>
+            </SectionErrorBoundary>
+          ) : null}
 
-              {sectionVisibility.showSettings ? (
-                <SectionErrorBoundary name="Settings">
-                <section className="flex-1 flex flex-col min-h-0">
+          {sectionVisibility.showSettings ? (
+            <SectionErrorBoundary name="Settings">
+              <section className="flex-1 flex flex-col min-h-0">
+                <Suspense fallback={<SectionLoader />}>
                   <SettingsPage
                     loadingConfig={loadingConfig}
                     savingConfig={savingConfig}
@@ -1284,10 +558,12 @@ export default function App() {
                     onNotifVolumeChange={setNotifVolume}
                     initialTab={settingsInitialTab}
                   />
-                </section>
-                </SectionErrorBoundary>
-              ) : null}
+                </Suspense>
+              </section>
+            </SectionErrorBoundary>
+          ) : null}
         </div>
+
         <EmbeddedAgentWidget
           config={config}
           onNavigate={(section, id) => {
@@ -1301,189 +577,26 @@ export default function App() {
         />
       </AppShell>
 
-      <Dialog open={inspectDialogOpen} onOpenChange={setInspectDialogOpen}>
-        <DialogContent className="!fixed !inset-0 !translate-x-0 !translate-y-0 !left-0 !top-0 !max-w-none w-full h-full overflow-hidden flex flex-col p-6 rounded-none border-none">
-          <DialogHeader className="sr-only">
-            <DialogTitle>Issue Inspector</DialogTitle>
-            <DialogDescription>Task details</DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 min-h-0">
-            {issueLookupPending ? (
-              <div className="space-y-4">
-                <Skeleton className="h-8 w-[200px]" />
-                <Skeleton className="h-[200px] w-full" />
-              </div>
-            ) : issueLookupError ? (
-              <div className="rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900/70 dark:bg-red-950/35 dark:text-red-200">
-                {issueLookupError}
-              </div>
-            ) : (issueLookupResult && typeof issueLookupResult === 'object') ? (
-              <IssueDetailView
-                result={{
-                  ...issueLookupResult,
-                  project_name: projects.find(p => p.id === (issueLookupResult as Record<string, unknown>).project_id)?.name || '',
-                }}
-                config={config}
-                timeline={timeline}
-                availableAgents={availableAgents}
-                snapshot={snapshot}
-                onUpdate={(updates) => handleIssueUpdate(issueLookupId, updates)}
-                onStopSession={(p) => handleStopSession(issueLookupId, p)}
-                theme={theme}
-                />
-
-
-            ) : (
-              <p className="text-center text-sm text-muted-foreground py-10">No issue data available.</p>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={sessionInspectDialogOpen} onOpenChange={setSessionInspectDialogOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Historical Session Analysis</DialogTitle>
-            <DialogDescription>Review historical execution logs and token usage for this session.</DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            {sessionLookupPending ? (
-              <div className="space-y-4">
-                <Skeleton className="h-8 w-[200px]" />
-                <Skeleton className="h-[200px] w-full" />
-              </div>
-            ) : sessionLookupError ? (
-              <div className="rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900/70 dark:bg-red-950/35 dark:text-red-200">
-                {sessionLookupError}
-              </div>
-            ) : sessionLookupResult ? (
-              <SessionDetailView session={sessionLookupResult} />
-            ) : (
-              <p className="text-center text-sm text-muted-foreground">No session selected.</p>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <CreateTaskDialog
-        open={createTaskDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) useAppStore.getState().closeCreateTaskDialog()
-        }}
+      <AppDialogs
         config={config}
-        initialState={createTaskInitialStateStr}
+        timeline={timeline}
         availableAgents={availableAgents}
-        allTools={allTools}
-        projects={projects}
-        initialProjectID={selectedProjectID || ''}
-        onSubmit={handleTaskSubmit}
+        snapshot={snapshot}
+        theme={theme}
+        issueLookupId={issueLookupId}
+        issueLookupPending={issueLookupPending}
+        issueLookupError={issueLookupError}
+        issueLookupResult={issueLookupResult}
+        sessionLookupPending={sessionLookupPending}
+        sessionLookupError={sessionLookupError}
+        sessionLookupResult={sessionLookupResult}
+        onIssueUpdate={handleIssueUpdate}
+        onStopSession={handleStopSession}
+        onTaskSubmit={handleTaskSubmit}
+        onAddProject={handleAddProject}
       />
 
-      <CreateProjectDialog
-        open={createProjectDialogOpen}
-        onOpenChange={setCreateProjectDialogOpen}
-        onSubmit={handleAddProject}
-      />
-
-      <Command.Dialog
-        open={paletteOpen}
-        onOpenChange={setPaletteOpen}
-        label="Global Command Palette"
-        className="fixed top-1/2 left-1/2 w-full max-w-xl -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-card shadow-2xl z-[100] overflow-hidden"
-      >
-        <Command.Input
-          autoFocus
-          placeholder="Type a command or search..."
-          className="w-full border-b border-border bg-transparent p-4 text-sm outline-none placeholder:text-muted-foreground"
-        />
-        <Command.List className="max-h-[300px] overflow-y-auto p-2">
-          <Command.Empty className="p-4 text-center text-sm text-muted-foreground">No results found.</Command.Empty>
-
-          <Command.Group heading="Navigation" className="px-2 py-1 text-xs font-semibold text-muted-foreground">
-            <Command.Item
-              onSelect={() => { setActiveSection('ISSUES'); setPaletteOpen(false) }}
-              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
-            >
-              <ListTodo className="h-4 w-4" /> Go to Tasks
-            </Command.Item>
-            <Command.Item
-              onSelect={() => { setActiveSection('PROJECTS'); setPaletteOpen(false) }}
-              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
-            >
-              <FolderTree className="h-4 w-4" /> Go to Projects
-            </Command.Item>
-            <Command.Item
-              onSelect={() => { setActiveSection('CONSOLE'); setPaletteOpen(false) }}
-              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
-            >
-              <Terminal className="h-4 w-4" /> Go to Development
-            </Command.Item>
-            <Command.Item
-              onSelect={() => { setActiveSection('AGENTS'); setPaletteOpen(false) }}
-              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
-            >
-              <Cpu className="h-4 w-4" /> Go to Agents
-            </Command.Item>
-            <Command.Item
-              onSelect={() => { setActiveSection('WAREHOUSE'); setPaletteOpen(false) }}
-              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
-            >
-              <Database className="h-4 w-4" /> Go to Usage
-            </Command.Item>
-            <Command.Item
-              onSelect={() => { setActiveSection('SETTINGS'); setPaletteOpen(false) }}
-              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
-            >
-              <Settings2 className="h-4 w-4" /> Go to Settings
-            </Command.Item>
-            <Command.Item
-              onSelect={() => { setActiveSection('DOCS'); setPaletteOpen(false) }}
-              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
-            >
-              <FileText className="h-4 w-4" /> Go to Documentation
-            </Command.Item>
-          </Command.Group>
-
-          <Command.Group heading="Actions" className="px-2 py-1 mt-2 text-xs font-semibold text-muted-foreground border-t border-border/40">
-            <Command.Item
-              onSelect={() => { handleCreateIssue('Backlog'); setPaletteOpen(false) }}
-              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
-            >
-              <ListTodo className="h-4 w-4" /> Create New Task
-            </Command.Item>
-            <Command.Item
-              onSelect={() => { setTheme(theme === 'dark' ? 'light' : 'dark'); setPaletteOpen(false) }}
-              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
-            >
-              <Settings2 className="h-4 w-4" /> Toggle Theme
-            </Command.Item>
-            <Command.Item
-              onSelect={() => { handleTogglePolling(); setPaletteOpen(false) }}
-              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
-            >
-              <Activity className="h-4 w-4" /> Toggle Connection Mode (SSE/Polling)
-            </Command.Item>
-          </Command.Group>
-
-          {projects.length > 0 && (
-            <Command.Group heading="Projects" className="px-2 py-1 mt-2 text-xs font-semibold text-muted-foreground border-t border-border/40">
-              {projects.map(p => (
-                <Command.Item
-                  key={p.id}
-                  onSelect={() => {
-                    setActiveSection('PROJECTS')
-                    setSelectedProjectID(p.id)
-                    setPaletteOpen(false)
-                  }}
-                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50 data-[selected=true]:bg-muted/50"
-                >
-                  <FolderTree className="h-4 w-4" /> {p.name}
-                </Command.Item>
-              ))}
-            </Command.Group>
-          )}
-        </Command.List>
-      </Command.Dialog>
+      <AppCommandPalette onCreateIssue={handleCreateIssue} onTogglePolling={handleTogglePolling} />
     </AppTooltipProvider>
   )
 }

@@ -1,6 +1,5 @@
-import { memo, useMemo, useRef, type KeyboardEvent } from 'react'
+import { memo, useRef, type KeyboardEvent } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { OverlayScrollbarsComponent } from 'overlayscrollbars-react'
 import type { SidebarItem } from '@layout/types'
 import { getNextSidebarIndex } from '@core/utils/navigation'
 import { AppTooltip } from '@ui/tooltip-wrapper'
@@ -21,11 +20,6 @@ export function SidebarNav({
   sidebarWidth: number
 }) {
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([])
-
-  const osOptions = useMemo(() => ({
-    scrollbars: { autoHide: 'move' as const, theme: 'os-theme-custom' },
-    overflow: { x: 'hidden' as const, y: 'scroll' as const }
-  }), [])
 
   const handleNavKeyDown = (index: number) => (event: KeyboardEvent<HTMLButtonElement>) => {
     const nextIndex = getNextSidebarIndex(event.key, index, items.length)
@@ -70,11 +64,7 @@ export function SidebarNav({
           )}
         </div>
 
-        <OverlayScrollbarsComponent
-          element="div"
-          options={osOptions}
-          className={`flex-1 min-h-0 pt-3 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}
-        >
+        <div className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden pt-3 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}>
           <nav className="flex flex-col gap-1.5" aria-label="Primary navigation">
             {items.map((item, index) => {
               const ItemIcon = item.icon
@@ -129,7 +119,7 @@ export function SidebarNav({
               )
             })}
           </nav>
-        </OverlayScrollbarsComponent>
+        </div>
       </div>
     </aside>
   )

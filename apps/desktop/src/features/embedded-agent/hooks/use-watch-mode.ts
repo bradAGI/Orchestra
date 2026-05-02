@@ -34,7 +34,7 @@ function savePrefs(prefs: { enabled: boolean; trackTypes: string[] }) {
  * Hook that monitors orchestrator SSE events and generates proactive
  * notifications in the agent chat panel.
  */
-export function useWatchMode(config: BackendConfig | null) {
+export function useWatchMode(config: BackendConfig | null, isPanelOpen = false) {
   const [enabled, setEnabled] = useState(() => loadPrefs().enabled)
   const [trackTypes, setTrackTypes] = useState(() => loadPrefs().trackTypes)
   const [notifications, setNotifications] = useState<WatchNotification[]>([])
@@ -83,7 +83,7 @@ export function useWatchMode(config: BackendConfig | null) {
   }, [])
 
   useEffect(() => {
-    if (!enabled || !config?.baseUrl) {
+    if (!enabled || !config?.baseUrl || !isPanelOpen) {
       if (eventSourceRef.current) {
         eventSourceRef.current.close()
         eventSourceRef.current = null
@@ -181,7 +181,7 @@ export function useWatchMode(config: BackendConfig | null) {
       es.close()
       eventSourceRef.current = null
     }
-  }, [enabled, config, trackTypes, addNotification])
+  }, [enabled, config, isPanelOpen, trackTypes, addNotification])
 
   return {
     enabled,
