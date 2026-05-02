@@ -152,7 +152,7 @@ describe('AgentsDashboard', () => {
       skills: [],
     })
 
-    render(<AgentsDashboard config={{ baseUrl: 'http://localhost:4010', apiToken: 'dev-token' }} snapshot={null} />)
+    render(<AgentsDashboard config={{ baseUrl: 'http://localhost:4010', apiToken: 'dev-token' }} />)
 
     fireEvent.click(screen.getByText('Gemini'))
     expect(screen.getByText('Gemini Settings Panel')).toBeTruthy()
@@ -225,7 +225,7 @@ describe('AgentsDashboard', () => {
       createSkillResourceFile: vi.fn(),
     })
 
-    render(<AgentsDashboard config={{ baseUrl: 'http://localhost:4010', apiToken: 'dev-token' }} snapshot={null} />)
+    render(<AgentsDashboard config={{ baseUrl: 'http://localhost:4010', apiToken: 'dev-token' }} />)
 
     fireEvent.click(screen.getByText('OpenCode'))
     expect(screen.getByText('OpenCode Config Panel')).toBeTruthy()

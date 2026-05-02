@@ -1,14 +1,8 @@
-import type { APIErrorEnvelope, EventEnvelope, GlobalStats, Project, ProjectStats, SnapshotPayload, AgentConfig, DocItem, Issue, SessionDetail, SessionSummary } from '@/lib/orchestra-types'
+import type { APIErrorEnvelope, BackendConfig, EventEnvelope, GlobalStats, Project, ProjectStats, SnapshotPayload, AgentConfig, DocItem, Issue, SessionDetail, SessionSummary } from '@/lib/orchestra-types'
 
-/** Runtime connection configuration for the orchestrator backend. */
-export type BackendConfig = {
-  /** Base URL of the orchestrator HTTP server. */
-  baseUrl: string
-  /** Bearer token used for API authentication. */
-  apiToken: string
-  /** Optional map of MCP server names to their connection URIs. */
-  mcpServers?: Record<string, string>
-}
+// Re-exported so existing `import { BackendConfig } from '@/lib/orchestra-client'`
+// callers keep working. Canonical definition lives in orchestra-types.ts.
+export type { BackendConfig }
 
 /** A tool exposed by an MCP (Model Context Protocol) server. */
 export type MCPTool = {

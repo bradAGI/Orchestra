@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import type { Components } from 'react-markdown'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -47,43 +48,52 @@ export function MarkdownRenderer({
 }: MarkdownRendererProps) {
   const theme = useAppStore((s) => s.theme)
 
-  const remarkPlugins: any[] = [remarkGfm, remarkBreaks]
-  if (enableMath) remarkPlugins.push(remarkMath)
-  if (extraRemarkPlugins) remarkPlugins.push(...extraRemarkPlugins)
+  // Plugin arrays must be referentially stable so react-markdown doesn't tear
+  // down its entire tree (and remount MermaidBlock) on every parent re-render.
+  const remarkPlugins = useMemo(() => {
+    const out: any[] = [remarkGfm, remarkBreaks]
+    if (enableMath) out.push(remarkMath)
+    if (extraRemarkPlugins) out.push(...extraRemarkPlugins)
+    return out
+  }, [enableMath, extraRemarkPlugins])
 
-  const rehypePlugins: any[] = [rehypeHighlight, rehypeSlug]
-  if (enableMath) rehypePlugins.push(rehypeKatex)
-  if (!allowHtml) rehypePlugins.push([rehypeSanitize, sanitizeSchema])
-  if (extraRehypePlugins) rehypePlugins.push(...extraRehypePlugins)
+  const rehypePlugins = useMemo(() => {
+    const out: any[] = [rehypeHighlight, rehypeSlug]
+    if (enableMath) out.push(rehypeKatex)
+    if (!allowHtml) out.push([rehypeSanitize, sanitizeSchema])
+    if (extraRehypePlugins) out.push(...extraRehypePlugins)
+    return out
+  }, [enableMath, allowHtml, extraRehypePlugins])
 
-  const defaultComponents: Components = {
-    pre({ children, ...props }) {
-      return <pre className="relative" {...props}>{children}</pre>
-    },
-    code({ children, className: cls, node, ...props }: any) {
-      const match = /language-(\w+)/.exec(cls ?? '')
-      const language = match?.[1] ?? ''
-      const isInline = !node?.position || !cls
+  // Same reasoning for the components map: re-creating these functions on
+  // every render is what makes MermaidBlock unmount/remount on each keystroke.
+  const mergedComponents = useMemo<Components>(() => {
+    const defaults: Components = {
+      pre({ children, ...props }) {
+        return <pre className="relative" {...props}>{children}</pre>
+      },
+      code({ children, className: cls, node, ...props }: any) {
+        const match = /language-(\w+)/.exec(cls ?? '')
+        const language = match?.[1] ?? ''
+        const isInline = !node?.position || !cls
 
-      if (isInline) {
-        return <code className="bg-muted px-1.5 py-0.5 rounded text-sm" {...props}>{children}</code>
-      }
+        if (isInline) {
+          return <code className="bg-muted px-1.5 py-0.5 rounded text-sm" {...props}>{children}</code>
+        }
 
-      if (enableMermaid && language === 'mermaid') {
-        return <MermaidBlock code={String(children).trim()} theme={theme} />
-      }
+        if (enableMermaid && language === 'mermaid') {
+          return <MermaidBlock code={String(children).trim()} theme={theme} />
+        }
 
-      return (
-        <CodeBlock className={cls} {...props}>
-          {children}
-        </CodeBlock>
-      )
-    },
-  }
-
-  const mergedComponents: Components = componentOverrides
-    ? { ...defaultComponents, ...componentOverrides }
-    : defaultComponents
+        return (
+          <CodeBlock className={cls} {...props}>
+            {children}
+          </CodeBlock>
+        )
+      },
+    }
+    return componentOverrides ? { ...defaults, ...componentOverrides } : defaults
+  }, [enableMermaid, theme, componentOverrides])
 
   return (
     <div className={`prose prose-sm dark:prose-invert max-w-none ${className}`}>

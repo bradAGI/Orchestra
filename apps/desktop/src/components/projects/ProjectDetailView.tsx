@@ -103,23 +103,30 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     const isGitHub = !!project.github_owner && !!project.github_repo
     const isConnected = !!project.github_token
 
-    // Fetch GitHub issues on mount
+    // Fetch GitHub issues on mount; cancel on project change so stale results
+    // never overwrite the freshly-selected project.
     useEffect(() => {
         if (!config || !isConnected) return
+        let cancelled = false
         fetchProjectGitHubIssues(config, project.id, 'open')
-            .then((data) => setGithubIssues(data?.issues ?? []))
-            .catch(() => setGithubIssues([]))
+            .then((data) => { if (!cancelled) setGithubIssues(data?.issues ?? []) })
+            .catch(() => { if (!cancelled) setGithubIssues([]) })
+        return () => { cancelled = true }
     }, [config, project.id, isConnected])
 
-    // Poll GitHub issues every 60s on overview tab
+    // Poll GitHub issues every 60s on overview tab; pause when window is hidden
+    // to avoid background polling, and bail on responses that arrive after change.
     useEffect(() => {
         if (!config || !isConnected || activeTab !== 'overview') return
-        const interval = setInterval(() => {
+        let cancelled = false
+        const tick = () => {
+            if (document.hidden) return
             fetchProjectGitHubIssues(config, project.id, 'open')
-                .then((data) => setGithubIssues(data?.issues ?? []))
+                .then((data) => { if (!cancelled) setGithubIssues(data?.issues ?? []) })
                 .catch(() => {})
-        }, 60000)
-        return () => clearInterval(interval)
+        }
+        const interval = setInterval(tick, 60000)
+        return () => { cancelled = true; clearInterval(interval) }
     }, [config, project.id, isConnected, activeTab])
 
     // Reset state on project change

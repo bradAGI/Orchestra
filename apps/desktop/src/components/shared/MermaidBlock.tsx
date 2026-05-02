@@ -2,41 +2,75 @@ import { useEffect, useRef, useState } from 'react'
 import mermaid from 'mermaid'
 import DOMPurify from 'dompurify'
 
-let renderQueue = Promise.resolve()
+let renderQueue: Promise<void> = Promise.resolve()
+let initializedTheme: 'light' | 'dark' | null = null
 
-mermaid.initialize({
-  startOnLoad: false,
-  theme: 'dark',
-  securityLevel: 'strict',
-})
+function ensureInitialized(theme: 'light' | 'dark') {
+  if (initializedTheme === theme) return
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: theme === 'light' ? 'default' : 'dark',
+    securityLevel: 'strict',
+  })
+  initializedTheme = theme
+}
+
+// Stable per-instance id so re-renders mutate the same SVG node instead of
+// regenerating one with a fresh random id (which causes the visible flash).
+let nextMermaidId = 0
 
 export function MermaidBlock({ code, theme }: { code: string; theme?: 'light' | 'dark' }) {
-  const containerRef = useRef<HTMLDivElement>(null)
+  const svgContainerRef = useRef<HTMLDivElement>(null)
+  const idRef = useRef<string>(`mermaid-${++nextMermaidId}`)
+  const lastRenderedRef = useRef<{ code: string; theme?: string } | null>(null)
+  // hasSvg tracks whether the container currently has a rendered diagram in
+  // it. While false, we render the source as a `<pre>` so the user sees text
+  // instead of a blank box (e.g. mid-typing or first paint).
+  const [hasSvg, setHasSvg] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const id = `mermaid-${Math.random().toString(36).slice(2, 10)}`
+    const last = lastRenderedRef.current
+    if (last && last.code === code && last.theme === theme) return
+
     let cancelled = false
+    const trimmed = code.trim()
+    if (!trimmed) {
+      if (svgContainerRef.current) svgContainerRef.current.innerHTML = ''
+      setHasSvg(false)
+      lastRenderedRef.current = { code, theme }
+      return
+    }
 
     renderQueue = renderQueue.then(async () => {
       if (cancelled) return
       try {
-        mermaid.initialize({
-          startOnLoad: false,
-          theme: theme === 'light' ? 'default' : 'dark',
-          securityLevel: 'strict',
+        ensureInitialized(theme === 'light' ? 'light' : 'dark')
+        const isValid = await tryParse(trimmed)
+        if (cancelled) return
+        if (!isValid) {
+          // Mid-typing: keep the existing SVG (if any) instead of flashing.
+          setError(null)
+          return
+        }
+        const { svg } = await mermaid.render(idRef.current, trimmed)
+        if (cancelled || !svgContainerRef.current) return
+        // Mermaid puts node labels inside <foreignObject> as HTML, so we need
+        // both SVG and HTML profiles. Without the html profile, label text is
+        // stripped and you see empty boxes. Keep <style>/<foreignObject> tags
+        // because Mermaid's themes embed CSS in a <style> child of the SVG.
+        svgContainerRef.current.innerHTML = DOMPurify.sanitize(svg, {
+          USE_PROFILES: { svg: true, svgFilters: true, html: true },
+          ADD_TAGS: ['foreignObject', 'style'],
+          ADD_ATTR: ['xmlns', 'xmlns:xlink', 'transform', 'preserveAspectRatio'],
         })
-        const { svg } = await mermaid.render(id, code)
-        if (cancelled || !containerRef.current) return
-        containerRef.current.innerHTML = DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true } })
+        lastRenderedRef.current = { code, theme }
+        setHasSvg(true)
         setError(null)
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Render failed')
       }
     })
-
-    // Collapse the queue so old closures can be GC'd
-    renderQueue = renderQueue.then(() => {})
 
     return () => { cancelled = true }
   }, [code, theme])
@@ -50,5 +84,30 @@ export function MermaidBlock({ code, theme }: { code: string; theme?: 'light' | 
     )
   }
 
-  return <div ref={containerRef} className="my-2 flex justify-center [&_svg]:max-w-full" />
+  // Always mount the same DOM nodes — the SVG container is hidden when we
+  // haven't rendered yet, and a fallback `<pre>` shows the source so the
+  // user sees content instead of a blank gap. Keeping both nodes mounted
+  // (rather than swapping React subtrees) avoids any layout flicker.
+  return (
+    <div className="my-2">
+      <div
+        ref={svgContainerRef}
+        className={`flex justify-center [&_svg]:max-w-full ${hasSvg ? '' : 'hidden'}`}
+      />
+      {!hasSvg && (
+        <pre className="rounded border border-border/60 bg-muted/40 p-3 text-xs whitespace-pre-wrap font-mono">
+          {code}
+        </pre>
+      )}
+    </div>
+  )
+}
+
+async function tryParse(code: string): Promise<boolean> {
+  try {
+    await mermaid.parse(code)
+    return true
+  } catch {
+    return false
+  }
 }

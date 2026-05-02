@@ -85,6 +85,12 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   setTheme: (theme) => {
     applyTheme(theme)
     set({ theme })
+    // Bridge to the new theme slice so re-applying the active theme picks up
+    // the mode change. setMode handles the actual CSS-var work.
+    try {
+      const setMode = (get() as AppState).setMode
+      if (typeof setMode === 'function') setMode(theme)
+    } catch { /* ignore — slice may not be attached yet during first init */ }
   },
 
   setActivePeriod: (period) => set({ activePeriod: period }),

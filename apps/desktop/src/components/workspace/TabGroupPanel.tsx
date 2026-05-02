@@ -9,8 +9,10 @@ import {
   FileText,
   SplitSquareHorizontal,
   SplitSquareVertical,
+  Settings,
 } from 'lucide-react'
 import { useAppStore } from '@/store'
+import { getAgentIcon } from '@/components/app-shell/shared/controls'
 import type { TabGroup, TabRef, WorkspaceContextID } from '@/store/types'
 import { EditorContent } from './EditorContent'
 import { BrowserContent } from './BrowserContent'
@@ -44,11 +46,15 @@ export function TabGroupPanel({ projectId, group, isFocused, siblingGroupIds }: 
   const setOpenTerminals = useAppStore((s) => s.setOpenTerminals)
   const openFile = useAppStore((s) => s.openFile)
   const openBrowserTab = useAppStore((s) => s.openBrowserTab)
+  const setActiveSection = useAppStore((s) => s.setActiveSection)
+  const reorderTabsInGroup = useAppStore((s) => s.reorderTabsInGroup)
 
   const [plusOpen, setPlusOpen] = useState(false)
   const [splitOpen, setSplitOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; tab: TabRef } | null>(null)
   const [isDropTarget, setIsDropTarget] = useState(false)
+  const [draggingTabId, setDraggingTabId] = useState<string | null>(null)
+  const [dropIndicator, setDropIndicator] = useState<{ index: number; side: 'before' | 'after' } | null>(null)
   const plusRef = useRef<HTMLButtonElement>(null)
   const splitRef = useRef<HTMLButtonElement>(null)
   const [plusAnchor, setPlusAnchor] = useState<{ left: number; top: number } | null>(null)
@@ -163,41 +169,111 @@ export function TabGroupPanel({ projectId, group, isFocused, siblingGroupIds }: 
       {/* Tab strip */}
       <div className="flex items-center border-b border-border/30 shrink-0 h-9">
         <div className="flex-1 flex items-center overflow-x-auto min-w-0">
-          {group.tabs.map((ref) => {
+          {group.tabs.map((ref, index) => {
             const isActive = group.activeTabId === ref.id
+            const isDragging = draggingTabId === ref.id
+            const showIndicatorBefore = dropIndicator?.index === index && dropIndicator.side === 'before'
+            const showIndicatorAfter =
+              dropIndicator?.side === 'after' &&
+              dropIndicator.index === index &&
+              index === group.tabs.length - 1
             const { title, isDirty } = titleFor(ref)
             return (
-              <button
+              <div
                 key={`${ref.type}-${ref.id}`}
-                onClick={() => activateTabInGroup(projectId, ref.id)}
-                onContextMenu={(e) => {
-                  e.preventDefault()
-                  setContextMenu({ x: e.clientX, y: e.clientY, tab: ref })
+                className="relative inline-flex shrink-0"
+                draggable
+                onDragStart={(e) => {
+                  setDraggingTabId(ref.id)
+                  e.dataTransfer.effectAllowed = 'move'
+                  e.dataTransfer.setData(
+                    'application/x-orchestra-tab',
+                    JSON.stringify({ groupId: group.id, tabId: ref.id, index }),
+                  )
+                  e.dataTransfer.setData('text/plain', title)
                 }}
-                className={`group relative inline-flex items-center gap-1.5 px-3 h-9 cursor-pointer transition-colors shrink-0 ${
-                  isActive
-                    ? 'text-foreground'
-                    : 'text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.03]'
-                }`}
-                title={title}
+                onDragEnd={() => {
+                  setDraggingTabId(null)
+                  setDropIndicator(null)
+                }}
+                onDragOver={(e) => {
+                  if (!Array.from(e.dataTransfer.types).includes('application/x-orchestra-tab')) return
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  const isLast = index === group.tabs.length - 1
+                  const past = e.clientX > rect.left + rect.width / 2
+                  if (isLast && past) {
+                    setDropIndicator({ index, side: 'after' })
+                  } else {
+                    setDropIndicator({ index, side: 'before' })
+                  }
+                }}
+                onDrop={(e) => {
+                  const raw = e.dataTransfer.getData('application/x-orchestra-tab')
+                  if (!raw) return
+                  e.preventDefault()
+                  e.stopPropagation()
+                  try {
+                    const { groupId: srcGroupId, index: fromIndex } = JSON.parse(raw) as {
+                      groupId: string
+                      tabId: string
+                      index: number
+                    }
+                    if (srcGroupId !== group.id) return // cross-group not handled here
+                    const indicator = dropIndicator
+                    let toIndex = index
+                    if (indicator?.side === 'after') toIndex = index + 1
+                    reorderTabsInGroup(projectId, group.id, fromIndex, toIndex)
+                  } catch (err) {
+                    console.warn('[tab-reorder] parse failed', err)
+                  } finally {
+                    setDraggingTabId(null)
+                    setDropIndicator(null)
+                  }
+                }}
               >
-                {isActive && (
-                  <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-primary" />
+                {showIndicatorBefore && (
+                  <span className="pointer-events-none absolute left-0 top-1 bottom-1 w-[2px] rounded-full bg-primary" />
                 )}
-                {iconFor(ref, isActive)}
-                {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
-                <span className="text-[12px] font-medium tracking-tight truncate max-w-[160px]">{title}</span>
-                <span
-                  role="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    closeTab(ref)
+                {showIndicatorAfter && (
+                  <span className="pointer-events-none absolute right-0 top-1 bottom-1 w-[2px] rounded-full bg-primary" />
+                )}
+                <button
+                  onClick={() => activateTabInGroup(projectId, ref.id)}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    setContextMenu({ x: e.clientX, y: e.clientY, tab: ref })
                   }}
-                  className="inline-flex items-center justify-center w-4 h-4 -mr-1 rounded text-muted-foreground/50 opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-foreground/[0.06] transition-all"
+                  className={`group relative inline-flex items-center gap-1.5 px-3 h-9 transition-colors shrink-0 ${
+                    isDragging ? 'cursor-grabbing opacity-40' : 'cursor-grab'
+                  } ${
+                    isActive
+                      ? 'text-foreground'
+                      : 'text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.03]'
+                  }`}
+                  title={title}
                 >
-                  <X size={11} />
-                </span>
-              </button>
+                  {isActive && (
+                    <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-primary" />
+                  )}
+                  {iconFor(ref, isActive)}
+                  {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
+                  <span className="text-[12px] font-medium tracking-tight truncate max-w-[160px]">{title}</span>
+                  <span
+                    role="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      closeTab(ref)
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onDragStart={(e) => e.preventDefault()}
+                    className="inline-flex items-center justify-center w-4 h-4 -mr-1 rounded text-muted-foreground/50 opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-foreground/[0.06] transition-all"
+                  >
+                    <X size={11} />
+                  </span>
+                </button>
+              </div>
             )
           })}
 
@@ -275,7 +351,12 @@ export function TabGroupPanel({ projectId, group, isFocused, siblingGroupIds }: 
           if (!raw) return
           e.preventDefault()
           try {
-            const { path, relativePath } = JSON.parse(raw) as { path: string; relativePath: string }
+            const { path, relativePath, isDirectory } = JSON.parse(raw) as {
+              path: string
+              relativePath: string
+              isDirectory?: boolean
+            }
+            if (isDirectory) return // directories aren't openable in the editor
             setFocusedGroup(projectId, group.id)
             openFile(path, relativePath, undefined, projectId)
           } catch (err) {
@@ -290,16 +371,19 @@ export function TabGroupPanel({ projectId, group, isFocused, siblingGroupIds }: 
       {plusOpen && plusAnchor && createPortal(
         <div
           data-portal-menu="open"
-          className="fixed z-[9999] bg-popover border border-border/60 rounded-lg shadow-xl py-1.5 min-w-[200px] backdrop-blur-sm"
+          className="fixed z-[9999] bg-popover border border-border/60 rounded-lg shadow-xl py-1 min-w-[240px] backdrop-blur-sm text-foreground"
           style={(() => {
-            const w = 220, h = 130, m = 8
+            const w = 240, h = 380, m = 8
             const left = Math.min(Math.max(m, plusAnchor.left), window.innerWidth - w - m)
             const top = plusAnchor.top + h + m > window.innerHeight ? Math.max(m, plusAnchor.top - h - 12) : plusAnchor.top
             return { left, top }
           })()}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <button
+          <PlusMenuItem
+            icon={<Terminal size={13} />}
+            label="New Terminal"
+            shortcut="Ctrl+T"
             onClick={() => {
               setPlusOpen(false)
               setFocusedGroup(projectId, group.id)
@@ -314,27 +398,26 @@ export function TabGroupPanel({ projectId, group, isFocused, siblingGroupIds }: 
               ])
               addTabToGroup(projectId, { type: 'terminal', id }, group.id)
             }}
-            className="flex items-center gap-2.5 w-full px-3 py-1.5 text-[12px] font-medium text-foreground/90 hover:text-foreground hover:bg-accent/60 text-left transition-colors"
-          >
-            <Terminal size={12} /> New Terminal
-          </button>
-          <button
+          />
+          <PlusMenuItem
+            icon={<Globe size={13} />}
+            label="New Browser Tab"
+            shortcut="Ctrl+Shift+B"
             onClick={() => {
               setPlusOpen(false)
               setFocusedGroup(projectId, group.id)
               openBrowserTab()
             }}
-            className="flex items-center gap-2.5 w-full px-3 py-1.5 text-[12px] font-medium text-foreground/90 hover:text-foreground hover:bg-accent/60 text-left transition-colors"
-          >
-            <Globe size={12} /> New Browser Tab
-          </button>
-          <button
+          />
+          <PlusMenuItem
+            icon={<FileText size={13} />}
+            label="New Markdown"
+            shortcut="Ctrl+Shift+M"
             onClick={async () => {
               setPlusOpen(false)
               setFocusedGroup(projectId, group.id)
               const proj = useAppStore.getState().projects.find((p) => p.id === projectId)
               const root = proj?.root_path || explorerRoot
-              console.log('[markdown] create requested', { projectId, hasProject: !!proj, root, hasConfig: !!config?.baseUrl })
               if (!root) {
                 alert('Cannot create markdown: no project root available. Open a project first.')
                 return
@@ -354,21 +437,46 @@ export function TabGroupPanel({ projectId, group, isFocused, siblingGroupIds }: 
                 const res = await fetch(url, { method: 'PUT', headers, body: initial })
                 if (!res.ok) {
                   const errText = await res.text().catch(() => '')
-                  console.error('[markdown] backend PUT failed', { status: res.status, body: errText })
                   alert(`Failed to create file: HTTP ${res.status} ${errText.slice(0, 200)}`)
                   return
                 }
-                console.log('[markdown] created', absPath)
                 openFile(absPath, filename, undefined, projectId)
               } catch (err) {
-                console.error('[markdown] fetch error', err)
                 alert(`Failed to create file: ${(err as Error).message}`)
               }
             }}
-            className="flex items-center gap-2.5 w-full px-3 py-1.5 text-[12px] font-medium text-foreground/90 hover:text-foreground hover:bg-accent/60 text-left transition-colors"
-          >
-            <FileText size={12} /> New Markdown File
-          </button>
+          />
+          <div className="my-1 h-px bg-border/60" />
+          {(['claude', 'codex', 'opencode', 'gemini', '8gent'] as const).map((agent) => (
+            <PlusMenuItem
+              key={agent}
+              icon={getAgentIcon(agent, 13)}
+              label={agentLabel(agent)}
+              onClick={() => {
+                setPlusOpen(false)
+                setFocusedGroup(projectId, group.id)
+                const id = `shell-${Date.now()}`
+                const proj = useAppStore.getState().projects.find((p) => p.id === projectId)
+                const cwd = proj?.root_path
+                const cmd = `cd "${(cwd ?? '~').replace(/"/g, '\\"')}" && clear && ${agent}`
+                const title = `${agentLabel(agent)}${proj ? ` · ${proj.name}` : ''}`
+                setOpenTerminals([
+                  ...openTerminals,
+                  { id, title, projectId: proj ? projectId : undefined, cwd, initialCommand: cmd },
+                ])
+                addTabToGroup(projectId, { type: 'terminal', id }, group.id)
+              }}
+            />
+          ))}
+          <div className="my-1 h-px bg-border/60" />
+          <PlusMenuItem
+            icon={<Settings size={13} className="text-muted-foreground" />}
+            label="Agent settings…"
+            onClick={() => {
+              setPlusOpen(false)
+              setActiveSection('AGENTS')
+            }}
+          />
         </div>,
         document.body,
       )}
@@ -418,4 +526,45 @@ export function TabGroupPanel({ projectId, group, isFocused, siblingGroupIds }: 
       )}
     </div>
   )
+}
+
+function PlusMenuItem({
+  icon,
+  label,
+  shortcut,
+  onClick,
+}: {
+  icon: ReactNode
+  label: string
+  shortcut?: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-2.5 w-full px-3 py-1.5 text-[12.5px] font-medium text-foreground hover:bg-accent/60 text-left transition-colors"
+    >
+      <span className="inline-flex w-4 h-4 items-center justify-center shrink-0">{icon}</span>
+      <span className="flex-1 truncate">{label}</span>
+      {shortcut && (
+        <span className="text-[10.5px] tabular-nums text-muted-foreground/70 font-mono">{shortcut}</span>
+      )}
+    </button>
+  )
+}
+
+function agentLabel(id: 'claude' | 'codex' | 'opencode' | 'gemini' | '8gent'): string {
+  switch (id) {
+    case 'claude':
+      return 'Claude'
+    case 'codex':
+      return 'Codex'
+    case 'opencode':
+      return 'OpenCode'
+    case 'gemini':
+      return 'Gemini'
+    case '8gent':
+      return '8gent'
+  }
 }

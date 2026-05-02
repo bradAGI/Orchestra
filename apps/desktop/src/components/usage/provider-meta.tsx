@@ -13,33 +13,22 @@ export function providerLabel(provider: UsageProvider): string {
   }
 }
 
-export function providerInitial(provider: UsageProvider): string {
+type ProviderIconMeta = { src: string; invert: boolean }
+
+function providerIconMeta(provider: UsageProvider): ProviderIconMeta {
   switch (provider) {
     case 'claude':
-      return 'C'
+      return { src: '/Anthropic_Symbol_1.png', invert: true }
     case 'codex':
-      return 'X'
+      return { src: '/OpenAI_Symbol_1.png', invert: true }
     case 'gemini':
-      return 'G'
+      return { src: '/Google_Symbol_1.png', invert: false }
     case 'opencode':
-      return 'O'
+      return { src: '/opencode.png', invert: false }
   }
 }
 
-// Tailwind text color used for the provider's accent (chart segments + initials)
-export function providerColor(provider: UsageProvider): string {
-  switch (provider) {
-    case 'claude':
-      return 'text-orange-500'
-    case 'codex':
-      return 'text-emerald-500'
-    case 'gemini':
-      return 'text-blue-500'
-    case 'opencode':
-      return 'text-fuchsia-500'
-  }
-}
-
+// Used by UsageStatusBar for stacked bar segment color.
 export function providerBg(provider: UsageProvider): string {
   switch (provider) {
     case 'claude':
@@ -53,14 +42,15 @@ export function providerBg(provider: UsageProvider): string {
   }
 }
 
-export function ProviderIcon({ provider, size = 12 }: { provider: UsageProvider; size?: number }) {
+export function ProviderIcon({ provider, size = 14 }: { provider: UsageProvider; size?: number }) {
+  const { src, invert } = providerIconMeta(provider)
   return (
-    <span
-      className={`inline-flex items-center justify-center font-mono font-bold ${providerColor(provider)}`}
-      style={{ fontSize: `${size}px`, width: `${size + 2}px`, height: `${size + 2}px` }}
-      aria-hidden
-    >
-      {providerInitial(provider)}
-    </span>
+    <img
+      src={src}
+      width={size}
+      height={size}
+      alt={providerLabel(provider)}
+      className={`rounded-sm object-contain ${invert ? 'dark:invert' : ''}`}
+    />
   )
 }

@@ -41,7 +41,7 @@ func TestCodexAppServerRunner_RunTurn(t *testing.T) {
 		IssueIdentifier: "ORC-10",
 		Timeout:         3 * time.Second,
 		AutoApprove:     true,
-		ToolExecutor: func(tool string, arguments map[string]any) map[string]any {
+		ToolExecutor: func(_ context.Context, tool string, arguments map[string]any) map[string]any {
 			toolInvoked = true
 			if tool != "linear_query" {
 				return map[string]any{"success": false, "error": "unexpected tool"}
@@ -452,7 +452,7 @@ func TestCodexAppServerRunner_IgnoresProtocolJSONOnStderr(t *testing.T) {
 		IssueIdentifier: "ORC-16",
 		Timeout:         3 * time.Second,
 		AutoApprove:     true,
-		ToolExecutor: func(tool string, arguments map[string]any) map[string]any {
+		ToolExecutor: func(_ context.Context, tool string, arguments map[string]any) map[string]any {
 			toolInvoked = true
 			return map[string]any{"success": true}
 		},

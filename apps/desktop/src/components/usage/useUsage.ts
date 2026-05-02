@@ -70,67 +70,69 @@ export function useUsage(config: BackendConfig | null): UsageState {
     opencode: emptyBundle('opencode'),
   }))
 
-  const inflight = useRef<Partial<Record<UsageProvider, Promise<void>>>>({})
+  // Per-provider request token. Each call increments the token; stale resolutions
+  // (from a prior scope/range) compare against the current token and bail.
+  const requestToken = useRef<Record<UsageProvider, number>>({
+    claude: 0, codex: 0, gemini: 0, opencode: 0,
+  })
 
   const loadProvider = useCallback(
     async (provider: UsageProvider, force = false): Promise<void> => {
       if (!config) return
-      const existing = inflight.current[provider]
-      if (existing) return existing
-      const run = (async () => {
-        setBundles((b) => ({ ...b, [provider]: { ...b[provider], loading: true, error: null } }))
-        try {
-          const scanState = await fetchUsageScanState(config, provider)
-          let next = scanState
-          if (scanState.enabled && (force || !scanState.last_scan_completed_at)) {
-            next = await refreshUsage(config, provider, force)
-          }
-          if (!next.enabled || !next.has_any_data) {
-            setBundles((b) => ({
-              ...b,
-              [provider]: {
-                ...emptyBundle(provider),
-                scanState: next,
-              },
-            }))
-            return
-          }
-          const [summary, daily, modelBreakdown, projectBreakdown, sessions] = await Promise.all([
-            fetchUsageSummary(config, provider, scope, range),
-            fetchUsageDaily(config, provider, scope, range),
-            fetchUsageBreakdown(config, provider, scope, range, 'model'),
-            fetchUsageBreakdown(config, provider, scope, range, 'project'),
-            fetchUsageSessions(config, provider, scope, range, 25),
-          ])
-          setBundles((b) => ({
-            ...b,
-            [provider]: {
-              provider,
-              scanState: next,
-              summary,
-              daily,
-              modelBreakdown,
-              projectBreakdown,
-              sessions,
-              loading: false,
-              error: null,
-            },
-          }))
-        } catch (err) {
-          setBundles((b) => ({
-            ...b,
-            [provider]: {
-              ...b[provider],
-              loading: false,
-              error: err instanceof Error ? err.message : 'Failed to load usage',
-            },
-          }))
-        } finally {
-          delete inflight.current[provider]
+      const token = ++requestToken.current[provider]
+      const isFresh = () => requestToken.current[provider] === token
+      setBundles((b) => ({ ...b, [provider]: { ...b[provider], loading: true, error: null } }))
+      try {
+        const scanState = await fetchUsageScanState(config, provider)
+        if (!isFresh()) return
+        let next = scanState
+        if (scanState.enabled && (force || !scanState.last_scan_completed_at)) {
+          next = await refreshUsage(config, provider, force)
+          if (!isFresh()) return
         }
-      })()
-      inflight.current[provider] = run
-      return run
+        if (!next.enabled || !next.has_any_data) {
+          setBundles((b) => ({
+            ...b,
+            [provider]: {
+              ...emptyBundle(provider),
+              scanState: next,
+            },
+          }))
+          return
+        }
+        const [summary, daily, modelBreakdown, projectBreakdown, sessions] = await Promise.all([
+          fetchUsageSummary(config, provider, scope, range),
+          fetchUsageDaily(config, provider, scope, range),
+          fetchUsageBreakdown(config, provider, scope, range, 'model'),
+          fetchUsageBreakdown(config, provider, scope, range, 'project'),
+          fetchUsageSessions(config, provider, scope, range, 25),
+        ])
+        if (!isFresh()) return
+        setBundles((b) => ({
+          ...b,
+          [provider]: {
+            provider,
+            scanState: next,
+            summary,
+            daily,
+            modelBreakdown,
+            projectBreakdown,
+            sessions,
+            loading: false,
+            error: null,
+          },
+        }))
+      } catch (err) {
+        if (!isFresh()) return
+        setBundles((b) => ({
+          ...b,
+          [provider]: {
+            ...b[provider],
+            loading: false,
+            error: err instanceof Error ? err.message : 'Failed to load usage',
+          },
+        }))
+      }
     },
     [config, scope, range],
   )

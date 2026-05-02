@@ -48,7 +48,20 @@ type Service struct {
 	scanners     map[Provider]scanFn
 	sourceCache  map[Provider]string // last known source path
 	sourceExists map[Provider]bool
+
+	// Rate-limit cache: probes are slow (HTTP / subprocess) and the windows
+	// move on the order of minutes, so we cache for rateLimitTTL and only
+	// refresh on demand or when force=true.
+	rateLimitMu      sync.Mutex
+	rateLimitCache   *RateLimitState
+	rateLimitFetched time.Time
+	rateLimitInflight chan struct{}
 }
+
+// Anthropic and Codex windows tick on the order of minutes; polling more
+// often than this just burns 429s when other clients (Orca, the CLI) share
+// the same per-account quota.
+const rateLimitTTL = 5 * time.Minute
 
 // NewService constructs a Service rooted at storageDir. worktrees may be nil
 // (sessions then attribute by cwd's last two segments only).
@@ -475,23 +488,79 @@ func (s *Service) Sessions(p Provider, scope Scope, r Range, limit int) ([]Sessi
 	return out, nil
 }
 
-// RateLimits is a stub — wiring real Claude OAuth + Codex probe is followup
-// work. For now we return Unavailable so the UI status bar gracefully shows
-// "--" instead of fake numbers.
+// RateLimits returns live quota data for each provider.
+// - Claude: Anthropic OAuth /api/oauth/usage with the local credentials file.
+// - Codex: codex app-server JSON-RPC.
+// - Gemini / OpenCode: no public window concept — always Unavailable.
+//
+// Results are cached for rateLimitTTL; force=true refreshes immediately.
+// Concurrent callers coalesce on the inflight refresh.
 func (s *Service) RateLimits(ctx context.Context, force bool) RateLimitState {
-	now := time.Now().UnixMilli()
-	stub := func(p Provider) *ProviderRateLimits {
-		return &ProviderRateLimits{
-			Provider:  p,
-			Status:    RateLimitUnavailable,
-			UpdatedAt: now,
+	s.rateLimitMu.Lock()
+	if !force && s.rateLimitCache != nil && time.Since(s.rateLimitFetched) < rateLimitTTL {
+		out := *s.rateLimitCache
+		s.rateLimitMu.Unlock()
+		return out
+	}
+	if s.rateLimitInflight != nil {
+		ch := s.rateLimitInflight
+		s.rateLimitMu.Unlock()
+		<-ch
+		s.rateLimitMu.Lock()
+		if s.rateLimitCache != nil {
+			out := *s.rateLimitCache
+			s.rateLimitMu.Unlock()
+			return out
 		}
+		s.rateLimitMu.Unlock()
+		return s.unavailableState("refresh failed")
+	}
+	done := make(chan struct{})
+	s.rateLimitInflight = done
+	s.rateLimitMu.Unlock()
+
+	defer func() {
+		s.rateLimitMu.Lock()
+		s.rateLimitInflight = nil
+		close(done)
+		s.rateLimitMu.Unlock()
+	}()
+
+	now := time.Now().UnixMilli()
+	state := RateLimitState{
+		Gemini:   &ProviderRateLimits{Provider: ProviderGemini, Status: RateLimitUnavailable, UpdatedAt: now, Error: "Gemini does not expose plan windows"},
+		OpenCode: &ProviderRateLimits{Provider: ProviderOpenCode, Status: RateLimitUnavailable, UpdatedAt: now, Error: "OpenCode does not expose plan windows"},
+	}
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		state.Claude = fetchClaudeRateLimits(ctx)
+	}()
+	go func() {
+		defer wg.Done()
+		state.Codex = fetchCodexRateLimits(ctx)
+	}()
+	wg.Wait()
+
+	s.rateLimitMu.Lock()
+	cached := state
+	s.rateLimitCache = &cached
+	s.rateLimitFetched = time.Now()
+	s.rateLimitMu.Unlock()
+	return state
+}
+
+func (s *Service) unavailableState(reason string) RateLimitState {
+	now := time.Now().UnixMilli()
+	mk := func(p Provider) *ProviderRateLimits {
+		return &ProviderRateLimits{Provider: p, Status: RateLimitUnavailable, UpdatedAt: now, Error: reason}
 	}
 	return RateLimitState{
-		Claude:   stub(ProviderClaude),
-		Codex:    stub(ProviderCodex),
-		Gemini:   stub(ProviderGemini),
-		OpenCode: stub(ProviderOpenCode),
+		Claude:   mk(ProviderClaude),
+		Codex:    mk(ProviderCodex),
+		Gemini:   mk(ProviderGemini),
+		OpenCode: mk(ProviderOpenCode),
 	}
 }
 

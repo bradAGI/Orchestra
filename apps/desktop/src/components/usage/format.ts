@@ -9,16 +9,36 @@ export function formatTokens(n: number): string {
   return formatNumber(n)
 }
 
-export function formatUSD(n: number | null | undefined): string {
-  if (n === null || n === undefined) return '—'
+export function formatCost(n: number | null | undefined): string {
+  if (n === null || n === undefined) return 'n/a'
+  if (n < 0.01) return '$' + n.toFixed(4)
   if (n >= 1000) return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 })
-  if (n >= 10) return '$' + n.toFixed(2)
-  return '$' + n.toFixed(3)
+  return '$' + n.toFixed(2)
+}
+
+export function formatUSD(n: number | null | undefined): string {
+  return formatCost(n)
 }
 
 export function formatPercent(n: number | null | undefined): string {
-  if (n === null || n === undefined) return '—'
+  if (n === null || n === undefined) return 'n/a'
   return (n * 100).toFixed(1) + '%'
+}
+
+export function formatUpdatedAt(timestamp: number | null | undefined): string {
+  if (!timestamp) return 'Not scanned yet'
+  return 'Updated ' + new Date(timestamp).toLocaleString()
+}
+
+export function formatSessionTime(iso: string): string {
+  const t = new Date(iso)
+  if (Number.isNaN(t.getTime())) return iso
+  return t.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }
 
 export function formatRelativeTime(iso: string): string {

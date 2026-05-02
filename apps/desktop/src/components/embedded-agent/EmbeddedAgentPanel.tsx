@@ -50,7 +50,7 @@ export function EmbeddedAgentPanel({ onOpenSettings }: { onOpenSettings?: () => 
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-5 pb-3">
         <div className="min-w-0 space-y-1">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">Agent</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">Maestro</p>
           {modelLabel ? (
             <h2 className="text-base font-black tracking-tight truncate capitalize">{modelLabel}</h2>
           ) : onOpenSettings ? (

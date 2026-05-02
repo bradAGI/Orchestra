@@ -147,6 +147,9 @@ func (c *Client) Notify(method string, params any) error {
 
 func (c *Client) listen() {
 	scanner := bufio.NewScanner(c.stdout)
+	// Allow large MCP payloads (default 64 KiB is too tight for tool results
+	// that can include big JSON blobs).
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		var resp struct {
@@ -159,22 +162,49 @@ func (c *Client) listen() {
 		}
 
 		if err := json.Unmarshal(line, &resp); err != nil {
+			c.logger.Debug().Err(err).Msg("mcp listen: unparseable payload, skipping")
 			continue
 		}
 
-		if resp.ID != "" {
-			c.mu.Lock()
-			ch, ok := c.pending[resp.ID]
-			c.mu.Unlock()
-			if ok {
-				if resp.Error != nil {
-					// Hack: pipe error as raw message for unmarshal to handle if needed
-					// Better: handle error explicitly
-				}
-				ch <- resp.Result
-			}
+		if resp.ID == "" {
+			continue
 		}
+
+		c.mu.Lock()
+		ch, ok := c.pending[resp.ID]
+		c.mu.Unlock()
+		if !ok {
+			continue
+		}
+		if resp.Error != nil {
+			// Surface errors as a synthetic JSON object so callers waiting on
+			// the channel can detect the failure without us blocking forever.
+			errPayload, _ := json.Marshal(map[string]any{
+				"_mcp_error": map[string]any{
+					"code":    resp.Error.Code,
+					"message": resp.Error.Message,
+				},
+			})
+			ch <- errPayload
+			continue
+		}
+		ch <- resp.Result
 	}
+	if err := scanner.Err(); err != nil {
+		c.logger.Warn().Err(err).Msg("mcp listen: stdout scanner terminated with error")
+	}
+	// Wake any callers still parked on a pending request — the server is
+	// gone, so handing them an empty payload is preferable to a goroutine
+	// leak. They'll either fail to unmarshal or recover via timeout.
+	c.mu.Lock()
+	for id, ch := range c.pending {
+		select {
+		case ch <- json.RawMessage(`{"_mcp_error":{"code":-1,"message":"mcp server stream closed"}}`):
+		default:
+		}
+		delete(c.pending, id)
+	}
+	c.mu.Unlock()
 }
 
 // Close shuts down the MCP server process by closing stdin/stdout and waiting for exit.

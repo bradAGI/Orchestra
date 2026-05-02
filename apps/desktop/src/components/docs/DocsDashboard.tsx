@@ -432,6 +432,12 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
                         <div className="px-3 pb-6 flex flex-col gap-0.5">
                             {loading && docs.length === 0 ? (
                                 [1, 2, 3, 4, 5, 6, 7].map(i => <Skeleton key={i} className="h-9 w-full rounded-md bg-muted/20" />)
+                            ) : filteredDocs.length === 0 ? (
+                                <div className="px-3 py-8 text-center text-[11px] text-muted-foreground/70 italic">
+                                    {searchQuery
+                                        ? <>No documents match <span className="font-mono not-italic">"{searchQuery}"</span></>
+                                        : 'No documentation available.'}
+                                </div>
                             ) : renderTree(filteredDocs)}
                         </div>
                     </OverlayScrollbarsComponent>

@@ -518,21 +518,22 @@ func processExecutionTick(
 		allResourceSpecs = append(allResourceSpecs, mcpResources...)
 	}
 
-	// Create a tool executor that can route to MCP
-	mcpAwareExecutor := func(tool string, args map[string]any) map[string]any {
-		// Check if it's an MCP tool (prefixed with server name)
+	// Tool executor that first tries MCP routing, then falls back to the
+	// tracker / linear executor. Context flows from the active turn so a
+	// cancelled run cleanly aborts in-flight tracker / MCP calls.
+	mcpAwareExecutor := func(ctx context.Context, tool string, args map[string]any) map[string]any {
 		if mcpReg := service.GetMCPRegistry(); mcpReg != nil {
 			if strings.Contains(tool, "_") {
 				parts := strings.SplitN(tool, "_", 2)
 				serverName := parts[0]
 				toolName := parts[1]
-				res, err := mcpReg.ExecuteTool(context.Background(), serverName, toolName, args)
+				res, err := mcpReg.ExecuteTool(ctx, serverName, toolName, args)
 				if err == nil {
 					return res
 				}
 			}
 		}
-		return toolExecutor(tool, args)
+		return toolExecutor(ctx, tool, args)
 	}
 
 	sessionID := fmt.Sprintf("%s-%d", entry.IssueIdentifier, time.Now().UnixNano())

@@ -84,6 +84,25 @@ export default function App() {
   // ---------------------------------------------------------------------------
   const theme = useAppStore(s => s.theme)
   const setTheme = useAppStore(s => s.setTheme)
+  const reapplyTheme = useAppStore(s => s.reapply)
+  const activeThemeId = useAppStore(s => s.activeThemeId)
+  const modeOverride = useAppStore(s => s.modeOverride)
+  // Apply the active theme on mount and whenever the active id or mode flips.
+  useEffect(() => {
+    reapplyTheme()
+  }, [reapplyTheme, activeThemeId, modeOverride])
+  // Follow OS theme changes when mode is `auto`.
+  useEffect(() => {
+    if (modeOverride !== 'auto') return
+    try {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)')
+      const onChange = () => reapplyTheme()
+      mq.addEventListener('change', onChange)
+      return () => mq.removeEventListener('change', onChange)
+    } catch {
+      return undefined
+    }
+  }, [modeOverride, reapplyTheme])
   const activeSection = useAppStore(s => s.activeSection)
   const setActiveSection = useAppStore(s => s.setActiveSection)
   const sidebarCollapsed = useAppStore(s => s.sidebarCollapsed)
@@ -1148,7 +1167,7 @@ export default function App() {
               {sectionVisibility.showAgents ? (
                 <SectionErrorBoundary name="Agents">
                 <section className="flex-1 flex flex-col min-h-0">
-                  <AgentsDashboard config={config} snapshot={snapshot} />
+                  <AgentsDashboard config={config} />
                 </section>
                 </SectionErrorBoundary>
               ) : null}

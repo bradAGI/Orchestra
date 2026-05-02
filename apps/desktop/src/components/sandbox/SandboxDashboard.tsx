@@ -185,10 +185,12 @@ export function SandboxDashboard({ config, onOpenSettings }: { config: BackendCo
       setCurrentJobStatus('pending')
       setProgressStatus(`${jobId.slice(0, 12)} pending...`)
 
-      // Step 2: Poll until done
+      // Step 2: Poll until done. Backoff from 1s up to 5s so we don't hammer
+      // the backend for long-running jobs.
       const pollUrl = new URL(`/api/v1/unsandbox/jobs/${jobId}`, config.baseUrl)
+      let pollDelay = 1000
       while (!controller.signal.aborted) {
-        await new Promise((r) => setTimeout(r, 2000))
+        await new Promise((r) => setTimeout(r, pollDelay))
         if (controller.signal.aborted) break
 
         const pollResp = await fetch(pollUrl.toString(), { headers, signal: controller.signal })
@@ -213,6 +215,7 @@ export function SandboxDashboard({ config, onOpenSettings }: { config: BackendCo
 
         setCurrentJobStatus(status)
         setProgressStatus(`${status}... (${jobId.slice(0, 12)})`)
+        pollDelay = Math.min(pollDelay * 1.5, 5000)
       }
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
@@ -221,6 +224,12 @@ export function SandboxDashboard({ config, onOpenSettings }: { config: BackendCo
     } finally {
       abortRef.current = null
       setExecuting(false)
+      // Clear ghost status if we exited via abort — controller.signal.aborted is set
+      // when the user cancels, leaving stale "pending"/"running" badges otherwise.
+      if (controller.signal.aborted) {
+        setCurrentJobStatus('')
+        setProgressStatus('')
+      }
     }
   }
 

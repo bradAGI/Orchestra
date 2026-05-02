@@ -73,7 +73,7 @@ export function SidebarNav({
         <OverlayScrollbarsComponent
           element="div"
           options={osOptions}
-          className={`flex-1 min-h-0 pt-4 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}
+          className={`flex-1 min-h-0 pt-3 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}
         >
           <nav className="flex flex-col gap-1.5" aria-label="Primary navigation">
             {items.map((item, index) => {
@@ -94,19 +94,35 @@ export function SidebarNav({
                     onKeyDown={handleNavKeyDown(index)}
                     aria-current={active ? 'page' : undefined}
                     data-testid={`sidebar-nav-${item.id}`}
-                    className={`group relative flex w-full items-center text-left rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
-                      sidebarCollapsed ? 'justify-center h-11 w-11 mx-auto' : 'gap-3 px-3 h-11'
+                    className={`group relative flex w-full items-center text-left rounded-xl transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+                      sidebarCollapsed ? 'justify-center h-12 w-12 mx-auto' : 'gap-3 px-2.5 h-12'
                     } ${active
-                      ? 'bg-foreground/[0.06] text-foreground'
-                      : 'text-muted-foreground/80 hover:text-foreground hover:bg-foreground/[0.03]'
+                      ? 'bg-gradient-to-r from-primary/[0.22] via-primary/[0.12] to-primary/[0.04] text-foreground shadow-[inset_0_0_0_1px] shadow-primary/20 ring-1 ring-primary/10'
+                      : 'text-muted-foreground/85 hover:text-foreground hover:bg-foreground/[0.05] hover:shadow-[inset_0_0_0_1px] hover:shadow-foreground/[0.06]'
                     }`}
                   >
                     {!sidebarCollapsed && active && (
-                      <span className="absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-primary" />
+                      <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-primary shadow-[0_0_10px] shadow-primary/70" />
                     )}
-                    <ItemIcon className={`h-[17px] w-[17px] shrink-0 transition-colors ${active ? 'text-primary' : 'text-muted-foreground/60 group-hover:text-foreground'}`} strokeWidth={active ? 2.25 : 1.75} />
+                    <span
+                      className={`relative grid place-items-center shrink-0 transition-all duration-200 h-9 w-9 rounded-lg ${
+                        active
+                          ? 'bg-primary/20 text-primary ring-1 ring-primary/25 shadow-[0_0_12px_-2px] shadow-primary/40'
+                          : 'text-muted-foreground/75 bg-foreground/[0.02] group-hover:bg-foreground/[0.06] group-hover:text-foreground ring-1 ring-transparent group-hover:ring-foreground/[0.06]'
+                      }`}
+                    >
+                      <ItemIcon
+                        className="h-[17px] w-[17px]"
+                        strokeWidth={active ? 2.4 : 1.9}
+                      />
+                    </span>
                     {!sidebarCollapsed && (
-                      <span className="truncate text-[13px] font-medium tracking-tight">{item.label}</span>
+                      <span className={`truncate text-[13px] tracking-tight transition-all ${active ? 'font-bold' : 'font-medium'}`}>
+                        {item.label}
+                      </span>
+                    )}
+                    {!sidebarCollapsed && active && (
+                      <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_8px] shadow-primary/60" />
                     )}
                   </button>
                 </AppTooltip>

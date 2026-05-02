@@ -10,7 +10,6 @@ import {
   Eye,
   EyeOff,
   FlaskConical,
-  FolderRoot,
   GitBranch,
   Globe,
   Keyboard,
@@ -48,6 +47,8 @@ import { CHAT_PROVIDERS } from '@/components/embedded-agent/lib/types'
 import { usePlatform } from '@/hooks/use-platform'
 import { CustomDropdown } from '@/components/app-shell/shared/controls'
 import { useAppStore } from '@/store'
+import { resolveMode } from '@/themes/applyTheme'
+import type { Theme, ThemeMode } from '@/themes/types'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -65,9 +66,8 @@ type BackendProfile = {
 // ---------------------------------------------------------------------------
 
 const SECTIONS = [
-  { id: 'general', label: 'General', icon: FolderRoot },
   { id: 'connections', label: 'Connections', icon: Database },
-  { id: 'agents', label: 'Agents', icon: Cpu },
+  { id: 'agents', label: 'Maestro', icon: Cpu },
   { id: 'git', label: 'Git', icon: GitBranch },
   { id: 'appearance', label: 'Appearance', icon: Paintbrush },
   { id: 'terminal', label: 'Terminal', icon: Terminal },
@@ -168,11 +168,17 @@ export function SettingsPage({
   const setTheme = useAppStore(s => s.setTheme)
   const browserHomepage = useAppStore(s => s.browserHomepage)
   const setBrowserHomepage = useAppStore(s => s.setBrowserHomepage)
+  const builtinThemes = useAppStore(s => s.builtinThemes)
+  const customThemes = useAppStore(s => s.customThemes)
+  const activeThemeId = useAppStore(s => s.activeThemeId)
+  const modeOverride = useAppStore(s => s.modeOverride)
+  const setActiveTheme = useAppStore(s => s.setActiveTheme)
+  const setMode = useAppStore(s => s.setMode)
   const [homepageDraft, setHomepageDraft] = useState(browserHomepage)
   useEffect(() => { setHomepageDraft(browserHomepage) }, [browserHomepage])
 
   const scrollRef = useRef<HTMLDivElement>(null)
-  const [activeId, setActiveId] = useState<SectionId>('general')
+  const [activeId, setActiveId] = useState<SectionId>('connections')
 
   useEffect(() => {
     ensureFlashStyle()
@@ -277,36 +283,6 @@ export function SettingsPage({
               Tune Orchestra to your workflow. Changes save automatically.
             </p>
           </header>
-          {/* ── General ── */}
-          <section data-settings-section="general" className="rounded-xl transition-colors duration-500 scroll-mt-4">
-            <SectionHeading icon={FolderRoot} title="General" description="Workspace and startup configuration" />
-            <div className="mt-4 space-y-4">
-              <div className="p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20">
-                <div className="space-y-0.5">
-                  <p className="text-xs font-black tracking-tight">Workspace Root</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    Set via <code className="text-[10px] font-mono bg-muted/30 px-1 rounded">ORCHESTRA_WORKSPACE_ROOT</code> environment variable
-                  </p>
-                </div>
-                <div className="mt-2 px-3 py-2 rounded-lg bg-muted/20 border border-border/20 text-xs font-mono text-muted-foreground select-all">
-                  {config?.baseUrl ? '(configured via backend)' : 'Not set'}
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <p className="text-xs font-black tracking-tight">Backend Auto-Start</p>
-                    <p className="text-[10px] text-muted-foreground">Automatically launch orchestrad when the app starts</p>
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
-                    Managed by Electron
-                  </span>
-                </div>
-              </div>
-            </div>
-          </section>
-
           {/* ── Connections ── */}
           <section data-settings-section="connections" className="rounded-xl transition-colors duration-500 scroll-mt-4">
             <SectionHeading icon={Database} title="Connections" description="Backend profiles and API connection" />
@@ -331,7 +307,7 @@ export function SettingsPage({
 
           {/* ── Agents ── */}
           <section data-settings-section="agents" className="rounded-xl transition-colors duration-500 scroll-mt-4">
-            <SectionHeading icon={Cpu} title="Agents" description="LLM provider and embedded agent configuration" />
+            <SectionHeading icon={Cpu} title="Maestro" description="LLM provider and embedded agent configuration" />
             <div className="mt-4 space-y-6">
               <EmbeddedAgentConfigForm config={config} disabled={savingConfig || loadingConfig} />
               <UnsandboxConfigForm config={config} disabled={savingConfig || loadingConfig} />
@@ -349,28 +325,23 @@ export function SettingsPage({
           {/* ── Appearance ── */}
           <section data-settings-section="appearance" className="rounded-xl transition-colors duration-500 scroll-mt-4">
             <SectionHeading icon={Paintbrush} title="Appearance" description="Theme and visual preferences" />
-            <div className="mt-4">
-              <div className="p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20">
-                <div className="space-y-0.5 mb-3">
-                  <p className="text-xs font-black tracking-tight">Theme</p>
-                  <p className="text-[10px] text-muted-foreground">Choose your preferred color scheme</p>
-                </div>
-                <div className="flex gap-2">
-                  {(['light', 'dark'] as const).map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setTheme(t)}
-                      className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
-                        theme === t
-                          ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
-                          : 'bg-muted/30 text-muted-foreground hover:bg-muted/50'
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <div className="mt-4 space-y-4">
+              <AppearanceModePane
+                modeOverride={modeOverride}
+                onModeChange={(m) => {
+                  setMode(m)
+                  // Keep legacy `theme` slice in sync so anything still reading
+                  // it gets a concrete light/dark value.
+                  const resolved = m === 'auto' ? resolveMode('auto') : m
+                  if (resolved !== theme) setTheme(resolved)
+                }}
+              />
+              <ThemePresetPane
+                themes={[...builtinThemes, ...customThemes]}
+                activeThemeId={activeThemeId}
+                modeOverride={modeOverride}
+                onSelect={setActiveTheme}
+              />
             </div>
           </section>
 
@@ -492,6 +463,145 @@ function PlaceholderPane({ text }: { text: string }) {
     <div className="p-8 rounded-xl border border-dashed border-border/30 bg-gradient-to-b from-muted/5 to-transparent text-center">
       <p className="text-xs text-muted-foreground/50 font-medium tracking-wide">{text}</p>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Appearance — Mode picker (Light / Dark / Auto)
+// ---------------------------------------------------------------------------
+
+function AppearanceModePane({
+  modeOverride,
+  onModeChange,
+}: {
+  modeOverride: ThemeMode
+  onModeChange: (mode: ThemeMode) => void
+}) {
+  const modes: Array<{ id: ThemeMode; label: string }> = [
+    { id: 'light', label: 'Light' },
+    { id: 'dark', label: 'Dark' },
+    { id: 'auto', label: 'Auto' },
+  ]
+  return (
+    <div className="p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20">
+      <div className="space-y-0.5 mb-3">
+        <p className="text-xs font-black tracking-tight">Mode</p>
+        <p className="text-[10px] text-muted-foreground">
+          Light, dark, or follow your system. Active theme adapts to the chosen mode.
+        </p>
+      </div>
+      <div className="flex gap-2">
+        {modes.map((m) => (
+          <button
+            key={m.id}
+            onClick={() => onModeChange(m.id)}
+            className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
+              modeOverride === m.id
+                ? 'bg-white text-black shadow-lg shadow-black/20'
+                : 'bg-muted/30 text-muted-foreground hover:bg-muted/50'
+            }`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Appearance — Theme preset picker
+// ---------------------------------------------------------------------------
+
+function ThemePresetPane({
+  themes,
+  activeThemeId,
+  modeOverride,
+  onSelect,
+}: {
+  themes: Theme[]
+  activeThemeId: string
+  modeOverride: ThemeMode
+  onSelect: (id: string) => void
+}) {
+  const resolved: 'light' | 'dark' = modeOverride === 'auto' ? resolveMode('auto') : modeOverride
+  return (
+    <div className="p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20">
+      <div className="space-y-0.5 mb-3">
+        <p className="text-xs font-black tracking-tight">Theme</p>
+        <p className="text-[10px] text-muted-foreground">
+          Pick a preset. Custom themes can be created in the Theme Studio (coming soon).
+        </p>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {themes.map((t) => (
+          <ThemeSwatchCard
+            key={t.id}
+            theme={t}
+            mode={resolved}
+            active={t.id === activeThemeId}
+            onClick={() => onSelect(t.id)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ThemeSwatchCard({
+  theme,
+  mode,
+  active,
+  onClick,
+}: {
+  theme: Theme
+  mode: 'light' | 'dark'
+  active: boolean
+  onClick: () => void
+}) {
+  const roles = theme.roles[mode]
+  const bg = `hsl(${roles.background})`
+  const surface = `hsl(${roles.surface})`
+  const surfaceRaised = `hsl(${roles.surfaceRaised})`
+  const text = `hsl(${roles.text})`
+  const accent = `hsl(${roles.accent})`
+  const border = `hsl(${roles.border})`
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative rounded-xl overflow-hidden text-left transition-all border ${
+        active
+          ? 'border-white/80 ring-2 ring-white/40 shadow-lg shadow-black/20'
+          : 'border-border/40 hover:border-border/70'
+      }`}
+      aria-pressed={active}
+    >
+      {/* Mini preview */}
+      <div className="p-2.5 flex flex-col gap-1.5" style={{ background: bg }}>
+        <div className="flex gap-1.5">
+          <div className="h-2 w-2 rounded-full" style={{ background: accent }} />
+          <div className="h-2 w-2 rounded-full opacity-60" style={{ background: text }} />
+          <div className="h-2 w-2 rounded-full opacity-30" style={{ background: text }} />
+        </div>
+        <div
+          className="h-6 rounded-md flex items-center px-1.5 gap-1"
+          style={{ background: surface, border: `1px solid ${border}` }}
+        >
+          <div className="h-1 w-3 rounded-full opacity-80" style={{ background: text }} />
+          <div className="h-1 w-5 rounded-full opacity-40" style={{ background: text }} />
+        </div>
+        <div
+          className="h-3 rounded-sm"
+          style={{ background: surfaceRaised, border: `1px solid ${border}` }}
+        />
+      </div>
+      {/* Label */}
+      <div className="px-2.5 py-2 flex items-center justify-between gap-2 bg-card/60 backdrop-blur border-t border-border/30">
+        <span className="text-[11px] font-bold tracking-tight truncate">{theme.name}</span>
+        {active && <Check className="h-3 w-3 text-white shrink-0" />}
+      </div>
+    </button>
   )
 }
 
@@ -679,16 +789,16 @@ function NotificationsPane({
           <p className="text-[10px] text-muted-foreground">Disable notification sounds when agents complete</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`text-[9px] font-bold uppercase tracking-widest ${!notifMuted ? 'text-primary' : 'text-muted-foreground/30'}`}>On</span>
+          <span className={`text-[9px] font-bold uppercase tracking-widest ${!notifMuted ? 'text-foreground' : 'text-muted-foreground/30'}`}>On</span>
           <button
             onClick={() => {
               const next = !notifMuted
               onNotifMutedChange?.(next)
               localStorage.setItem('orchestra_notif_muted', String(next))
             }}
-            className={`h-8 w-14 rounded-full transition-colors ${notifMuted ? 'bg-muted' : 'bg-primary'} relative`}
+            className={`h-8 w-14 rounded-full transition-colors ${notifMuted ? 'bg-muted' : 'bg-white'} relative`}
           >
-            <div className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${notifMuted ? 'left-7' : 'left-1'}`} />
+            <div className={`absolute top-1 h-6 w-6 rounded-full ${notifMuted ? 'bg-white' : 'bg-black'} shadow transition-transform ${notifMuted ? 'left-7' : 'left-1'}`} />
           </button>
           <span className={`text-[9px] font-bold uppercase tracking-widest ${notifMuted ? 'text-red-400' : 'text-muted-foreground/30'}`}>Mute</span>
         </div>
@@ -733,7 +843,7 @@ function NotificationsPane({
                 osc.onended = () => ctx.close()
               } catch { /* ignore */ }
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-white/10 text-foreground border border-white/20 hover:bg-white/20 transition-colors"
           >
             <Play size={10} />
             Test
@@ -753,7 +863,7 @@ function NotificationsPane({
               }}
               className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
                 notifSound === s.id
-                  ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                  ? 'bg-white text-black shadow-lg shadow-black/20'
                   : 'bg-muted/30 text-muted-foreground hover:bg-muted/50'
               }`}
             >
@@ -872,6 +982,11 @@ function BackendConfigForm({
   const [newProfileName, setNewProfileName] = useState('')
   const [showToken, setShowToken] = useState(false)
 
+  const baseUrlTrimmed = baseUrl.trim()
+  const baseUrlInvalid = baseUrlTrimmed !== '' && (() => {
+    try { new URL(baseUrlTrimmed); return false } catch { return true }
+  })()
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setBaseUrl(config?.baseUrl ?? '')
@@ -925,7 +1040,9 @@ function BackendConfigForm({
                   disabled={disabled || backendProfiles.length <= 1 || activeProfileId === ''}
                   onClick={(e) => {
                     e.preventDefault()
-                    if (activeProfileId !== '') {
+                    if (activeProfileId === '') return
+                    const name = backendProfiles.find((p) => p.id === activeProfileId)?.name ?? activeProfileId
+                    if (window.confirm(`Delete backend profile "${name}"? This cannot be undone.`)) {
                       void onDeleteProfile(activeProfileId)
                     }
                   }}
@@ -949,7 +1066,7 @@ function BackendConfigForm({
                   variant="outline"
                   size="sm"
                   aria-label="Create"
-                  className="h-9 px-3 rounded-lg bg-primary/5 border-primary/20 text-primary hover:bg-primary hover:text-primary-foreground"
+                  className="h-9 px-3 rounded-lg bg-white/5 border-white/20 text-foreground hover:bg-white hover:text-black"
                   disabled={disabled || newProfileName.trim() === ''}
                   onClick={() => {
                     void onCreateProfile(newProfileName.trim())
@@ -977,13 +1094,17 @@ function BackendConfigForm({
                   <Globe className="h-3 w-3" />
                 </div>
                 <input
-                  className="h-9 w-full rounded-lg border border-border bg-background pl-8 pr-3 text-xs font-mono focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+                  className={`h-9 w-full rounded-lg border bg-background pl-8 pr-3 text-xs font-mono focus:ring-2 transition-all shadow-sm ${baseUrlInvalid ? 'border-destructive/60 focus:ring-destructive/20 focus:border-destructive' : 'border-border focus:ring-primary/20 focus:border-primary'}`}
                   value={baseUrl}
                   onChange={(event) => setBaseUrl(event.target.value)}
                   placeholder="http://127.0.0.1:4010"
                   disabled={disabled}
+                  aria-invalid={baseUrlInvalid || undefined}
                 />
               </div>
+              {baseUrlInvalid && (
+                <span className="block text-[10px] text-destructive px-1">Must be a valid absolute URL (http:// or https://)</span>
+              )}
             </label>
 
             <label className="space-y-1.5 block">
@@ -1032,9 +1153,9 @@ function BackendConfigForm({
           </div>
         </div>
         <Button
-          onClick={() => void onSaveBackendConfig({ baseUrl: baseUrl.trim(), apiToken: apiToken.trim() })}
-          disabled={disabled || baseUrl.trim() === ''}
-          className="px-6 shadow-lg shadow-primary/20 font-black uppercase tracking-widest text-[9px] h-9 rounded-lg"
+          onClick={() => void onSaveBackendConfig({ baseUrl: baseUrlTrimmed, apiToken: apiToken.trim() })}
+          disabled={disabled || baseUrlTrimmed === '' || baseUrlInvalid}
+          className="px-6 shadow-lg shadow-black/20 font-black uppercase tracking-widest text-[9px] h-9 rounded-lg"
         >
           {savingConfig ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : 'Save Backend Config'}
         </Button>
@@ -1358,7 +1479,7 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
             <button
               onClick={handleSave}
               disabled={disabled || saving || !apiKey.trim()}
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-black hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {saving ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <Check className="h-3 w-3" />}
               Save
@@ -1567,7 +1688,7 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
           <button
             onClick={handleSave}
             disabled={disabled || saving || !publicKey.trim() || (!secretKey.trim() && !isConfigured)}
-            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-black hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {saving ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <Check className="h-3 w-3" />}
             Save Keys

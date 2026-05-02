@@ -38,6 +38,18 @@ type EnrichedIssue = IssueListItem & {
   at: string
 }
 
+const COLUMN_TO_STATE: Record<string, string> = {
+  backlog: 'Backlog',
+  todo: 'Todo',
+  progress: 'In Progress',
+  review: 'Review',
+  done: 'Done',
+}
+
+const STATE_TO_COLUMN: Record<string, string> = Object.fromEntries(
+  Object.entries(COLUMN_TO_STATE).map(([k, v]) => [v, k]),
+)
+
 export function KanbanBoard({
   loadingState,
   snapshot,
@@ -45,7 +57,6 @@ export function KanbanBoard({
   projects = [],
   availableAgents = [],
   onInspectIssue,
-  onJumpToTerminal: _onJumpToTerminal,
   onIssueUpdate,
   onIssueDelete,
   onStopSession,
@@ -139,22 +150,6 @@ export function KanbanBoard({
     const issueIdentifier = e.dataTransfer.getData('issueIdentifier')
     if (!issueIdentifier || !onIssueUpdate) return
 
-    const stateMap: Record<string, string> = {
-      backlog: 'Backlog',
-      todo: 'Todo',
-      progress: 'In Progress',
-      review: 'Review',
-      done: 'Done',
-    }
-
-    const columnIdFromState: Record<string, string> = {
-      'Backlog': 'backlog',
-      'Todo': 'todo',
-      'In Progress': 'progress',
-      'Review': 'review',
-      'Done': 'done',
-    }
-
     const allowedDragTransitions: Record<string, string[]> = {
       backlog: ['todo'],
       todo: ['progress'],
@@ -169,7 +164,7 @@ export function KanbanBoard({
     )
     if (!issue) return
 
-    const currentColumnId = columnIdFromState[issue.state] || ''
+    const currentColumnId = STATE_TO_COLUMN[issue.state] || ''
     if (currentColumnId === targetColumnId) return
 
     // Check if the transition is allowed
@@ -189,7 +184,7 @@ export function KanbanBoard({
       }
     }
 
-    const nextState = stateMap[targetColumnId]
+    const nextState = COLUMN_TO_STATE[targetColumnId]
     if (nextState) {
       await onIssueUpdate(issueIdentifier, { state: nextState })
     }
@@ -227,8 +222,6 @@ export function KanbanBoard({
     }
   })
 
-  const _uniqueStates = Array.from(new Set(enrichedIssues.map((item) => item.state))).sort()
-
   const filterItem = (item: EnrichedIssue) => {
     const stateMatch = stateFilter === 'all' || item.state === stateFilter
     const projectMatch = projectFilter === 'all' || item.project_id === projectFilter
@@ -236,18 +229,67 @@ export function KanbanBoard({
   }
 
   const stateIs = (s: string, target: string) => s.toLowerCase() === target.toLowerCase()
-  const backlogItems = enrichedIssues.filter((i) => stateIs(i.state, 'Backlog')).filter(filterItem)
-  const todoItems = enrichedIssues.filter((i) => stateIs(i.state, 'Todo')).filter(filterItem)
-  const inProgressItems = enrichedIssues.filter((i) => stateIs(i.state, 'In Progress')).filter(filterItem)
-  const reviewItems = enrichedIssues.filter((i) => stateIs(i.state, 'Review')).filter(filterItem)
-  const doneItemsList = enrichedIssues.filter((i) => stateIs(i.state, 'Done')).filter(filterItem)
+  const visibleIssues = enrichedIssues.filter(filterItem)
+  const backlogItems = visibleIssues.filter((i) => stateIs(i.state, 'Backlog'))
+  const todoItems = visibleIssues.filter((i) => stateIs(i.state, 'Todo'))
+  const inProgressItems = visibleIssues.filter((i) => stateIs(i.state, 'In Progress'))
+  const reviewItems = visibleIssues.filter((i) => stateIs(i.state, 'Review'))
+  const doneItemsList = visibleIssues.filter((i) => stateIs(i.state, 'Done'))
 
-  const columns = [
-    { id: 'backlog', title: 'Backlog', items: backlogItems, icon: <div className="h-2 w-2 rounded-full border-2 border-muted-foreground/40" />, accent: 'bg-muted-foreground/40' },
-    { id: 'todo', title: 'To Do', items: todoItems, icon: <div className="h-2 w-2 rounded-full border-2 border-muted-foreground" />, accent: 'bg-muted-foreground/70' },
-    { id: 'progress', title: 'In Progress', items: inProgressItems, icon: <div className="h-2 w-2 rounded-full border-2 border-amber-500 bg-amber-500" />, accent: 'bg-amber-500' },
-    { id: 'review', title: 'Review', items: reviewItems, icon: <div className="h-2 w-2 rounded-full border-2 border-blue-500 bg-blue-500" />, accent: 'bg-blue-500' },
-    { id: 'done', title: 'Done', items: doneItemsList, icon: <div className="h-2 w-2 rounded-full bg-primary" />, accent: 'bg-primary' },
+  const columns: {
+    id: string
+    title: string
+    items: EnrichedIssue[]
+    icon: React.ReactNode
+    accent: string
+    accentText: string
+    accentTint: string
+  }[] = [
+    {
+      id: 'backlog',
+      title: 'Backlog',
+      items: backlogItems,
+      icon: <div className="h-2 w-2 rounded-full border-2 border-muted-foreground/50" />,
+      accent: 'bg-muted-foreground/50',
+      accentText: 'text-muted-foreground',
+      accentTint: 'bg-muted-foreground/[0.06]',
+    },
+    {
+      id: 'todo',
+      title: 'To Do',
+      items: todoItems,
+      icon: <div className="h-2 w-2 rounded-full border-2 border-foreground/70" />,
+      accent: 'bg-foreground/70',
+      accentText: 'text-foreground',
+      accentTint: 'bg-foreground/[0.04]',
+    },
+    {
+      id: 'progress',
+      title: 'In Progress',
+      items: inProgressItems,
+      icon: <div className="h-2 w-2 rounded-full border-2 border-violet-500/80 bg-violet-500/80" />,
+      accent: 'bg-violet-500/80',
+      accentText: 'text-violet-700/90 dark:text-violet-300/90',
+      accentTint: 'bg-violet-500/[0.05]',
+    },
+    {
+      id: 'review',
+      title: 'Review',
+      items: reviewItems,
+      icon: <div className="h-2 w-2 rounded-full border-2 border-blue-600/70 bg-blue-600/70" />,
+      accent: 'bg-blue-600/70',
+      accentText: 'text-blue-700/90 dark:text-blue-300/85',
+      accentTint: 'bg-blue-500/[0.04]',
+    },
+    {
+      id: 'done',
+      title: 'Done',
+      items: doneItemsList,
+      icon: <div className="h-2 w-2 rounded-full bg-emerald-600/70" />,
+      accent: 'bg-emerald-600/70',
+      accentText: 'text-emerald-700/90 dark:text-emerald-300/85',
+      accentTint: 'bg-emerald-500/[0.04]',
+    },
   ]
 
   const orderedColumns = columnOrder.map((id) => columns.find((column) => column.id === id)!)
@@ -374,25 +416,25 @@ export function KanbanBoard({
               onDrop={(e) => handleDrop(e, column.id)}
             >
               <div
-                className="flex cursor-grab items-center justify-between px-2 py-1 active:cursor-grabbing shrink-0 group/header"
+                className={`flex cursor-grab items-center justify-between rounded-md px-2.5 py-1.5 active:cursor-grabbing shrink-0 group/header ${column.accentTint}`}
                 draggable
                 onDragStart={(e) => handleColumnDragStart(e, column.id)}
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  {column.icon}
-                  <h3 className="text-[12.5px] font-semibold tracking-tight text-foreground truncate">{column.title}</h3>
-                  <span className="inline-flex items-center justify-center min-w-[20px] h-[18px] px-1.5 rounded-full bg-muted/60 text-[10px] font-bold text-muted-foreground tabular-nums">
+                  <span className={`block h-1.5 w-1.5 rounded-full ${column.accent} shadow-[0_0_0_3px_var(--background)]`} />
+                  <h3 className={`text-[12.5px] font-semibold tracking-tight truncate ${column.accentText}`}>{column.title}</h3>
+                  <span className={`inline-flex items-center justify-center min-w-[20px] h-[18px] px-1.5 rounded-full bg-background/80 text-[10px] font-bold tabular-nums ${column.accentText}`}>
                     {column.items.length}
                   </span>
                 </div>
               </div>
 
-              <div className={`relative flex-1 flex flex-col rounded-xl min-h-0 transition-all overflow-hidden ${
+              <div className={`relative flex-1 flex flex-col min-h-0 transition-all overflow-hidden ${
                 isDraggingOver === column.id
-                  ? 'bg-primary/[0.05] ring-1 ring-primary/40 ring-inset'
-                  : 'bg-muted/[0.06] ring-1 ring-border/30 ring-inset'
+                  ? 'surface !border-primary/50 !shadow-primary/20'
+                  : 'surface'
               }`}>
-                <div className={`absolute top-0 left-0 right-0 h-[2px] ${column.accent} opacity-60`} />
+                <div className={`absolute top-0 left-0 right-0 h-[3px] ${column.accent}`} />
                 <OverlayScrollbarsComponent
                   element="div"
                   options={osOptions}
@@ -413,8 +455,9 @@ export function KanbanBoard({
                       <p className="text-[11px] font-semibold text-muted-foreground/60 group-hover/empty:text-foreground transition-colors">Add task</p>
                     </button>
                   ) : (
-                    <div className="w-full min-h-full flex items-center justify-center opacity-60">
-                      <p className="text-[10px] font-medium tracking-wide text-muted-foreground/40">— empty —</p>
+                    <div className={`w-full min-h-full flex flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border/40 ${column.accentTint}`}>
+                      <span className={`block h-1.5 w-1.5 rounded-full ${column.accent} opacity-50`} />
+                      <p className="text-[10px] font-medium tracking-wide text-muted-foreground/55">No tasks here</p>
                     </div>
                   )
                 ) : (
@@ -574,7 +617,8 @@ export function KanbanBoard({
                           agents={availableAgents}
                           onChange={(value) => {
                             if (onIssueUpdate) {
-                                void onIssueUpdate(getActionIssueRef(item), { assignee_id: value })
+                                const agentName = value.replace('agent-', '')
+                                void onIssueUpdate(getActionIssueRef(item), { assignee_id: value, provider: agentName })
                             }
                           }}
                         />

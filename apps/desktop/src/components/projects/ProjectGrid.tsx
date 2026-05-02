@@ -233,7 +233,7 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
                   <div
                     key={project.id}
                     onClick={() => onProjectClick(project.id)}
-                    className="group flex items-center gap-3 px-3 h-12 rounded-md cursor-pointer transition-colors hover:bg-foreground/[0.03]"
+                    className="group flex items-center gap-3 px-3 h-12 rounded-md cursor-pointer border border-border/30 bg-card/40 transition-colors hover:bg-foreground/[0.03] hover:border-border/60"
                   >
                     <Folder className="w-[15px] h-[15px] shrink-0 text-muted-foreground/60 group-hover:text-foreground transition-colors" strokeWidth={1.75} />
 

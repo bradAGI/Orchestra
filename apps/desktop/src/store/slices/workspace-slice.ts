@@ -308,6 +308,33 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     })
   },
 
+  reorderTabsInGroup: (projectId, groupId, fromIndex, toIndex) => {
+    const state = get()
+    const groups = state.projectGroups[projectId]
+    if (!groups || !groups[groupId]) return
+    const group = groups[groupId]
+    if (
+      fromIndex < 0 || fromIndex >= group.tabs.length ||
+      toIndex < 0 || toIndex > group.tabs.length ||
+      fromIndex === toIndex
+    ) return
+    const next = group.tabs.slice()
+    const [moved] = next.splice(fromIndex, 1)
+    // When moving forward, the splice above shifts subsequent indices left by one.
+    const insertAt = toIndex > fromIndex ? toIndex - 1 : toIndex
+    next.splice(insertAt, 0, moved)
+    if (next.every((t, i) => t.id === group.tabs[i]?.id)) return
+    set({
+      projectGroups: {
+        ...state.projectGroups,
+        [projectId]: {
+          ...groups,
+          [groupId]: { ...group, tabs: next },
+        },
+      },
+    })
+  },
+
   setGroupSplitRatio: (projectId, nodePath, ratio) => {
     const state = get()
     const layout = state.projectLayouts[projectId]

@@ -1,8 +1,9 @@
 import Editor from '@monaco-editor/react'
 import { useAppStore } from '@/store'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Save, RotateCcw, Check } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Save, RotateCcw, Check, Eye, Pencil, Columns2 } from 'lucide-react'
 import type { OpenFile } from '@/store/types'
+import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer'
 
 interface EditorContentProps {
   file: OpenFile
@@ -20,6 +21,39 @@ export function EditorContent({ file }: EditorContentProps) {
   const editorRef = useRef<unknown>(null)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveError, setSaveError] = useState<string | null>(null)
+
+  type PreviewKind = null | 'markdown' | 'html' | 'svg' | 'image' | 'json'
+  const previewKind: PreviewKind = useMemo(() => {
+    const lower = file.filePath.toLowerCase()
+    if (lower.endsWith('.md') || lower.endsWith('.markdown') || lower.endsWith('.mdx') || file.language === 'markdown') {
+      return 'markdown'
+    }
+    if (lower.endsWith('.html') || lower.endsWith('.htm')) return 'html'
+    if (lower.endsWith('.svg')) return 'svg'
+    if (lower.match(/\.(png|jpe?g|gif|webp|avif|bmp|ico)$/)) return 'image'
+    if (lower.endsWith('.json')) return 'json'
+    return null
+  }, [file.filePath, file.language])
+  const isPreviewable = previewKind !== null
+  const isMarkdown = previewKind === 'markdown'
+
+  type ViewMode = 'edit' | 'preview' | 'split'
+  const [mdView, setMdView] = useState<ViewMode>('edit')
+
+  // Debounce the markdown content fed to the renderer so that mermaid blocks
+  // (and code highlighting) don't thrash on every keystroke when split or
+  // preview is active. Edit-only view doesn't need this.
+  const [previewContent, setPreviewContent] = useState<string>(file.content ?? '')
+  useEffect(() => {
+    if (!isPreviewable || mdView === 'edit') {
+      setPreviewContent(file.content ?? '')
+      return
+    }
+    const handle = window.setTimeout(() => {
+      setPreviewContent(file.content ?? '')
+    }, 300)
+    return () => window.clearTimeout(handle)
+  }, [file.content, isPreviewable, mdView])
 
   // Reveal pending line when content + editor are both ready
   useEffect(() => {
@@ -137,6 +171,46 @@ export function EditorContent({ file }: EditorContentProps) {
           )}
         </div>
         <div className="flex items-center gap-1.5">
+          {isPreviewable && (
+            <div className="flex items-center rounded-md bg-muted/40 p-0.5">
+              <button
+                type="button"
+                onClick={() => setMdView('edit')}
+                title="Editor"
+                aria-label="Markdown editor view"
+                aria-pressed={mdView === 'edit'}
+                className={`grid h-5 w-6 place-items-center rounded transition-colors ${
+                  mdView === 'edit' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground/70 hover:text-foreground'
+                }`}
+              >
+                <Pencil size={11} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setMdView('split')}
+                title="Split"
+                aria-label="Markdown split view"
+                aria-pressed={mdView === 'split'}
+                className={`grid h-5 w-6 place-items-center rounded transition-colors ${
+                  mdView === 'split' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground/70 hover:text-foreground'
+                }`}
+              >
+                <Columns2 size={11} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setMdView('preview')}
+                title="Preview"
+                aria-label="Markdown preview view"
+                aria-pressed={mdView === 'preview'}
+                className={`grid h-5 w-6 place-items-center rounded transition-colors ${
+                  mdView === 'preview' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground/70 hover:text-foreground'
+                }`}
+              >
+                <Eye size={11} />
+              </button>
+            </div>
+          )}
           {saveState === 'saved' && (
             <span className="flex items-center gap-1 text-green-500">
               <Check size={11} /> Saved
@@ -163,44 +237,119 @@ export function EditorContent({ file }: EditorContentProps) {
           </button>
         </div>
       </div>
-      <div className="flex-1 min-h-0">
-        <Editor
-          key={file.id}
-          language={file.language}
-          value={file.content}
-          theme={theme === 'dark' ? 'vs-dark' : 'vs'}
-          onMount={(editor) => {
-            editorRef.current = editor
-            // Reveal pending line on mount if content already loaded
-            const line = file.pendingReveal
-            if (line) {
-              try {
-                editor.revealLineInCenter(line)
-                editor.setPosition({ lineNumber: line, column: 1 })
-                editor.focus()
-                clearPendingReveal(file.id)
-              } catch (err) {
-                console.warn('[editor] onMount reveal failed', err)
-              }
-            }
-          }}
-          onChange={(value) => {
-            if (value !== undefined) {
-              setFileContent(file.id, value)
-              setFileDirty(file.id, value !== originalContentRef.current)
-            }
-          }}
-          options={{
-            minimap: { enabled: false },
-            fontSize: 13,
-            lineNumbers: 'on',
-            wordWrap: 'on',
-            scrollBeyondLastLine: false,
-            automaticLayout: true,
-            tabSize: 2,
-          }}
-        />
+      <div className="flex-1 min-h-0 flex">
+        {(!isPreviewable || mdView !== 'preview') && (
+          <div className={`min-h-0 ${isPreviewable && mdView === 'split' ? 'w-1/2 border-r border-border/60' : 'w-full'}`}>
+            <Editor
+              key={file.id}
+              language={file.language}
+              value={file.content}
+              theme={theme === 'dark' ? 'vs-dark' : 'vs'}
+              onMount={(editor) => {
+                editorRef.current = editor
+                const line = file.pendingReveal
+                if (line) {
+                  try {
+                    editor.revealLineInCenter(line)
+                    editor.setPosition({ lineNumber: line, column: 1 })
+                    editor.focus()
+                    clearPendingReveal(file.id)
+                  } catch (err) {
+                    console.warn('[editor] onMount reveal failed', err)
+                  }
+                }
+              }}
+              onChange={(value) => {
+                if (value !== undefined) {
+                  setFileContent(file.id, value)
+                  setFileDirty(file.id, value !== originalContentRef.current)
+                }
+              }}
+              options={{
+                minimap: { enabled: false },
+                fontSize: 13,
+                lineNumbers: 'on',
+                wordWrap: 'on',
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                tabSize: 2,
+              }}
+            />
+          </div>
+        )}
+        {isPreviewable && mdView !== 'edit' && (
+          <div className={`min-h-0 overflow-auto ${mdView === 'split' ? 'w-1/2' : 'w-full'}`}>
+            <PreviewPane kind={previewKind} content={previewContent} filePath={file.filePath} />
+          </div>
+        )}
       </div>
     </div>
   )
+}
+
+function PreviewPane({
+  kind,
+  content,
+  filePath,
+}: {
+  kind: 'markdown' | 'html' | 'svg' | 'image' | 'json' | null
+  content: string
+  filePath: string
+}) {
+  if (kind === 'markdown') {
+    return (
+      <div className="px-6 py-5 max-w-3xl mx-auto">
+        <MarkdownRenderer content={content} />
+      </div>
+    )
+  }
+  if (kind === 'html') {
+    // Render in a sandboxed iframe — no scripts, no same-origin, no popups.
+    return (
+      <iframe
+        title={`Preview ${filePath}`}
+        srcDoc={content}
+        sandbox=""
+        className="h-full w-full bg-white"
+      />
+    )
+  }
+  if (kind === 'svg') {
+    // Inline the SVG so vector scaling kicks in. SVG source comes from the
+    // user's own filesystem — same trust model as the rest of the editor.
+    return (
+      <div className="grid h-full w-full place-items-center p-6">
+        <div
+          className="max-h-full max-w-full [&_svg]:max-h-full [&_svg]:max-w-full"
+          // eslint-disable-next-line react/no-danger -- local file source
+          dangerouslySetInnerHTML={{ __html: content }}
+        />
+      </div>
+    )
+  }
+  if (kind === 'image') {
+    // Use file:// so binary images render. Electron has no protocol restriction
+    // here; in browser dev mode this falls back to the backend file endpoint
+    // would be cleaner, but file:// works for the common case.
+    const src = `file://${filePath}`
+    return (
+      <div className="grid h-full w-full place-items-center p-6 bg-[repeating-conic-gradient(hsl(var(--muted))_0%_25%,transparent_0%_50%)] bg-[length:16px_16px]">
+        <img src={src} alt={filePath} className="max-h-full max-w-full object-contain" />
+      </div>
+    )
+  }
+  if (kind === 'json') {
+    let pretty = content
+    try {
+      pretty = JSON.stringify(JSON.parse(content), null, 2)
+    } catch {
+      /* keep raw text — likely partial / mid-typing */
+    }
+    return (
+      <pre className="px-6 py-5 text-[12px] leading-relaxed font-mono text-foreground whitespace-pre-wrap break-words">
+        {pretty}
+      </pre>
+    )
+  }
+  return null
 }

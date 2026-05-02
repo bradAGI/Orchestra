@@ -305,6 +305,8 @@ export interface WorkspaceSlice {
   closeGroup: (projectId: WorkspaceContextID, groupId: string) => void
   /** Move a tab from one group to another. */
   moveTabBetweenGroups: (projectId: WorkspaceContextID, tabId: string, dstGroupId: string) => void
+  /** Reorder tabs inside a single group by index. */
+  reorderTabsInGroup: (projectId: WorkspaceContextID, groupId: string, fromIndex: number, toIndex: number) => void
   /** Update split ratio between siblings. nodePath is a string path of 'first'/'second' steps from the root. */
   setGroupSplitRatio: (projectId: WorkspaceContextID, nodePath: string, ratio: number) => void
   /** Focus a group (where new tabs land + which group is "current"). */
@@ -367,6 +369,8 @@ export interface BrowserSlice {
 // Composite App State
 // ---------------------------------------------------------------------------
 
+import type { ThemeSlice } from './slices/theme-slice'
+
 export type AppState = UISlice &
   RuntimeSlice &
   IssuesSlice &
@@ -376,4 +380,5 @@ export type AppState = UISlice &
   TerminalsSlice &
   WorkspaceSlice &
   EditorSlice &
-  BrowserSlice
+  BrowserSlice &
+  ThemeSlice

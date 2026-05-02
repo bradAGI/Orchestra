@@ -4,6 +4,7 @@ import { FitAddon } from 'xterm-addon-fit'
 import { SearchAddon } from 'xterm-addon-search'
 import 'xterm/css/xterm.css'
 import { TerminalSearch } from './TerminalSearch'
+import { ORCHESTRA_FILE_MIME, shellQuote } from '@/components/workspace/FileTreeRow'
 
 // Track which sessions have already had their initial command sent,
 // so tab switches (unmount+remount) don't re-inject the command.
@@ -31,6 +32,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
     const searchAddonRef = useRef<SearchAddon | null>(null)
     const wsRef = useRef<WebSocket | null>(null)
     const [searchOpen, setSearchOpen] = useState(false)
+    const [isDropTarget, setIsDropTarget] = useState(false)
 
     useEffect(() => {
         if (!terminalRef.current) return
@@ -186,10 +188,61 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
         return () => container?.removeEventListener('keydown', handleKeyDown)
     }, [])
 
+    const handleDragOver = (e: React.DragEvent) => {
+        const types = Array.from(e.dataTransfer.types)
+        if (types.includes(ORCHESTRA_FILE_MIME) || types.includes('text/plain')) {
+            e.preventDefault()
+            e.stopPropagation()
+            e.dataTransfer.dropEffect = 'copy'
+            if (!isDropTarget) setIsDropTarget(true)
+        }
+    }
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsDropTarget(false)
+        const raw = e.dataTransfer.getData(ORCHESTRA_FILE_MIME)
+        let toInsert = ''
+        if (raw) {
+            try {
+                const { path } = JSON.parse(raw) as { path: string }
+                toInsert = shellQuote(path)
+            } catch {
+                /* fall through to plain text */
+            }
+        }
+        if (!toInsert) {
+            const plain = e.dataTransfer.getData('text/plain')
+            if (!plain) return
+            // If the plain payload looks pre-quoted, use as-is; else quote it.
+            toInsert = /^['"]/.test(plain) ? plain : shellQuote(plain)
+        }
+        const ws = wsRef.current
+        if (!ws || ws.readyState !== WebSocket.OPEN) return
+        // Send a leading space so the path is appended after whatever the user
+        // has typed without gluing it to the previous token. Trailing space
+        // makes it easy to keep typing additional args.
+        ws.send(' ' + toInsert + ' ')
+        xtermRef.current?.focus()
+    }
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDropTarget(false)
+    }
+
     return (
-        <div className="w-full h-full overflow-hidden">
+        <div
+            className="w-full h-full overflow-hidden"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+        >
             <div className="relative h-full">
                 <div ref={terminalRef} className="w-full h-full" />
+                {isDropTarget && (
+                    <div className="pointer-events-none absolute inset-0 ring-2 ring-primary/60 ring-inset rounded-sm bg-primary/[0.04]" />
+                )}
                 {searchOpen && (
                     <TerminalSearch
                         searchAddon={searchAddonRef.current}
