@@ -1,7 +1,0 @@
-export { DashboardOverview, MetricCard } from '@/components/dashboard/DashboardOverview'
-export { SettingsPage } from '@/components/settings/SettingsPage'
-export { CreateProjectDialog } from '@/components/projects/CreateProjectDialog'
-export { CreateTaskDialog } from '@/components/tasks/CreateTaskDialog'
-export { IssueDetailView } from '@widgets/issue-detail/IssueDetailView'
-export { KanbanBoard } from '@widgets/kanban/KanbanBoard'
-export { OperationsQueueCard } from '@widgets/running/OperationsQueueCard'

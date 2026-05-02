@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { BridgeProfilesPayload, SnapshotPayload } from '@/lib/orchestra-types'
+import type { BridgeProfilesPayload, SnapshotPayload } from '@core/api/types'
 
-vi.mock('@/components/terminal/TerminalView', () => ({
+vi.mock('@features/terminal/TerminalView', () => ({
   TerminalView: () => <div data-testid="terminal-view-mock" />,
 }))
 
 import App from './App'
-import { resetAppStore } from '@/store'
+import { resetAppStore } from '@core/store'
 
 // Mock Electron bridge
 const defaultProfiles: BridgeProfilesPayload = {
@@ -362,7 +362,7 @@ describe('App smoke render', () => {
 
       // Agent auto-selected from availableAgents, project auto-selected since only one exists
       const submitButton = screen.getAllByRole('button').find(
-        (btn) => btn.textContent === 'Create' && (btn as HTMLButtonElement).type === 'submit',
+        (btn) => btn.textContent === 'Create task' && (btn as HTMLButtonElement).type === 'submit',
       )
       expect(submitButton).toBeTruthy()
       fireEvent.click(submitButton!)
@@ -605,7 +605,7 @@ describe('App smoke render', () => {
 
       // Create button should be disabled: no project selected
       const submitButton = screen.getAllByRole('button').find(
-        (btn) => btn.textContent === 'Create' && (btn as HTMLButtonElement).type === 'submit',
+        (btn) => btn.textContent === 'Create task' && (btn as HTMLButtonElement).type === 'submit',
       )
       expect(submitButton).toBeTruthy()
       expect((submitButton as HTMLButtonElement).disabled).toBe(true)
@@ -674,7 +674,7 @@ describe('App smoke render', () => {
       fireEvent.click(await screen.findByTestId('sidebar-nav-PROJECTS'))
 
       // Wait for the empty state or projects to load
-      await screen.findByText(/No Projects/i)
+      await screen.findByText(/No projects yet/i)
       fireEvent.click(screen.getByRole('button', { name: /Add Project/i }))
 
       // Click the browse button
@@ -848,7 +848,7 @@ describe('App smoke render', () => {
       await user.click(screen.getByRole('button', { name: 'Save Backend Config' }))
 
       await waitFor(() => {
-        expect(screen.getByText(/base URL must be a valid absolute URL/i)).toBeTruthy()
+        expect(screen.getByText(/must be a valid absolute URL/i)).toBeTruthy()
       })
     })
 
@@ -975,6 +975,9 @@ describe('App smoke render', () => {
       await waitFor(() => {
         expect(bridge.setActiveBackendProfile).toHaveBeenCalledWith('staging')
       })
+
+      // Mock window.confirm to return true so the delete proceeds
+      vi.spyOn(window, 'confirm').mockReturnValue(true)
 
       const deleteButton = screen.getByRole('button', { name: 'Delete' })
       fireEvent.click(deleteButton)

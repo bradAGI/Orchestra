@@ -3,6 +3,7 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -1175,7 +1176,7 @@ func (s *Server) DeleteIssue(w http.ResponseWriter, r *http.Request) {
 	// Delete from tracker
 	if err := s.orchestrator.DeleteIssue(r.Context(), identifier); err != nil {
 		s.logger.Error().Err(err).Str("issue_identifier", identifier).Msg("failed to delete issue")
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			writeJSONError(w, http.StatusNotFound, "issue_not_found", "issue not found")
 			return
 		}

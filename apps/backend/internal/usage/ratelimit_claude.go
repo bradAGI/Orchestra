@@ -145,25 +145,27 @@ func fetchClaudeRateLimits(ctx context.Context) *ProviderRateLimits {
 	now := time.Now()
 	nowMs := now.UnixMilli()
 
-	// Park if we're inside an active 429 window — return the most recent
-	// snapshot (if any) instead of touching the API.
+	// Park if we're inside an active 429 window — keep the user's UI quiet:
+	// when we have a recent snapshot, return it as-is (Status=OK, no error)
+	// so the bar/popover just keep showing real numbers. When we have nothing
+	// cached yet, fall through to a `fetching` state so the UI shows a loader
+	// instead of an alarming red banner.
 	claudeBackoffMu.Lock()
 	if !claude429Until.IsZero() && now.Before(claude429Until) {
-		retryIn := claude429Until.Sub(now).Round(time.Second)
 		last := claudeLastResult
 		claudeBackoffMu.Unlock()
-		if last != nil {
+		if last != nil && (last.Session != nil || last.Weekly != nil) {
 			out := *last
-			out.UpdatedAt = nowMs
-			out.Status = RateLimitErrored
-			out.Error = fmt.Sprintf("Anthropic rate-limited the usage endpoint — backing off for %s", retryIn)
+			// Do not bump UpdatedAt — leaving it on the original successful
+			// fetch keeps the "updated Xm ago" badge honest.
+			out.Status = RateLimitOK
+			out.Error = ""
 			return &out
 		}
 		return &ProviderRateLimits{
 			Provider:  ProviderClaude,
-			Status:    RateLimitErrored,
+			Status:    RateLimitFetching,
 			UpdatedAt: nowMs,
-			Error:     fmt.Sprintf("Anthropic rate-limited the usage endpoint — retrying in %s", retryIn),
 		}
 	}
 	claudeBackoffMu.Unlock()
@@ -211,7 +213,9 @@ func fetchClaudeRateLimits(ctx context.Context) *ProviderRateLimits {
 	}
 	defer res.Body.Close()
 
-	// 429 — engage backoff, surface the cached state if we have it.
+	// 429 — engage backoff silently. Keep showing cached numbers as OK so the
+	// user's UI doesn't yell about something they can't act on. If we have no
+	// cache yet, return fetching (loader) instead of an error banner.
 	if res.StatusCode == http.StatusTooManyRequests {
 		_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, 512))
 		retryAfter := parseRetryAfter(res.Header.Get("Retry-After"))
@@ -225,19 +229,16 @@ func fetchClaudeRateLimits(ctx context.Context) *ProviderRateLimits {
 		claude429Until = time.Now().Add(retryAfter)
 		last := claudeLastResult
 		claudeBackoffMu.Unlock()
-		retryMsg := fmt.Sprintf("Refresh paused — Anthropic rate limit (retry in %s)", retryAfter.Round(time.Second))
-		if last != nil {
+		if last != nil && (last.Session != nil || last.Weekly != nil) {
 			out := *last
-			out.UpdatedAt = nowMs
-			out.Status = RateLimitErrored
-			out.Error = retryMsg
+			out.Status = RateLimitOK
+			out.Error = ""
 			return &out
 		}
 		return &ProviderRateLimits{
 			Provider:  ProviderClaude,
-			Status:    RateLimitErrored,
+			Status:    RateLimitFetching,
 			UpdatedAt: nowMs,
-			Error:     retryMsg,
 		}
 	}
 

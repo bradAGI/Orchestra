@@ -371,14 +371,26 @@ func contentTypeGuard(next http.Handler) http.Handler {
 // writeJSONError writes a structured JSON error response with the given HTTP
 // status code, machine-readable error code, and human-readable message.
 func writeJSONError(w http.ResponseWriter, status int, code string, message string) {
+	writeJSONErrorWithDetails(w, status, code, message, nil)
+}
+
+// writeJSONErrorWithDetails is the same as writeJSONError but attaches an
+// arbitrary `details` object alongside the error envelope. Use sparingly —
+// only when the client genuinely needs partial state (e.g., refresh that
+// completed for some files and failed for others).
+func writeJSONErrorWithDetails(w http.ResponseWriter, status int, code, message string, details map[string]any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(map[string]any{
+	envelope := map[string]any{
 		"error": map[string]string{
 			"code":    code,
 			"message": message,
 		},
-	}); err != nil {
+	}
+	if details != nil {
+		envelope["details"] = details
+	}
+	if err := json.NewEncoder(w).Encode(envelope); err != nil {
 		// Response already started; nothing else to do but log would be ideal.
 		// Caller's logger is unavailable here; this is a best-effort path.
 		_, _ = w.Write([]byte(`{"error":{"code":"encode_error","message":"failed to encode error response"}}`))
