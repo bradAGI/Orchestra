@@ -101,7 +101,14 @@ export type IssueCreatePayload = {
   assignee_id: string
   project_id: string
   provider?: string
+  runtime_target?: string
   disabled_tools?: string[]
+}
+
+/** A runtime execution target returned by GET /api/v1/config/runtimes. */
+export type RuntimeEntry = {
+  target: string
+  configured: boolean
 }
 
 /** Response from creating a GitHub pull request through the orchestrator. */
@@ -2161,6 +2168,82 @@ export async function fetchUnsandboxServices(config: BackendConfig): Promise<{ s
   return requestJSON<{ services: UnsandboxService[] }>(config, '/api/v1/unsandbox/services')
 }
 
+// --- Runtime Connections ---
+
+/** Configuration for a Tailscale SSH remote runtime. */
+export type TailscaleConfig = {
+  configured: boolean
+  ssh_host: string
+  ssh_user: string
+  ssh_key_path: string
+  ssh_port: number
+  worktree_root: string
+}
+
+/** Configuration for a Kubernetes remote runtime. */
+export type KubernetesConfig = {
+  configured: boolean
+  kubeconfig_path: string
+  namespace: string
+  image: string
+  git_repo_url: string
+  service_account: string
+}
+
+/** Fetches the list of available runtime targets and their configured status. */
+export async function fetchAvailableRuntimes(config: BackendConfig): Promise<RuntimeEntry[]> {
+  const res = await requestJSON<{ runtimes: RuntimeEntry[] }>(config, '/api/v1/config/runtimes')
+  return res.runtimes ?? []
+}
+
+/** Fetches the current Tailscale runtime configuration. */
+export async function fetchTailscaleConfig(config: BackendConfig): Promise<TailscaleConfig> {
+  return requestJSON<TailscaleConfig>(config, '/api/v1/config/tailscale')
+}
+
+/** Saves Tailscale runtime configuration to the backend. */
+export async function saveTailscaleConfig(config: BackendConfig, data: Partial<TailscaleConfig>): Promise<TailscaleConfig> {
+  return requestJSON<TailscaleConfig>(config, '/api/v1/config/tailscale', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+}
+
+/** Deletes the stored Tailscale runtime configuration. */
+export async function deleteTailscaleConfig(config: BackendConfig): Promise<void> {
+  await requestJSON<void>(config, '/api/v1/config/tailscale', { method: 'DELETE' })
+}
+
+/** Tests reachability of the configured Tailscale SSH host. */
+export async function testTailscaleConfig(config: BackendConfig): Promise<{ reachable: boolean; error?: string }> {
+  return requestJSON<{ reachable: boolean; error?: string }>(config, '/api/v1/config/tailscale/test')
+}
+
+/** Fetches the current Kubernetes runtime configuration. */
+export async function fetchKubernetesConfig(config: BackendConfig): Promise<KubernetesConfig> {
+  return requestJSON<KubernetesConfig>(config, '/api/v1/config/kubernetes')
+}
+
+/** Saves Kubernetes runtime configuration to the backend. */
+export async function saveKubernetesConfig(config: BackendConfig, data: Partial<KubernetesConfig>): Promise<KubernetesConfig> {
+  return requestJSON<KubernetesConfig>(config, '/api/v1/config/kubernetes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+}
+
+/** Deletes the stored Kubernetes runtime configuration. */
+export async function deleteKubernetesConfig(config: BackendConfig): Promise<void> {
+  await requestJSON<void>(config, '/api/v1/config/kubernetes', { method: 'DELETE' })
+}
+
+/** Tests reachability of the configured Kubernetes cluster. */
+export async function testKubernetesConfig(config: BackendConfig): Promise<{ reachable: boolean; server_version?: string; error?: string }> {
+  return requestJSON<{ reachable: boolean; server_version?: string; error?: string }>(config, '/api/v1/config/kubernetes/test')
+}
+
 /**
  * Fetches configured agent provider API keys from the orchestrator.
  * @param config - Backend connection configuration.
@@ -2350,4 +2433,139 @@ export async function fetchRateLimits(config: BackendConfig): Promise<RateLimitS
 
 export async function refreshRateLimits(config: BackendConfig): Promise<RateLimitState> {
   return requestJSON<RateLimitState>(config, '/api/v1/usage/rate-limits/refresh', { method: 'POST' })
+}
+
+// ─── Tracker types (re-exported from entities layer) ────────────────────────
+
+export type {
+  WorkItem,
+  WorkItemSource,
+  TrackerConfig,
+  TrackerProject,
+  TrackerState,
+  WorkItemFilter,
+  CreateTrackerConfigRequest,
+  UpdateTrackerConfigRequest,
+  TestConnectionResult,
+} from '@/entities/tracker/types'
+
+// ─── Tracker configs ─────────────────────────────────────────────────────────
+
+import type {
+  TrackerConfig,
+  TrackerProject,
+  TrackerState,
+  WorkItem,
+  CreateTrackerConfigRequest,
+  UpdateTrackerConfigRequest,
+  TestConnectionResult,
+} from '@/entities/tracker/types'
+
+/** List all configured tracker connections. */
+export async function listTrackerConfigs(config: BackendConfig): Promise<TrackerConfig[]> {
+  return requestJSON<TrackerConfig[]>(config, '/api/v1/tracker/configs')
+}
+
+/** Create a new tracker config. Backend encrypts the token before storage. */
+export async function createTrackerConfig(
+  config: BackendConfig,
+  payload: CreateTrackerConfigRequest,
+): Promise<TrackerConfig> {
+  return requestJSON<TrackerConfig>(config, '/api/v1/tracker/configs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+
+/** Patch an existing tracker config. Omit fields to leave them unchanged. */
+export async function updateTrackerConfig(
+  config: BackendConfig,
+  configId: string,
+  patch: UpdateTrackerConfigRequest,
+): Promise<TrackerConfig> {
+  return requestJSON<TrackerConfig>(
+    config,
+    `/api/v1/tracker/configs/${encodeURIComponent(configId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    },
+  )
+}
+
+/** Delete a tracker config by ID. */
+export async function deleteTrackerConfig(config: BackendConfig, configId: string): Promise<void> {
+  await requestJSON<{ deleted: boolean }>(
+    config,
+    `/api/v1/tracker/configs/${encodeURIComponent(configId)}`,
+    { method: 'DELETE' },
+  )
+}
+
+/** Ping a tracker connection to verify credentials/network. */
+export async function testTrackerConfig(
+  config: BackendConfig,
+  configId: string,
+): Promise<TestConnectionResult> {
+  return requestJSON<TestConnectionResult>(
+    config,
+    `/api/v1/tracker/configs/${encodeURIComponent(configId)}/test`,
+    { method: 'POST' },
+  )
+}
+
+/** Fetch the list of top-level projects/teams/repos in a tracker. */
+export async function fetchTrackerProjects(
+  config: BackendConfig,
+  configId: string,
+): Promise<TrackerProject[]> {
+  return requestJSON<TrackerProject[]>(
+    config,
+    `/api/v1/tracker/configs/${encodeURIComponent(configId)}/projects`,
+  )
+}
+
+/** Fetch the list of workflow states defined in a tracker. */
+export async function fetchTrackerStates(
+  config: BackendConfig,
+  configId: string,
+): Promise<TrackerState[]> {
+  return requestJSON<TrackerState[]>(
+    config,
+    `/api/v1/tracker/configs/${encodeURIComponent(configId)}/states`,
+  )
+}
+
+/** Browse work items from a specific tracker config. */
+export async function browseTrackerItems(
+  config: BackendConfig,
+  configId: string,
+  filter?: { states?: string[] },
+): Promise<WorkItem[]> {
+  const params = new URLSearchParams()
+  if (filter?.states?.length) {
+    params.set('states', filter.states.join(','))
+  }
+  const qs = params.toString()
+  const path = `/api/v1/tracker/configs/${encodeURIComponent(configId)}/issues${qs ? '?' + qs : ''}`
+  return requestJSON<WorkItem[]>(config, path)
+}
+
+/** Assign a tracker config to a project (or pass empty configId to clear). */
+export async function setProjectTracker(
+  config: BackendConfig,
+  projectId: string,
+  configId: string,
+): Promise<void> {
+  await requestJSON<{ ok: boolean }>(
+    config,
+    `/api/v1/projects/${encodeURIComponent(projectId)}/tracker`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config_id: configId }),
+    },
+  )
 }

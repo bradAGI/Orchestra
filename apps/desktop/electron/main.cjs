@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, safeStorage, shell, dialog, Menu } = require('electron')
+const { openOAuthWindow } = require('./oauth-handler.cjs')
 const path = require('node:path')
 const fs = require('node:fs/promises')
 const fsSync = require('node:fs')
@@ -216,6 +217,13 @@ async function stopManagedBackend() {
 app.commandLine.appendSwitch('enable-features', 'WebGPU')
 app.commandLine.appendSwitch('enable-unsafe-webgpu')
 app.commandLine.appendSwitch('ozone-platform-hint', 'auto')
+// Disable GBM DMA-BUF scanout path — fails on some Wayland + GPU driver combos
+// when moving/resizing the window across monitors (EINVAL from gbm_wrapper.cc).
+// Disabling these features keeps hardware acceleration while avoiding the BO
+// modifier negotiation that triggers the crash.
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('disable-features', 'UseDMABufVideoDecoder,WaylandWindowDecorations')
+}
 
 function createDefaultProfile() {
   const managed = managedBackendState?.config
@@ -656,6 +664,13 @@ ipcMain.handle('orchestra:select-file', async (_event, options) => {
   })
   if (result.canceled || result.filePaths.length === 0) return null
   return result.filePaths[0]
+})
+
+ipcMain.handle('orchestra:oauth-window', async (_event, provider) => {
+  if (typeof provider !== 'string') {
+    throw new Error('provider must be a string')
+  }
+  return openOAuthWindow(provider)
 })
 
 app.whenReady().then(async () => {

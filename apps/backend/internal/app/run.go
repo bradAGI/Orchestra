@@ -35,7 +35,10 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/usage"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
 	trackergithub "github.com/orchestra/orchestra/apps/backend/internal/tracker/github"
+	"github.com/orchestra/orchestra/apps/backend/internal/tracker/jira"
+	"github.com/orchestra/orchestra/apps/backend/internal/tracker/linear"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker/memory"
+	trackerregistry "github.com/orchestra/orchestra/apps/backend/internal/tracker/registry"
 	trackersqlite "github.com/orchestra/orchestra/apps/backend/internal/tracker/sqlite"
 	"github.com/orchestra/orchestra/apps/backend/internal/sessionlogger"
 	gitutil "github.com/orchestra/orchestra/apps/backend/internal/utils/git"
@@ -79,12 +82,55 @@ func Run(logger zerolog.Logger) error {
 	orchestratorService.SetMaxConcurrentByState(cfg.MaxConcurrentByState)
 	orchestratorService.SetMaxTurns(cfg.AgentMaxTurns)
 
-	trackerClient := newTrackerClient(cfg, warehouseDB)
+	// Build the tracker registry. Existing env-var configs are seeded into
+	// tracker_configs on first run so legacy deployments keep working unchanged.
+	factory := buildTrackerAdapterFactory(warehouseDB)
+	trackerRegistry := trackerregistry.NewWithFactory(warehouseDB, factory)
+	if err := seedTrackerConfigFromEnv(context.Background(), warehouseDB, cfg, trackerRegistry); err != nil {
+		logger.Warn().Err(err).Msg("seed tracker config from env failed")
+	}
+	trackerClient := trackerRegistry.DefaultClient()
+	if trackerClient == nil {
+		trackerClient = newLegacyTrackerClient(cfg, warehouseDB)
+	}
 	orchestratorService.SetTrackerClient(trackerClient)
 	pubsub := observability.NewPubSub()
 	termManager := terminal.NewManager()
 
 	agentRegistry := agents.NewRegistryWithTerminal(cfg.AgentCommands, termManager)
+
+	// Register optional remote execution backends if configured.
+	if cfg.TailscaleSSHHost != "" {
+		tsTransport := agents.NewTailscaleRunner(
+			agents.Provider(""), // no default provider — this is a transport
+			"",                  // no default command — set at dispatch time
+			cfg.TailscaleSSHHost,
+			cfg.TailscaleSSHUser,
+			cfg.TailscaleSSHKeyPath,
+			cfg.TailscaleSSHPort,
+			cfg.TailscaleWorktreeRoot,
+		)
+		agentRegistry.SetTransport(agents.RuntimeTailscale, tsTransport)
+		logger.Info().Str("host", cfg.TailscaleSSHHost).Msg("Tailscale transport registered")
+	}
+	if cfg.KubeNamespace != "" && cfg.KubeGitRepoURL != "" {
+		if clientset, k8sErr := agents.NewKubernetesClientset(cfg.KubeConfigPath); k8sErr != nil {
+			logger.Warn().Err(k8sErr).Msg("Kubernetes transport unavailable — kubeconfig error")
+		} else {
+			k8sTransport := agents.NewKubernetesRunner(
+				agents.Provider(""), // transport, not a provider
+				"",
+				clientset,
+				cfg.KubeNamespace,
+				cfg.KubeImage,
+				cfg.KubeGitRepoURL,
+				cfg.KubeServiceAccount,
+			)
+			agentRegistry.SetTransport(agents.RuntimeKubernetes, k8sTransport)
+			logger.Info().Str("namespace", cfg.KubeNamespace).Msg("Kubernetes transport registered")
+		}
+	}
+
 	provider := agents.Provider(cfg.AgentProvider)
 	if !agentRegistry.HasProvider(provider) {
 		return fmt.Errorf("agent provider %q is not configured", cfg.AgentProvider)
@@ -121,7 +167,7 @@ func Run(logger zerolog.Logger) error {
 		usageService = nil
 	}
 
-	router := api.NewRouterWithPubSub(logger, orchestratorService, &cfg, pubsub, warehouseDB, termManager, usageService)
+	router := api.NewRouterWithPubSub(logger, orchestratorService, &cfg, pubsub, warehouseDB, termManager, usageService, trackerRegistry)
 
 	cleanupTerminalWorkspaces(orchestratorService, trackerClient, workspaceService, cfg.WorkspaceHooks, warehouseDB, logger)
 
@@ -189,20 +235,101 @@ func killStaleOrchestrad(port string, logger zerolog.Logger) {
 	time.Sleep(100 * time.Millisecond)
 }
 
-// newTrackerClient builds the appropriate tracker.Client based on the configured
-// tracker type (GitHub or SQLite-backed with memory fallback).
-func newTrackerClient(cfg config.Config, localDB *db.DB) tracker.Client {
-	if strings.ToLower(cfg.TrackerType) == "github" {
-		// For GitHub, Endpoint is owner/repo
-		parts := strings.Split(cfg.TrackerEndpoint, "/")
-		if len(parts) == 2 {
-			return trackergithub.NewClient(parts[0], parts[1], cfg.TrackerToken, nil, localDB)
-		}
-	}
+// newLegacyTrackerClient builds a tracker.Client from legacy env-var config.
+// Used as a fallback when no tracker_configs rows exist (e.g. fresh local dev,
+// or a tracker type the registry can't yet handle like sqlite/memory).
+// GitHub is now handled by the tracker registry via seedTrackerConfigFromEnv.
+func newLegacyTrackerClient(cfg config.Config, localDB *db.DB) tracker.Client {
 	if localDB == nil {
 		return memory.NewClient(nil)
 	}
 	return trackersqlite.NewClient(localDB, cfg.TrackerWorkerAssigneeIDs)
+}
+
+// buildTrackerAdapterFactory returns the AdapterFactory injected into the registry.
+// Implemented as a closure so it can capture localDB for the GitHub adapter's
+// DeleteIssue cleanup path.
+// Lives here in app/run.go to break the import cycle: registry/ cannot import
+// linear/ or jira/ directly.
+func buildTrackerAdapterFactory(localDB *db.DB) trackerregistry.AdapterFactory {
+	return func(cfg *db.TrackerConfig, token string) (tracker.Adapter, error) {
+		switch strings.ToLower(cfg.Type) {
+		case "linear":
+			var extra struct {
+				StateMap map[string]string `json:"state_map"`
+			}
+			if cfg.Extra != "" {
+				_ = json.Unmarshal([]byte(cfg.Extra), &extra)
+			}
+			return linear.NewClient(cfg.Endpoint, token, nil, "", extra.StateMap), nil
+		case "jira":
+			var extra struct {
+				JQL         string            `json:"jql"`
+				StateMap    map[string]string `json:"state_map"`
+				DefaultProj string            `json:"default_project"`
+			}
+			if cfg.Extra != "" {
+				_ = json.Unmarshal([]byte(cfg.Extra), &extra)
+			}
+			// Jira Server uses Basic auth with user+token; Cloud uses Bearer (user empty).
+			// We don't have a separate "user" column today — encode it in extra if Server.
+			client := jira.NewClient(cfg.Endpoint, "", token, nil, extra.StateMap)
+			if extra.JQL != "" {
+				client.SetJQL(extra.JQL)
+			}
+			if extra.DefaultProj != "" {
+				client.SetDefaultProject(extra.DefaultProj)
+			}
+			return client, nil
+		case "github":
+			parts := strings.Split(cfg.Endpoint, "/")
+			if len(parts) != 2 {
+				return nil, fmt.Errorf("github endpoint must be 'owner/repo', got %q", cfg.Endpoint)
+			}
+			// localDB enables DeleteIssue to clean up warehouse records.
+			return trackergithub.NewClient(parts[0], parts[1], token, nil, localDB), nil
+		default:
+			return nil, fmt.Errorf("unsupported tracker type %q", cfg.Type)
+		}
+	}
+}
+
+// seedTrackerConfigFromEnv inserts a default tracker_configs row from legacy
+// env vars if none exist. Zero behaviour change for existing deployments.
+func seedTrackerConfigFromEnv(ctx context.Context, warehouse *db.DB, cfg config.Config, reg *trackerregistry.Registry) error {
+	if warehouse == nil {
+		return nil
+	}
+	existing, err := warehouse.ListTrackerConfigs(ctx)
+	if err != nil {
+		return err
+	}
+	if len(existing) > 0 {
+		return nil
+	}
+	t := strings.ToLower(strings.TrimSpace(cfg.TrackerType))
+	if t == "" || t == "sqlite" || t == "memory" {
+		return nil
+	}
+	if t != "linear" && t != "jira" && t != "github" {
+		return nil
+	}
+	encToken, err := db.EncryptToken(cfg.TrackerToken)
+	if err != nil {
+		encToken = cfg.TrackerToken
+	}
+	seed := db.TrackerConfig{
+		ID:          "default",
+		Type:        t,
+		DisplayName: strings.ToUpper(t[:1]) + t[1:] + " (from env)",
+		Endpoint:    cfg.TrackerEndpoint,
+		AuthMethod:  "apikey",
+		TokenEnc:    encToken,
+	}
+	if err := warehouse.UpsertTrackerConfig(ctx, seed); err != nil {
+		return err
+	}
+	return reg.Reload(ctx, seed.ID)
 }
 
 // startExecutionWorker runs a tight polling loop that claims runnable issues
@@ -583,6 +710,7 @@ func processExecutionTick(
 		ToolExecutor:    mcpAwareExecutor,
 		ToolSpecs:       allToolSpecs,
 		ResourceSpecs:   allResourceSpecs,
+		RuntimeTarget:   agents.NormalizeRuntimeTarget(entry.RuntimeTarget),
 	}, func(event agents.Event) {
 		service.RecordRunEvent(entry.IssueID, activeProviderName, event)
 		publishRunEvent(pubsub, entry, activeProviderName, event)

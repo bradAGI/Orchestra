@@ -6,6 +6,7 @@ import {
   FolderTree,
   ListTodo,
   Settings2,
+  Tag,
   Terminal,
 } from 'lucide-react'
 import type { SidebarItem } from '@layout/types'
@@ -59,9 +60,15 @@ export const sidebarItems: SidebarItem[] = [
   },
   {
     id: 'SANDBOX',
-    label: 'Sandbox',
+    label: 'Remote',
     description: 'Remote code execution',
     icon: SandboxIcon,
+  },
+  {
+    id: 'TRACKER',
+    label: 'Tracker',
+    description: 'Browse Linear, Jira, and GitHub work items',
+    icon: Tag,
   },
   {
     id: 'SETTINGS',
@@ -84,6 +91,7 @@ export type SectionID =
   | 'AGENTS'
   | 'WAREHOUSE'
   | 'SANDBOX'
+  | 'TRACKER'
   | 'SETTINGS'
   | 'DOCS'
   | 'CONSOLE'
@@ -95,6 +103,7 @@ const SECTION_IDS: readonly SectionID[] = [
   'AGENTS',
   'WAREHOUSE',
   'SANDBOX',
+  'TRACKER',
   'SETTINGS',
   'DOCS',
   'CONSOLE',
@@ -116,6 +125,7 @@ export type SectionVisibility = {
   showAgents: boolean
   showWarehouse: boolean
   showSandbox: boolean
+  showTracker: boolean
   showSettings: boolean
   showDocs: boolean
   showConsole: boolean
@@ -127,7 +137,8 @@ const sectionMeta: Record<SectionID, { label: string; title: string }> = {
   PROJECTS: { label: 'Workspace', title: 'Projects' },
   AGENTS: { label: 'Compute', title: 'Agents' },
   WAREHOUSE: { label: 'Usage', title: 'Usage' },
-  SANDBOX: { label: 'Compute', title: 'Sandbox' },
+  SANDBOX: { label: 'Compute', title: 'Remote Execution' },
+  TRACKER: { label: 'Tracker', title: 'Work Items' },
   SETTINGS: { label: 'System', title: 'Settings' },
   DOCS: { label: 'Knowledge', title: 'Documentation' },
   CONSOLE: { label: 'Workspace', title: 'Development' },
@@ -145,6 +156,7 @@ export function getSectionVisibility(activeSection: SectionID): SectionVisibilit
     showAgents: activeSection === 'AGENTS',
     showWarehouse: activeSection === 'WAREHOUSE',
     showSandbox: activeSection === 'SANDBOX',
+    showTracker: activeSection === 'TRACKER',
     showSettings: activeSection === 'SETTINGS',
     showDocs: activeSection === 'DOCS',
     showConsole: activeSection === 'CONSOLE',

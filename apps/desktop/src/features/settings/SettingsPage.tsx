@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Bell,
+  Cable,
   Check,
   CheckCircle2,
   CircleDashed,
@@ -57,10 +58,11 @@ import {
 import type { Project } from '@core/api/types'
 import { Github } from 'lucide-react'
 import { CHAT_PROVIDERS } from '@features/embedded-agent/lib/types'
+import { TrackerConnectionsPane } from './TrackerConnectionsPane'
 import { usePlatform } from '@/hooks/use-platform'
 import { CustomDropdown } from '@layout/shared/controls'
 import { useAppStore } from '@core/store'
-import { resolveMode } from '@core/theme/apply'
+import { applyTheme, resolveMode } from '@core/theme/apply'
 import { contrastRatio, formatHslTriplet, hexToHslTriplet, hslTripletToHex, parseHslTriplet, wcagBadge } from '@core/theme/color-utils'
 import { deriveRoles } from '@core/theme/derive-surface'
 import { normalizeTheme } from '@core/theme/defaults'
@@ -149,7 +151,7 @@ const CONTRAST_PAIRS: Array<{ label: string; foreground: ThemeRoleKey; backgroun
 const SECTIONS = [
   { id: 'connections', label: 'Connections', icon: Database },
   { id: 'agents', label: 'Maestro', icon: Cpu },
-  { id: 'git', label: 'Git', icon: GitBranch },
+  { id: 'integrations', label: 'Integrations', icon: Cable },
   { id: 'appearance', label: 'Appearance', icon: Paintbrush },
   { id: 'terminal', label: 'Terminal', icon: Terminal },
   { id: 'browser', label: 'Browser', icon: Globe },
@@ -214,7 +216,7 @@ export function SettingsPage({
   onNotifSoundChange,
   onNotifMutedChange,
   onNotifVolumeChange,
-  initialTab: _initialTab,
+  initialTab,
 }: {
   loadingConfig: boolean
   savingConfig: boolean
@@ -259,6 +261,7 @@ export function SettingsPage({
   const saveCustomTheme = useAppStore(s => s.saveCustomTheme)
   const duplicateTheme = useAppStore(s => s.duplicateTheme)
   const deleteCustomTheme = useAppStore(s => s.deleteCustomTheme)
+  const reapply = useAppStore(s => s.reapply)
   const [homepageDraft, setHomepageDraft] = useState(browserHomepage)
   const [themeStudioOpen, setThemeStudioOpen] = useState(false)
   const [themeStudioDraft, setThemeStudioDraft] = useState<Theme | null>(null)
@@ -273,11 +276,34 @@ export function SettingsPage({
     setThemeStudioPreviewMode(modeOverride === 'auto' ? resolveMode('auto') : modeOverride)
   }, [modeOverride, themeStudioOpen])
 
+  // Live-apply draft to the running app while Theme Studio is open
+  useEffect(() => {
+    if (!themeStudioOpen || !themeStudioDraft) return
+    applyTheme(normalizeTheme(themeStudioDraft), themeStudioPreviewMode)
+  }, [themeStudioDraft, themeStudioPreviewMode, themeStudioOpen])
+
   const scrollRef = useRef<HTMLDivElement>(null)
   const [activeId, setActiveId] = useState<SectionId>('connections')
 
   useEffect(() => {
     ensureFlashStyle()
+  }, [])
+
+  // Scroll to the section specified by initialTab on first mount
+  useEffect(() => {
+    if (!initialTab) return
+    const tabToSection: Record<string, SectionId> = {
+      backend: 'connections',
+      agents: 'agents',
+      integrations: 'integrations',
+      shortcuts: 'shortcuts',
+      notifications: 'notifications',
+    }
+    const sectionId = tabToSection[initialTab]
+    if (!sectionId) return
+    const handle = window.setTimeout(() => scrollToSection(sectionId), 120)
+    return () => window.clearTimeout(handle)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Scroll-spy: track which section is at ~40% viewport height
@@ -410,11 +436,16 @@ export function SettingsPage({
             </div>
           </section>
 
-          {/* ── Git ── */}
-          <section data-settings-section="git" className="rounded-xl transition-colors duration-500 scroll-mt-4">
-            <SectionHeading icon={GitBranch} title="Git" description="Version control and GitHub connections" />
-            <div className="mt-4">
-              <GitConnectionsPane config={config} />
+          {/* ── Integrations ── */}
+          <section data-settings-section="integrations" className="rounded-xl transition-colors duration-500 scroll-mt-4">
+            <SectionHeading icon={Cable} title="Integrations" description="GitHub, Linear, Jira, and other service connections" />
+            <div className="mt-4 space-y-4">
+              <div className="rounded-2xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 p-6 shadow-sm">
+                <TrackerConnectionsPane config={config} />
+              </div>
+              <div className="rounded-2xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 p-6 shadow-sm">
+                <GitConnectionsPane config={config} />
+              </div>
             </div>
           </section>
 
@@ -503,7 +534,7 @@ export function SettingsPage({
           <section data-settings-section="editor" className="rounded-xl transition-colors duration-500 scroll-mt-4">
             <SectionHeading icon={Type} title="Editor" description="Code editor configuration" />
             <div className="mt-4">
-              <PlaceholderPane text="Editor settings coming soon" />
+              <EditorSettingsPane />
             </div>
           </section>
 
@@ -547,6 +578,7 @@ export function SettingsPage({
           if (!open) {
             setThemeStudioDraft(null)
             setThemeStudioSourceId(activeThemeId)
+            reapply()
           }
         }}
         themes={[...builtinThemes, ...customThemes]}
@@ -788,6 +820,111 @@ function PlaceholderPane({ text }: { text: string }) {
   )
 }
 
+function EditorSettingsPane() {
+  const editorSettings = useAppStore((s) => s.editorSettings)
+  const setEditorSettings = useAppStore((s) => s.setEditorSettings)
+
+  return (
+    <div className="space-y-3">
+      <div className="p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 grid gap-3 md:grid-cols-2">
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground mb-1">Font Size</p>
+          <div className="flex items-center gap-3">
+            <input
+              type="range" min={10} max={20} step={1}
+              value={editorSettings.fontSize}
+              onChange={(e) => setEditorSettings({ fontSize: Number(e.target.value) })}
+              className="flex-1 accent-primary"
+            />
+            <span className="text-[11px] font-mono text-muted-foreground w-6 text-right">{editorSettings.fontSize}</span>
+          </div>
+        </div>
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground mb-1">Tab Size</p>
+          <div className="flex items-center gap-3">
+            <input
+              type="range" min={1} max={8} step={1}
+              value={editorSettings.tabSize}
+              onChange={(e) => setEditorSettings({ tabSize: Number(e.target.value) })}
+              className="flex-1 accent-primary"
+            />
+            <span className="text-[11px] font-mono text-muted-foreground w-6 text-right">{editorSettings.tabSize}</span>
+          </div>
+        </div>
+        <div className="md:col-span-2">
+          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground mb-1">Font Family</p>
+          <input
+            value={editorSettings.fontFamily}
+            placeholder="Default (inherit from theme)"
+            onChange={(e) => setEditorSettings({ fontFamily: e.target.value })}
+            className="w-full rounded-lg border border-border/40 bg-card px-3 py-2 text-[11px] font-mono outline-none focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+      </div>
+
+      <div className="p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 grid gap-3 md:grid-cols-2">
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground mb-1.5">Word Wrap</p>
+          <select
+            value={editorSettings.wordWrap}
+            onChange={(e) => setEditorSettings({ wordWrap: e.target.value as typeof editorSettings.wordWrap })}
+            className="w-full rounded-lg border border-border/40 bg-card px-3 py-2 text-[11px] outline-none focus:ring-2 focus:ring-primary/20"
+          >
+            <option value="on">On</option>
+            <option value="off">Off</option>
+            <option value="wordWrapColumn">At Column</option>
+            <option value="bounded">Bounded</option>
+          </select>
+        </div>
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground mb-1.5">Line Numbers</p>
+          <select
+            value={editorSettings.lineNumbers}
+            onChange={(e) => setEditorSettings({ lineNumbers: e.target.value as typeof editorSettings.lineNumbers })}
+            className="w-full rounded-lg border border-border/40 bg-card px-3 py-2 text-[11px] outline-none focus:ring-2 focus:ring-primary/20"
+          >
+            <option value="on">On</option>
+            <option value="off">Off</option>
+            <option value="relative">Relative</option>
+          </select>
+        </div>
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground mb-1.5">Render Whitespace</p>
+          <select
+            value={editorSettings.renderWhitespace}
+            onChange={(e) => setEditorSettings({ renderWhitespace: e.target.value as typeof editorSettings.renderWhitespace })}
+            className="w-full rounded-lg border border-border/40 bg-card px-3 py-2 text-[11px] outline-none focus:ring-2 focus:ring-primary/20"
+          >
+            <option value="none">None</option>
+            <option value="boundary">Boundary</option>
+            <option value="selection">Selection</option>
+            <option value="all">All</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 space-y-2">
+        {([
+          { key: 'minimap', label: 'Show Minimap' },
+          { key: 'formatOnSave', label: 'Format on Save' },
+        ] as const).map(({ key, label }) => (
+          <label key={key} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 hover:bg-muted/20 cursor-pointer">
+            <span className="text-[12px] font-medium">{label}</span>
+            <button
+              type="button"
+              aria-pressed={editorSettings[key]}
+              onClick={() => setEditorSettings({ [key]: !editorSettings[key] })}
+              className={`relative h-5 w-9 rounded-full transition-colors ${editorSettings[key] ? 'bg-primary' : 'bg-muted'}`}
+            >
+              <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${editorSettings[key] ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </button>
+          </label>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Appearance — Mode picker (Light / Dark / Auto)
 // ---------------------------------------------------------------------------
@@ -948,7 +1085,7 @@ function ThemeStudioDialog({
               <div>
                 <DialogTitle className="text-xl font-black tracking-tight">Theme Studio</DialogTitle>
                 <DialogDescription className="mt-1 text-[12px] max-w-2xl">
-                  The shell is live: pick a base theme, rename the draft, and inspect the token groups. Save, export, and fine-grained editors land next.
+                  Pick a base theme, edit colors, typography, density, and motion. Changes apply live. Save to persist.
                 </DialogDescription>
               </div>
               <div className="ml-auto flex items-start gap-2">
@@ -1150,12 +1287,8 @@ function ThemeStudioEditorPane({
               className="mt-2 w-full rounded-xl border border-border/40 bg-background px-3 py-2 text-lg font-black tracking-tight outline-none focus:ring-2 focus:ring-primary/30"
             />
             <p className="mt-2 text-[11px] text-muted-foreground">
-              Based on <span className="font-mono">{sourceThemeId}</span>. Editing is local to this shell for now.
+              Based on <span className="font-mono">{sourceThemeId}</span>. Unsaved changes apply live but reset on close.
             </p>
-          </div>
-          <div className="rounded-xl border border-border/40 bg-muted/20 px-3 py-2 text-right">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Status</p>
-            <p className="mt-1 text-xs font-bold">Scaffold live</p>
           </div>
         </div>
       </div>
@@ -1659,15 +1792,27 @@ function RoleEditorCard({
         <div className="space-y-2">
           <label className="block">
             <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">Hex</span>
-            <input
-              value={hexValue}
-              disabled={disabled}
-              onChange={(event) => {
-                const next = hexToHslTriplet(event.target.value)
-                if (next) onChange(next)
-              }}
-              className="w-full rounded-lg border border-border/40 bg-card px-2 py-2 text-[11px] font-mono outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed"
-            />
+            <div className="flex items-center gap-1.5">
+              <input
+                type="color"
+                value={hexValue}
+                disabled={disabled}
+                onChange={(event) => {
+                  const next = hexToHslTriplet(event.target.value)
+                  if (next) onChange(next)
+                }}
+                className="h-8 w-8 shrink-0 cursor-pointer rounded-md border border-border/40 bg-card p-0.5 disabled:cursor-not-allowed"
+              />
+              <input
+                value={hexValue}
+                disabled={disabled}
+                onChange={(event) => {
+                  const next = hexToHslTriplet(event.target.value)
+                  if (next) onChange(next)
+                }}
+                className="w-full rounded-lg border border-border/40 bg-card px-2 py-2 text-[11px] font-mono outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed"
+              />
+            </div>
           </label>
         </div>
         <div className="space-y-2">
@@ -1761,14 +1906,25 @@ function ChartPaletteEditor({
               </div>
               <span className="text-[10px] font-mono text-muted-foreground">{stop}</span>
             </div>
-            <input
-              value={hslTripletToHex(stop)}
-              onChange={(event) => {
-                const next = hexToHslTriplet(event.target.value)
-                if (next) onChange(index, next)
-              }}
-              className="w-full rounded-lg border border-border/40 bg-card px-2 py-2 text-[11px] font-mono outline-none focus:ring-2 focus:ring-primary/20"
-            />
+            <div className="flex items-center gap-1.5">
+              <input
+                type="color"
+                value={hslTripletToHex(stop)}
+                onChange={(event) => {
+                  const next = hexToHslTriplet(event.target.value)
+                  if (next) onChange(index, next)
+                }}
+                className="h-8 w-8 shrink-0 cursor-pointer rounded-md border border-border/40 bg-card p-0.5"
+              />
+              <input
+                value={hslTripletToHex(stop)}
+                onChange={(event) => {
+                  const next = hexToHslTriplet(event.target.value)
+                  if (next) onChange(index, next)
+                }}
+                className="w-full rounded-lg border border-border/40 bg-card px-2 py-2 text-[11px] font-mono outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </div>
           </div>
         ))}
       </div>
@@ -1797,7 +1953,7 @@ function RangeField({
     <label className="block">
       <div className="mb-1 flex items-center justify-between gap-3">
         <span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">{label}</span>
-        <span className="text-[10px] font-mono text-muted-foreground">{Math.round(value)}</span>
+        <span className="text-[10px] font-mono text-muted-foreground">{Number.isInteger(value) ? value : value.toFixed(step < 0.1 ? 3 : step < 1 ? 2 : 0)}</span>
       </div>
       <input
         type="range"
@@ -2131,7 +2287,7 @@ function ThemeSwatchCard({
 }
 
 // ---------------------------------------------------------------------------
-// Git connections pane — central view of GitHub-linked projects
+// Git connections pane — shows which Orchestra projects are linked to GitHub repos
 // ---------------------------------------------------------------------------
 
 function GitConnectionsPane({ config }: { config: BackendConfig | null }) {
@@ -2187,9 +2343,16 @@ function GitConnectionsPane({ config }: { config: BackendConfig | null }) {
   return (
     <div className="space-y-6">
       <div>
+        <div className="flex items-center gap-1.5 mb-1">
+          <GitBranch size={13} className="text-muted-foreground/60" />
+          <span className="text-[12px] font-semibold tracking-tight">GitHub project links</span>
+        </div>
+        <p className="text-[11px] text-muted-foreground/60 mb-4">
+          Projects linked to a GitHub repo — connect from the Git tab inside a project.
+        </p>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/55">GitHub</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/55">Linked</span>
             <span className="text-[10px] font-medium tabular-nums text-muted-foreground/40">{linked.length}</span>
           </div>
           <button
@@ -2278,7 +2441,7 @@ function GitConnectionsPane({ config }: { config: BackendConfig | null }) {
             ))}
           </div>
           <p className="text-[11px] text-muted-foreground/60 mt-2.5">
-            Connect a project to GitHub from its <span className="font-medium text-foreground/80">Git → GitHub</span> tab.
+            Connect a project to GitHub from the <span className="font-medium text-foreground/80">Git</span> tab inside the project.
           </p>
         </div>
       )}
@@ -3278,3 +3441,4 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
     </div>
   )
 }
+
