@@ -5,6 +5,7 @@ import {
     ArrowUp, Code as CodeIcon, ExternalLink
 } from 'lucide-react'
 import { useAppStore } from '@core/store'
+import { GLOBAL_PROJECT_ID } from '@core/store/types'
 import type { DocItem, BackendConfig } from '@core/api/types'
 import { Button } from '@ui/button'
 import { Skeleton } from '@ui/skeleton'
@@ -397,8 +398,20 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
                             <AppTooltip content="Open interactive API docs">
                                 <button
                                     onClick={() => {
+                                        const url = `${config.baseUrl}/api/docs`
+                                        const activeProjectId = useAppStore.getState().activeProjectId
+                                        // Workspace browser tabs only render inside a project's tab
+                                        // group. With no project open the tab gets parked under
+                                        // GLOBAL_PROJECT_ID and isn't visible — fall back to the
+                                        // system browser instead of switching to a blank pane.
+                                        if (!activeProjectId || activeProjectId === GLOBAL_PROJECT_ID) {
+                                            const bridge = (window as { orchestraDesktop?: { openExternal?: (u: string) => void } }).orchestraDesktop
+                                            if (bridge?.openExternal) bridge.openExternal(url)
+                                            else window.open(url, '_blank', 'noopener,noreferrer')
+                                            return
+                                        }
                                         setActiveSection('CONSOLE')
-                                        openBrowserTab(`${config.baseUrl}/api/docs`)
+                                        openBrowserTab(url)
                                     }}
                                     className="h-7 w-7 grid place-items-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-foreground/[0.03] transition-colors"
                                 >
