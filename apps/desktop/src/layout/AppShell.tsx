@@ -43,9 +43,9 @@ export function AppShell({
           sidebarWidth={sidebarWidth}
         />
 
-        <main className="min-w-0 flex-1 bg-background h-full flex flex-col overflow-y-auto overflow-x-hidden">
+        <main className={`min-w-0 flex-1 bg-background h-full flex flex-col ${fullBleed ? 'overflow-hidden' : 'overflow-y-auto overflow-x-hidden'}`}>
           {fullBleed ? (
-            <div className="w-full flex flex-col h-full min-h-0">
+            <div className="w-full flex flex-col h-full min-h-0 overflow-hidden">
               {children}
             </div>
           ) : (

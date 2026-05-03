@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useOpenUrl } from '@/hooks'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import {
@@ -118,18 +119,7 @@ export function OverviewTab({
     })
   }, [planItems])
 
-  const handleOpenExternal = async (url: string) => {
-    const desktopBridge = window.orchestraDesktop
-    try {
-      if (desktopBridge && typeof desktopBridge.openExternal === 'function') {
-        await desktopBridge.openExternal(url)
-        return
-      }
-      window.open(url, '_blank', 'noopener,noreferrer')
-    } catch (error) {
-      console.error('Failed to open external URL:', error)
-    }
-  }
+  const handleOpenExternal = useOpenUrl()
 
   useEffect(() => {
     const previousCounts = previousPlanTextCountsRef.current

@@ -1,6 +1,7 @@
 import { ExternalLink, GitPullRequest } from 'lucide-react'
 import { Badge } from '@ui/badge'
 import type { WorkItem, WorkItemSource } from '@/entities/tracker/types'
+import { useOpenUrl } from '@/hooks'
 
 const SOURCE_BADGE_CLASS: Record<WorkItemSource, string> = {
   github: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
@@ -27,6 +28,8 @@ interface Props {
  * Source-specific metadata appears as chips in the "Tracker metadata" section.
  */
 export function WorkItemDetail({ item }: Props) {
+  const openUrl = useOpenUrl()
+
   if (!item) {
     return (
       <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
@@ -137,26 +140,22 @@ export function WorkItemDetail({ item }: Props) {
           </h3>
           <div className="flex flex-col gap-1.5">
             {item.url && (
-              <a
-                href={item.url}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                onClick={() => openUrl(item.url)}
                 className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
                 <span className="truncate">View in {item.source}</span>
-              </a>
+              </button>
             )}
             {item.pr_url && (
-              <a
-                href={item.pr_url}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                onClick={() => openUrl(item.pr_url!)}
                 className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
               >
                 <GitPullRequest className="h-3.5 w-3.5" />
                 <span className="truncate">{item.pr_url}</span>
-              </a>
+              </button>
             )}
           </div>
         </div>

@@ -460,9 +460,9 @@ export default function App() {
             </SectionErrorBoundary>
           ) : null}
 
-          {sectionVisibility.showConsole && config ? (
+          {config && (
             <SectionErrorBoundary name="Console">
-              <section className="flex-1 flex flex-col min-h-0">
+              <section className={`flex-1 flex flex-col min-h-0 ${sectionVisibility.showConsole ? '' : 'hidden'}`}>
                 <Suspense fallback={<SectionLoader />}>
                   <WorkspaceLayout
                     onAddTerminal={() => {
@@ -514,8 +514,7 @@ export default function App() {
                 </Suspense>
               </section>
             </SectionErrorBoundary>
-          ) : null}
-
+          )}
           {sectionVisibility.showSandbox ? (
             <SectionErrorBoundary name="Sandbox">
               <section className="col-span-12 flex flex-col">

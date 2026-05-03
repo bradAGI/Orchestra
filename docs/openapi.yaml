@@ -737,7 +737,8 @@ paths:
     get:
       tags: [Health]
       summary: Health check (root)
-      description: Returns 200 OK with `{"status":"ok"}`. No authentication required.
+      description: >
+        Returns 200 OK with `{"status":"ok"}`. No authentication required.
       security: []
       responses:
         '200':
@@ -788,7 +789,7 @@ paths:
     get:
       tags: [State]
       summary: Orchestrator snapshot
-      description: Returns the full in-memory orchestrator state, including all running, queued, and retry issues. Used by the desktop for initial hydration.
+      description: Returns the full in-memory orchestrator state formatted by the presenter layer, including all running, queued, and retry issues with their last-event metadata. Used by the desktop for initial page hydration.
       responses:
         '200':
           description: Current orchestrator snapshot.
@@ -805,7 +806,7 @@ paths:
     post:
       tags: [State]
       summary: Queue orchestrator refresh
-      description: Enqueues a tracker sync cycle and returns immediately with 202 Accepted.
+      description: Enqueues a tracker sync cycle (re-fetches issues from the configured backend) and returns immediately with 202 Accepted. Does not block on the sync completing.
       responses:
         '202':
           description: Refresh queued.
@@ -823,8 +824,10 @@ paths:
       tags: [Issues]
       summary: List issues
       description: >
-        Returns all issues with optional filtering. Supports pagination via
-        `limit`/`offset`. `states` is a comma-separated list.
+        Lists issues from the orchestrator tracker with optional filtering by
+        `states` (comma-separated), `project_id`, and `assignee_id`. Pagination
+        is applied after filtering via `limit`/`offset`; `total` in the response
+        reflects the unfiltered count before pagination.
       parameters:
         - name: states
           in: query
@@ -872,7 +875,7 @@ paths:
     post:
       tags: [Issues]
       summary: Create issue
-      description: Creates a new issue in the configured tracker.
+      description: Creates a new issue in the configured tracker. `title` is required; `state` defaults to `Backlog`. The issue will not be dispatched to an agent until it is moved to `Todo` (which requires `title`, `description`, `assignee_id`, and `project_id` all set).
       requestBody:
         required: true
         content:
@@ -922,9 +925,10 @@ paths:
       tags: [Issues]
       summary: Get issue
       description: >
-        Returns full issue detail including runtime state, workspace path,
-        history, and recent events. Falls back to tracker data when the issue
-        is not actively running.
+        Returns full issue detail merging runtime state (running/retry/status)
+        with tracker metadata (title, description, labels, etc.). When the issue
+        is not in the active runtime map, falls back to a tracker search by
+        identifier; returns 404 only when neither source has the issue.
       parameters:
         - $ref: '#/components/parameters/IssueIdentifier'
       responses:
@@ -943,11 +947,13 @@ paths:
       tags: [Issues]
       summary: Update issue
       description: >
-        Applies partial updates to an issue. State changes are validated against
-        the allowed transition graph. Certain fields are locked when the issue is
-        not in Backlog (title, description, project_id, assignee_id).
-        Moving to Review or Done auto-commits the worktree. Moving to Done
-        also removes the worktree.
+        Partial update — only fields present in the body are changed. State
+        transitions are validated against the allowed graph (Backlog→Todo→In
+        Progress→Review→Done); `title`, `description`, `project_id`, and
+        `assignee_id` are locked once the issue leaves Backlog. Moving from
+        Review back to Todo or In Progress requires `feedback` in the body.
+        Transitioning to Review or Done triggers an auto-commit in the issue's
+        worktree; transitioning to Done also removes the worktree.
       parameters:
         - $ref: '#/components/parameters/IssueIdentifier'
       requestBody:
@@ -1000,7 +1006,7 @@ paths:
     delete:
       tags: [Issues]
       summary: Delete issue
-      description: Permanently deletes the issue, stops any running sessions, and removes the git worktree/branch.
+      description: Permanently deletes the issue from the tracker, stops any running agent sessions, removes the git worktree directory, prunes the worktree reference, and force-deletes the associated branch. Irreversible.
       parameters:
         - $ref: '#/components/parameters/IssueIdentifier'
       responses:
@@ -1017,7 +1023,7 @@ paths:
     get:
       tags: [Issues]
       summary: Issue history
-      description: Returns the run/event history for an issue.
+      description: Returns the unified run history for an issue, combining metadata entries and agent-sourced session events ordered by timestamp. Resolves the issue ID from the runtime map or via tracker search if not currently running.
       parameters:
         - $ref: '#/components/parameters/IssueIdentifier'
       responses:
@@ -1041,7 +1047,8 @@ paths:
     get:
       tags: [Issues]
       summary: Issue session logs
-      description: Returns the most recent agent session log as plain text.
+      description: >
+        Returns the most recent agent session log as plain text. Resolves to the active `SessionLogPath` when the issue is running, otherwise finds the newest `.log` file under `_logs/{identifier}/`. Returns an empty 200 (with a placeholder message) when no logs exist or the issue has no agent history yet.
       parameters:
         - $ref: '#/components/parameters/IssueIdentifier'
       responses:
@@ -1059,9 +1066,12 @@ paths:
       tags: [Issues]
       summary: Issue git diff
       description: >
-        Returns the unified git diff for all changes made by the agent.
-        Uses `base_sha..branch_name` when available; falls back to
-        legacy workspace diff.
+        Returns the unified git diff for all changes made by the agent on this
+        issue. When `base_sha` and `branch_name` are set, produces a
+        `base_sha...branch_name` committed diff plus any uncommitted worktree
+        changes. Without those fields, scans the worktree root for a directory
+        matching the identifier, then falls back to staged + unstaged + last-commit
+        diff on the project root. Returns an empty body if no changes are found.
       parameters:
         - $ref: '#/components/parameters/IssueIdentifier'
         - name: provider
@@ -1084,7 +1094,7 @@ paths:
     get:
       tags: [Issues]
       summary: List artifacts
-      description: Lists artifacts (files) produced during the issue's agent runs.
+      description: Lists file artifacts produced by the issue's agent runs. Pass `provider` to scope to a specific agent's output directory.
       parameters:
         - $ref: '#/components/parameters/IssueIdentifier'
         - name: provider
@@ -1111,7 +1121,7 @@ paths:
     get:
       tags: [Issues]
       summary: Get artifact content
-      description: Returns the raw binary content of a specific artifact file.
+      description: Returns the raw binary content of a specific artifact file. The `path` parameter is a relative path within the artifact directory. Returns 404 when the artifact does not exist.
       parameters:
         - $ref: '#/components/parameters/IssueIdentifier'
         - name: path
@@ -1142,7 +1152,7 @@ paths:
     delete:
       tags: [Issues]
       summary: Stop issue session
-      description: Stops the active agent session for an issue and resets state to Todo.
+      description: Stops the active agent session(s) for an issue and resets state to `Todo`. Pass `provider` query param to stop only that provider's session (returns 409 if no session exists for it); omit to stop all sessions. Works even when the issue has no active runtime entry.
       parameters:
         - $ref: '#/components/parameters/IssueIdentifier'
         - name: provider
@@ -1169,8 +1179,11 @@ paths:
       tags: [Issues]
       summary: Stop and reset issue
       description: >
-        Stops all agent sessions, removes the worktree/branch, and resets the
-        issue to Backlog, clearing feedback, plan, branch_name, and base_sha.
+        Hard-resets an issue: stops all active agent sessions, removes the git
+        worktree directory, prunes the worktree reference, force-deletes the
+        branch, and resets the issue to `Backlog` while clearing `feedback`,
+        `plan`, `branch_name`, and `base_sha`. Bypasses normal state-transition
+        validation.
       parameters:
         - $ref: '#/components/parameters/IssueIdentifier'
       responses:
@@ -1192,9 +1205,11 @@ paths:
       tags: [Issues]
       summary: Create GitHub pull request
       description: >
-        Pushes the issue branch and creates a GitHub pull request. Owner, repo,
-        and token are inferred from the project, global config, or `gh` CLI if
-        not supplied. Stores the resulting PR URL on the issue.
+        Pushes the issue's branch to `origin` (retrying with `--force-with-lease`
+        on failure) and creates a GitHub pull request. `owner`, `repo`, and `token`
+        are resolved in order: request body → project record → global config →
+        `gh auth token`. If a PR already exists for the branch, returns the
+        existing PR instead of erroring. Stores the resulting PR URL on the issue.
       parameters:
         - $ref: '#/components/parameters/IssueIdentifier'
       requestBody:
@@ -1223,7 +1238,7 @@ paths:
     get:
       tags: [Issues]
       summary: Search issues
-      description: Full-text search across all issues using the `q` parameter.
+      description: Full-text search across all issues using the `q` query parameter. Returns 400 if `q` is empty.
       parameters:
         - name: q
           in: query
@@ -1253,14 +1268,13 @@ paths:
       tags: [Events]
       summary: Subscribe to SSE event stream
       description: >
-        Long-lived Server-Sent Events stream. Each event carries a JSON payload
-        describing orchestrator state changes, agent execution events, and
-        telemetry updates.
-
-        **Event types:** `state_update`, `issue_update`, `agent_event`,
-        `session_started`, `session_ended`, `run_completed`, `run_failed`.
-
-        Clients should reconnect on disconnect using the `Last-Event-ID` header.
+        Long-lived Server-Sent Events stream. On connect, immediately sends a
+        `snapshot` event containing the full current orchestrator state.
+        Subsequent events are emitted for every pub/sub bus message, each
+        followed by another `snapshot`. A periodic `snapshot` is also sent every
+        5 seconds as a keep-alive. Pass `once=1` to receive a single snapshot
+        and close. Reconnect using standard SSE retry logic; `Last-Event-ID` is
+        not currently used for replay.
       responses:
         '200':
           description: SSE stream (keep-alive with periodic heartbeat comments).
@@ -1276,7 +1290,7 @@ paths:
     get:
       tags: [Sessions]
       summary: List sessions
-      description: Returns all agent sessions with aggregated token usage.
+      description: Returns all recorded agent sessions with aggregated token usage, optionally filtered by `project_id`. Supports `limit`/`offset` pagination; `total` reflects the unfiltered count.
       parameters:
         - name: project_id
           in: query
@@ -1313,7 +1327,7 @@ paths:
     get:
       tags: [Sessions]
       summary: Get session detail
-      description: Returns a session and all its ordered events.
+      description: Returns a session record and all its associated events in chronological order. Returns 404 when the session ID is not found.
       parameters:
         - name: session_id
           in: path
@@ -1337,7 +1351,7 @@ paths:
     get:
       tags: [Projects]
       summary: List projects
-      description: Returns all registered projects. Token fields are redacted.
+      description: Returns all registered projects. `github_token` is redacted to `"configured"` when set, `""` otherwise. `path_exists` is populated by a stat check on each `root_path` at request time.
       responses:
         '200':
           description: Project list.
@@ -1356,8 +1370,11 @@ paths:
       tags: [Projects]
       summary: Register project
       description: >
-        Registers a local directory as a project. Git remote info is detected
-        automatically. GitHub owner/repo are parsed from the remote URL.
+        Registers a local directory as a project. The git root and remote URL
+        are detected automatically from `root_path`; if the remote is a GitHub
+        URL, `github_owner` and `github_repo` are populated. Uses upsert
+        semantics — re-registering the same path returns the existing ID.
+        Returns 403 when `root_path` is outside the configured `ProjectRoots`.
         Pass `issue_source_*` fields to configure the issue source at creation time.
       requestBody:
         required: true
@@ -1399,7 +1416,7 @@ paths:
     get:
       tags: [Projects]
       summary: Get project stats
-      description: Returns aggregate session count and token usage for a project.
+      description: Returns aggregate session count, total input/output tokens, and last-active timestamp for the project. Returns 503 when the database is unavailable.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       responses:
@@ -1417,7 +1434,7 @@ paths:
     delete:
       tags: [Projects]
       summary: Delete project
-      description: Removes a project and all associated sessions, events, runs, and issues.
+      description: Removes a project and all associated sessions, events, runs, and issues via cascade delete. Does not clean up any worktrees or branches on disk.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       responses:
@@ -1434,7 +1451,7 @@ paths:
     post:
       tags: [Projects]
       summary: Refresh project git info
-      description: Re-scans the project's git remote URL and updates GitHub owner/repo.
+      description: Re-runs `git remote` on the project's `root_path` and updates `github_owner`/`github_repo` if the remote parses as a GitHub URL. Silently skips the git update if the path is unreachable.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       responses:
@@ -1457,7 +1474,7 @@ paths:
     patch:
       tags: [Projects]
       summary: Update issue source
-      description: Sets or updates the per-project issue source configuration.
+      description: Sets or replaces the per-project issue source (`issue_source_type`, `issue_source_endpoint`, `issue_source_token`). All three fields are full-replace — omitting a field clears it. Returns the updated project record.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       requestBody:
@@ -1489,7 +1506,8 @@ paths:
     post:
       tags: [Projects]
       summary: Test issue source connection
-      description: Pings the configured issue source and returns ok/error.
+      description: >
+        Attempts to connect to the project's configured issue source and returns `{"ok": true}` or `{"ok": false, "error": "..."}`. Does not modify any state.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       responses:
@@ -1513,7 +1531,7 @@ paths:
     get:
       tags: [Projects]
       summary: Browse tracker issues
-      description: Live browse of the project's issue source (used by TrackerViewer panel).
+      description: Fetches work items directly from the project's configured issue source (not the local tracker DB). Supports optional `states` comma-separated filter. Used by the TrackerViewer panel for live browsing.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
         - name: states
@@ -1539,7 +1557,7 @@ paths:
     get:
       tags: [Projects]
       summary: Get project file content
-      description: Returns the content of a file within the project.
+      description: Returns the content of a file within the project as plain text. The `path` query parameter is a relative path from the project root. Returns 403 for paths that escape the project root (path traversal), 404 when the file does not exist.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
         - name: path
@@ -1566,7 +1584,11 @@ paths:
     get:
       tags: [Projects]
       summary: Get project file tree
-      description: Returns a shallow directory listing (1 level deep) for the project root or a subdirectory.
+      description: >
+        Returns a 2-level directory tree (root + one level of children) for the
+        project or a subdirectory. Skips `.git`, `node_modules`, `dist`, `build`,
+        and `.DS_Store`. Entries are sorted — directories first, then files,
+        both alphabetically.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
         - name: path
@@ -1593,7 +1615,7 @@ paths:
     get:
       tags: [Git]
       summary: Git commit history
-      description: Returns the last 20 commits for the project (or a specific branch).
+      description: Returns the last 20 commits for the project root (or a specific `branch`). Returns 403 when the project path is outside authorized roots.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
         - name: branch
@@ -1618,7 +1640,7 @@ paths:
     get:
       tags: [Git]
       summary: Git working tree status
-      description: Returns porcelain file status and branch ahead/behind counts.
+      description: Returns the working tree's porcelain file status (two-character codes) and the current branch's `ahead`/`behind` counts relative to its remote tracking branch.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       responses:
@@ -1650,8 +1672,9 @@ paths:
       tags: [Git]
       summary: Git diff
       description: >
-        Returns a git diff. Pass `hash` for a specific commit, `file` to scope
-        to a path, `staged=true` for the index diff.
+        Returns a unified diff. Pass `hash` for a specific commit diff (`hash~1..hash`),
+        `file` to scope to a single path, or `staged=true` for the index (`--cached`) diff.
+        Omitting all params returns the unstaged working tree diff.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
         - name: hash
@@ -1683,7 +1706,7 @@ paths:
     post:
       tags: [Git]
       summary: Git commit
-      description: Creates a commit in the project directory with the given message.
+      description: Runs `git commit` with the provided `message` in the project directory. Returns 403 when the project path is outside authorized roots, 400 when `message` is empty.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       requestBody:
@@ -1722,7 +1745,10 @@ paths:
     post:
       tags: [Git]
       summary: Git push
-      description: Pushes the current or specified branch to remote.
+      description: >
+        Pushes to `remote` (default `origin`) and `branch` (defaults to the
+        current branch, falling back to the repo default branch if detection
+        fails). Returns 403 when the path is outside authorized roots.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       requestBody:
@@ -1758,7 +1784,10 @@ paths:
     post:
       tags: [Git]
       summary: Git pull
-      description: Pulls from remote.
+      description: >
+        Pulls from `remote` (default `origin`) and `branch` (defaults to the
+        current branch, falling back to the repo default branch if detection
+        fails). Returns 403 when the path is outside authorized roots.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       requestBody:
@@ -1788,7 +1817,7 @@ paths:
     post:
       tags: [Git]
       summary: Git fetch
-      description: Fetches all remotes.
+      description: Runs `git fetch` for all remotes in the project directory. Returns 403 when the path is outside authorized roots.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       responses:
@@ -1807,7 +1836,7 @@ paths:
     get:
       tags: [Git]
       summary: List branches
-      description: Returns local and remote branch names with the current branch.
+      description: Returns `current` branch name, all local `branches`, and all `remote_branches` for the project.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       responses:
@@ -1836,7 +1865,8 @@ paths:
     post:
       tags: [Git]
       summary: Create branch
-      description: Creates a new branch from the current HEAD.
+      description: >
+        Creates a new local branch from the current HEAD using `git branch {name}`.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       requestBody:
@@ -1865,7 +1895,7 @@ paths:
     get:
       tags: [Git]
       summary: List branches with detail
-      description: Returns branches with ahead/behind counts and last commit info.
+      description: Returns all local branches with `ahead`/`behind` counts relative to the remote tracking branch, `last_commit` hash, and `last_commit_date`.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       responses:
@@ -1884,7 +1914,7 @@ paths:
     delete:
       tags: [Git]
       summary: Delete branch
-      description: Deletes a local branch.
+      description: Deletes a local branch using `git branch -D` (force delete). Does not remove any associated remote branch.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
         - name: branch
@@ -1908,7 +1938,8 @@ paths:
     post:
       tags: [Git]
       summary: Checkout branch
-      description: Checks out an existing branch.
+      description: >
+        Checks out an existing local branch (`git checkout {branch}`). Does not create branches; use POST `/git/branches` first for new branches.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       requestBody:
@@ -1937,7 +1968,8 @@ paths:
     post:
       tags: [Git]
       summary: Stage files
-      description: Stages files for commit (`git add`).
+      description: >
+        Stages the specified files for commit (`git add {files...}`). Pass an empty array to stage nothing.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       requestBody:
@@ -1965,7 +1997,8 @@ paths:
     post:
       tags: [Git]
       summary: Unstage files
-      description: Unstages files from the index (`git reset HEAD`).
+      description: >
+        Removes the specified files from the staging index (`git reset HEAD {files...}`) without discarding working-tree changes.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       requestBody:
@@ -1993,7 +2026,8 @@ paths:
     post:
       tags: [Git]
       summary: Git stash
-      description: Stashes working tree changes.
+      description: >
+        Stashes working tree changes with an optional `message`. Equivalent to `git stash push -m {message}`.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       requestBody:
@@ -2018,7 +2052,7 @@ paths:
     get:
       tags: [Git]
       summary: List stashes
-      description: Returns the stash list.
+      description: Returns the current stash list (`git stash list`) as an array of stash entry objects.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       responses:
@@ -2037,7 +2071,7 @@ paths:
     post:
       tags: [Git]
       summary: Pop stash
-      description: Applies and removes the top stash entry.
+      description: Applies the top stash entry and removes it from the stash list (`git stash pop`).
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       responses:
@@ -2054,7 +2088,8 @@ paths:
     post:
       tags: [Git]
       summary: Apply stash
-      description: Applies a stash entry without removing it.
+      description: >
+        Applies a stash entry by `index` without removing it from the stash list (`git stash apply stash@{index}`).
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       requestBody:
@@ -2079,7 +2114,8 @@ paths:
     post:
       tags: [Git]
       summary: Drop stash
-      description: Removes a stash entry.
+      description: >
+        Discards a stash entry by `index` without applying it (`git stash drop stash@{index}`).
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       requestBody:
@@ -2104,7 +2140,7 @@ paths:
     get:
       tags: [Git]
       summary: List merge conflicts
-      description: Returns files with merge conflicts.
+      description: Returns files currently in a conflicted state (both-modified, etc.) in the working tree.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       responses:
@@ -2121,7 +2157,8 @@ paths:
     post:
       tags: [Git]
       summary: Merge branch
-      description: Merges a branch into the current branch.
+      description: >
+        Merges the specified `branch` into the current branch (`git merge {branch}`). Returns merge result output; may leave the repo in a conflicted state on failure.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       requestBody:
@@ -2148,7 +2185,7 @@ paths:
     post:
       tags: [Git]
       summary: Abort merge
-      description: Aborts an in-progress merge.
+      description: Aborts an in-progress merge and restores the pre-merge state (`git merge --abort`).
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       responses:
@@ -2165,7 +2202,8 @@ paths:
     post:
       tags: [Git]
       summary: Resolve conflict
-      description: Marks a conflicted file as resolved.
+      description: >
+        Marks a conflicted file as resolved by staging it (`git add {path}`). Does not modify file content; the caller is expected to have already applied the desired resolution.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       requestBody:
@@ -2192,7 +2230,7 @@ paths:
     get:
       tags: [Git]
       summary: Get default branch
-      description: Returns the default branch name (main or master).
+      description: Detects and returns the repository's default branch name (typically `main` or `master`) by inspecting `HEAD` of the remote.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       responses:
@@ -2215,7 +2253,7 @@ paths:
     get:
       tags: [GitHub]
       summary: List GitHub issues
-      description: Returns GitHub issues for the project's linked repository.
+      description: Returns GitHub issues for the project's linked repository using the project's stored GitHub token. Supports `state` (`open`/`closed`) and `page` parameters. Returns 502 on upstream GitHub API errors.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
         - name: state
@@ -2254,7 +2292,7 @@ paths:
     post:
       tags: [GitHub]
       summary: Create GitHub issue
-      description: Creates a new issue in the project's GitHub repository.
+      description: Creates a new issue in the project's linked GitHub repository. `title` is required; `body` and `labels` are optional. Returns 502 on upstream GitHub API errors.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       requestBody:
@@ -2290,7 +2328,7 @@ paths:
     patch:
       tags: [GitHub]
       summary: Update GitHub issue
-      description: Updates a GitHub issue's title, body, state, or labels.
+      description: Partially updates a GitHub issue (title, body, state, labels) by proxying a PATCH to the GitHub API. Only fields present in the request body are updated.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
         - name: number
@@ -2322,7 +2360,7 @@ paths:
     get:
       tags: [GitHub]
       summary: List pull requests
-      description: Returns open pull requests for the project's GitHub repository.
+      description: Returns open pull requests for the project's linked GitHub repository. Returns 502 on upstream GitHub API errors.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       responses:
@@ -2346,7 +2384,7 @@ paths:
     post:
       tags: [GitHub]
       summary: Create pull request (project)
-      description: Creates a GitHub pull request for the project.
+      description: Creates a GitHub pull request for the project using the project's stored token. Unlike the issue-scoped PR endpoint, this does not push the branch first.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       requestBody:
@@ -2372,7 +2410,7 @@ paths:
     get:
       tags: [GitHub]
       summary: Pull request diff
-      description: Returns the unified diff for a pull request.
+      description: Fetches and returns the unified diff for a GitHub pull request by requesting `application/vnd.github.v3.diff` from the API.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
         - name: number
@@ -2394,6 +2432,7 @@ paths:
     get:
       tags: [GitHub]
       summary: List PR reviews
+      description: Returns all reviews submitted for the specified pull request number.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
         - name: number
@@ -2414,6 +2453,7 @@ paths:
     post:
       tags: [GitHub]
       summary: Submit PR review
+      description: Submits a review on a pull request. `event` controls the review type (`COMMENT`, `APPROVE`, or `REQUEST_CHANGES`).
       parameters:
         - $ref: '#/components/parameters/ProjectID'
         - name: number
@@ -2447,6 +2487,7 @@ paths:
     get:
       tags: [GitHub]
       summary: List PR comments
+      description: Returns all inline review comments on a pull request.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
         - name: number
@@ -2468,6 +2509,7 @@ paths:
     put:
       tags: [GitHub]
       summary: Merge pull request
+      description: Merges a pull request using `merge_method` (`merge`, `squash`, or `rebase`; default `merge`). Returns the GitHub merge result object.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
         - name: number
@@ -2547,7 +2589,7 @@ paths:
     get:
       tags: [GitHub]
       summary: GitHub OAuth login
-      description: Redirects to GitHub OAuth. Rate-limited to 5 req/s.
+      description: Initiates the GitHub OAuth flow by redirecting to GitHub's authorization URL. No authentication required. Rate-limited to 5 req/s.
       security: []
       responses:
         '302':
@@ -2557,7 +2599,7 @@ paths:
     get:
       tags: [GitHub]
       summary: GitHub OAuth callback
-      description: Handles the OAuth callback from GitHub. Rate-limited to 5 req/s.
+      description: Completes the GitHub OAuth flow by exchanging the `code` parameter for an access token and redirecting the desktop app. No authentication required. Rate-limited to 5 req/s.
       security: []
       parameters:
         - name: code
@@ -2578,7 +2620,7 @@ paths:
     get:
       tags: [TrackerConfigs]
       summary: List tracker configs
-      description: Returns all stored tracker connection configurations.
+      description: Returns all stored tracker connection configurations. The encrypted token is never returned; `has_token` indicates whether one is stored.
       responses:
         '200':
           description: Config list.
@@ -2594,7 +2636,7 @@ paths:
     post:
       tags: [TrackerConfigs]
       summary: Create tracker config
-      description: Creates a new tracker connection. Token is encrypted before storage.
+      description: Creates a new named tracker connection. The `token` is AES-encrypted before storage and never returned in responses. `auth_method` defaults to `apikey`.
       requestBody:
         required: true
         content:
@@ -2636,7 +2678,7 @@ paths:
     patch:
       tags: [TrackerConfigs]
       summary: Update tracker config
-      description: Partial update of a tracker config. Omit fields to leave them unchanged.
+      description: Partial update of a tracker config — only fields present in the body are changed. If `token` is provided, it is re-encrypted and replaces the stored token.
       parameters:
         - name: config_id
           in: path
@@ -2678,6 +2720,7 @@ paths:
     delete:
       tags: [TrackerConfigs]
       summary: Delete tracker config
+      description: Permanently removes a tracker config record. Any projects assigned to this config will retain the `tracker_config_id` reference but the config will no longer resolve.
       parameters:
         - name: config_id
           in: path
@@ -2703,7 +2746,10 @@ paths:
     post:
       tags: [TrackerConfigs]
       summary: Test tracker connection
-      description: Pings the tracker and returns ok/error.
+      description: >
+        Instantiates the tracker adapter with the stored credentials and makes
+        a lightweight API call to verify connectivity. Returns
+        `{"ok": true}` or `{"ok": false, "error": "..."}`. Does not modify any state.
       parameters:
         - name: config_id
           in: path
@@ -2731,7 +2777,7 @@ paths:
     get:
       tags: [TrackerConfigs]
       summary: List tracker projects
-      description: Returns projects/teams available in the connected tracker.
+      description: Returns the projects or teams available in the connected tracker (e.g., GitHub repos, Linear teams, Jira projects) using the stored credentials.
       parameters:
         - name: config_id
           in: path
@@ -2756,7 +2802,7 @@ paths:
     get:
       tags: [TrackerConfigs]
       summary: List tracker states
-      description: Returns workflow states available in the connected tracker.
+      description: Returns the workflow states (e.g., todo, in_progress, done) available in the connected tracker for populating state-mapping UI.
       parameters:
         - name: config_id
           in: path
@@ -2781,7 +2827,7 @@ paths:
     get:
       tags: [TrackerConfigs]
       summary: Browse tracker issues
-      description: Returns work items from the tracker adapter with optional state filtering.
+      description: Returns work items directly from the tracker adapter (not the local DB) using the stored credentials. Supports optional comma-separated `states` filter.
       parameters:
         - name: config_id
           in: path
@@ -2810,7 +2856,7 @@ paths:
     post:
       tags: [TrackerConfigs]
       summary: Assign tracker config to project
-      description: Links a global tracker config to a project. Pass `config_id=""` to clear.
+      description: Links a global tracker config to a project by setting `tracker_config_id`. Pass `config_id=""` to unlink the current config without deleting it.
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       requestBody:
@@ -2843,7 +2889,7 @@ paths:
     get:
       tags: [Workspace]
       summary: Read workspace file
-      description: Returns the content of a file inside a registered project or workspace root.
+      description: Returns the content of a file as plain text. The `path` parameter must be an absolute path inside the workspace root, a worktree root, or any registered project root. Returns 400 for relative paths or paths that escape all roots.
       parameters:
         - name: path
           in: query
@@ -2869,8 +2915,10 @@ paths:
       tags: [Workspace]
       summary: Write workspace file
       description: >
-        Writes content to a file inside a registered root. Maximum 32 MiB.
-        The raw body is used as file content (not JSON-wrapped).
+        Writes the raw request body to a file at the given absolute `path`
+        (must be inside a registered root). Creates or overwrites the file.
+        Capped at 32 MiB — returns 413 if exceeded. Path validation is identical
+        to GET.
       parameters:
         - name: path
           in: query
@@ -2910,7 +2958,7 @@ paths:
     get:
       tags: [Workspace]
       summary: List workspace directory
-      description: Returns a flat directory listing for a path inside a registered root.
+      description: Returns a flat (non-recursive) directory listing of the given absolute `path` inside a registered root. Returns 400 for paths outside allowed roots.
       parameters:
         - name: path
           in: query
@@ -2935,7 +2983,7 @@ paths:
     post:
       tags: [Workspace]
       summary: Create directory
-      description: Creates a directory (and parents) inside a registered root.
+      description: Creates a directory (and any missing parents) at the given absolute `path` inside a registered root. Returns 409 if the path already exists.
       parameters:
         - name: path
           in: query
@@ -2967,7 +3015,7 @@ paths:
     post:
       tags: [Workspace]
       summary: Rename/move path
-      description: Moves a file or directory inside registered roots.
+      description: Moves a file or directory from `from` to `to`. Both absolute paths must be inside registered roots. Returns 404 when the source does not exist, 409 when the destination already exists.
       requestBody:
         required: true
         content:
@@ -3009,7 +3057,7 @@ paths:
     delete:
       tags: [Workspace]
       summary: Delete workspace path
-      description: Removes a file or directory inside a registered root.
+      description: Removes a file or a directory tree (recursively) at the given absolute `path` inside a registered root. Returns 404 when the path does not exist.
       parameters:
         - name: path
           in: query
@@ -3037,7 +3085,7 @@ paths:
     get:
       tags: [Workspace]
       summary: Migration plan
-      description: Returns the workspace migration plan for upgrading schema structures.
+      description: Returns a dry-run plan showing what files/directories would be moved when migrating from an old workspace root to the current one. Accepts `from` and `to` query params; defaults to the previous workspace default and the current workspace root.
       responses:
         '200':
           description: Migration plan.
@@ -3053,7 +3101,10 @@ paths:
     post:
       tags: [Workspace]
       summary: Run migration
-      description: Executes the workspace migration.
+      description: >
+        Executes a workspace migration, moving files from `from` to `to`.
+        Pass `"dry_run": true` (the default) to preview without making changes.
+        Returns 202 with a result object describing actions taken.
       responses:
         '200':
           description: Migration result.
@@ -3070,7 +3121,7 @@ paths:
     get:
       tags: [MCP]
       summary: List MCP tools
-      description: Returns all tools advertised by running MCP servers.
+      description: Returns all tools advertised by currently running MCP server processes. Returns an empty list when no MCP registry is configured.
       responses:
         '200':
           description: Tool list.
@@ -3091,7 +3142,7 @@ paths:
     get:
       tags: [MCP]
       summary: List MCP servers
-      description: Returns all registered MCP server entries.
+      description: Returns all MCP server entries stored in the database. Returns an empty list when the database is unavailable.
       responses:
         '200':
           description: Server list.
@@ -3110,7 +3161,7 @@ paths:
     post:
       tags: [MCP]
       summary: Register MCP server
-      description: Adds a new MCP server and hot-reloads the registry.
+      description: Persists a new MCP server entry and immediately rebuilds and starts the full MCP registry (all existing servers plus the new one). The new server is available to agents after this call without restart.
       requestBody:
         required: true
         content:
@@ -3139,7 +3190,7 @@ paths:
     delete:
       tags: [MCP]
       summary: Delete MCP server
-      description: Removes an MCP server and rebuilds the registry.
+      description: Removes an MCP server entry from the database, then rebuilds the live registry from the remaining DB entries plus static config. Takes effect immediately without restart.
       parameters:
         - name: id
           in: path
@@ -3157,7 +3208,7 @@ paths:
     get:
       tags: [Agents]
       summary: List configured agents
-      description: Returns the list of agent providers configured in the orchestrator.
+      description: Returns the list of agent provider names and their configuration status as known to the orchestrator.
       responses:
         '200':
           description: Agent provider list.
@@ -3178,7 +3229,7 @@ paths:
     get:
       tags: [Agents]
       summary: Get agent config
-      description: Returns command mappings, default provider, and max_turns.
+      description: Returns the current agent command map (provider name → executable), the default provider name, and `max_turns`.
       responses:
         '200':
           description: Agent configuration.
@@ -3192,7 +3243,7 @@ paths:
     patch:
       tags: [Agents]
       summary: Update agent config (max_turns)
-      description: Updates max_turns (1–100).
+      description: Updates `max_turns` in the running orchestrator (1–100 inclusive). Other fields are ignored. Returns the full updated config.
       requestBody:
         required: true
         content:
@@ -3219,7 +3270,7 @@ paths:
     post:
       tags: [Agents]
       summary: Replace agent config
-      description: Replaces agent command mappings and default provider.
+      description: Full-replaces the agent `commands` map and `agent_provider` default in the running orchestrator. Returns 204 on success. Does not persist across restarts.
       requestBody:
         required: true
         content:
@@ -3245,7 +3296,7 @@ paths:
     get:
       tags: [Agents]
       summary: List provider MCP servers
-      description: Returns MCP server entries for the given agent provider.
+      description: Returns MCP server entries from the provider's native config file (e.g., Claude's `settings.json`, Codex/OpenCode/Gemini config). Pass `project_id` to merge project-scoped MCP servers for Claude.
       parameters:
         - $ref: '#/components/parameters/Provider'
       responses:
@@ -3261,6 +3312,7 @@ paths:
     post:
       tags: [Agents]
       summary: Add provider MCP server
+      description: Adds an MCP server entry to the provider's native config file.
       parameters:
         - $ref: '#/components/parameters/Provider'
       requestBody:
@@ -3284,6 +3336,7 @@ paths:
     put:
       tags: [Agents]
       summary: Update provider MCP server
+      description: Replaces an MCP server entry by name in the provider's native config file.
       parameters:
         - $ref: '#/components/parameters/Provider'
         - name: name
@@ -3358,6 +3411,7 @@ paths:
     get:
       tags: [Agents]
       summary: Get provider permissions
+      description: Returns the normalized permission config (allow/deny/ask tool lists, approval mode) read from the provider's native config file.
       parameters:
         - $ref: '#/components/parameters/Provider'
       responses:
@@ -3373,6 +3427,7 @@ paths:
     post:
       tags: [Agents]
       summary: Set provider permissions
+      description: Writes the permission config (allow/deny/ask tool lists, approval mode) to the provider's native config file, replacing the existing permissions section.
       parameters:
         - $ref: '#/components/parameters/Provider'
       requestBody:
@@ -3396,6 +3451,7 @@ paths:
     get:
       tags: [Agents]
       summary: Get provider model
+      description: Returns the model name, effort level, and temperature configured in the provider's native config file.
       parameters:
         - $ref: '#/components/parameters/Provider'
       responses:
@@ -3411,6 +3467,7 @@ paths:
     post:
       tags: [Agents]
       summary: Set provider model
+      description: Writes the `model` name to the provider's native config file.
       parameters:
         - $ref: '#/components/parameters/Provider'
       requestBody:
@@ -3436,6 +3493,7 @@ paths:
     get:
       tags: [Agents]
       summary: Get provider hooks
+      description: Returns the lifecycle hooks (pre-tool, post-tool, etc.) configured in the provider's native config file.
       parameters:
         - $ref: '#/components/parameters/Provider'
       responses:
@@ -3451,6 +3509,7 @@ paths:
     post:
       tags: [Agents]
       summary: Set provider hooks
+      description: Writes the hooks configuration to the provider's native config file, replacing the existing hooks section.
       parameters:
         - $ref: '#/components/parameters/Provider'
       requestBody:
@@ -3474,7 +3533,7 @@ paths:
     get:
       tags: [Agents]
       summary: Get Claude settings
-      description: Returns the contents of Claude's `settings.json`.
+      description: Returns the parsed contents of Claude's `settings.json` from `~/.claude/`.
       responses:
         '200':
           description: Claude settings.
@@ -3489,6 +3548,7 @@ paths:
     post:
       tags: [Agents]
       summary: Save Claude settings
+      description: Overwrites Claude's `settings.json` with the provided JSON object.
       requestBody:
         required: true
         content:
@@ -3510,6 +3570,7 @@ paths:
     get:
       tags: [Agents]
       summary: Get Claude CLAUDE.md instructions
+      description: Returns the contents of `~/.claude/CLAUDE.md` as a JSON object with a `content` string field.
       responses:
         '200':
           description: Instructions text.
@@ -3526,6 +3587,7 @@ paths:
     post:
       tags: [Agents]
       summary: Save Claude CLAUDE.md instructions
+      description: Overwrites `~/.claude/CLAUDE.md` with the provided `content` string.
       requestBody:
         required: true
         content:
@@ -3549,6 +3611,7 @@ paths:
     delete:
       tags: [Agents]
       summary: Delete Claude instructions
+      description: Removes `~/.claude/CLAUDE.md` if it exists.
       responses:
         '204':
           description: Deleted.
@@ -3559,6 +3622,7 @@ paths:
     get:
       tags: [Agents]
       summary: List Claude rules
+      description: Returns all rule files from `~/.claude/rules/` as a list with name and content.
       responses:
         '200':
           description: Rule list.
@@ -3572,6 +3636,8 @@ paths:
     post:
       tags: [Agents]
       summary: Create/update Claude rule
+      description: >
+        Creates or overwrites a rule file at `~/.claude/rules/{name}.md` with the provided `content`.
       requestBody:
         required: true
         content:
@@ -3598,6 +3664,8 @@ paths:
     delete:
       tags: [Agents]
       summary: Delete Claude rule
+      description: >
+        Removes the rule file `~/.claude/rules/{name}.md`.
       parameters:
         - name: name
           in: path
@@ -3614,6 +3682,7 @@ paths:
     get:
       tags: [Agents]
       summary: List Claude skills
+      description: Returns all skill files from `~/.claude/skills/` as a list with name and content.
       responses:
         '200':
           description: Skill list.
@@ -3627,6 +3696,8 @@ paths:
     post:
       tags: [Agents]
       summary: Create/update Claude skill
+      description: >
+        Creates or overwrites a skill file at `~/.claude/skills/{name}.md` with the provided `content`.
       requestBody:
         required: true
         content:
@@ -3653,6 +3724,8 @@ paths:
     delete:
       tags: [Agents]
       summary: Delete Claude skill
+      description: >
+        Removes the skill file `~/.claude/skills/{name}.md`.
       parameters:
         - name: name
           in: path
@@ -3669,6 +3742,7 @@ paths:
     get:
       tags: [Agents]
       summary: List Claude sub-agents
+      description: Returns all sub-agent configurations from Claude's config directory.
       responses:
         '200':
           description: Sub-agent list.
@@ -3682,6 +3756,7 @@ paths:
     post:
       tags: [Agents]
       summary: Create/update Claude sub-agent
+      description: Creates or updates a Claude sub-agent configuration entry.
       requestBody:
         required: true
         content:
@@ -3703,6 +3778,7 @@ paths:
     delete:
       tags: [Agents]
       summary: Delete Claude sub-agent
+      description: Removes the named sub-agent configuration entry from Claude's config.
       parameters:
         - name: name
           in: path
@@ -3720,7 +3796,7 @@ paths:
     get:
       tags: [Usage]
       summary: Usage scan state
-      description: Returns the scanner state for the given provider.
+      description: Returns the current scanner state for the given provider — whether scanning is enabled, last scan time, file/session counts, and any error from the last scan.
       parameters:
         - $ref: '#/components/parameters/UsageProvider'
       responses:
@@ -3739,6 +3815,7 @@ paths:
     post:
       tags: [Usage]
       summary: Enable/disable usage tracking
+      description: Enables or disables the usage file scanner for the given provider. Triggers an initial scan when enabling. Returns the updated scan state.
       parameters:
         - $ref: '#/components/parameters/UsageProvider'
       requestBody:
@@ -3765,7 +3842,11 @@ paths:
     post:
       tags: [Usage]
       summary: Refresh usage data
-      description: Triggers a re-scan of the provider's usage files.
+      description: >
+        Triggers a synchronous re-scan of the provider's usage files.
+        Pass `"force": true` to bypass any scan-interval throttle.
+        On partial failure, returns 500 with the in-progress state
+        attached as `details.state`.
       parameters:
         - $ref: '#/components/parameters/UsageProvider'
       requestBody:
@@ -3797,7 +3878,7 @@ paths:
     get:
       tags: [Usage]
       summary: Usage summary
-      description: Returns aggregated token usage and cost for the given provider, scope, and range.
+      description: Returns aggregated token usage and estimated cost for the given provider, `scope`, and `range`. Data is read from the in-memory scan results, not the warehouse DB.
       parameters:
         - $ref: '#/components/parameters/UsageProvider'
         - $ref: '#/components/parameters/UsageScope'
@@ -3818,7 +3899,7 @@ paths:
     get:
       tags: [Usage]
       summary: Daily usage
-      description: Returns per-day token/cost data points.
+      description: Returns per-day token/cost data points for the given `scope` and `range`. Useful for rendering time-series charts.
       parameters:
         - $ref: '#/components/parameters/UsageProvider'
         - $ref: '#/components/parameters/UsageScope'
@@ -3841,7 +3922,7 @@ paths:
     get:
       tags: [Usage]
       summary: Usage breakdown
-      description: Returns usage grouped by model, project, or session.
+      description: Returns usage aggregated by `kind` (`model`, `project`, or `session`; default `model`) for the given `scope` and `range`. The `key` field in each row contains the model name, project name, or session ID respectively.
       parameters:
         - $ref: '#/components/parameters/UsageProvider'
         - $ref: '#/components/parameters/UsageScope'
@@ -3871,7 +3952,7 @@ paths:
     get:
       tags: [Usage]
       summary: Usage sessions
-      description: Returns individual session-level usage records. Max 200 per call.
+      description: Returns individual session-level usage records for the given `scope` and `range`. Capped at 200 rows per call; use `limit` to request fewer (default 25).
       parameters:
         - $ref: '#/components/parameters/UsageProvider'
         - $ref: '#/components/parameters/UsageScope'
@@ -3900,7 +3981,7 @@ paths:
     get:
       tags: [Usage]
       summary: Rate limit status
-      description: Returns current Claude API rate limit headers (cached).
+      description: Returns the most recently observed Claude API rate limit headers (requests/tokens remaining, reset times). Returns cached values from the last API response; use POST `/rate-limits/refresh` to force a live check.
       responses:
         '200':
           description: Rate limit state.
@@ -3915,7 +3996,7 @@ paths:
     post:
       tags: [Usage]
       summary: Refresh rate limits
-      description: Forces a fresh rate limit check against the Claude API.
+      description: Makes a lightweight request to the Claude API to refresh the cached rate limit state and returns the updated values.
       responses:
         '200':
           description: Updated rate limit state.
@@ -3932,8 +4013,11 @@ paths:
       tags: [Usage]
       summary: Warehouse global stats
       description: >
-        Returns platform-wide aggregate token usage, per-provider/model breakdowns,
-        and the 50 most recent sessions. Results are cached for 30 seconds.
+        Returns platform-wide aggregate token usage (including cache read/write and
+        thinking tokens), per-provider and per-model breakdowns, session success/failure
+        stats, and the 50 most recent sessions from the warehouse DB.
+        Accepts `since`, `until` (RFC3339), `provider`, and `project_id` filters.
+        Results are cached in-memory for 30 seconds per unique filter combination.
       parameters:
         - name: since
           in: query
@@ -3970,7 +4054,7 @@ paths:
     get:
       tags: [STT]
       summary: STT health
-      description: Returns whether the speech-to-text (Whisper) service is available.
+      description: Reports whether the Whisper binary and model file are both present and configured. Returns `ready`, `binary` path, `model` path, and `language` in the response.
       responses:
         '200':
           description: STT health status.
@@ -3988,7 +4072,7 @@ paths:
     post:
       tags: [STT]
       summary: Transcribe audio
-      description: Submits audio for Whisper transcription and returns the text.
+      description: Submits base64-encoded audio to the local Whisper binary for transcription. Limited to 8 MB of audio. Optional `language` (BCP-47) overrides the server-configured default. Times out after 30 seconds.
       requestBody:
         required: true
         content:
@@ -4027,12 +4111,11 @@ paths:
       tags: [Terminal]
       summary: Terminal WebSocket
       description: >
-        Upgrades to a WebSocket connection that proxies a PTY session.
-        The session is identified by `session_id`. No HTTP authentication
-        is required on this endpoint (auth occurs at the WebSocket handshake level).
-
-        **Protocol:** xterm-compatible binary frames. Resize via a JSON control frame:
-        `{"type":"resize","cols":N,"rows":N}`.
+        Upgrades to a WebSocket connection that proxies a PTY session identified
+        by `session_id`. No bearer token authentication is required on this endpoint
+        (authentication occurs separately at the WebSocket handshake level).
+        Send binary frames for terminal input; receive binary frames for output.
+        Send a JSON control frame `{"type":"resize","cols":N,"rows":N}` to resize the PTY.
       security: []
       parameters:
         - name: session_id
@@ -4051,7 +4134,7 @@ paths:
     get:
       tags: [Unsandbox]
       summary: Unsandbox status
-      description: Returns the connection status of the remote execution service.
+      description: Returns the connection status and configuration of the remote unsandbox execution service (configured via environment variables).
       responses:
         '200':
           description: Status.
@@ -4067,7 +4150,12 @@ paths:
     post:
       tags: [Unsandbox]
       summary: Execute remote command
-      description: Submits a command for remote execution via the unsandbox service.
+      description: >
+        Submits `code` in `language` (default `bash`) to the unsandbox service
+        for async execution with a 900-second TTL. For bash code referencing
+        `claude`, Claude credentials are prepended automatically. Returns a
+        job object with `job_id` and `status: "pending"`. Returns 503 if
+        unsandbox is not configured.
       requestBody:
         required: true
         content:
@@ -4090,6 +4178,7 @@ paths:
     get:
       tags: [Unsandbox]
       summary: List unsandbox sessions
+      description: Returns active or recent execution sessions from the unsandbox service.
       responses:
         '200':
           description: Session list.
@@ -4104,6 +4193,7 @@ paths:
     get:
       tags: [Unsandbox]
       summary: List unsandbox services
+      description: Returns available service targets (e.g., language runtimes) exposed by the unsandbox service.
       responses:
         '200':
           description: Service list.
@@ -4118,6 +4208,7 @@ paths:
     get:
       tags: [Unsandbox]
       summary: Get unsandbox config
+      description: Returns the stored unsandbox service configuration (endpoint, credentials, etc.).
       responses:
         '200':
           description: Config.
@@ -4131,6 +4222,7 @@ paths:
     post:
       tags: [Unsandbox]
       summary: Save unsandbox config
+      description: Persists the unsandbox service configuration. Replaces the existing config.
       requestBody:
         required: true
         content:
@@ -4151,6 +4243,7 @@ paths:
     delete:
       tags: [Unsandbox]
       summary: Delete unsandbox config
+      description: Removes the stored unsandbox service configuration.
       responses:
         '204':
           description: Deleted.
@@ -4162,7 +4255,7 @@ paths:
     get:
       tags: [Runtimes]
       summary: List available runtimes
-      description: Returns Tailscale and Kubernetes runtime targets.
+      description: Returns the configured Tailscale and Kubernetes runtime targets from `runtime-targets.json`. Returns defaults when not yet configured.
       responses:
         '200':
           description: Runtime list.
@@ -4177,6 +4270,7 @@ paths:
     get:
       tags: [Runtimes]
       summary: Get Tailscale config
+      description: Returns the Tailscale SSH remote execution config (host, user, key path, port, worktree root) from `runtime-targets.json`.
       responses:
         '200':
           description: Tailscale config.
@@ -4190,6 +4284,7 @@ paths:
     post:
       tags: [Runtimes]
       summary: Save Tailscale config
+      description: Writes Tailscale SSH config fields to `runtime-targets.json`, merging with existing Kubernetes config.
       requestBody:
         required: true
         content:
@@ -4210,6 +4305,7 @@ paths:
     delete:
       tags: [Runtimes]
       summary: Delete Tailscale config
+      description: Clears the Tailscale section of `runtime-targets.json`.
       responses:
         '204':
           description: Deleted.
@@ -4220,6 +4316,7 @@ paths:
     get:
       tags: [Runtimes]
       summary: Test Tailscale connection
+      description: Attempts an SSH connection to the configured Tailscale host and returns the result.
       responses:
         '200':
           description: Test result.
@@ -4234,6 +4331,7 @@ paths:
     get:
       tags: [Runtimes]
       summary: Get Kubernetes config
+      description: Returns the Kubernetes runtime config (kubeconfig path, namespace, image, service account) from `runtime-targets.json`.
       responses:
         '200':
           description: Kubernetes config.
@@ -4247,6 +4345,7 @@ paths:
     post:
       tags: [Runtimes]
       summary: Save Kubernetes config
+      description: Writes Kubernetes runtime config fields to `runtime-targets.json`, merging with existing Tailscale config.
       requestBody:
         required: true
         content:
@@ -4267,6 +4366,7 @@ paths:
     delete:
       tags: [Runtimes]
       summary: Delete Kubernetes config
+      description: Clears the Kubernetes section of `runtime-targets.json`.
       responses:
         '204':
           description: Deleted.
@@ -4277,6 +4377,7 @@ paths:
     get:
       tags: [Runtimes]
       summary: Test Kubernetes connection
+      description: Verifies connectivity to the configured Kubernetes cluster using the stored kubeconfig and returns the result.
       responses:
         '200':
           description: Test result.
@@ -4291,7 +4392,7 @@ paths:
     get:
       tags: [Agents]
       summary: Get agent provider API keys
-      description: Returns configured API keys for embedded agent providers (for the embedded agent widget).
+      description: Returns the configuration status of all embedded-agent LLM providers (`openrouter`, `claude`, `openai`, `gemini`). API keys are included when set but the field is omitted entirely when not configured. Stored in `~/.orchestra/agent-providers.json`.
       responses:
         '200':
           description: Provider config.
@@ -4305,6 +4406,10 @@ paths:
     post:
       tags: [Agents]
       summary: Save agent provider API key
+      description: >
+        Saves or removes an API key for an embedded-agent LLM provider.
+        Pass an empty `api_key` to delete the stored key.
+        Valid providers are `openrouter`, `claude`, `openai`, `gemini`.
       requestBody:
         required: true
         content:
@@ -4326,7 +4431,7 @@ paths:
     get:
       tags: [Health]
       summary: Telemetry health
-      description: Returns whether the warehouse database is healthy.
+      description: Returns whether the warehouse SQLite database is accessible and healthy. Response contains a `healthy` boolean field.
       responses:
         '200':
           description: Telemetry health.

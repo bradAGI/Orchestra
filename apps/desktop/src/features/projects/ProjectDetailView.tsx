@@ -161,6 +161,9 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     // Development workspace too, and we get save/revert/jump-to-line for free.
     const openFileInStore = useAppStore((s) => s.openFile)
     const openFiles = useAppStore((s) => s.openFiles)
+    const openBrowserTab = useAppStore((s) => s.openBrowserTab)
+    const setActiveSection = useAppStore((s) => s.setActiveSection)
+    const openUrl = (url: string) => { setActiveSection('CONSOLE'); openBrowserTab(url) }
     const activeOpenFile = useMemo(() => {
         if (!selectedFile) return null
         const abs = `${project.root_path.replace(/\/$/, '')}/${selectedFile}`
@@ -206,22 +209,13 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         }
     }
 
-    const openExternal = async (url: string) => {
-        const bridge = window.orchestraDesktop
-        if (bridge?.openExternal) {
-            await bridge.openExternal(url)
-            return
-        }
-        window.open(url, '_blank', 'noopener,noreferrer')
-    }
-
     const handleConnectGitHub = async () => {
         if (!config || !project.id) return
         setGithubError('')
         setGithubPending(true)
         try {
             const loginUrl = `${config.baseUrl}/api/v1/github/login?project_id=${project.id}`
-            await openExternal(loginUrl)
+            openUrl(loginUrl)
             // SSE GITHUB_CONNECTED event will trigger project refresh automatically
         } catch (err) {
             setGithubError(err instanceof Error ? err.message : 'Failed to start GitHub authentication')
@@ -452,7 +446,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                     {project.remote_url && (
                         <AppTooltip content="Open repository in browser">
                             <button
-                                onClick={() => void openExternal(sshToHttps(project.remote_url))}
+                                onClick={() => openUrl(sshToHttps(project.remote_url))}
                                 className="h-7 w-7 grid place-items-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
                             >
                                 <Globe size={12} />

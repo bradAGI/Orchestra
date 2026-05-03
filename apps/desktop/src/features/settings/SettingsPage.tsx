@@ -2336,15 +2336,13 @@ function GitConnectionsPane({ config }: { config: BackendConfig | null }) {
     }
   }
 
+  const openInBrowser = (url: string) => {
+    useAppStore.getState().setActiveSection('CONSOLE')
+    useAppStore.getState().openBrowserTab(url)
+  }
+
   const openOnGitHub = (owner: string, repo: string) => {
-    const url = `https://github.com/${owner}/${repo}`
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const bridge = (window as any).orchestraDesktop
-    if (bridge && typeof bridge.openExternal === 'function') {
-      void bridge.openExternal(url)
-    } else {
-      window.open(url, '_blank')
-    }
+    openInBrowser(`https://github.com/${owner}/${repo}`)
   }
 
   return (
@@ -3280,6 +3278,11 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
     }
   }
 
+  const openInBrowser = (url: string) => {
+    useAppStore.getState().setActiveSection('CONSOLE')
+    useAppStore.getState().openBrowserTab(url)
+  }
+
   const handleRemove = async () => {
     if (!config) return
     setSaving(true)
@@ -3309,15 +3312,7 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
               <p className="text-sm font-bold">Unsandbox</p>
               <button
                 type="button"
-                onClick={() => {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const bridge = (window as any).orchestraDesktop
-                  if (bridge && typeof bridge.openExternal === 'function') {
-                    void bridge.openExternal('https://unsandbox.com')
-                  } else {
-                    window.open('https://unsandbox.com', '_blank')
-                  }
-                }}
+                onClick={() => openInBrowser('https://unsandbox.com')}
                 className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
                 title="Open unsandbox.com"
               >
@@ -3431,15 +3426,7 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
         You can also set <code className="text-[10px] font-mono bg-muted/30 px-1 rounded">UNSANDBOX_PUBLIC_KEY</code> and <code className="text-[10px] font-mono bg-muted/30 px-1 rounded">UNSANDBOX_SECRET_KEY</code> environment variables.{' '}
         <button
           type="button"
-          onClick={() => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const bridge = (window as any).orchestraDesktop
-            if (bridge && typeof bridge.openExternal === 'function') {
-              void bridge.openExternal('https://unsandbox.com/docs')
-            } else {
-              window.open('https://unsandbox.com/docs', '_blank')
-            }
-          }}
+          onClick={() => openInBrowser('https://unsandbox.com/docs')}
           className="inline-flex items-center gap-0.5 text-primary hover:underline"
         >
           API docs <ExternalLink className="h-2.5 w-2.5" />
