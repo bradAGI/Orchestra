@@ -780,55 +780,8 @@ func TestRefreshProjectNotFound(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// MCP (Global)
+// MCP (Global) — see mcp_servers_test.go for the full Tier 2 contract suite
 // ---------------------------------------------------------------------------
-
-func TestGetMCPTools(t *testing.T) {
-	router := newTestRouter(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/mcp/tools", nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	// May return 200 with tools or 500
-	if rec.Code != http.StatusOK && rec.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 200 or 500, got %d", rec.Code)
-	}
-}
-
-func TestGetMCPServers(t *testing.T) {
-	router := newTestRouter(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/mcp/servers", nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK && rec.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 200 or 500, got %d", rec.Code)
-	}
-}
-
-func TestPostMCPServerRejectsInvalidJSON(t *testing.T) {
-	router := newTestRouter(t)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/mcp/servers", strings.NewReader("{bad"))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", rec.Code)
-	}
-}
-
-func TestDeleteMCPServerReturns204OrError(t *testing.T) {
-	router := newTestRouter(t)
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/mcp/servers/nonexistent", nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	// Should not panic
-	if rec.Code == 0 {
-		t.Fatalf("expected a response")
-	}
-}
 
 // ---------------------------------------------------------------------------
 // Dashboard

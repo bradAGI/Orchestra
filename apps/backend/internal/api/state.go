@@ -529,9 +529,9 @@ func (s *Server) GetIssue(w http.ResponseWriter, r *http.Request) {
 var validTransitions = map[string][]string{
 	"Backlog":     {"Todo"},
 	"Todo":        {"In Progress", "Backlog"},
-	"In Progress": {"Review", "Backlog"},
+	"In Progress": {"Review", "Todo", "Backlog"},
 	"Review":      {"Done", "Todo", "In Progress", "Backlog"},
-	"Done":        {},
+	"Done":        {"Todo", "Backlog"},
 }
 
 // lockedFields are fields that cannot be changed when an issue is not in Backlog.
