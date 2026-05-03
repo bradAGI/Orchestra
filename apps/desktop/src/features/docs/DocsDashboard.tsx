@@ -4,6 +4,7 @@ import {
     RefreshCcw, Folder, FolderOpen,
     ArrowUp, Code as CodeIcon, ExternalLink
 } from 'lucide-react'
+import { useAppStore } from '@core/store'
 import type { DocItem, BackendConfig } from '@core/api/types'
 import { Button } from '@ui/button'
 import { Skeleton } from '@ui/skeleton'
@@ -40,6 +41,8 @@ function AuthImage({ docPath, alt, config, ...props }: { docPath: string; alt: s
 }
 
 export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) => {
+    const openBrowserTab = useAppStore((s) => s.openBrowserTab)
+    const setActiveSection = useAppStore((s) => s.setActiveSection)
     const [docs, setDocs] = useState<DocItem[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedPath, setSelectedPath] = useState<string | null>(null)
@@ -394,10 +397,8 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
                             <AppTooltip content="Open interactive API docs">
                                 <button
                                     onClick={() => {
-                                        const url = `${config.baseUrl}/api/docs`
-                                        const bridge = (window as { orchestraDesktop?: { openExternal?: (u: string) => void } }).orchestraDesktop
-                                        if (bridge?.openExternal) bridge.openExternal(url)
-                                        else window.open(url, '_blank', 'noopener,noreferrer')
+                                        setActiveSection('CONSOLE')
+                                        openBrowserTab(`${config.baseUrl}/api/docs`)
                                     }}
                                     className="h-7 w-7 grid place-items-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-foreground/[0.03] transition-colors"
                                 >

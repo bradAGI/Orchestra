@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/orchestra/orchestra/apps/backend/internal/config"
 	"github.com/orchestra/orchestra/apps/backend/internal/orchestrator"
+	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
+	"github.com/orchestra/orchestra/apps/backend/internal/tracker/memory"
 	"github.com/rs/zerolog"
 )
 
@@ -200,15 +203,44 @@ func TestPostIssueStopNotFound(t *testing.T) {
 	}
 }
 
-func TestPostIssueStopRunningIssue(t *testing.T) {
+// TestPostIssueStopResetsStateAndCancelsSession pins down the contract that
+// #147 step 6 ("stop running session → state returns cleanly") relies on:
+// hitting POST /issues/{id}/stop must (1) invoke the registered cancel func
+// for the active run and (2) reset the issue back to Backlog with
+// branch_name/base_sha/plan/feedback cleared. Note: the #147 issue body says
+// "Todo" but the implementation uses "Backlog" — the live matrix should
+// expect Backlog.
+func TestPostIssueStopResetsStateAndCancelsSession(t *testing.T) {
+	const issueID = "issue-stop-1"
+	const identifier = "STOP-1"
+
+	// Seed without ProjectID so the handler skips the worktree-cleanup
+	// branch (which requires *db.DB). The state-reset and cancel-invocation
+	// paths are what we're pinning down here.
+	tr := memory.NewClient([]tracker.Issue{{
+		ID:         issueID,
+		Identifier: identifier,
+		Title:      "stop me",
+		State:      "In Progress",
+		BranchName: "feat/stop-me",
+	}})
+
 	orch := orchestrator.NewService()
+	orch.SetTrackerClient(tr)
 	orch.SetRunningForTest([]orchestrator.RunningEntry{{
-		IssueID:         "issue-stop-1",
-		IssueIdentifier: "STOP-1",
+		IssueID:         issueID,
+		IssueIdentifier: identifier,
 		State:           "In Progress",
 		Provider:        "CODEX",
 		SessionID:       "session-1",
 	}})
+
+	cancelled := false
+	_, cancel := context.WithCancel(context.Background())
+	orch.RegisterCancel(issueID, "CODEX", func() {
+		cancelled = true
+		cancel()
+	})
 
 	router := NewRouter(zerolog.Nop(), orch, &config.Config{
 		WorkspaceRoot: t.TempDir(),
@@ -216,14 +248,26 @@ func TestPostIssueStopRunningIssue(t *testing.T) {
 		APIToken:      "",
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/issues/STOP-1/stop", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/issues/"+identifier+"/stop", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
-	// StopAllSessionsForIssue should succeed; UpdateIssue may fail without tracker
-	// returning 500 (update_failed) or 404 (issue_not_found)
-	if rec.Code != http.StatusOK && rec.Code != http.StatusInternalServerError && rec.Code != http.StatusNotFound {
-		t.Fatalf("expected 200, 404, or 500, got %d: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("POST /stop: got %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+	if !cancelled {
+		t.Fatal("registered cancel func was not invoked")
+	}
+
+	updated, err := tr.FetchIssueByIdentifier(context.Background(), identifier)
+	if err != nil || updated == nil {
+		t.Fatalf("fetch updated issue: %v", err)
+	}
+	if updated.State != "Backlog" {
+		t.Errorf("issue state: got %q, want %q", updated.State, "Backlog")
+	}
+	if updated.BranchName != "" {
+		t.Errorf("branch_name: got %q, want cleared", updated.BranchName)
 	}
 }
 

@@ -4340,8 +4340,6 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  parameters: {}
-
   responses:
     Unauthorized:
       description: Missing or invalid bearer token.
