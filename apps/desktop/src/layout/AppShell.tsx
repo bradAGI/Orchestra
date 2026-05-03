@@ -28,9 +28,6 @@ export function AppShell({
   bottomBar,
   children,
 }: AppShellProps) {
-  // Development view (CONSOLE) goes full-bleed — no top bar, no outer padding,
-  // mirroring Orca's edge-to-edge workspace layout.
-  const fullBleed = activeSection === 'CONSOLE'
   return (
     <div className="h-full w-full overflow-hidden bg-background text-foreground flex flex-col">
       <div className="flex flex-1 w-full min-h-0">
@@ -43,19 +40,13 @@ export function AppShell({
           sidebarWidth={sidebarWidth}
         />
 
-        <main className={`min-w-0 flex-1 bg-background h-full flex flex-col ${fullBleed ? 'overflow-hidden' : 'overflow-y-auto overflow-x-hidden'}`}>
-          {fullBleed ? (
-            <div className="w-full flex flex-col h-full min-h-0 overflow-hidden">
+        <main className="min-w-0 flex-1 bg-background h-full flex flex-col overflow-hidden">
+          <div className={`w-full flex flex-col h-full min-h-0 px-4 pt-3 ${flushContent ? 'pb-0' : 'pb-4'}`}>
+            <TopBar {...topBarProps} flush={flushContent} />
+            <div className={`flex-1 flex flex-col min-h-0 ${flushContent ? '-mx-4' : ''}`}>
               {children}
             </div>
-          ) : (
-            <div className={`w-full flex flex-col h-full min-h-0 px-4 pt-3 ${flushContent ? 'pb-0' : 'pb-4'}`}>
-              <TopBar {...topBarProps} flush={flushContent} />
-              <div className={`flex-1 flex flex-col min-h-0 ${flushContent ? '-mx-4' : ''}`}>
-                {children}
-              </div>
-            </div>
-          )}
+          </div>
         </main>
       </div>
       {bottomBar}

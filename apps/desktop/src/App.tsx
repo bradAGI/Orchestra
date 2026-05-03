@@ -352,7 +352,7 @@ export default function App() {
         sidebarCollapsed={sidebarCollapsed}
         onToggleCollapsed={() => useAppStore.getState().toggleSidebar()}
         sidebarWidth={sidebarWidth}
-        flushContent={sectionVisibility.showDocs || sectionVisibility.showSettings || activeSection === 'CONSOLE'}
+        flushContent={sectionVisibility.showDocs || sectionVisibility.showSettings || sectionVisibility.showConsole}
         bottomBar={<UsageStatusBar config={config} />}
         topBarProps={{
           sectionLabel: currentSectionMeta.label,
