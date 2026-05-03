@@ -132,9 +132,10 @@ type Service struct {
 	retryMaxDelay    time.Duration
 	stallTimeout     time.Duration
 	db               *db.DB
-	mcpRegistry      *mcp.Registry
-	mcpServers       map[string]string
-	trackerReg       *trackerregistry.Registry
+	mcpRegistry        *mcp.Registry
+	mcpServers         map[string]string
+	trackerReg         *trackerregistry.Registry
+	onRetryExhausted   func(issueID, issueIdentifier, issueState string)
 }
 
 // IssueRuntime bundles the running and retry state for a single issue,
@@ -716,6 +717,16 @@ func (s *Service) SetMaxConcurrentByState(limits map[string]int) {
 
 // SetRetryPolicy configures the retry backoff parameters: maximum attempts,
 // base delay, and maximum delay cap.
+// SetOnRetryExhausted registers a callback invoked when an issue exceeds its
+// maximum retry attempts and will no longer be scheduled. The callback receives
+// the issue ID, identifier, and last-known state so callers can surface the
+// failure to users (e.g. move the issue back to Backlog).
+func (s *Service) SetOnRetryExhausted(fn func(issueID, issueIdentifier, issueState string)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onRetryExhausted = fn
+}
+
 func (s *Service) SetRetryPolicy(maxAttempts int64, baseDelay time.Duration, maxDelay time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1279,6 +1290,10 @@ func (s *Service) RecordRunFailure(issueID string, provider string, issueIdentif
 
 	if attempt > s.maxRetryAttempts {
 		delete(s.claimed, issueID)
+		if s.onRetryExhausted != nil {
+			cb := s.onRetryExhausted
+			go cb(issueID, issueIdentifier, issueState)
+		}
 		return
 	}
 
