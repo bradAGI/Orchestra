@@ -19,6 +19,7 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/orchestrator"
 	"github.com/orchestra/orchestra/apps/backend/internal/staticassets"
 	"github.com/orchestra/orchestra/apps/backend/internal/terminal"
+	trackerregistry "github.com/orchestra/orchestra/apps/backend/internal/tracker/registry"
 	"github.com/orchestra/orchestra/apps/backend/internal/usage"
 	"github.com/rs/zerolog"
 )
@@ -36,6 +37,7 @@ type Server struct {
 	config        *config.Config
 	termManager   *terminal.Manager
 	usageService  *usage.Service
+	registry      *trackerregistry.Registry
 }
 
 // NewRouter creates an http.Handler with the full API route table, using only
@@ -45,7 +47,7 @@ func NewRouter(
 	orchestratorService *orchestrator.Service,
 	cfg *config.Config,
 ) http.Handler {
-	return NewRouterWithPubSub(logger, orchestratorService, cfg, nil, nil, nil, nil)
+	return NewRouterWithPubSub(logger, orchestratorService, cfg, nil, nil, nil, nil, nil)
 }
 
 // NewRouterWithPubSub creates an http.Handler with the full API route table and
@@ -59,6 +61,7 @@ func NewRouterWithPubSub(
 	warehouseDB *db.DB,
 	termManager *terminal.Manager,
 	usageService *usage.Service,
+	registry *trackerregistry.Registry,
 ) http.Handler {
 	if termManager == nil {
 		termManager = terminal.NewManager()
@@ -74,6 +77,7 @@ func NewRouterWithPubSub(
 		config:        cfg,
 		termManager:   termManager,
 		usageService:  usageService,
+		registry:      registry,
 	}
 	r := chi.NewRouter()
 
@@ -106,9 +110,30 @@ func NewRouterWithPubSub(
 	r.Get("/healthz", Healthz)
 	r.Get("/api/v1/healthz", Healthz)
 	r.Get("/api/v1/openapi.yaml", server.GetOpenAPIYAML)
+	r.Get("/api/docs", server.GetSwaggerUI)
+	r.Get("/api/docs/", server.GetSwaggerUI)
 	protected.Get("/api/v1/stt/health", server.GetSTTHealth)
 	protected.Post("/api/v1/stt/transcribe", server.PostSTTTranscribe)
 	protected.Get("/api/v1/state", server.GetState)
+
+	// Tracker configs (CRUD + test-connection + browse)
+	protected.Get("/api/v1/tracker/configs", server.GetTrackerConfigs)
+	protected.Post("/api/v1/tracker/configs", server.PostTrackerConfig)
+	protected.Patch("/api/v1/tracker/configs/{config_id}", server.PatchTrackerConfig)
+	protected.Delete("/api/v1/tracker/configs/{config_id}", server.DeleteTrackerConfig)
+	protected.Post("/api/v1/tracker/configs/{config_id}/test", server.PostTrackerConfigTest)
+	protected.Get("/api/v1/tracker/configs/{config_id}/projects", server.GetTrackerProjects)
+	protected.Get("/api/v1/tracker/configs/{config_id}/states", server.GetTrackerStates)
+	protected.Get("/api/v1/tracker/configs/{config_id}/issues", server.GetTrackerConfigIssues)
+	// Per-project tracker assignment (legacy global config link)
+	protected.Post("/api/v1/projects/{project_id}/tracker", server.PostProjectTrackerConfig)
+	// Per-project embedded issue source (replaces global tracker config)
+	protected.Patch("/api/v1/projects/{project_id}/issue-source", server.PatchProjectIssueSource)
+	protected.Post("/api/v1/projects/{project_id}/issue-source/test", server.PostProjectIssueSourceTest)
+	protected.Post("/api/v1/projects/{project_id}/issue-source/list-projects", server.PostProjectIssueSourceListProjects)
+	// Live browse of a project's issue source (used by TrackerViewer)
+	protected.Get("/api/v1/projects/{project_id}/tracker/issues", server.GetProjectTrackerIssues)
+
 	protected.Get("/api/v1/issues", server.GetIssues)
 	protected.Post("/api/v1/issues", server.PostIssue)
 	protected.Get("/api/v1/search", server.GetSearch)
@@ -263,21 +288,31 @@ func NewRouterWithPubSub(
 	protected.Post("/api/v1/refresh", server.PostRefresh)
 	protected.Post("/api/v1/workspace/migrate", server.PostWorkspaceMigrate)
 
+	// Agent provider API keys (embedded agent widget)
+	protected.Get("/api/v1/config/agent-providers", server.HandleGetAgentProviders)
+	protected.Post("/api/v1/config/agent-providers", server.HandleSaveAgentProvider)
+
 	// Unsandbox remote execution
 	protected.Get("/api/v1/unsandbox/status", server.GetUnsandboxStatus)
 	protected.Post("/api/v1/unsandbox/execute", server.PostUnsandboxExecute)
 	protected.Get("/api/v1/unsandbox/jobs/*", server.GetUnsandboxJob)
 	protected.Get("/api/v1/unsandbox/sessions", server.GetUnsandboxSessions)
 	protected.Get("/api/v1/unsandbox/services", server.GetUnsandboxServices)
-
 	// Unsandbox configuration (API keys)
 	protected.Get("/api/v1/config/unsandbox", server.GetUnsandboxConfig)
 	protected.Post("/api/v1/config/unsandbox", server.PostUnsandboxConfig)
 	protected.Delete("/api/v1/config/unsandbox", server.DeleteUnsandboxConfig)
 
-	// Agent provider API keys (embedded agent widget)
-	protected.Get("/api/v1/config/agent-providers", server.HandleGetAgentProviders)
-	protected.Post("/api/v1/config/agent-providers", server.HandleSaveAgentProvider)
+	// Runtime targets (Tailscale and Kubernetes)
+	protected.Get("/api/v1/config/runtimes", server.GetAvailableRuntimes)
+	protected.Get("/api/v1/config/tailscale", server.GetTailscaleConfig)
+	protected.Post("/api/v1/config/tailscale", server.SaveTailscaleConfig)
+	protected.Delete("/api/v1/config/tailscale", server.DeleteTailscaleConfig)
+	protected.Get("/api/v1/config/tailscale/test", server.TestTailscaleConfig)
+	protected.Get("/api/v1/config/kubernetes", server.GetKubernetesConfig)
+	protected.Post("/api/v1/config/kubernetes", server.SaveKubernetesConfig)
+	protected.Delete("/api/v1/config/kubernetes", server.DeleteKubernetesConfig)
+	protected.Get("/api/v1/config/kubernetes/test", server.TestKubernetesConfig)
 
 	protected.Get("/api/v1/issues/{issue_identifier}", server.GetIssue)
 	protected.Get("/api/v1/issues/{issue_identifier}/logs", server.GetIssueLogs)

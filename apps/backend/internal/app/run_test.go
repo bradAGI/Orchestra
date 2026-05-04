@@ -13,8 +13,8 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/db"
 	"github.com/orchestra/orchestra/apps/backend/internal/observability"
 	"github.com/orchestra/orchestra/apps/backend/internal/orchestrator"
-	"github.com/orchestra/orchestra/apps/backend/internal/tracker/memory"
 	"github.com/orchestra/orchestra/apps/backend/internal/workspace"
+	"github.com/orchestra/orchestra/apps/backend/internal/tracker/memory"
 	"github.com/rs/zerolog"
 )
 
@@ -51,8 +51,8 @@ func testProjectSetup(t *testing.T) (workspaceRoot string, projectID string, war
 	return workspaceRoot, projectID, warehouseDB
 }
 
-func TestNewTrackerClientUsesMemoryWhenEndpointUnset(t *testing.T) {
-	client := newTrackerClient(config.Config{}, nil)
+func TestLegacyTrackerClientUsesMemoryWhenEndpointUnset(t *testing.T) {
+	client := newLegacyTrackerClient(config.Config{}, nil)
 	if _, ok := client.(*memory.Client); !ok {
 		t.Fatalf("expected memory tracker client when endpoint is unset")
 	}
@@ -141,6 +141,7 @@ func TestProcessExecutionTickPublishesSuccessLifecycleEvents(t *testing.T) {
 		nil,
 		nil,
 		&config.Config{},
+		nil,
 		zerolog.Nop(),
 	)
 
@@ -189,6 +190,7 @@ func TestProcessExecutionTickPublishesFailureAndRetryLifecycleEvents(t *testing.
 		nil,
 		nil,
 		&config.Config{},
+		nil,
 		zerolog.Nop(),
 	)
 
@@ -270,6 +272,7 @@ func TestProcessExecutionTickDoesNotPublishRetryWhenAttemptExceedsMax(t *testing
 		nil,
 		nil,
 		&config.Config{},
+		nil,
 		zerolog.Nop(),
 	)
 
@@ -414,6 +417,7 @@ func TestProcessExecutionTickPreservesRateLimitsFromMixedNestedEnvelope(t *testi
 		nil,
 		nil,
 		&config.Config{},
+		nil,
 		zerolog.Nop(),
 	)
 
@@ -462,6 +466,7 @@ func TestProcessExecutionTickSkipsBeforeRunHookAfterFirstTurn(t *testing.T) {
 		nil,
 		nil,
 		&config.Config{},
+		nil,
 		zerolog.Nop(),
 	)
 
@@ -511,6 +516,7 @@ func TestProcessExecutionTickPublishesBeforeRunHookFailureCause(t *testing.T) {
 		nil,
 		nil,
 		&config.Config{},
+		nil,
 		zerolog.Nop(),
 	)
 

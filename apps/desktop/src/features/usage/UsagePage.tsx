@@ -30,7 +30,7 @@ export function UsagePage({ config }: { config: BackendConfig | null }) {
 
   return (
     <div className="h-full overflow-auto bg-background">
-      <div className="mx-auto w-full max-w-6xl px-6 py-6 space-y-4">
+      <div className="w-full px-6 py-6 space-y-4">
         <div>
           <h1 className="text-base font-semibold text-foreground">Usage</h1>
           <p className="mt-0.5 text-xs text-muted-foreground">

@@ -1,4 +1,4 @@
-export { SettingsPage } from '@features/settings/SettingsPage'
+export { SettingsPage, SettingsSideNav } from '@features/settings/SettingsPage'
 export { CreateProjectDialog } from '@features/projects/CreateProjectDialog'
 export { CreateTaskDialog } from '@features/tasks/CreateTaskDialog'
 export { IssueDetailView } from '@features/issue-detail/IssueDetailView'

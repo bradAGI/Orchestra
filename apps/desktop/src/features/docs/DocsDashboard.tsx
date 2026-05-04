@@ -2,8 +2,9 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import {
     FileText, ChevronRight, Search,
     RefreshCcw, Folder, FolderOpen,
-    ArrowUp, Code as CodeIcon
+    ArrowUp, Code as CodeIcon, ExternalLink
 } from 'lucide-react'
+import { useAppStore } from '@core/store'
 import type { DocItem, BackendConfig } from '@core/api/types'
 import { Button } from '@ui/button'
 import { Skeleton } from '@ui/skeleton'
@@ -40,6 +41,11 @@ function AuthImage({ docPath, alt, config, ...props }: { docPath: string; alt: s
 }
 
 export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) => {
+    const openBrowserTab = useAppStore((s) => s.openBrowserTab)
+    const setActiveSection = useAppStore((s) => s.setActiveSection)
+    const activeDocPath = useAppStore((s) => s.activeDocPath)
+    const setActiveDocPath = useAppStore((s) => s.setActiveDocPath)
+    const setDocTree = useAppStore((s) => s.setDocTree)
     const [docs, setDocs] = useState<DocItem[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedPath, setSelectedPath] = useState<string | null>(null)
@@ -57,7 +63,8 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
         try {
             const data = await fetchDocs(config)
             setDocs(data)
-            
+            setDocTree(data)
+
             if (!selectedPath && data.length > 0) {
                 const first = findFirstDoc(data)
                 if (first) {
@@ -90,9 +97,17 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [config])
 
+    useEffect(() => {
+        if (activeDocPath && activeDocPath !== selectedPath) {
+            void handleSelectDocRef.current(activeDocPath)
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeDocPath])
+
     const handleSelectDoc = async (path: string) => {
         if (!config) return
         setSelectedPath(path)
+        setActiveDocPath(path)
         setContentLoading(true)
         try {
             const text = await fetchDocContent(config, path)
@@ -160,7 +175,19 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
                     </a>
                 )
             }
-            return <a href={href} target="_blank" rel="noopener noreferrer" {...props}>{children}</a>
+            return (
+                <a
+                    href={href}
+                    onClick={(e) => {
+                        if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+                            e.preventDefault()
+                            setActiveSection('CONSOLE')
+                            openBrowserTab(href)
+                        }
+                    }}
+                    {...props}
+                >{children}</a>
+            )
         },
         pre({node, children, ...preProps}: any) {
             const codeChild = node?.children?.[0]
@@ -386,47 +413,6 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
         <div className="flex flex-col h-full bg-background overflow-hidden">
             <DiagramFullscreenOverlay />
             <div className="flex-1 flex overflow-hidden min-h-0 relative">
-                {/* Left Sidebar (Navigation) */}
-                <div className="w-64 border-r border-border/40 flex flex-col min-h-0">
-                    <div className="px-4 pt-7 pb-3">
-                        <h2 className="text-[15px] font-black tracking-tight leading-none">Documentation</h2>
-                    </div>
-                    <div className="px-3 pb-3 flex items-center gap-2">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
-                            <input
-                                type="text"
-                                placeholder="Search docs..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full h-8 pl-8 pr-3 bg-muted/30 rounded-md text-[12px] font-medium placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/40 transition-all"
-                            />
-                        </div>
-                        <AppTooltip content="Refresh">
-                            <button
-                                onClick={loadDocs}
-                                disabled={loading}
-                                className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.03] transition-colors disabled:opacity-50"
-                            >
-                                <RefreshCcw size={13} className={loading ? 'animate-refresh-spin' : ''} />
-                            </button>
-                        </AppTooltip>
-                    </div>
-                    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
-                        <div className="px-3 pb-6 flex flex-col gap-0.5">
-                            {loading && docs.length === 0 ? (
-                                [1, 2, 3, 4, 5, 6, 7].map(i => <Skeleton key={i} className="h-9 w-full rounded-md bg-muted/20" />)
-                            ) : filteredDocs.length === 0 ? (
-                                <div className="px-3 py-8 text-center text-[11px] text-muted-foreground/70 italic">
-                                    {searchQuery
-                                        ? <>No documents match <span className="font-mono not-italic">"{searchQuery}"</span></>
-                                        : 'No documentation available.'}
-                                </div>
-                            ) : renderTree(filteredDocs)}
-                        </div>
-                    </div>
-                </div>
-
                 {/* Main Content Area */}
                 <div className="flex-1 flex flex-col min-h-0 relative">
                     <div

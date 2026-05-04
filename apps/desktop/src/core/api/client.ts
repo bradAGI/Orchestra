@@ -101,7 +101,14 @@ export type IssueCreatePayload = {
   assignee_id: string
   project_id: string
   provider?: string
+  runtime_target?: string
   disabled_tools?: string[]
+}
+
+/** A runtime execution target returned by GET /api/v1/config/runtimes. */
+export type RuntimeEntry = {
+  target: string
+  configured: boolean
 }
 
 /** Response from creating a GitHub pull request through the orchestrator. */
@@ -729,6 +736,45 @@ export async function deleteProject(config: BackendConfig, projectId: string): P
   return requestJSON<void>(config, `/api/v1/projects/${projectId}`, {
     method: 'DELETE',
   })
+}
+
+/** Save per-project issue source config (type, endpoint, token). Pass token="" to leave unchanged. */
+export async function updateProjectIssueSource(
+  config: BackendConfig,
+  projectId: string,
+  payload: { type: string; endpoint: string; token?: string }
+): Promise<{ ok: boolean }> {
+  return requestJSON<{ ok: boolean }>(
+    config,
+    `/api/v1/projects/${projectId}/issue-source`,
+    { method: 'PATCH', body: JSON.stringify(payload) }
+  )
+}
+
+/** List available projects/teams from a tracker using stored or override credentials. */
+export async function listIssueSourceProjects(
+  config: BackendConfig,
+  projectId: string,
+  payload?: { type?: string; endpoint?: string; token?: string }
+): Promise<Array<{ id: string; name: string }>> {
+  return requestJSON<Array<{ id: string; name: string }>>(
+    config,
+    `/api/v1/projects/${projectId}/issue-source/list-projects`,
+    { method: 'POST', body: JSON.stringify(payload ?? {}) }
+  )
+}
+
+/** Test connectivity for a project's issue source. Can pass override values before saving. */
+export async function testProjectIssueSource(
+  config: BackendConfig,
+  projectId: string,
+  payload?: { type?: string; endpoint?: string; token?: string }
+): Promise<{ ok: boolean; error?: string }> {
+  return requestJSON<{ ok: boolean; error?: string }>(
+    config,
+    `/api/v1/projects/${projectId}/issue-source/test`,
+    { method: 'POST', body: JSON.stringify(payload ?? {}) }
+  )
 }
 
 /**
@@ -2161,6 +2207,82 @@ export async function fetchUnsandboxServices(config: BackendConfig): Promise<{ s
   return requestJSON<{ services: UnsandboxService[] }>(config, '/api/v1/unsandbox/services')
 }
 
+// --- Runtime Connections ---
+
+/** Configuration for a Tailscale SSH remote runtime. */
+export type TailscaleConfig = {
+  configured: boolean
+  ssh_host: string
+  ssh_user: string
+  ssh_key_path: string
+  ssh_port: number
+  worktree_root: string
+}
+
+/** Configuration for a Kubernetes remote runtime. */
+export type KubernetesConfig = {
+  configured: boolean
+  kubeconfig_path: string
+  namespace: string
+  image: string
+  git_repo_url: string
+  service_account: string
+}
+
+/** Fetches the list of available runtime targets and their configured status. */
+export async function fetchAvailableRuntimes(config: BackendConfig): Promise<RuntimeEntry[]> {
+  const res = await requestJSON<{ runtimes: RuntimeEntry[] }>(config, '/api/v1/config/runtimes')
+  return res.runtimes ?? []
+}
+
+/** Fetches the current Tailscale runtime configuration. */
+export async function fetchTailscaleConfig(config: BackendConfig): Promise<TailscaleConfig> {
+  return requestJSON<TailscaleConfig>(config, '/api/v1/config/tailscale')
+}
+
+/** Saves Tailscale runtime configuration to the backend. */
+export async function saveTailscaleConfig(config: BackendConfig, data: Partial<TailscaleConfig>): Promise<TailscaleConfig> {
+  return requestJSON<TailscaleConfig>(config, '/api/v1/config/tailscale', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+}
+
+/** Deletes the stored Tailscale runtime configuration. */
+export async function deleteTailscaleConfig(config: BackendConfig): Promise<void> {
+  await requestJSON<void>(config, '/api/v1/config/tailscale', { method: 'DELETE' })
+}
+
+/** Tests reachability of the configured Tailscale SSH host. */
+export async function testTailscaleConfig(config: BackendConfig): Promise<{ reachable: boolean; error?: string }> {
+  return requestJSON<{ reachable: boolean; error?: string }>(config, '/api/v1/config/tailscale/test')
+}
+
+/** Fetches the current Kubernetes runtime configuration. */
+export async function fetchKubernetesConfig(config: BackendConfig): Promise<KubernetesConfig> {
+  return requestJSON<KubernetesConfig>(config, '/api/v1/config/kubernetes')
+}
+
+/** Saves Kubernetes runtime configuration to the backend. */
+export async function saveKubernetesConfig(config: BackendConfig, data: Partial<KubernetesConfig>): Promise<KubernetesConfig> {
+  return requestJSON<KubernetesConfig>(config, '/api/v1/config/kubernetes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+}
+
+/** Deletes the stored Kubernetes runtime configuration. */
+export async function deleteKubernetesConfig(config: BackendConfig): Promise<void> {
+  await requestJSON<void>(config, '/api/v1/config/kubernetes', { method: 'DELETE' })
+}
+
+/** Tests reachability of the configured Kubernetes cluster. */
+export async function testKubernetesConfig(config: BackendConfig): Promise<{ reachable: boolean; server_version?: string; error?: string }> {
+  return requestJSON<{ reachable: boolean; server_version?: string; error?: string }>(config, '/api/v1/config/kubernetes/test')
+}
+
 /**
  * Fetches configured agent provider API keys from the orchestrator.
  * @param config - Backend connection configuration.
@@ -2350,4 +2472,98 @@ export async function fetchRateLimits(config: BackendConfig): Promise<RateLimitS
 
 export async function refreshRateLimits(config: BackendConfig): Promise<RateLimitState> {
   return requestJSON<RateLimitState>(config, '/api/v1/usage/rate-limits/refresh', { method: 'POST' })
+}
+
+// ─── Tracker work item types ─────────────────────────────────────────────────
+
+export type {
+  WorkItem,
+  WorkItemSource,
+  WorkItemFilter,
+} from '@/entities/tracker/types'
+
+import type { WorkItem } from '@/entities/tracker/types'
+
+/** Browse work items from a global tracker config (used by useTrackerWorkItems configId path). */
+export async function browseTrackerItems(
+  config: BackendConfig,
+  configId: string,
+  filter?: { states?: string[] },
+): Promise<WorkItem[]> {
+  const params = new URLSearchParams()
+  if (filter?.states?.length) {
+    params.set('states', filter.states.join(','))
+  }
+  const qs = params.toString()
+  const path = `/api/v1/tracker/configs/${encodeURIComponent(configId)}/issues${qs ? '?' + qs : ''}`
+  return requestJSON<WorkItem[]>(config, path)
+}
+
+/** Browse live work items from a project's per-project issue source. */
+export async function browseProjectTrackerItems(
+  config: BackendConfig,
+  projectId: string,
+  filter?: { states?: string[] },
+): Promise<WorkItem[]> {
+  const params = new URLSearchParams()
+  if (filter?.states?.length) {
+    params.set('states', filter.states.join(','))
+  }
+  const qs = params.toString()
+  const path = `/api/v1/projects/${encodeURIComponent(projectId)}/tracker/issues${qs ? '?' + qs : ''}`
+  return requestJSON<WorkItem[]>(config, path)
+}
+
+export type TrackerConfig = {
+  id: string
+  type: string
+  display_name: string
+  endpoint: string
+  auth_method: string
+  has_token: boolean
+  extra?: string
+  created_at: number
+  updated_at: number
+}
+
+export async function listTrackerConfigs(config: BackendConfig): Promise<TrackerConfig[]> {
+  return requestJSON<TrackerConfig[]>(config, '/api/v1/tracker/configs')
+}
+
+export async function createTrackerConfig(
+  config: BackendConfig,
+  payload: { type: string; display_name: string; endpoint?: string; auth_method?: string; token?: string; extra?: Record<string, unknown> },
+): Promise<TrackerConfig> {
+  return requestJSON<TrackerConfig>(config, '/api/v1/tracker/configs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateTrackerConfig(
+  config: BackendConfig,
+  id: string,
+  payload: { display_name?: string; endpoint?: string; token?: string; extra?: Record<string, unknown> },
+): Promise<TrackerConfig> {
+  return requestJSON<TrackerConfig>(config, `/api/v1/tracker/configs/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteTrackerConfig(config: BackendConfig, id: string): Promise<void> {
+  await requestJSON<void>(config, `/api/v1/tracker/configs/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export async function testTrackerConfig(
+  config: BackendConfig,
+  id: string,
+): Promise<{ ok: boolean; latency_ms?: number; error?: string }> {
+  return requestJSON<{ ok: boolean; latency_ms?: number; error?: string }>(
+    config,
+    `/api/v1/tracker/configs/${encodeURIComponent(id)}/test`,
+    { method: 'POST' },
+  )
 }

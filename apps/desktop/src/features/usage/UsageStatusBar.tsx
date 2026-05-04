@@ -26,7 +26,7 @@ const BAR_PROVIDERS: UsageProvider[] = ['claude', 'codex']
 const POLL_MS = 5 * 60 * 1000     // 5 min — quota windows are slow-moving
 const FOCUS_MIN_MS = 30 * 1000    // refetch on focus if older than 30s
 
-export function UsageStatusBar({ config }: { config: BackendConfig | null }) {
+export function UsageStatusBar({ config, generatedAt }: { config: BackendConfig | null; generatedAt?: string }) {
   const [rateLimits, setRateLimits] = useState<RateLimitState | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const lastFetchRef = useRef(0)
@@ -92,9 +92,9 @@ export function UsageStatusBar({ config }: { config: BackendConfig | null }) {
   return (
     <div
       ref={containerRef}
-      className="flex items-center h-6 min-h-[24px] px-3 gap-4 border-t border-border bg-[var(--bg-titlebar,var(--card))] text-xs select-none shrink-0"
+      className="flex items-center h-6 min-h-[24px] px-3 border-t border-border bg-[var(--bg-titlebar,var(--card))] text-xs select-none shrink-0 overflow-hidden"
     >
-      <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center gap-3 flex-1 min-w-0 overflow-hidden">
         {BAR_PROVIDERS.map((p) => (
           <ProviderSegment
             key={p}
@@ -114,7 +114,9 @@ export function UsageStatusBar({ config }: { config: BackendConfig | null }) {
           </button>
         </AppTooltip>
       </div>
-      <div className="flex-1" />
+      {generatedAt && (
+        <span className="text-[10px] font-mono text-muted-foreground/40 tabular-nums shrink-0 pl-4">{generatedAt}</span>
+      )}
     </div>
   )
 }

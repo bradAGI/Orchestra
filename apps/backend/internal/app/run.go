@@ -35,7 +35,10 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/usage"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
 	trackergithub "github.com/orchestra/orchestra/apps/backend/internal/tracker/github"
+	"github.com/orchestra/orchestra/apps/backend/internal/tracker/jira"
+	"github.com/orchestra/orchestra/apps/backend/internal/tracker/linear"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker/memory"
+	trackerregistry "github.com/orchestra/orchestra/apps/backend/internal/tracker/registry"
 	trackersqlite "github.com/orchestra/orchestra/apps/backend/internal/tracker/sqlite"
 	"github.com/orchestra/orchestra/apps/backend/internal/sessionlogger"
 	gitutil "github.com/orchestra/orchestra/apps/backend/internal/utils/git"
@@ -79,12 +82,56 @@ func Run(logger zerolog.Logger) error {
 	orchestratorService.SetMaxConcurrentByState(cfg.MaxConcurrentByState)
 	orchestratorService.SetMaxTurns(cfg.AgentMaxTurns)
 
-	trackerClient := newTrackerClient(cfg, warehouseDB)
+	// Build the tracker registry. Existing env-var configs are seeded into
+	// tracker_configs on first run so legacy deployments keep working unchanged.
+	factory := buildTrackerAdapterFactory(warehouseDB)
+	trackerRegistry := trackerregistry.NewWithFactory(warehouseDB, factory)
+	if err := seedTrackerConfigFromEnv(context.Background(), warehouseDB, cfg, trackerRegistry); err != nil {
+		logger.Warn().Err(err).Msg("seed tracker config from env failed")
+	}
+	trackerClient := trackerRegistry.DefaultClient()
+	if trackerClient == nil {
+		trackerClient = newLegacyTrackerClient(cfg, warehouseDB)
+	}
 	orchestratorService.SetTrackerClient(trackerClient)
+	orchestratorService.SetTrackerRegistry(trackerRegistry)
 	pubsub := observability.NewPubSub()
 	termManager := terminal.NewManager()
 
 	agentRegistry := agents.NewRegistryWithTerminal(cfg.AgentCommands, termManager)
+
+	// Register optional remote execution backends if configured.
+	if cfg.TailscaleSSHHost != "" {
+		tsTransport := agents.NewTailscaleRunner(
+			agents.Provider(""), // no default provider — this is a transport
+			"",                  // no default command — set at dispatch time
+			cfg.TailscaleSSHHost,
+			cfg.TailscaleSSHUser,
+			cfg.TailscaleSSHKeyPath,
+			cfg.TailscaleSSHPort,
+			cfg.TailscaleWorktreeRoot,
+		)
+		agentRegistry.SetTransport(agents.RuntimeTailscale, tsTransport)
+		logger.Info().Str("host", cfg.TailscaleSSHHost).Msg("Tailscale transport registered")
+	}
+	if cfg.KubeNamespace != "" && cfg.KubeGitRepoURL != "" {
+		if clientset, k8sErr := agents.NewKubernetesClientset(cfg.KubeConfigPath); k8sErr != nil {
+			logger.Warn().Err(k8sErr).Msg("Kubernetes transport unavailable — kubeconfig error")
+		} else {
+			k8sTransport := agents.NewKubernetesRunner(
+				agents.Provider(""), // transport, not a provider
+				"",
+				clientset,
+				cfg.KubeNamespace,
+				cfg.KubeImage,
+				cfg.KubeGitRepoURL,
+				cfg.KubeServiceAccount,
+			)
+			agentRegistry.SetTransport(agents.RuntimeKubernetes, k8sTransport)
+			logger.Info().Str("namespace", cfg.KubeNamespace).Msg("Kubernetes transport registered")
+		}
+	}
+
 	provider := agents.Provider(cfg.AgentProvider)
 	if !agentRegistry.HasProvider(provider) {
 		return fmt.Errorf("agent provider %q is not configured", cfg.AgentProvider)
@@ -94,6 +141,19 @@ func Run(logger zerolog.Logger) error {
 	workspaceService := workspace.Service{Root: cfg.WorktreeRoot}
 	orchestratorService.SetWorkspaceService(workspaceService)
 	orchestratorService.SetWorkspaceRoot(cfg.WorkspaceRoot)
+
+	// When an issue exhausts all retry attempts, move it back to Backlog so
+	// users can see it has permanently stalled and can manually re-queue it.
+	orchestratorService.SetOnRetryExhausted(func(issueID, issueIdentifier, _ string) {
+		if warehouseDB == nil {
+			return
+		}
+		if _, err := orchestratorService.UpdateIssue(context.Background(), issueIdentifier, map[string]any{"state": "Backlog"}); err != nil {
+			logger.Warn().Err(err).Str("issue_id", issueID).Msg("failed to move exhausted-retry issue to Backlog")
+		} else {
+			logger.Warn().Str("issue_id", issueID).Str("identifier", issueIdentifier).Msg("issue exhausted all retry attempts — moved to Backlog")
+		}
+	})
 
 	// Prune stale worktree references left over from previous crashes.
 	pruneAllWorktrees(warehouseDB, workspaceService, logger)
@@ -121,12 +181,12 @@ func Run(logger zerolog.Logger) error {
 		usageService = nil
 	}
 
-	router := api.NewRouterWithPubSub(logger, orchestratorService, &cfg, pubsub, warehouseDB, termManager, usageService)
+	router := api.NewRouterWithPubSub(logger, orchestratorService, &cfg, pubsub, warehouseDB, termManager, usageService, trackerRegistry)
 
 	cleanupTerminalWorkspaces(orchestratorService, trackerClient, workspaceService, cfg.WorkspaceHooks, warehouseDB, logger)
 
 	go startGarbageCollector(orchestratorService, warehouseDB, workspaceService, cfg.TelemetryRetentionDays, logger)
-	go startRefreshWorker(orchestratorService, pubsub, logger)
+	go startRefreshWorker(orchestratorService, trackerRegistry, warehouseDB, pubsub, logger)
 	go startDailyMetricsRollup(warehouseDB, logger)
 	go telemetry.StartWatcher(context.Background(), warehouseDB, cfg.ProjectRoots, telemetry.Options{
 		Providers:       cfg.TelemetryProviders,
@@ -143,7 +203,7 @@ func Run(logger zerolog.Logger) error {
 	}
 
 	toolExecutor := tools.NewLinearToolExecutor(trackerClient)
-	go startExecutionWorker(orchestratorService, agentRegistry, provider, cfg.AgentProvider, cfg.WorkspaceRoot, cfg.WorkflowFile, cfg.AgentMaxTurns, toolExecutor.Execute, tools.TrackerToolSpecs(), cfg.WorkspaceHooks, pubsub, warehouseDB, sessionLog, termManager, &cfg, logger)
+	go startExecutionWorker(orchestratorService, agentRegistry, provider, cfg.AgentProvider, cfg.WorkspaceRoot, cfg.WorkflowFile, cfg.AgentMaxTurns, toolExecutor.Execute, tools.TrackerToolSpecs(), cfg.WorkspaceHooks, pubsub, warehouseDB, sessionLog, termManager, &cfg, trackerRegistry, logger)
 
 	logger.Info().Str("addr", addr).Str("service_id", runtime.ServiceOrchestrator).Msg("starting orchestrad")
 
@@ -189,20 +249,101 @@ func killStaleOrchestrad(port string, logger zerolog.Logger) {
 	time.Sleep(100 * time.Millisecond)
 }
 
-// newTrackerClient builds the appropriate tracker.Client based on the configured
-// tracker type (GitHub or SQLite-backed with memory fallback).
-func newTrackerClient(cfg config.Config, localDB *db.DB) tracker.Client {
-	if strings.ToLower(cfg.TrackerType) == "github" {
-		// For GitHub, Endpoint is owner/repo
-		parts := strings.Split(cfg.TrackerEndpoint, "/")
-		if len(parts) == 2 {
-			return trackergithub.NewClient(parts[0], parts[1], cfg.TrackerToken, nil, localDB)
-		}
-	}
+// newLegacyTrackerClient builds a tracker.Client from legacy env-var config.
+// Used as a fallback when no tracker_configs rows exist (e.g. fresh local dev,
+// or a tracker type the registry can't yet handle like sqlite/memory).
+// GitHub is now handled by the tracker registry via seedTrackerConfigFromEnv.
+func newLegacyTrackerClient(cfg config.Config, localDB *db.DB) tracker.Client {
 	if localDB == nil {
 		return memory.NewClient(nil)
 	}
 	return trackersqlite.NewClient(localDB, cfg.TrackerWorkerAssigneeIDs)
+}
+
+// buildTrackerAdapterFactory returns the AdapterFactory injected into the registry.
+// Implemented as a closure so it can capture localDB for the GitHub adapter's
+// DeleteIssue cleanup path.
+// Lives here in app/run.go to break the import cycle: registry/ cannot import
+// linear/ or jira/ directly.
+func buildTrackerAdapterFactory(localDB *db.DB) trackerregistry.AdapterFactory {
+	return func(cfg *db.TrackerConfig, token string) (tracker.Adapter, error) {
+		switch strings.ToLower(cfg.Type) {
+		case "linear":
+			var extra struct {
+				StateMap map[string]string `json:"state_map"`
+			}
+			if cfg.Extra != "" {
+				_ = json.Unmarshal([]byte(cfg.Extra), &extra)
+			}
+			return linear.NewClient(cfg.Endpoint, token, nil, "", extra.StateMap), nil
+		case "jira":
+			var extra struct {
+				JQL         string            `json:"jql"`
+				StateMap    map[string]string `json:"state_map"`
+				DefaultProj string            `json:"default_project"`
+			}
+			if cfg.Extra != "" {
+				_ = json.Unmarshal([]byte(cfg.Extra), &extra)
+			}
+			// Jira Server uses Basic auth with user+token; Cloud uses Bearer (user empty).
+			// We don't have a separate "user" column today — encode it in extra if Server.
+			client := jira.NewClient(cfg.Endpoint, "", token, nil, extra.StateMap)
+			if extra.JQL != "" {
+				client.SetJQL(extra.JQL)
+			}
+			if extra.DefaultProj != "" {
+				client.SetDefaultProject(extra.DefaultProj)
+			}
+			return client, nil
+		case "github":
+			parts := strings.Split(cfg.Endpoint, "/")
+			if len(parts) != 2 {
+				return nil, fmt.Errorf("github endpoint must be 'owner/repo', got %q", cfg.Endpoint)
+			}
+			// localDB enables DeleteIssue to clean up warehouse records.
+			return trackergithub.NewClient(parts[0], parts[1], token, nil, localDB), nil
+		default:
+			return nil, fmt.Errorf("unsupported tracker type %q", cfg.Type)
+		}
+	}
+}
+
+// seedTrackerConfigFromEnv inserts a default tracker_configs row from legacy
+// env vars if none exist. Zero behaviour change for existing deployments.
+func seedTrackerConfigFromEnv(ctx context.Context, warehouse *db.DB, cfg config.Config, reg *trackerregistry.Registry) error {
+	if warehouse == nil {
+		return nil
+	}
+	existing, err := warehouse.ListTrackerConfigs(ctx)
+	if err != nil {
+		return err
+	}
+	if len(existing) > 0 {
+		return nil
+	}
+	t := strings.ToLower(strings.TrimSpace(cfg.TrackerType))
+	if t == "" || t == "sqlite" || t == "memory" {
+		return nil
+	}
+	if t != "linear" && t != "jira" && t != "github" {
+		return nil
+	}
+	encToken, err := db.EncryptToken(cfg.TrackerToken)
+	if err != nil {
+		encToken = cfg.TrackerToken
+	}
+	seed := db.TrackerConfig{
+		ID:          "default",
+		Type:        t,
+		DisplayName: strings.ToUpper(t[:1]) + t[1:] + " (from env)",
+		Endpoint:    cfg.TrackerEndpoint,
+		AuthMethod:  "apikey",
+		TokenEnc:    encToken,
+	}
+	if err := warehouse.UpsertTrackerConfig(ctx, seed); err != nil {
+		return err
+	}
+	return reg.Reload(ctx, seed.ID)
 }
 
 // startExecutionWorker runs a tight polling loop that claims runnable issues
@@ -223,6 +364,7 @@ func startExecutionWorker(
 	sessionLog *sessionlogger.Logger,
 	termManager *terminal.Manager,
 	cfg *config.Config,
+	trackerReg *trackerregistry.Registry,
 	logger zerolog.Logger,
 ) {
 	workspaceService := workspace.Service{Root: workspaceRoot}
@@ -230,7 +372,7 @@ func startExecutionWorker(
 	defer ticker.Stop()
 
 	for range ticker.C {
-		processExecutionTick(service, workspaceService, registry, provider, providerName, workspaceRoot, workflowFile, agentMaxTurns, toolExecutor, toolSpecs, workspaceHooks, pubsub, warehouseDB, sessionLog, termManager, cfg, logger)
+		processExecutionTick(service, workspaceService, registry, provider, providerName, workspaceRoot, workflowFile, agentMaxTurns, toolExecutor, toolSpecs, workspaceHooks, pubsub, warehouseDB, sessionLog, termManager, cfg, trackerReg, logger)
 	}
 }
 
@@ -254,6 +396,7 @@ func processExecutionTick(
 	sessionLog *sessionlogger.Logger,
 	termManager *terminal.Manager,
 	cfg *config.Config,
+	trackerReg *trackerregistry.Registry,
 	logger zerolog.Logger,
 ) {
 	entry, ok := service.ClaimNextRunnable()
@@ -333,6 +476,14 @@ func processExecutionTick(
 		return
 	}
 	resolvedProject = project
+
+	// Override the global tool executor with one scoped to this project's tracker.
+	// Falls back to the global executor if the project has no issue source configured.
+	if trackerReg != nil {
+		if projectClient, clientErr := trackerReg.GetForProjectDirect(resolvedProject); clientErr == nil && projectClient != nil {
+			toolExecutor = tools.NewLinearToolExecutor(projectClient).Execute
+		}
+	}
 
 	if project.RootPath == "" || !filepath.IsAbs(project.RootPath) {
 		errMsg := fmt.Errorf("project root path is empty or not absolute: %q", project.RootPath)
@@ -583,6 +734,7 @@ func processExecutionTick(
 		ToolExecutor:    mcpAwareExecutor,
 		ToolSpecs:       allToolSpecs,
 		ResourceSpecs:   allResourceSpecs,
+		RuntimeTarget:   agents.NormalizeRuntimeTarget(entry.RuntimeTarget),
 	}, func(event agents.Event) {
 		service.RecordRunEvent(entry.IssueID, activeProviderName, event)
 		publishRunEvent(pubsub, entry, activeProviderName, event)
@@ -842,6 +994,104 @@ func processExecutionTick(
 				logger.Info().Str("issue_id", entry.IssueID).Str("branch", branchName).Msg("pushed branch to update existing PR")
 			}
 		}
+
+		// Post completion comment once: only on the final In Progress → Review transition.
+		if entry.ProjectID != "" && warehouseDB != nil {
+			agentSummary := ""
+			for i := len(eventsBuffer) - 1; i >= 0; i-- {
+				msg := strings.TrimSpace(eventsBuffer[i].Message)
+				if msg != "" && len(msg) > 50 {
+					agentSummary = msg
+					break
+				}
+			}
+
+			go func() {
+				project := resolvedProject
+				diffDir := workspacePath
+				if diffDir == "" {
+					diffDir = project.RootPath
+				}
+				if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
+					return
+				}
+				issue, fetchErr := service.FetchIssueByID(context.Background(), entry.IssueID)
+				if fetchErr != nil || issue == nil || issue.URL == "" {
+					return
+				}
+				issueNumber := extractGitHubIssueNumber(issue.URL)
+				if issueNumber <= 0 {
+					return
+				}
+
+				diffStats := ""
+				if diffDir != "" {
+					cmd := exec.Command("git", "-C", diffDir, "diff", "--stat", "HEAD")
+					if out, err := cmd.Output(); err == nil && len(out) > 0 {
+						diffStats = string(out)
+					}
+				}
+
+				changedFiles := ""
+				if diffDir != "" {
+					cmd := exec.Command("git", "-C", diffDir, "diff", "--name-only", "HEAD")
+					if out, err := cmd.Output(); err == nil && len(out) > 0 {
+						changedFiles = strings.TrimSpace(string(out))
+					}
+					cmd2 := exec.Command("git", "-C", diffDir, "ls-files", "--others", "--exclude-standard")
+					if out2, err := cmd2.Output(); err == nil && len(out2) > 0 {
+						if changedFiles != "" {
+							changedFiles += "\n"
+						}
+						changedFiles += strings.TrimSpace(string(out2))
+					}
+				}
+
+				comment := fmt.Sprintf("## %s Agent Run Completed\n\n", strings.ToUpper(activeProviderName))
+				comment += fmt.Sprintf("**Issue**: %s\n**Agent**: %s\n**Turns**: %d\n\n", entry.IssueIdentifier, activeProviderName, entry.TurnCount+1)
+
+				if agentSummary != "" {
+					comment += "### Summary\n\n" + agentSummary + "\n\n"
+				}
+
+				if changedFiles != "" {
+					files := strings.Split(changedFiles, "\n")
+					comment += "### Files Changed\n\n"
+					for _, f := range files {
+						f = strings.TrimSpace(f)
+						if f != "" {
+							comment += "- `" + f + "`\n"
+						}
+					}
+					comment += "\n"
+				}
+
+				if diffStats != "" {
+					comment += "### Diff Stats\n\n```\n" + strings.TrimSpace(diffStats) + "\n```\n\n"
+				}
+
+				comment += "---\n*Automatically posted by [Orchestra](https://github.com/Traves-Theberge/Orchestra)*"
+
+				token, updatedJSON, tokenErr := ghutil.RefreshableToken(context.Background(), project.GitHubToken, cfg.GitHubClientID, cfg.GitHubClientSecret)
+				if tokenErr != nil {
+					logger.Warn().Err(tokenErr).Str("issue_id", entry.IssueID).Msg("failed to resolve github token for comment")
+					return
+				}
+				if updatedJSON != "" {
+					if enc, encErr := db.EncryptToken(updatedJSON); encErr == nil {
+						if _, dbErr := warehouseDB.ExecContext(context.Background(), "UPDATE projects SET github_token = ? WHERE id = ?", enc, project.ID); dbErr == nil {
+							logger.Info().Str("project_id", project.ID).Msg("refreshed and persisted github token in execution worker")
+						}
+					}
+				}
+
+				if err := ghutil.PostIssueComment(context.Background(), project.GitHubOwner, project.GitHubRepo, token, issueNumber, comment); err != nil {
+					logger.Warn().Err(err).Str("issue_id", entry.IssueID).Msg("failed to post GitHub comment")
+				} else {
+					logger.Info().Str("issue_id", entry.IssueID).Int("github_issue", issueNumber).Msg("posted completion comment to GitHub")
+				}
+			}()
+		}
 	} else {
 		logger.Info().Str("issue_id", entry.IssueID).Str("state", currentState).Msg("run succeeded but state is not auto-advanceable; skipping")
 	}
@@ -855,109 +1105,6 @@ func processExecutionTick(
 	})
 
 	runAfterHook()
-
-	// Post completion comment to GitHub issue if linked
-	if entry.ProjectID != "" && warehouseDB != nil {
-		// Extract the last substantive agent message for the summary
-		agentSummary := ""
-		for i := len(eventsBuffer) - 1; i >= 0; i-- {
-			msg := strings.TrimSpace(eventsBuffer[i].Message)
-			if msg != "" && len(msg) > 50 {
-				agentSummary = msg
-				break
-			}
-		}
-
-		go func() {
-			project := resolvedProject
-			diffDir := workspacePath // use worktree path for diff stats
-			if diffDir == "" {
-				diffDir = project.RootPath
-			}
-			if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
-				return
-			}
-			issue, fetchErr := service.FetchIssueByID(context.Background(), entry.IssueID)
-			if fetchErr != nil || issue == nil || issue.URL == "" {
-				return
-			}
-			issueNumber := extractGitHubIssueNumber(issue.URL)
-			if issueNumber <= 0 {
-				return
-			}
-
-			// Get git diff stats for the comment
-			diffStats := ""
-			if diffDir != "" {
-				cmd := exec.Command("git", "-C", diffDir, "diff", "--stat", "HEAD")
-				if out, err := cmd.Output(); err == nil && len(out) > 0 {
-					diffStats = string(out)
-				}
-			}
-
-			// Get list of changed files
-			changedFiles := ""
-			if diffDir != "" {
-				cmd := exec.Command("git", "-C", diffDir, "diff", "--name-only", "HEAD")
-				if out, err := cmd.Output(); err == nil && len(out) > 0 {
-					changedFiles = strings.TrimSpace(string(out))
-				}
-				// Also include untracked files
-				cmd2 := exec.Command("git", "-C", diffDir, "ls-files", "--others", "--exclude-standard")
-				if out2, err := cmd2.Output(); err == nil && len(out2) > 0 {
-					if changedFiles != "" {
-						changedFiles += "\n"
-					}
-					changedFiles += strings.TrimSpace(string(out2))
-				}
-			}
-
-			comment := fmt.Sprintf("## %s Agent Run Completed\n\n", strings.ToUpper(activeProviderName))
-			comment += fmt.Sprintf("**Issue**: %s\n**Agent**: %s\n**Turns**: %d\n\n", entry.IssueIdentifier, activeProviderName, entry.TurnCount+1)
-
-			if agentSummary != "" {
-				comment += "### Summary\n\n" + agentSummary + "\n\n"
-			}
-
-			if changedFiles != "" {
-				files := strings.Split(changedFiles, "\n")
-				comment += "### Files Changed\n\n"
-				for _, f := range files {
-					f = strings.TrimSpace(f)
-					if f != "" {
-						comment += "- `" + f + "`\n"
-					}
-				}
-				comment += "\n"
-			}
-
-			if diffStats != "" {
-				comment += "### Diff Stats\n\n```\n" + strings.TrimSpace(diffStats) + "\n```\n\n"
-			}
-
-			comment += "---\n*Automatically posted by [Orchestra](https://github.com/Traves-Theberge/Orchestra)*"
-
-			// Resolve a valid token, refreshing if expired
-			token, updatedJSON, tokenErr := ghutil.RefreshableToken(context.Background(), project.GitHubToken, cfg.GitHubClientID, cfg.GitHubClientSecret)
-			if tokenErr != nil {
-				logger.Warn().Err(tokenErr).Str("issue_id", entry.IssueID).Msg("failed to resolve github token for comment")
-				return
-			}
-			if updatedJSON != "" {
-				if enc, encErr := db.EncryptToken(updatedJSON); encErr == nil {
-					if _, dbErr := warehouseDB.ExecContext(context.Background(), "UPDATE projects SET github_token = ? WHERE id = ?", enc, project.ID); dbErr == nil {
-						logger.Info().Str("project_id", project.ID).Msg("refreshed and persisted github token in execution worker")
-					}
-				}
-			}
-
-			if err := ghutil.PostIssueComment(context.Background(), project.GitHubOwner, project.GitHubRepo, token, issueNumber, comment); err != nil {
-				logger.Warn().Err(err).Str("issue_id", entry.IssueID).Msg("failed to post GitHub comment")
-			} else {
-				logger.Info().Str("issue_id", entry.IssueID).Int("github_issue", issueNumber).Msg("posted completion comment to GitHub")
-			}
-		}()
-	}
 
 	logger.Info().Str("issue_id", entry.IssueID).Str("session_id", result.SessionID).Msg("agent run completed — issue moved to Review")
 	publishSnapshot(pubsub, service)
@@ -1045,7 +1192,7 @@ func extractPlanFromResult(result agents.TurnResult, events []agents.Event) stri
 				checkboxLines = append(checkboxLines, trimmed)
 			}
 		}
-		if len(checkboxLines) >= 3 {
+		if len(checkboxLines) >= 1 {
 			return strings.Join(checkboxLines, "\n")
 		}
 
@@ -1080,7 +1227,7 @@ func extractPlanFromResult(result agents.TurnResult, events []agents.Event) stri
 			bestMsg = text
 		}
 	}
-	if bestCount >= 3 {
+	if bestCount >= 1 {
 		return bestMsg
 	}
 
@@ -1093,7 +1240,7 @@ func extractPlanFromResult(result agents.TurnResult, events []agents.Event) stri
 			checkboxLines = append(checkboxLines, trimmed)
 		}
 	}
-	if len(checkboxLines) >= 3 {
+	if len(checkboxLines) >= 1 {
 		return strings.Join(checkboxLines, "\n")
 	}
 
@@ -1119,7 +1266,7 @@ func extractOriginalPlan(warehouseDB *db.DB, issueID string) string {
 				count++
 			}
 		}
-		if count >= 3 {
+		if count >= 1 {
 			return msg
 		}
 	}
@@ -1221,11 +1368,17 @@ func pruneAllWorktrees(warehouseDB *db.DB, workspaceService workspace.Service, l
 	}
 }
 
-// startRefreshWorker runs a 5-second polling loop that triggers tracker refresh
-// cycles, publishes updated snapshots, and persists orchestrator state to disk.
-// Snapshots are only broadcast when state actually changed (via content hash),
-// reducing unnecessary SSE traffic during idle periods.
-func startRefreshWorker(service *orchestrator.Service, pubsub *observability.PubSub, logger zerolog.Logger) {
+// startRefreshWorker runs a 5-second polling loop that triggers per-project tracker
+// refresh cycles, publishes updated snapshots, and persists orchestrator state to disk.
+// Each project gets its own tracker client built from its embedded issue_source_* fields.
+// Projects with no issue source configured are skipped (local-only mode).
+func startRefreshWorker(
+	service *orchestrator.Service,
+	registry *trackerregistry.Registry,
+	warehouseDB *db.DB,
+	pubsub *observability.PubSub,
+	logger zerolog.Logger,
+) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
@@ -1239,11 +1392,44 @@ func startRefreshWorker(service *orchestrator.Service, pubsub *observability.Pub
 		}
 		before := service.Snapshot()
 
-		if err := service.PerformRefresh(context.Background()); err != nil {
-			logger.Error().Err(err).Str("service_id", runtime.ServiceOrchestrator).Msg("refresh worker failed")
+		ctx := context.Background()
+		var refreshErr error
+
+		projects, dbErr := warehouseDB.GetProjects(ctx)
+		if dbErr != nil {
+			logger.Warn().Err(dbErr).Msg("refresh worker: failed to load projects")
+			// Fall back to stall-reconciliation-only path
+			refreshErr = service.PerformRefreshForClient(ctx, nil)
+		} else {
+			ranAtLeastOne := false
+			for _, proj := range projects {
+				if proj.IssueSourceType == "" {
+					continue // no external source; stall reconciliation runs via nil path below
+				}
+				client, clientErr := registry.GetForProjectDirect(proj)
+				if clientErr != nil || client == nil {
+					if clientErr != nil {
+						logger.Warn().Err(clientErr).Str("project_id", proj.ID).Msg("refresh worker: failed to build tracker client")
+					}
+					continue
+				}
+				ranAtLeastOne = true
+				if err := service.PerformRefreshForClient(ctx, client); err != nil {
+					logger.Error().Err(err).Str("project_id", proj.ID).Str("service_id", runtime.ServiceOrchestrator).Msg("refresh worker: project refresh failed")
+					refreshErr = err
+				}
+			}
+			// Ensure stall reconciliation + retry releases run even when no project has an external source
+			if !ranAtLeastOne {
+				refreshErr = service.PerformRefreshForClient(ctx, nil)
+			}
+		}
+
+		if refreshErr != nil {
 			publishSnapshot(pubsub, service)
 			continue
 		}
+
 		after := service.Snapshot()
 		publishRefreshRetryLifecycleEvents(pubsub, before, after)
 
@@ -1251,7 +1437,7 @@ func startRefreshWorker(service *orchestrator.Service, pubsub *observability.Pub
 		if newHash != lastHash {
 			lastHash = newHash
 			publishSnapshot(pubsub, service)
-			if err := service.PersistStateToDB(context.Background()); err != nil {
+			if err := service.PersistStateToDB(ctx); err != nil {
 				logger.Warn().Err(err).Msg("failed to persist orchestrator state to DB")
 			}
 		}

@@ -23,6 +23,7 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/db"
 	"github.com/orchestra/orchestra/apps/backend/internal/mcp"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
+	trackerregistry "github.com/orchestra/orchestra/apps/backend/internal/tracker/registry"
 	"github.com/orchestra/orchestra/apps/backend/internal/workspace"
 )
 
@@ -46,6 +47,7 @@ type RunningEntry struct {
 	ProjectID       string   `json:"project_id,omitempty"`
 	SessionID       string   `json:"session_id"`
 	Provider        string   `json:"provider"`
+	RuntimeTarget   string   `json:"runtime_target,omitempty"`
 	SessionLogPath  string   `json:"session_log_path,omitempty"`
 	WorktreePath    string   `json:"worktree_path,omitempty"`
 	DisabledTools   []string `json:"disabled_tools,omitempty"`
@@ -68,6 +70,7 @@ type RetryEntry struct {
 	State           string   `json:"state,omitempty"`
 	AssigneeID      string   `json:"assignee_id,omitempty"`
 	Provider        string   `json:"provider,omitempty"`
+	RuntimeTarget   string   `json:"runtime_target,omitempty"`
 	DisabledTools   []string `json:"disabled_tools,omitempty"`
 	Attempt         int64    `json:"attempt"`
 	DueAt           string   `json:"due_at"`
@@ -129,8 +132,10 @@ type Service struct {
 	retryMaxDelay    time.Duration
 	stallTimeout     time.Duration
 	db               *db.DB
-	mcpRegistry      *mcp.Registry
-	mcpServers       map[string]string
+	mcpRegistry        *mcp.Registry
+	mcpServers         map[string]string
+	trackerReg         *trackerregistry.Registry
+	onRetryExhausted   func(issueID, issueIdentifier, issueState string)
 }
 
 // IssueRuntime bundles the running and retry state for a single issue,
@@ -359,6 +364,37 @@ func (s *Service) SetDB(database *db.DB) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.db = database
+}
+
+// SetTrackerRegistry wires the per-project tracker registry into the service so
+// issue operations can resolve a project-specific client instead of the global one.
+func (s *Service) SetTrackerRegistry(reg *trackerregistry.Registry) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.trackerReg = reg
+}
+
+// clientForProject returns a per-project tracker.Client when the registry and DB
+// are wired and the project has an issue source configured. Falls back to the
+// global trackerClient so existing single-tracker setups keep working.
+func (s *Service) clientForProject(ctx context.Context, projectID string) tracker.Client {
+	s.mu.RLock()
+	reg := s.trackerReg
+	global := s.trackerClient
+	s.mu.RUnlock()
+
+	if reg == nil || projectID == "" || s.db == nil {
+		return global
+	}
+	project, err := s.db.GetProjectByID(ctx, projectID)
+	if err != nil {
+		return global
+	}
+	client, err := reg.GetForProjectDirect(project)
+	if err != nil || client == nil {
+		return global
+	}
+	return client
 }
 
 // SetAgentRegistry configures the agent registry, per-provider commands, and
@@ -681,6 +717,16 @@ func (s *Service) SetMaxConcurrentByState(limits map[string]int) {
 
 // SetRetryPolicy configures the retry backoff parameters: maximum attempts,
 // base delay, and maximum delay cap.
+// SetOnRetryExhausted registers a callback invoked when an issue exceeds its
+// maximum retry attempts and will no longer be scheduled. The callback receives
+// the issue ID, identifier, and last-known state so callers can surface the
+// failure to users (e.g. move the issue back to Backlog).
+func (s *Service) SetOnRetryExhausted(fn func(issueID, issueIdentifier, issueState string)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onRetryExhausted = fn
+}
+
 func (s *Service) SetRetryPolicy(maxAttempts int64, baseDelay time.Duration, maxDelay time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -713,23 +759,32 @@ func (s *Service) ShouldRetryAttempt(attempt int64) bool {
 	return attempt > 0 && attempt <= s.maxRetryAttempts
 }
 
-// PerformRefresh executes a full refresh cycle: reconciles stalled runs, fetches
-// candidate issues from the tracker, filters retries, promotes due retries, and
-// reconciles running states against the tracker's current view.
+// PerformRefresh executes a full refresh cycle using the service's global tracker
+// client. Kept for backward compatibility; prefer PerformRefreshForClient.
 func (s *Service) PerformRefresh(ctx context.Context) error {
 	s.mu.RLock()
 	client := s.trackerClient
+	s.mu.RUnlock()
+	return s.PerformRefreshForClient(ctx, client)
+}
+
+// PerformRefreshForClient executes a full refresh cycle against the given client.
+// Pass nil to run stall reconciliation and retry releases without fetching from
+// any external tracker — used when a project has no issue source set.
+func (s *Service) PerformRefreshForClient(ctx context.Context, client tracker.Client) error {
+	s.mu.RLock()
 	activeStates := append([]string(nil), s.activeStates...)
 	terminalStates := append([]string(nil), s.terminalStates...)
 	s.mu.RUnlock()
 
-	if client == nil {
-		s.CompleteRefreshCycle()
-		return nil
-	}
 	defer s.CompleteRefreshCycle()
 
 	s.reconcileStalledRunningIssues()
+
+	if client == nil {
+		s.releaseDueRetries()
+		return nil
+	}
 
 	candidates, err := client.FetchCandidateIssues(ctx, activeStates)
 	if err != nil {
@@ -765,9 +820,7 @@ func (s *Service) PerformRefresh(ctx context.Context) error {
 
 // ListIssues delegates to the tracker client to fetch issues matching the given filter.
 func (s *Service) ListIssues(ctx context.Context, filter tracker.IssueFilter) ([]tracker.Issue, error) {
-	s.mu.RLock()
-	client := s.trackerClient
-	s.mu.RUnlock()
+	client := s.clientForProject(ctx, filter.ProjectID)
 
 	if client == nil {
 		return []tracker.Issue{}, nil
@@ -803,16 +856,21 @@ func (s *Service) SearchIssues(ctx context.Context, query string) ([]tracker.Iss
 }
 
 // CreateIssue creates a new issue in the configured tracker with the given metadata.
-func (s *Service) CreateIssue(ctx context.Context, title, description, state string, priority int, assigneeID, projectID string, provider string, disabledTools []string) (*tracker.Issue, error) {
-	s.mu.RLock()
-	client := s.trackerClient
-	s.mu.RUnlock()
+func (s *Service) CreateIssue(ctx context.Context, title, description, state string, priority int, assigneeID, projectID string, provider string, runtimeTarget string, disabledTools []string) (*tracker.Issue, error) {
+	client := s.clientForProject(ctx, projectID)
 
 	if client == nil {
 		return nil, fmt.Errorf("tracker client not available")
 	}
 
-	return client.CreateIssue(ctx, title, description, state, priority, assigneeID, projectID, provider, disabledTools)
+	issue, err := client.CreateIssue(ctx, title, description, state, priority, assigneeID, projectID, provider, disabledTools)
+	if err != nil {
+		return nil, err
+	}
+	if issue != nil && runtimeTarget != "" {
+		issue.RuntimeTarget = runtimeTarget
+	}
+	return issue, nil
 }
 
 // UpdateIssue applies field updates to an issue, logs audit history for changed
@@ -1039,6 +1097,7 @@ func (s *Service) enqueueCandidates(candidates []tracker.Issue) {
 			AssigneeID:      issue.AssigneeID,
 			ProjectID:       issue.ProjectID,
 			Provider:        targetProvider,
+			RuntimeTarget:   issue.RuntimeTarget,
 			DisabledTools:   append([]string(nil), issue.DisabledTools...),
 			StartedAt:       now,
 			LastEventAt:     now,
@@ -1114,6 +1173,7 @@ func (s *Service) releaseDueRetries() {
 			State:           state,
 			AssigneeID:      retry.AssigneeID,
 			Provider:        retry.Provider,
+			RuntimeTarget:   retry.RuntimeTarget,
 			DisabledTools:   append([]string(nil), retry.DisabledTools...),
 			StartedAt:       now.Format(time.RFC3339),
 			LastEventAt:     now.Format(time.RFC3339),
@@ -1200,6 +1260,7 @@ func (s *Service) RecordRunFailure(issueID string, provider string, issueIdentif
 	issueState := ""
 	issueAssigneeID := ""
 	lastProvider := ""
+	lastRuntimeTarget := ""
 	var disabledTools []string
 	found := false
 	for _, entry := range s.running {
@@ -1210,6 +1271,7 @@ func (s *Service) RecordRunFailure(issueID string, provider string, issueIdentif
 		issueState = entry.State
 		issueAssigneeID = entry.AssigneeID
 		lastProvider = entry.Provider
+		lastRuntimeTarget = entry.RuntimeTarget
 		disabledTools = append([]string(nil), entry.DisabledTools...)
 		s.accumulateEntryTotalsLocked(entry)
 		found = true
@@ -1228,6 +1290,10 @@ func (s *Service) RecordRunFailure(issueID string, provider string, issueIdentif
 
 	if attempt > s.maxRetryAttempts {
 		delete(s.claimed, issueID)
+		if s.onRetryExhausted != nil {
+			cb := s.onRetryExhausted
+			go cb(issueID, issueIdentifier, issueState)
+		}
 		return
 	}
 
@@ -1253,6 +1319,7 @@ func (s *Service) RecordRunFailure(issueID string, provider string, issueIdentif
 		State:           issueState,
 		AssigneeID:      issueAssigneeID,
 		Provider:        nextProvider,
+		RuntimeTarget:   lastRuntimeTarget,
 		DisabledTools:   disabledTools,
 		Attempt:         attempt,
 		DueAt:           dueAt.UTC().Format(time.RFC3339),
@@ -1617,6 +1684,11 @@ func (s *Service) reconcileStalledRunningIssues() {
 		s.accumulateEntryTotalsLocked(entry)
 		if attempt > s.maxRetryAttempts {
 			delete(s.claimed, entry.IssueID)
+			if s.onRetryExhausted != nil {
+				cb := s.onRetryExhausted
+				id, ident, state := entry.IssueID, entry.IssueIdentifier, entry.State
+				go cb(id, ident, state)
+			}
 			continue
 		}
 

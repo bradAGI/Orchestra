@@ -84,6 +84,15 @@ func runMigrations(db *sql.DB) error {
 		{"issues", "pr_url", "TEXT DEFAULT ''"},
 		// Agent plan stored separately from description
 		{"issues", "plan", "TEXT DEFAULT ''"},
+		// Tracker config assignment per project
+		{"projects", "tracker_config_id", "TEXT"},
+		// Runtime target for remote execution (TAILSCALE, KUBERNETES)
+		{"runs", "runtime_target", "TEXT"},
+		{"issues", "runtime_target", "TEXT"},
+		// Per-project issue source (replaces global tracker_configs join)
+		{"projects", "issue_source_type", "TEXT NOT NULL DEFAULT ''"},
+		{"projects", "issue_source_endpoint", "TEXT NOT NULL DEFAULT ''"},
+		{"projects", "issue_source_token", "TEXT NOT NULL DEFAULT ''"}, // AES-GCM encrypted
 	}
 
 	for _, m := range migrations {
@@ -91,6 +100,19 @@ func runMigrations(db *sql.DB) error {
 			return err
 		}
 	}
+
+	// Backfill issue_source_* from tracker_configs for projects that have a
+	// tracker_config_id set but no issue_source_type yet. Idempotent.
+	_, _ = db.Exec(`
+		UPDATE projects
+		SET
+			issue_source_type     = COALESCE(tc.type, ''),
+			issue_source_endpoint = COALESCE(tc.endpoint, ''),
+			issue_source_token    = COALESCE(tc.token_enc, '')
+		FROM tracker_configs tc
+		WHERE projects.tracker_config_id = tc.id
+		  AND projects.issue_source_type  = ''
+	`)
 
 	return nil
 }

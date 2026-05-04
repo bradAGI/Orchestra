@@ -1,6 +1,7 @@
 // Package agents provides runner implementations for dispatching work to
 // machine-learning coding agents (Claude, Gemini, OpenCode, Codex via app-server,
-// and Unsandbox) and a registry that maps provider names to their concrete runners.
+// Tailscale SSH, and Kubernetes pods) and a registry that maps provider names to
+// their concrete runners.
 package agents
 
 import (
@@ -25,6 +26,30 @@ const (
 	Provider8gent Provider = "8GENT"
 )
 
+// RuntimeTarget identifies where an agent turn executes.
+type RuntimeTarget string
+
+const (
+	RuntimeLocal      RuntimeTarget = "LOCAL"
+	RuntimeTailscale  RuntimeTarget = "TAILSCALE"
+	RuntimeKubernetes RuntimeTarget = "KUBERNETES"
+)
+
+// NormalizeRuntimeTarget upper-cases and trims. Empty string returns RuntimeLocal.
+func NormalizeRuntimeTarget(s string) RuntimeTarget {
+	if strings.TrimSpace(s) == "" {
+		return RuntimeLocal
+	}
+	return RuntimeTarget(strings.ToUpper(strings.TrimSpace(s)))
+}
+
+// RuntimeTransport wraps a command string to execute on a remote target.
+// WrapCommand takes the AI provider and its CLI command string, returning
+// a Runner that will invoke the command on the remote infrastructure.
+type RuntimeTransport interface {
+	WrapCommand(provider Provider, command string) Runner
+}
+
 // NormalizeProvider normalizes a provider string to UPPERCASE for backward compatibility.
 func NormalizeProvider(s string) Provider {
 	return Provider(strings.ToUpper(strings.TrimSpace(s)))
@@ -45,6 +70,7 @@ type TurnRequest struct {
 	ToolExecutor    ToolExecutor
 	ToolSpecs       []map[string]any
 	ResourceSpecs   []map[string]any
+	RuntimeTarget   RuntimeTarget
 }
 
 // TokenUsage tracks the token consumption for a single agent turn, including
