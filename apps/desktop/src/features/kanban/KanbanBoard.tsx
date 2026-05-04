@@ -503,7 +503,7 @@ export function KanbanBoard({
                 onDragStart={(e) => handleColumnDragStart(e, column.id)}
               >
                 <span className={`block h-2 w-2 rounded-full shrink-0 ${column.dot}`} />
-                <h3 className="text-[11px] font-semibold uppercase tracking-widest text-foreground/40 flex-1 truncate">{column.title}</h3>
+                <span className="text-[9px] font-semibold uppercase tracking-widest text-foreground/40 flex-1 truncate">{column.title}</span>
                 {column.items.length > 0 && (
                   <span className="text-[10px] font-medium tabular-nums text-muted-foreground/35 bg-muted/50 px-1.5 py-0.5 rounded-full leading-none">{column.items.length}</span>
                 )}
@@ -531,7 +531,7 @@ export function KanbanBoard({
                         <p className="text-[10.5px] font-medium text-muted-foreground/40 group-hover/empty:text-muted-foreground/70 transition-colors">Add task</p>
                       </button>
                     ) : (
-                      <div className="w-full min-h-full flex items-center justify-center rounded-lg">
+                      <div className="w-full min-h-full flex items-center justify-center rounded-lg border border-dashed border-border/30">
                         <p className="text-[10px] text-muted-foreground/25 font-medium">Empty</p>
                       </div>
                     )
