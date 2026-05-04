@@ -13,6 +13,7 @@ import type {
   ProjectStats,
   BackendConfig,
   BridgeProfilesPayload,
+  DocItem,
 } from '@core/api/types'
 import type { TimelineItem } from '@layout/types'
 import type { IssueListItem } from '@core/api/client'
@@ -117,6 +118,18 @@ export interface UISlice {
   createProjectDialogOpen: boolean
   settingsInitialTab: SettingsTab | undefined
   browserHomepage: string
+  sidePanelOpen: boolean
+  activeSettingsSection: string
+  scrollToSettingsSection: ((id: string) => void) | null
+  activeAgentProvider: 'claude' | 'codex' | 'gemini' | 'opencode' | '8gent'
+  activeAgentScope: 'GLOBAL' | 'PROJECT'
+  activeAgentProjectId: string
+  activeAgentCategory: string
+  agentCategories: Array<{ id: string; label: string; icon: unknown }>
+  agentCategoryCounts: Record<string, number>
+  activeDocPath: string | null
+  docTree: DocItem[]
+  expandedDocFolders: Set<string>
 
   // Actions
   setActiveSection: (section: SectionID) => void
@@ -133,6 +146,18 @@ export interface UISlice {
   closeCreateTaskDialog: () => void
   setCreateProjectDialogOpen: (open: boolean) => void
   setSettingsInitialTab: (tab: SettingsTab | undefined) => void
+  setSidePanelOpen: (v: boolean) => void
+  toggleSidePanel: () => void
+  setActiveSettingsSection: (id: string) => void
+  setScrollToSettingsSection: (fn: ((id: string) => void) | null) => void
+  setActiveAgentProvider: (provider: 'claude' | 'codex' | 'gemini' | 'opencode' | '8gent') => void
+  setActiveAgentScope: (scope: 'GLOBAL' | 'PROJECT', projectId?: string) => void
+  setActiveAgentCategory: (cat: string) => void
+  setAgentCategories: (cats: Array<{ id: string; label: string; icon: unknown }>) => void
+  setAgentCategoryCounts: (counts: Record<string, number>) => void
+  setActiveDocPath: (path: string | null) => void
+  setDocTree: (tree: DocItem[]) => void
+  toggleDocFolder: (path: string) => void
 }
 
 // ---------------------------------------------------------------------------

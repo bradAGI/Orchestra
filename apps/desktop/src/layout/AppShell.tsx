@@ -1,52 +1,53 @@
-import type { ComponentProps, ReactNode } from 'react'
-import { SidebarNav } from '@layout/sidebar-nav'
-import { TopBar } from '@layout/top-bar'
+import type { ReactNode } from 'react'
+import { AppSidebar } from '@layout/AppSidebar'
 import type { SidebarItem } from '@layout/types'
+import type { Project } from '@core/api/types'
+import type { IssueListItem } from '@core/api/client'
 
 type AppShellProps = {
   items: SidebarItem[]
   activeSection: string
   onSectionChange: (section: string) => void
-  sidebarCollapsed: boolean
-  sidebarWidth: number
-  onToggleCollapsed: () => void
-  topBarProps: ComponentProps<typeof TopBar>
-  flushContent?: boolean
   bottomBar?: ReactNode
   children: ReactNode
+  projects: Project[]
+  selectedProjectID: string | null
+  onSelectProject: (id: string) => void
+  onCreateProject: () => void
+  onSearch?: (query: string) => Promise<IssueListItem[]>
+  onResultClick?: (issueIdentifier: string) => void
 }
 
 export function AppShell({
   items,
   activeSection,
   onSectionChange,
-  sidebarCollapsed,
-  sidebarWidth,
-  onToggleCollapsed,
-  topBarProps,
-  flushContent,
   bottomBar,
   children,
+  projects,
+  selectedProjectID,
+  onSelectProject,
+  onCreateProject,
+  onSearch,
+  onResultClick,
 }: AppShellProps) {
   return (
     <div className="h-full w-full overflow-hidden bg-background text-foreground flex flex-col">
       <div className="flex flex-1 w-full min-h-0">
-        <SidebarNav
+        <AppSidebar
           items={items}
           activeSection={activeSection}
           onSectionChange={onSectionChange}
-          sidebarCollapsed={sidebarCollapsed}
-          onToggleCollapsed={onToggleCollapsed}
-          sidebarWidth={sidebarWidth}
+          projects={projects}
+          selectedProjectID={selectedProjectID}
+          onSelectProject={onSelectProject}
+          onCreateProject={onCreateProject}
+          onSearch={onSearch}
+          onResultClick={onResultClick}
         />
 
         <main className="min-w-0 flex-1 bg-background h-full flex flex-col overflow-hidden">
-          <div className={`w-full flex flex-col h-full min-h-0 px-4 pt-3 ${flushContent ? 'pb-0' : 'pb-4'}`}>
-            <TopBar {...topBarProps} flush={flushContent} />
-            <div className={`flex-1 flex flex-col min-h-0 ${flushContent ? '-mx-4' : ''}`}>
-              {children}
-            </div>
-          </div>
+          {children}
         </main>
       </div>
       {bottomBar}

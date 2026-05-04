@@ -11,6 +11,22 @@ const SOURCE_BADGE_CLASS: Record<WorkItemSource, string> = {
   memory: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
 }
 
+const SOURCE_PILL_CLASS: Record<WorkItemSource, { active: string; idle: string }> = {
+  github:  { active: 'bg-zinc-500/20 text-zinc-200 border-zinc-500/40',   idle: 'text-muted-foreground/60 hover:text-foreground/80 hover:bg-foreground/[0.04] border-transparent' },
+  linear:  { active: 'bg-violet-500/20 text-violet-300 border-violet-500/40', idle: 'text-muted-foreground/60 hover:text-foreground/80 hover:bg-foreground/[0.04] border-transparent' },
+  jira:    { active: 'bg-blue-500/20 text-blue-300 border-blue-500/40',    idle: 'text-muted-foreground/60 hover:text-foreground/80 hover:bg-foreground/[0.04] border-transparent' },
+  sqlite:  { active: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40', idle: 'text-muted-foreground/60 hover:text-foreground/80 hover:bg-foreground/[0.04] border-transparent' },
+  memory:  { active: 'bg-zinc-500/20 text-zinc-200 border-zinc-500/40',   idle: 'text-muted-foreground/60 hover:text-foreground/80 hover:bg-foreground/[0.04] border-transparent' },
+}
+
+const SOURCE_LABEL: Record<WorkItemSource, string> = {
+  github: 'GitHub',
+  linear: 'Linear',
+  jira: 'Jira',
+  sqlite: 'Local',
+  memory: 'Memory',
+}
+
 const PRIORITY_LABEL: Record<number, string> = {
   0: '',
   1: 'Urgent',
@@ -45,8 +61,19 @@ export function WorkItemBrowser({
   filter,
   onFilterChange,
 }: Props) {
+  const presentSources = useMemo(() => {
+    const s = new Set<WorkItemSource>()
+    for (const item of items) s.add(item.source as WorkItemSource)
+    return [...s].sort()
+  }, [items])
+
+  const activeSource = (filter.source && filter.source !== 'all') ? filter.source : null
+
   const filtered = useMemo(() => {
     let out = items
+    if (activeSource) {
+      out = out.filter((i) => i.source === activeSource)
+    }
     if (filter.search) {
       const q = filter.search.toLowerCase()
       out = out.filter(
@@ -68,12 +95,16 @@ export function WorkItemBrowser({
       )
     }
     return out
-  }, [items, filter])
+  }, [items, filter, activeSource])
+
+  const setSource = (src: WorkItemSource | 'all') => {
+    onFilterChange({ ...filter, source: src === 'all' ? undefined : src })
+  }
 
   return (
     <div className="flex flex-col h-full">
       {/* Search bar */}
-      <div className="p-2 border-b border-border">
+      <div className="p-2 border-b border-border space-y-2">
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
           <input
@@ -84,6 +115,31 @@ export function WorkItemBrowser({
             className="w-full pl-7 pr-2 py-1.5 text-sm bg-background rounded border border-border focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
+
+        {/* Source filter pills — only shown when 2+ sources are present */}
+        {presentSources.length >= 2 && (
+          <div className="flex items-center gap-1 flex-wrap">
+            <button
+              onClick={() => setSource('all')}
+              className={`h-6 px-2 rounded text-[11px] font-medium border transition-colors ${!activeSource ? 'bg-foreground/10 text-foreground border-border/60' : 'text-muted-foreground/60 hover:text-foreground/80 hover:bg-foreground/[0.04] border-transparent'}`}
+            >
+              All
+            </button>
+            {presentSources.map((src) => {
+              const cls = SOURCE_PILL_CLASS[src] ?? SOURCE_PILL_CLASS.memory
+              const isActive = activeSource === src
+              return (
+                <button
+                  key={src}
+                  onClick={() => setSource(src)}
+                  className={`h-6 px-2 rounded text-[11px] font-medium border transition-colors ${isActive ? cls.active : cls.idle}`}
+                >
+                  {SOURCE_LABEL[src] ?? src}
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Item list */}

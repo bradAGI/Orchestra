@@ -1684,6 +1684,11 @@ func (s *Service) reconcileStalledRunningIssues() {
 		s.accumulateEntryTotalsLocked(entry)
 		if attempt > s.maxRetryAttempts {
 			delete(s.claimed, entry.IssueID)
+			if s.onRetryExhausted != nil {
+				cb := s.onRetryExhausted
+				id, ident, state := entry.IssueID, entry.IssueIdentifier, entry.State
+				go cb(id, ident, state)
+			}
 			continue
 		}
 

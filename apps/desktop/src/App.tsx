@@ -6,7 +6,6 @@ import {
   type BackendConfig,
 } from '@core/api/client'
 import type { SessionSummary } from '@core/api/types'
-import { ProjectGrid } from '@features/projects/ProjectGrid'
 import { ProjectDetailView } from '@features/projects/ProjectDetailView'
 import { UsagePage } from '@features/usage/UsagePage'
 import { UsageStatusBar } from '@features/usage/UsageStatusBar'
@@ -78,7 +77,6 @@ export default function App() {
 
   const activeSection = useAppStore(s => s.activeSection)
   const setActiveSection = useAppStore(s => s.setActiveSection)
-  const sidebarCollapsed = useAppStore(s => s.sidebarCollapsed)
   const setCreateProjectDialogOpen = useAppStore(s => s.setCreateProjectDialogOpen)
   const settingsInitialTab = useAppStore(s => s.settingsInitialTab)
   const setSettingsInitialTab = useAppStore(s => s.setSettingsInitialTab)
@@ -267,6 +265,44 @@ export default function App() {
         useAppStore.getState().toggleRightSidebar()
         return
       }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'm') {
+        e.preventDefault()
+        const s = useAppStore.getState()
+        s.setActiveSection('CONSOLE')
+        const pid = s.activeProjectId
+        const proj = s.projects.find((p) => p.id === pid)
+        const root = proj?.root_path || s.explorerRoot
+        const cfg = s.config
+        if (!root || !cfg?.baseUrl) return
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+        const filename = `Untitled-${stamp}.md`
+        const absPath = `${root.replace(/\/$/, '')}/${filename}`
+        const headers: Record<string, string> = { 'Content-Type': 'text/plain' }
+        if (cfg.apiToken) headers['Authorization'] = `Bearer ${cfg.apiToken}`
+        void fetch(`${cfg.baseUrl}/api/v1/workspace/file?path=${encodeURIComponent(absPath)}`, {
+          method: 'PUT', headers, body: '# Untitled\n\n',
+        }).then((res) => {
+          if (res.ok) s.openFile(absPath, filename, undefined, pid)
+        })
+        return
+      }
+      if (e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === 't') {
+        e.preventDefault()
+        const s = useAppStore.getState()
+        s.setActiveSection('CONSOLE')
+        const pid = s.activeProjectId
+        const focusedGroupId = s.projectFocusedGroupId[pid]
+        if (focusedGroupId) {
+          const id = `shell-${Date.now()}`
+          const proj = s.projects.find((p) => p.id === pid)
+          const cwd = proj?.root_path
+          const initialCommand = cwd ? `cd '${cwd}' && clear` : undefined
+          const title = proj ? `${proj.name} Shell` : 'Shell'
+          s.setOpenTerminals([...s.openTerminals, { id, title, projectId: proj ? pid : undefined, cwd, initialCommand }])
+          s.addTabToGroup(pid, { type: 'terminal', id }, focusedGroupId)
+        }
+        return
+      }
       if (e.ctrlKey && !e.altKey && !e.shiftKey) {
         const num = parseInt(e.key, 10)
         if (!isNaN(num) && num >= 1 && num <= sidebarItems.length) {
@@ -340,42 +376,24 @@ export default function App() {
     URL.revokeObjectURL(url)
   }
 
-  const sidebarWidth = sidebarCollapsed ? 64 : 248
   const sectionVisibility = getSectionVisibility(activeSection)
   const currentSectionMeta = getCurrentSectionMeta(activeSection)
+
   return (
     <AppTooltipProvider>
       <AppShell
         items={sidebarItems}
         activeSection={activeSection}
         onSectionChange={handleSectionChange}
-        sidebarCollapsed={sidebarCollapsed}
-        onToggleCollapsed={() => useAppStore.getState().toggleSidebar()}
-        sidebarWidth={sidebarWidth}
-        flushContent={sectionVisibility.showDocs || sectionVisibility.showSettings || sectionVisibility.showConsole}
-        bottomBar={<UsageStatusBar config={config} />}
-        topBarProps={{
-          sectionLabel: currentSectionMeta.label,
-          sectionTitle: currentSectionMeta.title,
-          theme,
-          setTheme,
-          activePeriod,
-          setActivePeriod,
-          refreshPending,
-          configReady: Boolean(config),
-          onOpenSettings: () => setActiveSection('SETTINGS'),
-          onRefresh: handleRefresh,
-          onSearch: (query) => (config ? searchIssues(config, query) : Promise.resolve([])),
-          onResultClick: handleInspectIssueFromList,
-          statusMessage,
-          errorMessage,
-          generatedAt,
-          usePolling,
-          onDownloadDiagnostics: handleDownloadDiagnostics,
-          onTogglePolling: handleTogglePolling,
-        }}
+        projects={projects}
+        selectedProjectID={selectedProjectID}
+        onSelectProject={(id) => useAppStore.getState().setSelectedProjectID(id)}
+        onCreateProject={() => setCreateProjectDialogOpen(true)}
+        onSearch={(query) => (config ? searchIssues(config, query) : Promise.resolve([]))}
+        onResultClick={handleInspectIssueFromList}
+        bottomBar={<UsageStatusBar config={config} generatedAt={generatedAt} />}
       >
-        <div className="mt-4 flex flex-col flex-1 min-w-0 min-h-0 h-full">
+        <div className="flex flex-col flex-1 min-w-0 min-h-0 h-full">
           {sectionVisibility.showProjects ? (
             <SectionErrorBoundary name="Projects">
               <section className="flex-1 flex flex-col min-h-0">
@@ -399,14 +417,22 @@ export default function App() {
                     onRefreshProjects={refreshProjectsAndStats}
                   />
                 ) : (
-                  <ProjectGrid
-                    projects={projects}
-                    stats={projectStats}
-                    loading={dataLoading}
-                    onProjectClick={(id) => setSelectedProjectID(id)}
-                    onAddProject={() => setCreateProjectDialogOpen(true)}
-                    onDeleteProject={handleDeleteProject}
-                  />
+                  <div className="flex-1 grid place-items-center text-muted-foreground/50 text-sm">
+                    {projects.length === 0 ? (
+                      <div className="flex flex-col items-center gap-2 text-center">
+                        <p className="text-[13px] font-medium">No projects yet</p>
+                        <button
+                          type="button"
+                          onClick={() => setCreateProjectDialogOpen(true)}
+                          className="text-[12px] text-primary hover:underline"
+                        >
+                          Add a project
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-[13px]">Select a project from the sidebar</p>
+                    )}
+                  </div>
                 )}
               </section>
             </SectionErrorBoundary>
@@ -434,6 +460,8 @@ export default function App() {
             <SectionErrorBoundary name="Kanban Board">
               <section className="flex-1 flex flex-col min-h-0">
                 <KanbanBoard
+                  config={config}
+                  project={projects.find(p => p.id === selectedProjectID) ?? null}
                   loadingState={loadingState}
                   snapshot={snapshot}
                   boardIssues={allBoardIssues}
@@ -525,16 +553,6 @@ export default function App() {
             </SectionErrorBoundary>
           ) : null}
 
-          {sectionVisibility.showTracker ? (
-            <SectionErrorBoundary name="Tracker">
-              <section className="col-span-12 flex flex-col">
-                <Suspense fallback={<SectionLoader />}>
-                  <TrackerViewer config={config} project={projects.find(p => p.id === selectedProjectID) ?? null} />
-                </Suspense>
-              </section>
-            </SectionErrorBoundary>
-          ) : null}
-
           {sectionVisibility.showSettings ? (
             <SectionErrorBoundary name="Settings">
               <section className="flex-1 flex flex-col min-h-0">
@@ -573,19 +591,19 @@ export default function App() {
             </SectionErrorBoundary>
           ) : null}
         </div>
-
-        <EmbeddedAgentWidget
-          config={config}
-          onNavigate={(section, id) => {
-            setActiveSection(section as SectionID)
-            if (section === 'SETTINGS' && id) {
-              setSettingsInitialTab(id as 'backend' | 'agents' | 'integrations' | 'shortcuts' | 'notifications')
-            }
-          }}
-          onOpenSettings={() => { setSettingsInitialTab('integrations'); setActiveSection('SETTINGS') }}
-          activeSection={activeSection}
-        />
       </AppShell>
+
+      <EmbeddedAgentWidget
+        config={config}
+        onNavigate={(section, id) => {
+          setActiveSection(section as SectionID)
+          if (section === 'SETTINGS' && id) {
+            setSettingsInitialTab(id as 'backend' | 'agents' | 'integrations' | 'shortcuts' | 'notifications')
+          }
+        }}
+        onOpenSettings={() => { setSettingsInitialTab('agents'); setActiveSection('SETTINGS') }}
+        activeSection={activeSection}
+      />
 
       <AppDialogs
         config={config}

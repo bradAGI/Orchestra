@@ -167,7 +167,7 @@ export function TabGroupPanel({ projectId, group, isFocused, siblingGroupIds }: 
       }}
     >
       {/* Tab strip */}
-      <div className="flex items-center border-b border-border/30 shrink-0 h-9">
+      <div className="flex items-center border-b border-border/30 shrink-0 h-11">
         <div className="flex-1 flex items-center overflow-x-auto min-w-0">
           {group.tabs.map((ref, index) => {
             const isActive = group.activeTabId === ref.id
@@ -245,7 +245,7 @@ export function TabGroupPanel({ projectId, group, isFocused, siblingGroupIds }: 
                     e.preventDefault()
                     setContextMenu({ x: e.clientX, y: e.clientY, tab: ref })
                   }}
-                  className={`group relative inline-flex items-center gap-1.5 px-3 h-9 transition-colors shrink-0 ${
+                  className={`group relative inline-flex items-center gap-1.5 px-3 h-11 transition-colors shrink-0 ${
                     isDragging ? 'cursor-grabbing opacity-40' : 'cursor-grab'
                   } ${
                     isActive
@@ -287,7 +287,7 @@ export function TabGroupPanel({ projectId, group, isFocused, siblingGroupIds }: 
               }
               setPlusOpen((v) => !v)
             }}
-            className={`inline-flex items-center justify-center h-9 w-9 transition-colors shrink-0 ${
+            className={`inline-flex items-center justify-center h-11 w-11 transition-colors shrink-0 ${
               plusOpen
                 ? 'text-foreground bg-foreground/[0.04]'
                 : 'text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.03]'

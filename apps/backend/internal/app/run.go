@@ -142,6 +142,19 @@ func Run(logger zerolog.Logger) error {
 	orchestratorService.SetWorkspaceService(workspaceService)
 	orchestratorService.SetWorkspaceRoot(cfg.WorkspaceRoot)
 
+	// When an issue exhausts all retry attempts, move it back to Backlog so
+	// users can see it has permanently stalled and can manually re-queue it.
+	orchestratorService.SetOnRetryExhausted(func(issueID, issueIdentifier, _ string) {
+		if warehouseDB == nil {
+			return
+		}
+		if _, err := orchestratorService.UpdateIssue(context.Background(), issueIdentifier, map[string]any{"state": "Backlog"}); err != nil {
+			logger.Warn().Err(err).Str("issue_id", issueID).Msg("failed to move exhausted-retry issue to Backlog")
+		} else {
+			logger.Warn().Str("issue_id", issueID).Str("identifier", issueIdentifier).Msg("issue exhausted all retry attempts — moved to Backlog")
+		}
+	})
+
 	// Prune stale worktree references left over from previous crashes.
 	pruneAllWorktrees(warehouseDB, workspaceService, logger)
 
@@ -981,6 +994,104 @@ func processExecutionTick(
 				logger.Info().Str("issue_id", entry.IssueID).Str("branch", branchName).Msg("pushed branch to update existing PR")
 			}
 		}
+
+		// Post completion comment once: only on the final In Progress → Review transition.
+		if entry.ProjectID != "" && warehouseDB != nil {
+			agentSummary := ""
+			for i := len(eventsBuffer) - 1; i >= 0; i-- {
+				msg := strings.TrimSpace(eventsBuffer[i].Message)
+				if msg != "" && len(msg) > 50 {
+					agentSummary = msg
+					break
+				}
+			}
+
+			go func() {
+				project := resolvedProject
+				diffDir := workspacePath
+				if diffDir == "" {
+					diffDir = project.RootPath
+				}
+				if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
+					return
+				}
+				issue, fetchErr := service.FetchIssueByID(context.Background(), entry.IssueID)
+				if fetchErr != nil || issue == nil || issue.URL == "" {
+					return
+				}
+				issueNumber := extractGitHubIssueNumber(issue.URL)
+				if issueNumber <= 0 {
+					return
+				}
+
+				diffStats := ""
+				if diffDir != "" {
+					cmd := exec.Command("git", "-C", diffDir, "diff", "--stat", "HEAD")
+					if out, err := cmd.Output(); err == nil && len(out) > 0 {
+						diffStats = string(out)
+					}
+				}
+
+				changedFiles := ""
+				if diffDir != "" {
+					cmd := exec.Command("git", "-C", diffDir, "diff", "--name-only", "HEAD")
+					if out, err := cmd.Output(); err == nil && len(out) > 0 {
+						changedFiles = strings.TrimSpace(string(out))
+					}
+					cmd2 := exec.Command("git", "-C", diffDir, "ls-files", "--others", "--exclude-standard")
+					if out2, err := cmd2.Output(); err == nil && len(out2) > 0 {
+						if changedFiles != "" {
+							changedFiles += "\n"
+						}
+						changedFiles += strings.TrimSpace(string(out2))
+					}
+				}
+
+				comment := fmt.Sprintf("## %s Agent Run Completed\n\n", strings.ToUpper(activeProviderName))
+				comment += fmt.Sprintf("**Issue**: %s\n**Agent**: %s\n**Turns**: %d\n\n", entry.IssueIdentifier, activeProviderName, entry.TurnCount+1)
+
+				if agentSummary != "" {
+					comment += "### Summary\n\n" + agentSummary + "\n\n"
+				}
+
+				if changedFiles != "" {
+					files := strings.Split(changedFiles, "\n")
+					comment += "### Files Changed\n\n"
+					for _, f := range files {
+						f = strings.TrimSpace(f)
+						if f != "" {
+							comment += "- `" + f + "`\n"
+						}
+					}
+					comment += "\n"
+				}
+
+				if diffStats != "" {
+					comment += "### Diff Stats\n\n```\n" + strings.TrimSpace(diffStats) + "\n```\n\n"
+				}
+
+				comment += "---\n*Automatically posted by [Orchestra](https://github.com/Traves-Theberge/Orchestra)*"
+
+				token, updatedJSON, tokenErr := ghutil.RefreshableToken(context.Background(), project.GitHubToken, cfg.GitHubClientID, cfg.GitHubClientSecret)
+				if tokenErr != nil {
+					logger.Warn().Err(tokenErr).Str("issue_id", entry.IssueID).Msg("failed to resolve github token for comment")
+					return
+				}
+				if updatedJSON != "" {
+					if enc, encErr := db.EncryptToken(updatedJSON); encErr == nil {
+						if _, dbErr := warehouseDB.ExecContext(context.Background(), "UPDATE projects SET github_token = ? WHERE id = ?", enc, project.ID); dbErr == nil {
+							logger.Info().Str("project_id", project.ID).Msg("refreshed and persisted github token in execution worker")
+						}
+					}
+				}
+
+				if err := ghutil.PostIssueComment(context.Background(), project.GitHubOwner, project.GitHubRepo, token, issueNumber, comment); err != nil {
+					logger.Warn().Err(err).Str("issue_id", entry.IssueID).Msg("failed to post GitHub comment")
+				} else {
+					logger.Info().Str("issue_id", entry.IssueID).Int("github_issue", issueNumber).Msg("posted completion comment to GitHub")
+				}
+			}()
+		}
 	} else {
 		logger.Info().Str("issue_id", entry.IssueID).Str("state", currentState).Msg("run succeeded but state is not auto-advanceable; skipping")
 	}
@@ -994,109 +1105,6 @@ func processExecutionTick(
 	})
 
 	runAfterHook()
-
-	// Post completion comment to GitHub issue if linked
-	if entry.ProjectID != "" && warehouseDB != nil {
-		// Extract the last substantive agent message for the summary
-		agentSummary := ""
-		for i := len(eventsBuffer) - 1; i >= 0; i-- {
-			msg := strings.TrimSpace(eventsBuffer[i].Message)
-			if msg != "" && len(msg) > 50 {
-				agentSummary = msg
-				break
-			}
-		}
-
-		go func() {
-			project := resolvedProject
-			diffDir := workspacePath // use worktree path for diff stats
-			if diffDir == "" {
-				diffDir = project.RootPath
-			}
-			if project.GitHubOwner == "" || project.GitHubRepo == "" || project.GitHubToken == "" {
-				return
-			}
-			issue, fetchErr := service.FetchIssueByID(context.Background(), entry.IssueID)
-			if fetchErr != nil || issue == nil || issue.URL == "" {
-				return
-			}
-			issueNumber := extractGitHubIssueNumber(issue.URL)
-			if issueNumber <= 0 {
-				return
-			}
-
-			// Get git diff stats for the comment
-			diffStats := ""
-			if diffDir != "" {
-				cmd := exec.Command("git", "-C", diffDir, "diff", "--stat", "HEAD")
-				if out, err := cmd.Output(); err == nil && len(out) > 0 {
-					diffStats = string(out)
-				}
-			}
-
-			// Get list of changed files
-			changedFiles := ""
-			if diffDir != "" {
-				cmd := exec.Command("git", "-C", diffDir, "diff", "--name-only", "HEAD")
-				if out, err := cmd.Output(); err == nil && len(out) > 0 {
-					changedFiles = strings.TrimSpace(string(out))
-				}
-				// Also include untracked files
-				cmd2 := exec.Command("git", "-C", diffDir, "ls-files", "--others", "--exclude-standard")
-				if out2, err := cmd2.Output(); err == nil && len(out2) > 0 {
-					if changedFiles != "" {
-						changedFiles += "\n"
-					}
-					changedFiles += strings.TrimSpace(string(out2))
-				}
-			}
-
-			comment := fmt.Sprintf("## %s Agent Run Completed\n\n", strings.ToUpper(activeProviderName))
-			comment += fmt.Sprintf("**Issue**: %s\n**Agent**: %s\n**Turns**: %d\n\n", entry.IssueIdentifier, activeProviderName, entry.TurnCount+1)
-
-			if agentSummary != "" {
-				comment += "### Summary\n\n" + agentSummary + "\n\n"
-			}
-
-			if changedFiles != "" {
-				files := strings.Split(changedFiles, "\n")
-				comment += "### Files Changed\n\n"
-				for _, f := range files {
-					f = strings.TrimSpace(f)
-					if f != "" {
-						comment += "- `" + f + "`\n"
-					}
-				}
-				comment += "\n"
-			}
-
-			if diffStats != "" {
-				comment += "### Diff Stats\n\n```\n" + strings.TrimSpace(diffStats) + "\n```\n\n"
-			}
-
-			comment += "---\n*Automatically posted by [Orchestra](https://github.com/Traves-Theberge/Orchestra)*"
-
-			// Resolve a valid token, refreshing if expired
-			token, updatedJSON, tokenErr := ghutil.RefreshableToken(context.Background(), project.GitHubToken, cfg.GitHubClientID, cfg.GitHubClientSecret)
-			if tokenErr != nil {
-				logger.Warn().Err(tokenErr).Str("issue_id", entry.IssueID).Msg("failed to resolve github token for comment")
-				return
-			}
-			if updatedJSON != "" {
-				if enc, encErr := db.EncryptToken(updatedJSON); encErr == nil {
-					if _, dbErr := warehouseDB.ExecContext(context.Background(), "UPDATE projects SET github_token = ? WHERE id = ?", enc, project.ID); dbErr == nil {
-						logger.Info().Str("project_id", project.ID).Msg("refreshed and persisted github token in execution worker")
-					}
-				}
-			}
-
-			if err := ghutil.PostIssueComment(context.Background(), project.GitHubOwner, project.GitHubRepo, token, issueNumber, comment); err != nil {
-				logger.Warn().Err(err).Str("issue_id", entry.IssueID).Msg("failed to post GitHub comment")
-			} else {
-				logger.Info().Str("issue_id", entry.IssueID).Int("github_issue", issueNumber).Msg("posted completion comment to GitHub")
-			}
-		}()
-	}
 
 	logger.Info().Str("issue_id", entry.IssueID).Str("session_id", result.SessionID).Msg("agent run completed — issue moved to Review")
 	publishSnapshot(pubsub, service)
@@ -1184,7 +1192,7 @@ func extractPlanFromResult(result agents.TurnResult, events []agents.Event) stri
 				checkboxLines = append(checkboxLines, trimmed)
 			}
 		}
-		if len(checkboxLines) >= 3 {
+		if len(checkboxLines) >= 1 {
 			return strings.Join(checkboxLines, "\n")
 		}
 
@@ -1219,7 +1227,7 @@ func extractPlanFromResult(result agents.TurnResult, events []agents.Event) stri
 			bestMsg = text
 		}
 	}
-	if bestCount >= 3 {
+	if bestCount >= 1 {
 		return bestMsg
 	}
 
@@ -1232,7 +1240,7 @@ func extractPlanFromResult(result agents.TurnResult, events []agents.Event) stri
 			checkboxLines = append(checkboxLines, trimmed)
 		}
 	}
-	if len(checkboxLines) >= 3 {
+	if len(checkboxLines) >= 1 {
 		return strings.Join(checkboxLines, "\n")
 	}
 
@@ -1258,7 +1266,7 @@ func extractOriginalPlan(warehouseDB *db.DB, issueID string) string {
 				count++
 			}
 		}
-		if count >= 3 {
+		if count >= 1 {
 			return msg
 		}
 	}

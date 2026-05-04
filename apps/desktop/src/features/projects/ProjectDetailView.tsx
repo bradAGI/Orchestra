@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react'
 import {
     ArrowLeft, Globe, ExternalLink,
     GitBranch, RefreshCcw, Trash2, Github,
-    FileText, Layers, ChevronRight, File, Folder as FolderIcon, FolderOpen, AlertCircle, Search, X,
-    Cable, CheckCircle2, Loader2,
+    FileText, Layers, ChevronRight, ChevronDown, File, Folder as FolderIcon, FolderOpen, AlertCircle, Search, X,
+    Cable, CheckCircle2, Loader2, ListFilter,
 } from 'lucide-react'
 import type { Project, ProjectStats, SnapshotPayload } from '@core/api/types'
 import { Button } from '@ui/button'
@@ -16,6 +16,7 @@ import {
     fetchProjectGitHubIssues,
     updateProjectIssueSource,
     testProjectIssueSource,
+    listIssueSourceProjects,
     type BackendConfig,
     type GitHubIssue,
     type IssueListItem,
@@ -109,6 +110,10 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     const [sourceTestResult, setSourceTestResult] = useState<{ ok: boolean; error?: string } | null>(null)
     const [sourceError, setSourceError] = useState('')
     const [showSourceEditor, setShowSourceEditor] = useState(false)
+    const [trackerProjects, setTrackerProjects] = useState<Array<{ id: string; name: string }>>([])
+    const [projectsLoading, setProjectsLoading] = useState(false)
+    const [projectsError, setProjectsError] = useState('')
+    const [showProjectPicker, setShowProjectPicker] = useState(false)
 
     const pathExists = project.path_exists !== false
     const isGitHub = !!project.github_owner && !!project.github_repo
@@ -155,6 +160,9 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         setSourceEndpoint(project.issue_source_endpoint ?? '')
         setSourceToken('')
         setSourceTestResult(null)
+        setTrackerProjects([])
+        setShowProjectPicker(false)
+        setProjectsError('')
     }, [project.id])
 
     // Subscribe to the global editor store so the file shows up in the
@@ -277,6 +285,27 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         }
     }
 
+    const handleBrowseProjects = async () => {
+        if (!config) return
+        setProjectsLoading(true)
+        setProjectsError('')
+        setTrackerProjects([])
+        setShowProjectPicker(false)
+        try {
+            const list = await listIssueSourceProjects(config, project.id, {
+                type: sourceType || undefined,
+                endpoint: sourceEndpoint || undefined,
+                token: sourceToken || undefined,
+            })
+            setTrackerProjects(list)
+            setShowProjectPicker(true)
+        } catch (err) {
+            setProjectsError(err instanceof Error ? err.message : 'Failed to fetch projects')
+        } finally {
+            setProjectsLoading(false)
+        }
+    }
+
     const handleOpenFolder = async () => {
         const bridge = window.orchestraDesktop
         try {
@@ -378,7 +407,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                     <ArrowLeft size={14} />
                 </button>
 
-                <h1 className="text-[14px] font-bold tracking-tight truncate shrink-0">{project.name}</h1>
+                <h1 className="font-bold tracking-tight truncate shrink-0" style={{ fontSize: '11px' }}>{project.name}</h1>
 
                 <span className="text-[11px] font-mono text-muted-foreground/50 truncate min-w-0 hidden md:inline">
                     {project.root_path}
@@ -493,12 +522,25 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
 
             {/* Issue source editor panel */}
             {showSourceEditor && (
-                <div className="shrink-0 border-b border-border/30 bg-muted/20 px-5 py-3 space-y-2.5">
-                    <p className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider">Issue Source</p>
+                <div className="shrink-0 border-b border-border/30 bg-muted/20 px-5 py-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <p className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider">Issue Source</p>
+                        <button onClick={() => setShowSourceEditor(false)} className="text-muted-foreground/50 hover:text-foreground transition-colors">
+                            <X size={13} />
+                        </button>
+                    </div>
+
+                    {/* Row 1: type + token */}
                     <div className="flex items-center gap-2 flex-wrap">
                         <select
                             value={sourceType}
-                            onChange={(e) => { setSourceType(e.target.value); setSourceTestResult(null) }}
+                            onChange={(e) => {
+                                setSourceType(e.target.value)
+                                setSourceTestResult(null)
+                                setTrackerProjects([])
+                                setShowProjectPicker(false)
+                                setSourceEndpoint('')
+                            }}
                             className="h-7 px-2 rounded-md text-[11px] bg-background border border-border/40 text-foreground/80 focus:outline-none focus:ring-1 focus:ring-ring"
                         >
                             <option value="">None</option>
@@ -507,31 +549,95 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                             <option value="jira">Jira</option>
                             <option value="sqlite">SQLite</option>
                         </select>
+
                         {sourceType && sourceType !== 'sqlite' && (
-                            <>
+                            <input
+                                type="password"
+                                value={sourceToken}
+                                onChange={(e) => { setSourceToken(e.target.value); setSourceTestResult(null); setTrackerProjects([]); setShowProjectPicker(false) }}
+                                placeholder={project.issue_source_has_token ? '••••••• (keep existing)' : sourceType === 'github' ? 'ghp_… or OAuth token' : sourceType === 'linear' ? 'lin_api_…' : 'API token or PAT'}
+                                className="h-7 px-2 rounded-md text-[11px] bg-background border border-border/40 text-foreground/80 focus:outline-none focus:ring-1 focus:ring-ring w-52 placeholder:text-muted-foreground/40"
+                            />
+                        )}
+
+                        {/* Jira needs the base URL before we can browse */}
+                        {sourceType === 'jira' && (
+                            <input
+                                type="text"
+                                value={sourceEndpoint}
+                                onChange={(e) => { setSourceEndpoint(e.target.value); setTrackerProjects([]); setShowProjectPicker(false) }}
+                                placeholder="https://yourco.atlassian.net"
+                                className="h-7 px-2 rounded-md text-[11px] bg-background border border-border/40 text-foreground/80 focus:outline-none focus:ring-1 focus:ring-ring w-52 placeholder:text-muted-foreground/40"
+                            />
+                        )}
+                    </div>
+
+                    {/* Row 2: project picker (GitHub owner/repo text fallback, Linear/Jira browse) */}
+                    {sourceType && sourceType !== 'sqlite' && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {sourceType === 'github' ? (
                                 <input
                                     type="text"
                                     value={sourceEndpoint}
                                     onChange={(e) => { setSourceEndpoint(e.target.value); setSourceTestResult(null) }}
-                                    placeholder={sourceType === 'github' ? 'owner/repo' : sourceType === 'linear' ? 'team-key' : 'project-key'}
-                                    className="h-7 px-2 rounded-md text-[11px] bg-background border border-border/40 text-foreground/80 focus:outline-none focus:ring-1 focus:ring-ring w-36 placeholder:text-muted-foreground/40"
+                                    placeholder="owner/repo  (or browse →)"
+                                    className="h-7 px-2 rounded-md text-[11px] bg-background border border-border/40 text-foreground/80 focus:outline-none focus:ring-1 focus:ring-ring w-48 placeholder:text-muted-foreground/40"
                                 />
+                            ) : sourceType !== 'jira' ? (
+                                /* Linear: endpoint = team key, can be typed or browsed */
                                 <input
-                                    type="password"
-                                    value={sourceToken}
-                                    onChange={(e) => { setSourceToken(e.target.value); setSourceTestResult(null) }}
-                                    placeholder={project.issue_source_has_token ? '••••••• (keep)' : 'API token'}
+                                    type="text"
+                                    value={sourceEndpoint}
+                                    onChange={(e) => { setSourceEndpoint(e.target.value); setSourceTestResult(null) }}
+                                    placeholder="team key  (or browse →)"
                                     className="h-7 px-2 rounded-md text-[11px] bg-background border border-border/40 text-foreground/80 focus:outline-none focus:ring-1 focus:ring-ring w-40 placeholder:text-muted-foreground/40"
                                 />
-                            </>
-                        )}
+                            ) : null}
+
+                            {/* Browse button — enabled once we have a token (and URL for Jira) */}
+                            <button
+                                onClick={() => void handleBrowseProjects()}
+                                disabled={projectsLoading || !sourceType || !(sourceToken || project.issue_source_has_token) || (sourceType === 'jira' && !sourceEndpoint)}
+                                className="h-7 px-2.5 rounded-md text-[11px] font-medium bg-muted hover:bg-muted/80 text-foreground/70 disabled:opacity-40 transition-colors inline-flex items-center gap-1.5"
+                                title="Fetch available projects from this tracker"
+                            >
+                                {projectsLoading ? <Loader2 size={10} className="animate-spin" /> : <ListFilter size={10} />}
+                                Browse projects
+                                <ChevronDown size={10} />
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Project picker dropdown */}
+                    {showProjectPicker && trackerProjects.length > 0 && (
+                        <div className="rounded-lg border border-border/40 bg-background overflow-hidden max-h-48 overflow-y-auto">
+                            {trackerProjects.map((tp, idx) => (
+                                <button
+                                    key={tp.id}
+                                    onClick={() => { setSourceEndpoint(tp.id); setShowProjectPicker(false) }}
+                                    className={`w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-foreground/[0.04] transition-colors ${idx > 0 ? 'border-t border-border/20' : ''} ${sourceEndpoint === tp.id ? 'bg-foreground/[0.06]' : ''}`}
+                                >
+                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${sourceEndpoint === tp.id ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
+                                    <span className="text-[12px] font-medium text-foreground/85 truncate">{tp.name}</span>
+                                    <span className="ml-auto font-mono text-[10.5px] text-muted-foreground/50 shrink-0">{tp.id}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    {showProjectPicker && trackerProjects.length === 0 && !projectsLoading && (
+                        <p className="text-[11px] text-muted-foreground/60">No projects found — check your credentials.</p>
+                    )}
+                    {projectsError && <p className="text-[11px] text-destructive">{projectsError}</p>}
+
+                    {/* Row 3: actions */}
+                    <div className="flex items-center gap-2">
                         <button
                             onClick={() => void handleSourceTest()}
                             disabled={!sourceType || sourceTesting}
                             className="h-7 px-3 rounded-md text-[11px] font-medium bg-muted hover:bg-muted/80 text-foreground/70 disabled:opacity-40 transition-colors inline-flex items-center gap-1.5"
                         >
                             {sourceTesting ? <Loader2 size={10} className="animate-spin" /> : null}
-                            Test
+                            Test connection
                         </button>
                         <button
                             onClick={() => void handleSourceSave()}
@@ -541,16 +647,14 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                             {sourceSaving ? <Loader2 size={10} className="animate-spin" /> : null}
                             Save
                         </button>
-                        <button onClick={() => setShowSourceEditor(false)} className="ml-auto text-muted-foreground/50 hover:text-foreground">
-                            <X size={13} />
-                        </button>
+                        {sourceTestResult && (
+                            <span className={`flex items-center gap-1.5 text-[11px] ${sourceTestResult.ok ? 'text-green-500' : 'text-destructive'}`}>
+                                <CheckCircle2 size={11} />
+                                {sourceTestResult.ok ? 'Connected' : sourceTestResult.error}
+                            </span>
+                        )}
                     </div>
-                    {sourceTestResult && (
-                        <div className={`flex items-center gap-1.5 text-[11px] ${sourceTestResult.ok ? 'text-green-500' : 'text-destructive'}`}>
-                            <CheckCircle2 size={11} />
-                            {sourceTestResult.ok ? 'Connected' : sourceTestResult.error}
-                        </div>
-                    )}
+
                     {sourceError && <p className="text-[11px] text-destructive">{sourceError}</p>}
                 </div>
             )}
@@ -575,6 +679,8 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                         )}
                         <div className="flex-1 flex flex-col min-h-0">
                             <KanbanBoard
+                                config={config}
+                                project={project}
                                 loadingState={loadingState}
                                 snapshot={snapshot}
                                 boardIssues={(() => {

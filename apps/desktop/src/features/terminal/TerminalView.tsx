@@ -41,7 +41,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
         const term = new Terminal({
             cursorBlink: true,
             fontSize: 13,
-            lineHeight: 1.3,
+            lineHeight: 1.0,
             letterSpacing: 0,
             fontFamily: '"CaskaydiaMono Nerd Font", "CaskaydiaMono NFM", "JetBrainsMono Nerd Font Mono", Menlo, Monaco, Consolas, monospace',
             theme: {
@@ -152,22 +152,40 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
             resizeObserver.observe(terminalRef.current)
         }
 
-        // IntersectionObserver to re-fit when terminal becomes visible again
-        // (e.g. navigating away from Terminals section and back)
+        // IntersectionObserver to re-fit when terminal becomes visible again.
+        // Single rAF is not enough — layout hasn't settled yet. Chain two rAFs
+        // then a 50ms timeout so the containing flex/grid has measured correctly.
+        let revealDebounce: ReturnType<typeof setTimeout> | null = null
         const intersectionObserver = new IntersectionObserver((entries) => {
             if (entries[0]?.isIntersecting) {
-                requestAnimationFrame(handleResize)
+                if (revealDebounce) clearTimeout(revealDebounce)
+                revealDebounce = setTimeout(() => {
+                    requestAnimationFrame(() => requestAnimationFrame(handleResize))
+                }, 50)
             }
         })
         if (terminalRef.current) {
             intersectionObserver.observe(terminalRef.current)
         }
 
+        // Also re-fit when the document becomes visible (tab switch back)
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                if (revealDebounce) clearTimeout(revealDebounce)
+                revealDebounce = setTimeout(() => {
+                    requestAnimationFrame(() => requestAnimationFrame(handleResize))
+                }, 50)
+            }
+        }
+        document.addEventListener('visibilitychange', onVisibilityChange)
+
         window.addEventListener('resize', handleResize)
 
         return () => {
             window.removeEventListener('resize', handleResize)
+            document.removeEventListener('visibilitychange', onVisibilityChange)
             if (resizeDebounce) clearTimeout(resizeDebounce)
+            if (revealDebounce) clearTimeout(revealDebounce)
             resizeObserver.disconnect()
             intersectionObserver.disconnect()
             ws.close()
@@ -234,11 +252,12 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId, projectId
     return (
         <div
             className="w-full h-full overflow-hidden"
+            style={{ background: theme === 'light' ? '#f8fafc' : '#0a0a0b' }}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
         >
-            <div className="relative h-full">
+            <div className="relative h-full pl-3 pt-2">
                 <div ref={terminalRef} className="w-full h-full" />
                 {isDropTarget && (
                     <div className="pointer-events-none absolute inset-0 ring-2 ring-primary/60 ring-inset rounded-sm bg-primary/[0.04]" />

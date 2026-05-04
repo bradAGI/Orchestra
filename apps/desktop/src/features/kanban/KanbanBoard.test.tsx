@@ -22,6 +22,8 @@ afterEach(() => {
 })
 
 const defaultProps = {
+  config: null,
+  project: null,
   loadingState: false,
   snapshot: null,
   boardIssues: [],

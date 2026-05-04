@@ -1008,7 +1008,7 @@ export function SandboxDashboard({ config, onOpenSettings }: { config: BackendCo
 
   return (
     <div className="h-full overflow-auto bg-background">
-      <div className="max-w-3xl mx-auto px-10 pt-10 pb-16 space-y-8">
+      <div className="w-full px-6 pt-6 pb-16 space-y-8">
         {/* Header */}
         <header className="flex items-end justify-between gap-4">
           <div className="space-y-2">

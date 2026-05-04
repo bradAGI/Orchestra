@@ -74,6 +74,18 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   createProjectDialogOpen: false,
   settingsInitialTab: undefined,
   browserHomepage: getInitialHomepage(),
+  sidePanelOpen: true,
+  activeSettingsSection: 'connections',
+  scrollToSettingsSection: null,
+  activeAgentProvider: 'claude',
+  activeAgentScope: 'GLOBAL',
+  activeAgentProjectId: '',
+  activeAgentCategory: 'settings',
+  agentCategories: [],
+  agentCategoryCounts: {},
+  activeDocPath: null,
+  docTree: [],
+  expandedDocFolders: new Set(['plans', 'specs']),
 
   // ---- Actions --------------------------------------------------------------
   setActiveSection: (section) => set({ activeSection: section }),
@@ -118,4 +130,33 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     try { localStorage.setItem(HOMEPAGE_KEY, normalized) } catch { /* unavailable in tests */ }
     set({ browserHomepage: normalized })
   },
+
+  setSidePanelOpen: (v) => set({ sidePanelOpen: v }),
+
+  toggleSidePanel: () => set((s) => ({ sidePanelOpen: !s.sidePanelOpen })),
+
+  setActiveSettingsSection: (id) => set({ activeSettingsSection: id }),
+
+  setScrollToSettingsSection: (fn) => set({ scrollToSettingsSection: fn }),
+
+  setActiveAgentProvider: (provider) => set({ activeAgentProvider: provider }),
+
+  setActiveAgentScope: (scope, projectId = '') => set({ activeAgentScope: scope, activeAgentProjectId: projectId }),
+
+  setActiveAgentCategory: (cat) => set({ activeAgentCategory: cat }),
+
+  setAgentCategories: (cats) => set({ agentCategories: cats }),
+
+  setAgentCategoryCounts: (counts) => set({ agentCategoryCounts: counts }),
+
+  setActiveDocPath: (path) => set({ activeDocPath: path }),
+
+  setDocTree: (tree) => set({ docTree: tree }),
+
+  toggleDocFolder: (path) => set((s) => {
+    const next = new Set(s.expandedDocFolders)
+    if (next.has(path)) next.delete(path)
+    else next.add(path)
+    return { expandedDocFolders: next }
+  }),
 })

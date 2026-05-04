@@ -398,7 +398,7 @@ export function IssueDetailView({
       </div>
 
       {/* ── Tab content (fills remaining space) ── */}
-      <div className="flex-1 min-h-0 overflow-auto custom-scrollbar">
+      <div className="flex-1 min-h-0 overflow-auto overflow-x-hidden custom-scrollbar">
 
         {/* Details */}
         {bottomTab === 'details' && (
@@ -442,7 +442,7 @@ export function IssueDetailView({
             </div>
 
             {/* Sidebar properties */}
-            <div className="w-72 border-l border-border/40 shrink-0 overflow-y-auto bg-muted/5">
+            <div className="w-56 lg:w-72 border-l border-border/40 shrink-0 overflow-y-auto bg-muted/5">
               <div className="px-4 py-3 border-b border-border/20">
                 <div className="space-y-2">
                   <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Status</span>

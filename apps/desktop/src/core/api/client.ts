@@ -751,6 +751,19 @@ export async function updateProjectIssueSource(
   )
 }
 
+/** List available projects/teams from a tracker using stored or override credentials. */
+export async function listIssueSourceProjects(
+  config: BackendConfig,
+  projectId: string,
+  payload?: { type?: string; endpoint?: string; token?: string }
+): Promise<Array<{ id: string; name: string }>> {
+  return requestJSON<Array<{ id: string; name: string }>>(
+    config,
+    `/api/v1/projects/${projectId}/issue-source/list-projects`,
+    { method: 'POST', body: JSON.stringify(payload ?? {}) }
+  )
+}
+
 /** Test connectivity for a project's issue source. Can pass override values before saving. */
 export async function testProjectIssueSource(
   config: BackendConfig,
@@ -2499,4 +2512,58 @@ export async function browseProjectTrackerItems(
   const qs = params.toString()
   const path = `/api/v1/projects/${encodeURIComponent(projectId)}/tracker/issues${qs ? '?' + qs : ''}`
   return requestJSON<WorkItem[]>(config, path)
+}
+
+export type TrackerConfig = {
+  id: string
+  type: string
+  display_name: string
+  endpoint: string
+  auth_method: string
+  has_token: boolean
+  extra?: string
+  created_at: number
+  updated_at: number
+}
+
+export async function listTrackerConfigs(config: BackendConfig): Promise<TrackerConfig[]> {
+  return requestJSON<TrackerConfig[]>(config, '/api/v1/tracker/configs')
+}
+
+export async function createTrackerConfig(
+  config: BackendConfig,
+  payload: { type: string; display_name: string; endpoint?: string; auth_method?: string; token?: string; extra?: Record<string, unknown> },
+): Promise<TrackerConfig> {
+  return requestJSON<TrackerConfig>(config, '/api/v1/tracker/configs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateTrackerConfig(
+  config: BackendConfig,
+  id: string,
+  payload: { display_name?: string; endpoint?: string; token?: string; extra?: Record<string, unknown> },
+): Promise<TrackerConfig> {
+  return requestJSON<TrackerConfig>(config, `/api/v1/tracker/configs/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteTrackerConfig(config: BackendConfig, id: string): Promise<void> {
+  await requestJSON<void>(config, `/api/v1/tracker/configs/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export async function testTrackerConfig(
+  config: BackendConfig,
+  id: string,
+): Promise<{ ok: boolean; latency_ms?: number; error?: string }> {
+  return requestJSON<{ ok: boolean; latency_ms?: number; error?: string }>(
+    config,
+    `/api/v1/tracker/configs/${encodeURIComponent(id)}/test`,
+    { method: 'POST' },
+  )
 }

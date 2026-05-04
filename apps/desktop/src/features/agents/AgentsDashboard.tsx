@@ -1,11 +1,12 @@
 // apps/desktop/src/widgets/agents/AgentsDashboard.tsx
 import { useEffect, useState, useMemo } from 'react'
+import { useAppStore } from '@core/store'
 import { AlertCircle } from 'lucide-react'
-import type { BackendConfig } from '@core/api/types'
+import type { BackendConfig, Project } from '@core/api/types'
 import type { ProviderFileEntry } from '@core/api/client'
 import { Skeleton } from '@ui/skeleton'
-import { ProviderHeader } from './ProviderHeader'
-import { CategoryList } from './CategoryList'
+import { CustomDropdown } from '@layout/shared/controls'
+import { Folder } from 'lucide-react'
 import { SettingsPanel } from './panels/SettingsPanel'
 import { InstructionsPanel } from './panels/InstructionsPanel'
 import { SkillsPanel } from './panels/SkillsPanel'
@@ -46,10 +47,15 @@ interface AgentsDashboardProps {
 }
 
 export function AgentsDashboard({ config }: AgentsDashboardProps) {
-  const [provider, setProvider] = useState<Provider>('claude')
-  const [category, setCategory] = useState<CategoryId>('settings')
-  const [scope, setScope] = useState<Scope>('GLOBAL')
-  const [projectId, setProjectId] = useState('')
+  const provider = useAppStore(s => s.activeAgentProvider) as Provider
+  const setProvider = useAppStore(s => s.setActiveAgentProvider)
+  const category = useAppStore(s => s.activeAgentCategory) as CategoryId
+  const setCategory = useAppStore(s => s.setActiveAgentCategory)
+  const setAgentCategories = useAppStore(s => s.setAgentCategories)
+  const setAgentCategoryCounts = useAppStore(s => s.setAgentCategoryCounts)
+  const scope = useAppStore(s => s.activeAgentScope)
+  const projectId = useAppStore(s => s.activeAgentProjectId)
+  const setScope = (s: Scope, pid = '') => useAppStore.getState().setActiveAgentScope(s, pid)
 
   const isClaude = provider === 'claude'
   const is8gent = provider === '8gent'
@@ -107,6 +113,10 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
       setCategory(categories[0]?.id ?? 'config')
     }
   }, [categories, category])
+
+  useEffect(() => {
+    setAgentCategories(categories.map(c => ({ id: c.id, label: c.label, icon: c.icon })))
+  }, [categories, setAgentCategories])
 
   // Category counts for Claude and 8gent (same structure)
   const claudeCounts = useMemo((): Record<string, number> => {
@@ -167,6 +177,10 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
 
   const categoryCounts = isClaudeOrEightgent ? claudeCounts : legacyCounts
 
+  useEffect(() => {
+    setAgentCategoryCounts(categoryCounts)
+  }, [categoryCounts, setAgentCategoryCounts])
+
   const providerItems = useMemo(() => {
     if (isClaudeOrEightgent) {
       return {
@@ -220,34 +234,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
       )}
 
       <div className="flex flex-col flex-1 min-h-0">
-        {/* Header bar: provider tabs + scope */}
-        <ProviderHeader
-          provider={provider}
-          onProviderChange={(p) => {
-            setProvider(p)
-            setCategory(
-              p === 'claude' || p === '8gent' || p === 'gemini'
-                ? 'settings'
-                : 'config',
-            )
-          }}
-          scope={scope}
-          projectId={projectId}
-          projects={isClaudeOrEightgent ? claude.projects : domainState.projects}
-          onScopeChange={(s, pid) => { setScope(s); setProjectId(pid) }}
-        />
-
-        {/* Main content: category list + detail panel */}
+        {/* Detail panel */}
         <div className="flex flex-1 min-h-0">
-            {/* Column 2: Category list */}
-            <CategoryList
-              categories={categories}
-              selectedCategory={category}
-              categoryCounts={categoryCounts}
-              onSelectCategory={handleSelectCategory}
-            />
-
-            {/* Column 3: Detail panel */}
             <div className="flex-1 min-w-0 min-h-0">
               {state.loading ? (
                 <div className="p-6 space-y-3"><Skeleton className="h-6 w-48" /><Skeleton className="h-[300px] w-full" /></div>
@@ -546,6 +534,32 @@ function buildResourceName(provider: Provider, entry: ProviderFileEntry): string
   }
 
   return base
+}
+
+function ScopeBar({ scope, projectId, projects, onScopeChange }: {
+  scope: Scope
+  projectId: string
+  projects: Project[]
+  onScopeChange: (scope: Scope, projectId: string) => void
+}) {
+  const options = [
+    { label: 'Global', value: 'GLOBAL', icon: <Folder size={10} className="text-muted-foreground/50" /> },
+    ...projects.map(p => ({ label: p.name, value: p.id, icon: <Folder size={10} className="text-primary/60" /> })),
+  ]
+  return (
+    <div className="flex items-center justify-end px-3 py-1.5 border-b border-border/20 bg-card/20 shrink-0">
+      <CustomDropdown
+        className="min-w-[130px]"
+        value={scope === 'GLOBAL' ? 'GLOBAL' : projectId}
+        options={options}
+        onChange={(val) => {
+          if (val === 'GLOBAL') onScopeChange('GLOBAL', '')
+          else onScopeChange('PROJECT', val)
+        }}
+        placeholder="Scope"
+      />
+    </div>
+  )
 }
 
 function compareStackItems(a: FileResourceItem, b: FileResourceItem): number {
