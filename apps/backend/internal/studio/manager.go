@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/orchestra/orchestra/apps/backend/internal/db"
 	"github.com/orchestra/orchestra/apps/backend/internal/observability"
+	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
 )
 
 // RunnerSpawner abstracts the CLI agent spawn used by a studio session.
@@ -20,15 +21,27 @@ type RunnerSpawner interface {
 	Stop(sessionID string) error
 }
 
+// Tracker is the subset of tracker.Client that Manager needs to push a draft to the backlog.
+type Tracker interface {
+	CreateIssue(ctx context.Context, title, description, state string, priority int, assigneeID, projectID, provider string, disabledTools []string) (*tracker.Issue, error)
+	UpdateIssue(ctx context.Context, identifier string, updates map[string]any) (*tracker.Issue, error)
+}
+
 type Manager struct {
 	d       *sql.DB
 	bus     *observability.PubSub
 	spawner RunnerSpawner
+	tracker Tracker
 	mu      sync.Mutex // guards read-modify-write draft operations
 }
 
 func NewManager(d *sql.DB, bus *observability.PubSub, spawner RunnerSpawner) *Manager {
 	return &Manager{d: d, bus: bus, spawner: spawner}
+}
+
+// SetTracker configures the tracker backend used by Push.
+func (m *Manager) SetTracker(t Tracker) {
+	m.tracker = t
 }
 
 func (m *Manager) StartSession(ctx context.Context, req StartSessionRequest) (Session, error) {
@@ -62,6 +75,71 @@ func (m *Manager) Discard(sessionID string) error {
 		return err
 	}
 	return db.EndStudioSession(m.d, sessionID, string(StatusDiscarded))
+}
+
+// Push validates the draft, creates a backlog issue via the configured tracker,
+// persists studio-specific fields, then closes out the session.
+// Returns the new issue's identifier.
+func (m *Manager) Push(ctx context.Context, sessionID string) (string, error) {
+	snap, err := m.GetDraft(sessionID)
+	if err != nil {
+		return "", err
+	}
+	if snap.Title == "" {
+		return "", fmt.Errorf("studio: title required")
+	}
+	if snap.Description == "" {
+		return "", fmt.Errorf("studio: description required")
+	}
+	if m.tracker == nil {
+		return "", fmt.Errorf("studio: tracker not configured")
+	}
+
+	sess, err := db.GetStudioSession(m.d, sessionID)
+	if err != nil {
+		return "", fmt.Errorf("get session: %w", err)
+	}
+
+	// Initial create with the core fields the tracker interface supports.
+	state := "Backlog"
+	priority := 0
+	issue, err := m.tracker.CreateIssue(
+		ctx,
+		snap.Title, snap.Description, state, priority,
+		"", sess.ProjectID, snap.SuggestedProvider, nil,
+	)
+	if err != nil {
+		return "", fmt.Errorf("create issue: %w", err)
+	}
+
+	// Persist studio-specific fields via UpdateIssue.
+	acJSON, _ := json.Marshal(snap.AcceptanceCriteria)
+	attJSON, _ := json.Marshal(snap.Attachments)
+	guidanceJSON, _ := json.Marshal(snap.AgentGuidance)
+	updates := map[string]any{
+		"acceptance_criteria":  string(acJSON),
+		"attachments":          string(attJSON),
+		"agent_guidance":       string(guidanceJSON),
+		"authoring_session_id": sessionID,
+	}
+	if snap.TemplateName != "" {
+		updates["source_template"] = snap.TemplateName
+	}
+	if _, err := m.tracker.UpdateIssue(ctx, issue.Identifier, updates); err != nil {
+		return "", fmt.Errorf("update issue with studio fields: %w", err)
+	}
+
+	_ = db.DeleteDraft(m.d, sessionID)
+	_ = db.EndStudioSession(m.d, sessionID, string(StatusPushed))
+	if m.spawner != nil {
+		_ = m.spawner.Stop(sessionID)
+	}
+	m.dispatch(Event{
+		SessionID: sessionID,
+		Kind:      EventSessionStatus,
+		Payload:   map[string]string{"status": string(StatusPushed), "issue_id": issue.Identifier},
+	})
+	return issue.Identifier, nil
 }
 
 func (m *Manager) GetDraft(sessionID string) (DraftSnapshot, error) {

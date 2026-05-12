@@ -11,7 +11,35 @@ import (
 	_ "modernc.org/sqlite"
 	"github.com/orchestra/orchestra/apps/backend/internal/db"
 	"github.com/orchestra/orchestra/apps/backend/internal/observability"
+	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
 )
+
+// fakeTracker is an in-memory Tracker implementation for testing Push.
+type fakeTracker struct {
+	created []*tracker.Issue
+	updates []map[string]any
+	nextID  int
+}
+
+func (f *fakeTracker) CreateIssue(_ context.Context, title, description, state string, priority int, assigneeID, projectID, provider string, disabledTools []string) (*tracker.Issue, error) {
+	f.nextID++
+	iss := &tracker.Issue{
+		ID:          fmt.Sprintf("uuid-%d", f.nextID),
+		Identifier:  fmt.Sprintf("ISS-%d", f.nextID),
+		Title:       title,
+		Description: description,
+		State:       state,
+		ProjectID:   projectID,
+		Provider:    provider,
+	}
+	f.created = append(f.created, iss)
+	return iss, nil
+}
+
+func (f *fakeTracker) UpdateIssue(_ context.Context, identifier string, updates map[string]any) (*tracker.Issue, error) {
+	f.updates = append(f.updates, updates)
+	return &tracker.Issue{Identifier: identifier}, nil
+}
 
 func newTestManager(t *testing.T) *Manager {
 	t.Helper()
@@ -108,5 +136,52 @@ func TestConcurrentDraftWrites(t *testing.T) {
 	snap, _ := m.GetDraft(sess.ID)
 	if len(snap.AcceptanceCriteria) == 0 {
 		t.Fatalf("expected some ACs added")
+	}
+}
+
+func TestPushPersistsIssueAndEndsSession(t *testing.T) {
+	m := newTestManager(t)
+	tr := &fakeTracker{}
+	m.SetTracker(tr)
+
+	sess, _ := m.StartSession(context.Background(), StartSessionRequest{ProjectID: "p", Runner: "claude-code"})
+	_ = m.SetTitle(sess.ID, "Refactor auth")
+	_ = m.SetDescription(sess.ID, "Body")
+	_ = m.AddAcceptanceCriterion(sess.ID, "tests pass")
+
+	id, err := m.Push(context.Background(), sess.ID)
+	if err != nil {
+		t.Fatalf("push: %v", err)
+	}
+	if id == "" || len(tr.created) != 1 || len(tr.updates) != 1 {
+		t.Fatalf("tracker not called correctly: created=%v updates=%v", tr.created, tr.updates)
+	}
+	if tr.created[0].Title != "Refactor auth" {
+		t.Fatalf("title mismatch: %q", tr.created[0].Title)
+	}
+	if _, ok := tr.updates[0]["acceptance_criteria"]; !ok {
+		t.Fatalf("update missing acceptance_criteria: %+v", tr.updates[0])
+	}
+	if _, err := m.GetDraft(sess.ID); err == nil {
+		t.Fatalf("expected draft removed after push")
+	}
+}
+
+func TestPushRejectsEmptyTitle(t *testing.T) {
+	m := newTestManager(t)
+	m.SetTracker(&fakeTracker{})
+	sess, _ := m.StartSession(context.Background(), StartSessionRequest{ProjectID: "p", Runner: "claude-code"})
+	if _, err := m.Push(context.Background(), sess.ID); err == nil {
+		t.Fatalf("expected validation error")
+	}
+}
+
+func TestPushRejectsEmptyDescription(t *testing.T) {
+	m := newTestManager(t)
+	m.SetTracker(&fakeTracker{})
+	sess, _ := m.StartSession(context.Background(), StartSessionRequest{ProjectID: "p", Runner: "claude-code"})
+	_ = m.SetTitle(sess.ID, "T")
+	if _, err := m.Push(context.Background(), sess.ID); err == nil {
+		t.Fatalf("expected validation error")
 	}
 }

@@ -188,6 +188,9 @@ func (c *Client) UpdateIssue(ctx context.Context, identifier string, updates map
 		"project_id": true, "priority": true, "branch_name": true, "url": true,
 		"labels": true, "blocked_by": true, "provider": true, "disabled_tools": true,
 		"base_sha": true, "feedback": true, "pr_url": true, "plan": true,
+		// Studio-authored issue fields (added in Task 2 schema migration).
+		"acceptance_criteria": true, "attachments": true, "agent_guidance": true,
+		"source_template": true, "authoring_session_id": true,
 	}
 
 	query := "UPDATE issues SET "
