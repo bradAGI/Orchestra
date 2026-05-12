@@ -67,6 +67,59 @@ func (m *Manager) StartSession(ctx context.Context, req StartSessionRequest) (Se
 	return sess, nil
 }
 
+// SendMessage forwards a user message to the runner attached to this session.
+func (m *Manager) SendMessage(ctx context.Context, sessionID, msg string) error {
+	if m.spawner == nil {
+		return fmt.Errorf("studio: no runner attached")
+	}
+	return m.spawner.SendMessage(ctx, sessionID, msg)
+}
+
+// ApplyDraftPatch applies a map of field updates to the draft for a session.
+// Supported keys: title, description, suggested_provider, suggested_model, max_turns.
+func (m *Manager) ApplyDraftPatch(sessionID string, patch map[string]interface{}) error {
+	for k, v := range patch {
+		switch k {
+		case "title":
+			s, _ := v.(string)
+			if err := m.SetTitle(sessionID, s); err != nil {
+				return err
+			}
+		case "description":
+			s, _ := v.(string)
+			if err := m.SetDescription(sessionID, s); err != nil {
+				return err
+			}
+		case "suggested_provider":
+			s, _ := v.(string)
+			if err := m.SetProvider(sessionID, s); err != nil {
+				return err
+			}
+		case "suggested_model":
+			s, _ := v.(string)
+			if err := m.SetModel(sessionID, s); err != nil {
+				return err
+			}
+		case "max_turns":
+			switch x := v.(type) {
+			case float64:
+				if err := m.SetMaxTurns(sessionID, int(x)); err != nil {
+					return err
+				}
+			case int:
+				if err := m.SetMaxTurns(sessionID, x); err != nil {
+					return err
+				}
+			default:
+				return fmt.Errorf("studio: max_turns must be a number")
+			}
+		default:
+			return fmt.Errorf("studio: field not patchable: %q", k)
+		}
+	}
+	return nil
+}
+
 func (m *Manager) Discard(sessionID string) error {
 	if m.spawner != nil {
 		_ = m.spawner.Stop(sessionID)

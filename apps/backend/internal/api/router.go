@@ -18,6 +18,7 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/observability"
 	"github.com/orchestra/orchestra/apps/backend/internal/orchestrator"
 	"github.com/orchestra/orchestra/apps/backend/internal/staticassets"
+	"github.com/orchestra/orchestra/apps/backend/internal/studio"
 	"github.com/orchestra/orchestra/apps/backend/internal/terminal"
 	trackerregistry "github.com/orchestra/orchestra/apps/backend/internal/tracker/registry"
 	"github.com/orchestra/orchestra/apps/backend/internal/usage"
@@ -38,6 +39,7 @@ type Server struct {
 	termManager   *terminal.Manager
 	usageService  *usage.Service
 	registry      *trackerregistry.Registry
+	studioMgr     *studio.Manager
 }
 
 // NewRouter creates an http.Handler with the full API route table, using only
@@ -47,7 +49,7 @@ func NewRouter(
 	orchestratorService *orchestrator.Service,
 	cfg *config.Config,
 ) http.Handler {
-	return NewRouterWithPubSub(logger, orchestratorService, cfg, nil, nil, nil, nil, nil)
+	return NewRouterWithPubSub(logger, orchestratorService, cfg, nil, nil, nil, nil, nil, nil)
 }
 
 // NewRouterWithPubSub creates an http.Handler with the full API route table and
@@ -62,6 +64,7 @@ func NewRouterWithPubSub(
 	termManager *terminal.Manager,
 	usageService *usage.Service,
 	registry *trackerregistry.Registry,
+	studioMgr *studio.Manager,
 ) http.Handler {
 	if termManager == nil {
 		termManager = terminal.NewManager()
@@ -78,6 +81,7 @@ func NewRouterWithPubSub(
 		termManager:   termManager,
 		usageService:  usageService,
 		registry:      registry,
+		studioMgr:     studioMgr,
 	}
 	r := chi.NewRouter()
 
@@ -324,6 +328,15 @@ func NewRouterWithPubSub(
 	protected.Delete("/api/v1/issues/{issue_identifier}", server.DeleteIssue)
 	protected.Delete("/api/v1/issues/{issue_identifier}/session", server.DeleteIssueSession)
 	protected.Post("/api/v1/issues/{issue_identifier}/stop", server.PostIssueStop)
+
+	// Task Authoring Studio
+	protected.Post("/api/v1/studio/sessions", server.PostStudioSession)
+	protected.Get("/api/v1/studio/sessions/{id}/events", server.GetStudioSessionEvents)
+	protected.Post("/api/v1/studio/sessions/{id}/message", server.PostStudioSessionMessage)
+	protected.Post("/api/v1/studio/sessions/{id}/draft", server.PostStudioSessionDraft)
+	protected.Get("/api/v1/studio/sessions/{id}/draft", server.GetStudioSessionDraft)
+	protected.Post("/api/v1/studio/sessions/{id}/push", server.PostStudioSessionPush)
+	protected.Delete("/api/v1/studio/sessions/{id}", server.DeleteStudioSession)
 
 	return r
 }
