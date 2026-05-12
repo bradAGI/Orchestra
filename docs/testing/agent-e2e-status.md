@@ -73,7 +73,10 @@ note any deviations, and link back to filed bug issues.
 - [ ] No orphaned agent processes (`ps aux | grep -E '(claude|codex|opencode|gemini)'`)
 
 ### 6. Failure paths
-- [ ] Stop running session → state returns to Todo cleanly
+- [ ] Stop running session → state returns to **Backlog** (the issue body says
+      Todo, but `PostIssueStop` resets to Backlog and clears
+      `branch_name`/`base_sha`/`plan`/`feedback`; pinned by
+      `TestPostIssueStopResetsStateAndCancelsSession`)
 - [ ] Tool error during run → surfaces in session log, worker keeps going
 - [ ] Rate limit during run → backs off, doesn't crash
 
@@ -97,6 +100,11 @@ _Not yet run._
 
 ## Filed bugs
 
-_None yet._ Add a bullet here for each failure with a link to the GitHub
-issue. If the same failure shows up across two or more agents, file a
-meta-issue under the orchestrator path instead of one-per-agent.
+- `PostIssueStop` calls `s.db.GetProjectByID` without nil-checking `s.db`. In
+  practice the daemon always has a DB wired, but the handler will panic if
+  any future code path constructs a `Server` without one. Surfaced while
+  writing `TestPostIssueStopResetsStateAndCancelsSession`. Defensive
+  nil-check is cheap; not filed yet.
+- _None other yet._ Add a bullet here for each failure with a link to the
+  GitHub issue. If the same failure shows up across two or more agents, file
+  a meta-issue under the orchestrator path instead of one-per-agent.

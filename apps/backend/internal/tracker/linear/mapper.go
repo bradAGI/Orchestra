@@ -29,7 +29,9 @@ type linearIssueNode struct {
 			Name string `json:"name"`
 		} `json:"nodes"`
 	} `json:"labels"`
-	Assignee  *struct{ ID string `json:"id"` } `json:"assignee"`
+	Assignee *struct {
+		ID string `json:"id"`
+	} `json:"assignee"`
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt string `json:"updatedAt"`
 }
@@ -37,6 +39,7 @@ type linearIssueNode struct {
 // mapNode converts a Linear GraphQL issue node into a tracker.WorkItem.
 // stateMap may be nil — the default mapping is applied in that case.
 func mapNode(n linearIssueNode, stateMap map[string]string) tracker.WorkItem {
+	usingDefault := stateMap == nil
 	sm := stateMap
 	if sm == nil {
 		sm = defaultStateMap
@@ -44,6 +47,11 @@ func mapNode(n linearIssueNode, stateMap map[string]string) tracker.WorkItem {
 	state := n.State.Name
 	if mapped, ok := sm[n.State.Type]; ok {
 		state = mapped
+	} else if !usingDefault {
+		// Custom map doesn't cover this state type — fall back to the default mapping.
+		if mapped, ok := defaultStateMap[n.State.Type]; ok {
+			state = mapped
+		}
 	}
 	labels := make([]string, 0, len(n.Labels.Nodes))
 	for _, l := range n.Labels.Nodes {

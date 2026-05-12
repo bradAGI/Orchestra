@@ -4,6 +4,8 @@ import {
   Cable,
   Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   CircleDashed,
   Copy,
   Cpu,
@@ -16,9 +18,11 @@ import {
   GitBranch,
   Globe,
   Keyboard,
+  Layers,
   Loader2,
   Paintbrush,
   PanelLeft,
+  Pencil,
   Play,
   Plus,
   RefreshCcw,
@@ -26,10 +30,12 @@ import {
   SignalHigh,
   SlidersHorizontal,
   Terminal,
+  TestTube2,
   Trash2,
   Type,
   Upload,
   Users,
+  XCircle,
   Info,
 } from 'lucide-react'
 import { Button } from '@ui/button'
@@ -54,6 +60,12 @@ import {
   disconnectProjectGitHub,
   type UnsandboxConfig,
   type UnsandboxStatus,
+  type TrackerConfig,
+  listTrackerConfigs,
+  createTrackerConfig,
+  updateTrackerConfig,
+  deleteTrackerConfig,
+  testTrackerConfig,
 } from '@core/api/client'
 import type { Project } from '@core/api/types'
 import { Github } from 'lucide-react'
@@ -282,7 +294,6 @@ export function SettingsPage({
   }, [themeStudioDraft, themeStudioPreviewMode, themeStudioOpen])
 
   const scrollRef = useRef<HTMLDivElement>(null)
-  const [activeId, setActiveId] = useState<SectionId>('connections')
 
   useEffect(() => {
     ensureFlashStyle()
@@ -327,7 +338,7 @@ export function SettingsPage({
             }
           }
         }
-        setActiveId(current)
+        useAppStore.getState().setActiveSettingsSection(current)
       })
     }
 
@@ -344,9 +355,7 @@ export function SettingsPage({
 
     target.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
-    // Flash animation
     target.classList.remove('settings-section-flash')
-    // Force reflow to restart animation
     void (target as HTMLElement).offsetWidth
     target.classList.add('settings-section-flash')
     const cleanup = () => {
@@ -356,46 +365,17 @@ export function SettingsPage({
     target.addEventListener('animationend', cleanup)
   }, [])
 
-  return (
-    <div className="flex flex-1 min-h-0 min-w-0 bg-background">
-      {/* Sidebar */}
-      <nav className="w-[220px] shrink-0 border-r border-border/40 flex flex-col overflow-y-auto custom-scrollbar bg-background">
-        <div className="px-5 pt-8 pb-6">
-          <h2 className="text-[15px] font-black tracking-tight leading-none">Settings</h2>
-        </div>
-        <div className="flex flex-col gap-1 px-3 pb-6">
-          {SECTIONS.map((section) => {
-            const Icon = section.icon
-            const isActive = activeId === section.id
-            return (
-              <button
-                key={section.id}
-                onClick={() => scrollToSection(section.id)}
-                className={`group relative flex items-center gap-3 px-3 h-10 rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
-                  isActive
-                    ? 'bg-foreground/[0.06] text-foreground'
-                    : 'text-muted-foreground/80 hover:text-foreground hover:bg-foreground/[0.03]'
-                }`}
-              >
-                {isActive && (
-                  <span className="absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-primary" />
-                )}
-                <Icon
-                  className={`h-[15px] w-[15px] shrink-0 transition-colors ${
-                    isActive ? 'text-primary' : 'text-muted-foreground/60 group-hover:text-foreground'
-                  }`}
-                  strokeWidth={isActive ? 2.25 : 1.75}
-                />
-                <span className="truncate text-[12.5px] font-medium tracking-tight">{section.label}</span>
-              </button>
-            )
-          })}
-        </div>
-      </nav>
+  useEffect(() => {
+    const fn = (id: string) => scrollToSection(id as SectionId)
+    useAppStore.getState().setScrollToSettingsSection(fn)
+    return () => useAppStore.getState().setScrollToSettingsSection(null)
+  }, [scrollToSection])
 
+  return (
+    <div className="flex flex-col h-full">
       {/* Scrollable content */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar">
-        <div className="max-w-5xl mx-auto pt-12 pb-24 px-12 space-y-14">
+        <div className="w-full pt-8 pb-24 px-6 lg:px-10 space-y-14">
           {/* Page hero */}
           <header className="space-y-2 pb-2">
             <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary/80">Workspace</p>
@@ -438,21 +418,8 @@ export function SettingsPage({
           {/* ── Integrations ── */}
           <section data-settings-section="integrations" className="rounded-xl transition-colors duration-500 scroll-mt-4">
             <SectionHeading icon={Cable} title="Integrations" description="GitHub, Linear, Jira, and other service connections" />
-            <div className="mt-4 space-y-4">
-              <div className="rounded-2xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 p-6 shadow-sm">
-                <div className="flex items-start gap-3">
-                  <Cable size={16} className="mt-0.5 shrink-0 text-muted-foreground/50" />
-                  <div>
-                    <p className="text-[13px] font-semibold text-foreground/80">Issue source is configured per project</p>
-                    <p className="mt-1 text-[12px] text-muted-foreground/60 leading-relaxed">
-                      Open a project, click the <span className="font-mono bg-muted/60 px-1 rounded text-[11px]">Source</span> button in the toolbar, and enter the tracker type, endpoint, and API token. Each project stores its own credentials independently.
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="rounded-2xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 p-6 shadow-sm">
-                <GitConnectionsPane config={config} />
-              </div>
+            <div className="mt-4">
+              <IntegrationsPane config={config} />
             </div>
           </section>
 
@@ -1448,7 +1415,7 @@ function TypographyEditor({
             onChange={(value) => onChange({ fontWeight: { heading: value } })}
           />
         </div>
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 xl:grid-cols-3 sm:grid-cols-2">
           <RangeField
             label="Body Spacing"
             min={-0.04}
@@ -2294,6 +2261,392 @@ function ThemeSwatchCard({
 }
 
 // ---------------------------------------------------------------------------
+// Integrations pane — tracker connection management
+// ---------------------------------------------------------------------------
+
+type AuthField = {
+  key: string
+  label: string
+  type: 'text' | 'password'
+  placeholder: string
+  required?: boolean
+}
+
+const PROVIDER_META: Record<string, { label: string; color: string; authFields: AuthField[] }> = {
+  github: {
+    label: 'GitHub',
+    color: 'text-foreground',
+    authFields: [
+      { key: 'display_name', label: 'Connection name', type: 'text', placeholder: 'My GitHub', required: true },
+      { key: 'endpoint', label: 'Owner/repo or org', type: 'text', placeholder: 'myorg/myrepo' },
+      { key: 'token', label: 'Personal access token', type: 'password', placeholder: 'ghp_…', required: true },
+    ],
+  },
+  linear: {
+    label: 'Linear',
+    color: 'text-purple-400',
+    authFields: [
+      { key: 'display_name', label: 'Connection name', type: 'text', placeholder: 'My Linear', required: true },
+      { key: 'token', label: 'API key', type: 'password', placeholder: 'lin_api_…', required: true },
+    ],
+  },
+  jira: {
+    label: 'Jira',
+    color: 'text-blue-400',
+    authFields: [
+      { key: 'display_name', label: 'Connection name', type: 'text', placeholder: 'My Jira', required: true },
+      { key: 'endpoint', label: 'Base URL', type: 'text', placeholder: 'https://yourcompany.atlassian.net', required: true },
+      { key: 'jira_user', label: 'Email (Cloud) or username (Server)', type: 'text', placeholder: 'user@example.com' },
+      { key: 'token', label: 'API token or PAT', type: 'password', placeholder: 'token…', required: true },
+    ],
+  },
+}
+
+type TestResult = { ok: boolean; latency_ms?: number; error?: string }
+
+function IntegrationsPane({ config }: { config: BackendConfig | null }) {
+  const [configs, setConfigs] = useState<TrackerConfig[]>([])
+  const [loading, setLoading] = useState(false)
+  const [addingType, setAddingType] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [testResults, setTestResults] = useState<Record<string, { result: TestResult; ts: number }>>({})
+  const [testPending, setTestPending] = useState<Record<string, boolean>>({})
+  const [savePending, setSavePending] = useState(false)
+  const [formValues, setFormValues] = useState<Record<string, string>>({})
+  const [gitLinksOpen, setGitLinksOpen] = useState(false)
+
+  const load = useCallback(async () => {
+    if (!config) return
+    setLoading(true)
+    try {
+      const data = await listTrackerConfigs(config)
+      setConfigs(data ?? [])
+    } catch {
+      setConfigs([])
+    } finally {
+      setLoading(false)
+    }
+  }, [config])
+
+  useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = []
+    for (const [id, entry] of Object.entries(testResults)) {
+      const age = Date.now() - entry.ts
+      const remaining = 3000 - age
+      if (remaining > 0) {
+        timers.push(setTimeout(() => {
+          setTestResults(prev => {
+            const next = { ...prev }
+            delete next[id]
+            return next
+          })
+        }, remaining))
+      }
+    }
+    return () => timers.forEach(clearTimeout)
+  }, [testResults])
+
+  const openAddForm = (type: string) => {
+    setAddingType(type)
+    setEditingId(null)
+    setFormValues({})
+  }
+
+  const openEditForm = (tc: TrackerConfig) => {
+    setEditingId(tc.id)
+    setAddingType(null)
+    const meta = PROVIDER_META[tc.type]
+    const vals: Record<string, string> = { display_name: tc.display_name, endpoint: tc.endpoint ?? '' }
+    if (meta) {
+      for (const f of meta.authFields) {
+        if (f.key !== 'display_name' && f.key !== 'endpoint' && f.key !== 'token') {
+          try {
+            const extra = tc.extra ? (JSON.parse(tc.extra) as Record<string, unknown>) : {}
+            vals[f.key] = typeof extra[f.key] === 'string' ? (extra[f.key] as string) : ''
+          } catch {
+            vals[f.key] = ''
+          }
+        }
+      }
+    }
+    setFormValues(vals)
+  }
+
+  const cancelForm = () => {
+    setAddingType(null)
+    setEditingId(null)
+    setFormValues({})
+  }
+
+  const handleSave = async () => {
+    if (!config) return
+    setSavePending(true)
+    try {
+      if (addingType) {
+        const meta = PROVIDER_META[addingType]
+        const extra: Record<string, string> = {}
+        for (const f of (meta?.authFields ?? [])) {
+          if (f.key !== 'display_name' && f.key !== 'endpoint' && f.key !== 'token' && formValues[f.key]) {
+            extra[f.key] = formValues[f.key]
+          }
+        }
+        await createTrackerConfig(config, {
+          type: addingType,
+          display_name: formValues.display_name ?? '',
+          endpoint: formValues.endpoint,
+          token: formValues.token,
+          extra: Object.keys(extra).length > 0 ? extra : undefined,
+        })
+      } else if (editingId) {
+        const tc = configs.find(c => c.id === editingId)
+        const meta = tc ? PROVIDER_META[tc.type] : null
+        const extra: Record<string, string> = {}
+        for (const f of (meta?.authFields ?? [])) {
+          if (f.key !== 'display_name' && f.key !== 'endpoint' && f.key !== 'token' && formValues[f.key]) {
+            extra[f.key] = formValues[f.key]
+          }
+        }
+        await updateTrackerConfig(config, editingId, {
+          display_name: formValues.display_name,
+          endpoint: formValues.endpoint,
+          token: formValues.token || undefined,
+          extra: Object.keys(extra).length > 0 ? extra : undefined,
+        })
+      }
+      cancelForm()
+      await load()
+    } finally {
+      setSavePending(false)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!config) return
+    try {
+      await deleteTrackerConfig(config, id)
+      setConfirmDeleteId(null)
+      await load()
+    } catch {
+      // ignore
+    }
+  }
+
+  const handleTest = async (id: string) => {
+    if (!config) return
+    setTestPending(prev => ({ ...prev, [id]: true }))
+    try {
+      const result = await testTrackerConfig(config, id)
+      setTestResults(prev => ({ ...prev, [id]: { result, ts: Date.now() } }))
+    } catch (err) {
+      setTestResults(prev => ({
+        ...prev,
+        [id]: { result: { ok: false, error: err instanceof Error ? err.message : 'Test failed' }, ts: Date.now() },
+      }))
+    } finally {
+      setTestPending(prev => ({ ...prev, [id]: false }))
+    }
+  }
+
+  const renderForm = (type: string, isEdit: boolean, tc?: TrackerConfig) => {
+    const meta = PROVIDER_META[type]
+    if (!meta) return null
+    return (
+      <div className="mt-2 rounded-xl border border-border/50 bg-muted/20 p-4 space-y-3">
+        {meta.authFields.map(f => (
+          <div key={f.key} className="space-y-1">
+            <label className="text-[11px] font-medium text-muted-foreground/70">
+              {f.label}{f.required && <span className="text-destructive ml-0.5">*</span>}
+            </label>
+            <input
+              type={f.type}
+              className="w-full h-8 rounded-md border border-border/50 bg-background px-3 text-[12px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-ring/50 transition-colors"
+              placeholder={f.key === 'token' && isEdit && tc?.has_token ? '••••••••' : f.placeholder}
+              value={formValues[f.key] ?? ''}
+              onChange={e => setFormValues(prev => ({ ...prev, [f.key]: e.target.value }))}
+            />
+          </div>
+        ))}
+        <div className="flex items-center gap-2 pt-1">
+          <button
+            onClick={() => void handleSave()}
+            disabled={savePending}
+            className="h-7 px-3 rounded-md bg-foreground text-background text-[12px] font-medium hover:bg-foreground/90 disabled:opacity-50 transition-colors"
+          >
+            {savePending ? 'Saving…' : 'Save'}
+          </button>
+          <button
+            onClick={cancelForm}
+            disabled={savePending}
+            className="h-7 px-3 rounded-md text-[12px] font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] disabled:opacity-50 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const providerDot = (type: string) => {
+    if (type === 'github') return 'bg-foreground/60'
+    if (type === 'linear') return 'bg-purple-400'
+    if (type === 'jira') return 'bg-blue-400'
+    return 'bg-muted-foreground/40'
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        {Object.entries(PROVIDER_META).map(([type, meta]) => (
+          <button
+            key={type}
+            onClick={() => openAddForm(type)}
+            className="h-8 px-3 inline-flex items-center gap-1.5 rounded-md border border-border/50 bg-card text-[12px] font-medium text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+          >
+            <Plus size={12} />
+            {meta.label}
+          </button>
+        ))}
+        <button
+          onClick={() => void load()}
+          disabled={loading || !config}
+          className="ml-auto h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md text-[11px] font-medium text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] disabled:opacity-40 transition-colors"
+        >
+          <RefreshCcw size={11} className={loading ? 'animate-spin' : ''} />
+          Refresh
+        </button>
+      </div>
+
+      {addingType && (
+        <div className="rounded-xl border border-border/50 bg-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className={`h-2 w-2 rounded-full ${providerDot(addingType)}`} />
+            <span className="text-[12px] font-semibold">{PROVIDER_META[addingType]?.label}</span>
+            <span className="text-[11px] text-muted-foreground/50">new connection</span>
+          </div>
+          {renderForm(addingType, false)}
+        </div>
+      )}
+
+      {configs.length === 0 && !loading && !addingType && (
+        <div className="rounded-xl border border-dashed border-border/40 p-6 text-center">
+          <Layers size={18} className="mx-auto mb-2 text-muted-foreground/30" />
+          <p className="text-[12px] text-muted-foreground/50">No tracker connections yet</p>
+          <p className="text-[11px] text-muted-foreground/35 mt-1">Add GitHub, Linear, or Jira above to get started</p>
+        </div>
+      )}
+
+      {configs.length > 0 && (
+        <div className="rounded-xl border border-border/40 bg-card overflow-hidden divide-y divide-border/30">
+          {configs.map(tc => {
+            const meta = PROVIDER_META[tc.type]
+            const testEntry = testResults[tc.id]
+            const isPendingTest = testPending[tc.id]
+            const isConfirmingDelete = confirmDeleteId === tc.id
+            const isEditing = editingId === tc.id
+            return (
+              <div key={tc.id} className="p-3">
+                <div className="flex items-center gap-3">
+                  <span className={`h-2 w-2 rounded-full shrink-0 ${providerDot(tc.type)}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[12px] font-semibold truncate">{tc.display_name}</span>
+                      <span className="text-[10px] font-medium text-muted-foreground/50 bg-muted/40 px-1.5 py-0.5 rounded-full shrink-0">{meta?.label ?? tc.type}</span>
+                      {tc.endpoint && (
+                        <span className="text-[11px] text-muted-foreground/40 truncate max-w-[180px]">{tc.endpoint}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {testEntry && (
+                      testEntry.result.ok ? (
+                        <div className="flex items-center gap-1 text-emerald-500">
+                          <CheckCircle2 size={13} />
+                          {testEntry.result.latency_ms != null && (
+                            <span className="text-[10px]">{testEntry.result.latency_ms}ms</span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 text-destructive">
+                          <XCircle size={13} />
+                          {testEntry.result.error && (
+                            <span className="text-[10px] max-w-[100px] truncate">{testEntry.result.error}</span>
+                          )}
+                        </div>
+                      )
+                    )}
+                    <button
+                      onClick={() => void handleTest(tc.id)}
+                      disabled={isPendingTest || !config}
+                      className="h-7 px-2 rounded-md text-[11px] font-medium text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.04] disabled:opacity-40 transition-colors inline-flex items-center gap-1"
+                    >
+                      {isPendingTest ? <Loader2 size={11} className="animate-spin" /> : <TestTube2 size={11} />}
+                      Test
+                    </button>
+                    <button
+                      onClick={() => isEditing ? cancelForm() : openEditForm(tc)}
+                      className="h-7 px-2 rounded-md text-[11px] font-medium text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.04] transition-colors inline-flex items-center gap-1"
+                    >
+                      <Pencil size={11} />
+                      Edit
+                    </button>
+                    {isConfirmingDelete ? (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[11px] text-destructive/80">Delete?</span>
+                        <button
+                          onClick={() => void handleDelete(tc.id)}
+                          className="h-7 px-2 rounded-md text-[11px] font-medium text-destructive hover:bg-destructive/10 transition-colors"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="h-7 px-2 rounded-md text-[11px] font-medium text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDeleteId(tc.id)}
+                        className="h-7 px-2 rounded-md text-[11px] font-medium text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors inline-flex items-center gap-1"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {isEditing && renderForm(tc.type, true, tc)}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <div className="rounded-xl border border-border/40 bg-card overflow-hidden">
+        <button
+          onClick={() => setGitLinksOpen(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-foreground/[0.02] transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Github size={13} className="text-muted-foreground/60" />
+            <span className="text-[12px] font-semibold">GitHub project links</span>
+          </div>
+          {gitLinksOpen ? <ChevronUp size={13} className="text-muted-foreground/40" /> : <ChevronDown size={13} className="text-muted-foreground/40" />}
+        </button>
+        {gitLinksOpen && (
+          <div className="px-4 pb-4 border-t border-border/30">
+            <GitConnectionsPane config={config} />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Git connections pane — shows which Orchestra projects are linked to GitHub repos
 // ---------------------------------------------------------------------------
 
@@ -2336,15 +2689,13 @@ function GitConnectionsPane({ config }: { config: BackendConfig | null }) {
     }
   }
 
+  const openInBrowser = (url: string) => {
+    useAppStore.getState().setActiveSection('CONSOLE')
+    useAppStore.getState().openBrowserTab(url)
+  }
+
   const openOnGitHub = (owner: string, repo: string) => {
-    const url = `https://github.com/${owner}/${repo}`
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const bridge = (window as any).orchestraDesktop
-    if (bridge && typeof bridge.openExternal === 'function') {
-      void bridge.openExternal(url)
-    } else {
-      window.open(url, '_blank')
-    }
+    openInBrowser(`https://github.com/${owner}/${repo}`)
   }
 
   return (
@@ -3280,6 +3631,11 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
     }
   }
 
+  const openInBrowser = (url: string) => {
+    useAppStore.getState().setActiveSection('CONSOLE')
+    useAppStore.getState().openBrowserTab(url)
+  }
+
   const handleRemove = async () => {
     if (!config) return
     setSaving(true)
@@ -3309,15 +3665,7 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
               <p className="text-sm font-bold">Unsandbox</p>
               <button
                 type="button"
-                onClick={() => {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const bridge = (window as any).orchestraDesktop
-                  if (bridge && typeof bridge.openExternal === 'function') {
-                    void bridge.openExternal('https://unsandbox.com')
-                  } else {
-                    window.open('https://unsandbox.com', '_blank')
-                  }
-                }}
+                onClick={() => openInBrowser('https://unsandbox.com')}
                 className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
                 title="Open unsandbox.com"
               >
@@ -3431,20 +3779,46 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
         You can also set <code className="text-[10px] font-mono bg-muted/30 px-1 rounded">UNSANDBOX_PUBLIC_KEY</code> and <code className="text-[10px] font-mono bg-muted/30 px-1 rounded">UNSANDBOX_SECRET_KEY</code> environment variables.{' '}
         <button
           type="button"
-          onClick={() => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const bridge = (window as any).orchestraDesktop
-            if (bridge && typeof bridge.openExternal === 'function') {
-              void bridge.openExternal('https://unsandbox.com/docs')
-            } else {
-              window.open('https://unsandbox.com/docs', '_blank')
-            }
-          }}
+          onClick={() => openInBrowser('https://unsandbox.com/docs')}
           className="inline-flex items-center gap-0.5 text-primary hover:underline"
         >
           API docs <ExternalLink className="h-2.5 w-2.5" />
         </button>
       </p>
+    </div>
+  )
+}
+
+export function SettingsSideNav() {
+  const activeId = useAppStore(s => s.activeSettingsSection)
+  const scrollTo = useAppStore(s => s.scrollToSettingsSection)
+
+  return (
+    <div className="flex flex-col h-full py-3">
+      <div className="px-3 pb-2">
+        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50">Settings</p>
+      </div>
+      <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
+        {SECTIONS.map((section) => {
+          const Icon = section.icon
+          const active = activeId === section.id
+          return (
+            <button
+              key={section.id}
+              onClick={() => scrollTo?.(section.id)}
+              className={`w-full flex items-center gap-2.5 h-9 px-2.5 rounded-lg text-left transition-colors relative ${
+                active
+                  ? 'bg-foreground/[0.08] text-foreground'
+                  : 'text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04]'
+              }`}
+            >
+              {active && <span className="absolute left-0 w-[2px] h-5 rounded-r-full bg-primary" />}
+              <Icon size={14} strokeWidth={active ? 2.2 : 1.8} className={active ? 'text-primary' : ''} />
+              <span className={`text-[12.5px] truncate ${active ? 'font-semibold' : 'font-medium'}`}>{section.label}</span>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

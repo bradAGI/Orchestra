@@ -1,11 +1,18 @@
 // apps/desktop/src/widgets/agents/AgentsDashboard.tsx
 import { useEffect, useState, useMemo } from 'react'
+import { useAppStore } from '@core/store'
 import { AlertCircle } from 'lucide-react'
-import type { BackendConfig } from '@core/api/types'
+import type { BackendConfig, Project } from '@core/api/types'
 import type { ProviderFileEntry } from '@core/api/client'
 import { Skeleton } from '@ui/skeleton'
-import { ProviderHeader } from './ProviderHeader'
-import { CategoryList } from './CategoryList'
+import { Button } from '@ui/button'
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@ui/dialog'
+import { OverviewPanel, type ProviderSummary } from './panels/OverviewPanel'
+import { ProjectSelector } from './components/ProjectSelector'
+import { ScopeToggle } from './components/ScopeToggle'
+import { computeClaudeSummary, computeClaudeProjectSummary } from './hooks/use-overview-summary'
 import { SettingsPanel } from './panels/SettingsPanel'
 import { InstructionsPanel } from './panels/InstructionsPanel'
 import { SkillsPanel } from './panels/SkillsPanel'
@@ -46,10 +53,35 @@ interface AgentsDashboardProps {
 }
 
 export function AgentsDashboard({ config }: AgentsDashboardProps) {
-  const [provider, setProvider] = useState<Provider>('claude')
-  const [category, setCategory] = useState<CategoryId>('settings')
-  const [scope, setScope] = useState<Scope>('GLOBAL')
-  const [projectId, setProjectId] = useState('')
+  const provider = useAppStore(s => s.activeAgentProvider) as Provider
+  const setProvider = useAppStore(s => s.setActiveAgentProvider)
+  const category = useAppStore(s => s.activeAgentCategory) as CategoryId
+  const setCategory = useAppStore(s => s.setActiveAgentCategory)
+  const setAgentCategories = useAppStore(s => s.setAgentCategories)
+  const setAgentCategoryCounts = useAppStore(s => s.setAgentCategoryCounts)
+  const scope = useAppStore(s => s.activeAgentScope)
+  const projectId = useAppStore(s => s.activeAgentProjectId)
+  // Agent Hub (overview/scope-toggle) state — separate from legacy activeAgentScope/projectId
+  const projects = useAppStore(s => s.projects)
+  const agentHubProjectId = useAppStore(s => s.agentHubProjectId)
+  const setAgentHubProjectId = useAppStore(s => s.setAgentHubProjectId)
+  const agentHubScope = useAppStore(s => s.agentHubScope)
+  const setAgentHubScope = useAppStore(s => s.setAgentHubScope)
+  const requestAgentHubNav = useAppStore(s => s.requestAgentHubNav)
+  const agentHubPendingNav = useAppStore(s => s.agentHubPendingNav)
+  const setAgentHubPendingNav = useAppStore(s => s.setAgentHubPendingNav)
+  const setAgentHubDirty = useAppStore(s => s.setAgentHubDirty)
+  const selectedProjectID = useAppStore(s => s.selectedProjectID)
+  const selectedProject = agentHubProjectId
+    ? projects.find(p => p.id === agentHubProjectId) ?? null
+    : null
+
+  useEffect(() => {
+    if (agentHubProjectId === null && selectedProjectID) {
+      setAgentHubProjectId(selectedProjectID)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProjectID])
 
   const isClaude = provider === 'claude'
   const is8gent = provider === '8gent'
@@ -60,6 +92,20 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
     isClaudeOrEightgent ? config : null,
     scope,
     projectId || undefined,
+  )
+
+  // For the Overview panel we need both global and project snapshots.
+  // We always fetch the global snapshot, and additionally fetch the project
+  // snapshot when a project is selected in the hub.
+  const claudeGlobal = useClaudeConfig(
+    isClaudeOrEightgent ? config : null,
+    'GLOBAL',
+    undefined,
+  )
+  const claudeProject = useClaudeConfig(
+    isClaudeOrEightgent && agentHubProjectId ? config : null,
+    'PROJECT',
+    agentHubProjectId || undefined,
   )
 
   const codex = useCodexConfig(
@@ -104,9 +150,19 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
 
   useEffect(() => {
     if (!categories.some(item => item.id === category)) {
-      setCategory(categories[0]?.id ?? 'config')
+      setCategory('overview')
     }
   }, [categories, category])
+
+  // Reset to Overview whenever the provider changes
+  useEffect(() => {
+    setCategory('overview')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider])
+
+  useEffect(() => {
+    setAgentCategories(categories.map(c => ({ id: c.id, label: c.label, icon: c.icon })))
+  }, [categories, setAgentCategories])
 
   // Category counts for Claude and 8gent (same structure)
   const claudeCounts = useMemo((): Record<string, number> => {
@@ -167,6 +223,10 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
 
   const categoryCounts = isClaudeOrEightgent ? claudeCounts : legacyCounts
 
+  useEffect(() => {
+    setAgentCategoryCounts(categoryCounts)
+  }, [categoryCounts, setAgentCategoryCounts])
+
   const providerItems = useMemo(() => {
     if (isClaudeOrEightgent) {
       return {
@@ -209,6 +269,60 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
     setCategory(id)
   }
 
+  // Build provider summaries for the Overview panel.
+  // For Claude/8gent we compose from useClaudeConfig data; for other providers
+  // we render an honest null-stub until provider-specific builders land.
+  const emptySummary: ProviderSummary = {
+    model: null,
+    instructionsLines: null,
+    skillsCount: null,
+    mcpCount: null,
+    hooksCount: null,
+    subAgentsCount: null,
+  }
+
+  const claudeGlobalBundle = useMemo(() => ({
+    settings: { model: (claudeGlobal.settings as { model?: string | null })?.model ?? null },
+    claudeMd: claudeGlobal.instructionsExists ? claudeGlobal.instructions : null,
+    skills: claudeGlobal.skills.map(s => ({ name: s.name })),
+    hooks: claudeGlobal.hooks,
+    mcpServers: Object.fromEntries(
+      [
+        ...claudeGlobal.providerMcpServers.map((s, i) => [s.name ?? `provider-${i}`, s]),
+        ...claudeGlobal.orchestraMcpServers.map((s, i) => [s.name ?? `orchestra-${i}`, s]),
+      ] as Array<[string, unknown]>,
+    ),
+    subAgents: claudeGlobal.subagents.map(a => ({ name: a.name })),
+  }), [claudeGlobal])
+
+  const overviewSummaryGlobal: ProviderSummary = useMemo(() => {
+    if (isClaudeOrEightgent) {
+      return computeClaudeSummary(claudeGlobalBundle)
+    }
+    return emptySummary
+  }, [isClaudeOrEightgent, claudeGlobalBundle])
+
+  const overviewSummaryProject: ProviderSummary | null = useMemo(() => {
+    if (!isClaudeOrEightgent) return null
+    if (!agentHubProjectId) return null
+    return computeClaudeProjectSummary(
+      claudeGlobalBundle,
+      {
+        settings: { model: (claudeProject.settings as { model?: string | null })?.model ?? null },
+        claudeMd: claudeProject.instructionsExists ? claudeProject.instructions : null,
+        skills: claudeProject.skills.map(s => ({ name: s.name })),
+        hooks: claudeProject.hooks,
+        mcpServers: Object.fromEntries(
+          [
+            ...claudeProject.providerMcpServers.map((s, i) => [s.name ?? `provider-${i}`, s]),
+            ...claudeProject.orchestraMcpServers.map((s, i) => [s.name ?? `orchestra-${i}`, s]),
+          ] as Array<[string, unknown]>,
+        ),
+        subAgents: claudeProject.subagents.map(a => ({ name: a.name })),
+      },
+    )
+  }, [isClaudeOrEightgent, agentHubProjectId, claudeGlobalBundle, claudeProject])
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {state.error && (
@@ -219,43 +333,47 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
         </div>
       )}
 
-      <div className="flex flex-col flex-1 min-h-0">
-        {/* Header bar: provider tabs + scope */}
-        <ProviderHeader
-          provider={provider}
-          onProviderChange={(p) => {
-            setProvider(p)
-            setCategory(
-              p === 'claude' || p === '8gent' || p === 'gemini'
-                ? 'settings'
-                : 'config',
-            )
-          }}
-          scope={scope}
-          projectId={projectId}
-          projects={isClaudeOrEightgent ? claude.projects : domainState.projects}
-          onScopeChange={(s, pid) => { setScope(s); setProjectId(pid) }}
+      {/* Top bar: project selector + scope toggle */}
+      <div className="flex items-center justify-end gap-2 px-3 py-1.5 border-b border-border/20 bg-card/20 shrink-0">
+        {category !== 'overview' && (
+          <ScopeToggle
+            scope={agentHubScope}
+            projectName={selectedProject?.name ?? null}
+            onChange={(s) => requestAgentHubNav(() => setAgentHubScope(s))}
+          />
+        )}
+        <ProjectSelector
+          projects={projects}
+          selectedId={agentHubProjectId}
+          onChange={(id) => requestAgentHubNav(() => setAgentHubProjectId(id))}
         />
+      </div>
 
-        {/* Main content: category list + detail panel */}
+      <div className="flex flex-col flex-1 min-h-0">
+        {/* Detail panel */}
         <div className="flex flex-1 min-h-0">
-            {/* Column 2: Category list */}
-            <CategoryList
-              categories={categories}
-              selectedCategory={category}
-              categoryCounts={categoryCounts}
-              onSelectCategory={handleSelectCategory}
-            />
-
-            {/* Column 3: Detail panel */}
             <div className="flex-1 min-w-0 min-h-0">
-              {state.loading ? (
+              {category === 'overview' ? (
+                <OverviewPanel
+                  provider={provider}
+                  projectName={selectedProject?.name ?? null}
+                  globalSummary={overviewSummaryGlobal}
+                  projectSummary={overviewSummaryProject}
+                  onNavigate={(nextCategory, nextScope) => requestAgentHubNav(() => {
+                    setAgentHubScope(nextScope)
+                    setCategory(nextCategory)
+                  })}
+                />
+              ) : state.loading ? (
                 <div className="p-6 space-y-3"><Skeleton className="h-6 w-48" /><Skeleton className="h-[300px] w-full" /></div>
               ) : isClaudeOrEightgent ? (
                 <>
                   {category === 'settings' && (
                     <SettingsPanel
                       settings={claude.settings}
+                      globalSettings={claudeGlobal.settings}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       settingsPath={claude.settingsPath}
                       settingsExists={claude.settingsExists}
                       saving={claude.saving}
@@ -268,17 +386,31 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                       path={claude.instructionsPath}
                       exists={claude.instructionsExists}
                       saving={claude.saving}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       onSave={claude.saveInstructions}
                       onDelete={claude.deleteInstructions}
                     />
                   )}
                   {category === 'hooks' && (
-                    <HooksPanel hooks={claude.hooks} onSave={claude.saveHooks} loading={claude.loading} saving={claude.saving} provider="claude" />
+                    <HooksPanel
+                      hooks={claude.hooks}
+                      globalHooks={claudeGlobal.hooks}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
+                      onSave={claude.saveHooks}
+                      loading={claude.loading}
+                      saving={claude.saving}
+                      provider="claude"
+                    />
                   )}
                   {category === 'mcp' && (
                     <MCPPanel
                       providerServers={claude.providerMcpServers}
                       orchestraServers={claude.orchestraMcpServers}
+                      globalProviderServers={claudeGlobal.providerMcpServers}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       onAddProvider={claude.addMCPServer}
                       onUpdateProvider={claude.updateMCPServer}
                       onToggleProvider={claude.toggleMCPServer}
@@ -292,6 +424,9 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                   {category === 'rules' && (
                     <RulesPanel
                       items={claude.rules}
+                      globalItems={claudeGlobal.rules}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={claude.saving}
                       onSave={claude.saveRule}
                       onDelete={claude.removeRule}
@@ -300,6 +435,9 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                   {category === 'skills' && (
                     <SkillsPanel
                       items={claude.skills}
+                      globalItems={claudeGlobal.skills}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={claude.saving}
                       onSave={claude.saveSkill}
                       onDelete={claude.removeSkill}
@@ -308,6 +446,9 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                   {category === 'agents' && (
                     <SubAgentsPanel
                       items={claude.subagents}
+                      globalItems={claudeGlobal.subagents}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={claude.saving}
                       onSave={claude.saveSubAgent}
                       onDelete={claude.removeSubAgent}
@@ -319,6 +460,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                   {category === 'config' && provider === 'opencode' && (
                     <OpenCodeConfigPanel
                       items={providerItems.config}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={domainState.saving}
                       onSave={opencode.saveConfigResource}
                       onCreate={opencode.createConfigResource}
@@ -327,6 +470,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                   {category === 'config' && provider === 'codex' && (
                     <CodexConfigPanel
                       items={providerItems.config}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={domainState.saving}
                       onSave={codex.saveConfigFile}
                       onCreate={codex.createConfigFile}
@@ -335,6 +480,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                   {category === 'approvals' && provider === 'codex' && (
                     <CodexApprovalsPanel
                       permissions={codex.permissions}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={codex.saving}
                       onSave={codex.savePermissions}
                     />
@@ -343,6 +490,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                     <CodexModelPanel
                       modelConfig={codex.modelConfig}
                       configContent={codex.config[0]?.content ?? ''}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={codex.saving}
                       onSave={codex.saveModel}
                       onSaveConfig={(content) => codex.saveConfigFile(codex.config[0]?.path ?? '', content)}
@@ -351,6 +500,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                   {category === 'environment' && provider === 'codex' && (
                     <CodexEnvironmentPanel
                       items={codex.config}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={codex.saving}
                       onSave={codex.saveConfigFile}
                     />
@@ -358,6 +509,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                   {category === 'profiles' && provider === 'codex' && (
                     <CodexProfilesPanel
                       items={codex.config}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={codex.saving}
                       onSave={codex.saveConfigFile}
                     />
@@ -366,6 +519,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                     provider === 'gemini' ? (
                       <GeminiSettingsPanel
                         items={providerItems.config}
+                        scope={agentHubScope}
+                        projectName={selectedProject?.name ?? null}
                         saving={domainState.saving}
                         onSave={gemini.saveSettingsFile}
                         onCreate={gemini.createSettingsResource}
@@ -376,6 +531,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                     <GeminiModelPanel
                       modelConfig={gemini.modelConfig}
                       settingsContent={gemini.settings[0]?.content ?? ''}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={gemini.saving}
                       onSave={gemini.saveModel}
                     />
@@ -384,6 +541,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                     <OpenCodeModelPanel
                       modelConfig={opencode.modelConfig}
                       configContent={opencode.config[0]?.content ?? ''}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={opencode.saving}
                       onSave={opencode.saveModel}
                     />
@@ -392,6 +551,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                     provider === 'codex' ? (
                       <CodexInstructionsPanel
                         items={providerItems.instructions}
+                        scope={agentHubScope}
+                        projectName={selectedProject?.name ?? null}
                         saving={domainState.saving}
                         onSave={codex.saveInstructionFile}
                         onCreate={codex.createInstructionFile}
@@ -399,6 +560,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                     ) : (
                       <OpenCodeInstructionsPanel
                         items={providerItems.instructions}
+                        scope={agentHubScope}
+                        projectName={selectedProject?.name ?? null}
                         saving={domainState.saving}
                         onSave={opencode.saveConfigResource}
                         onCreate={() => opencode.createConfigResource()}
@@ -408,6 +571,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                   {category === 'context' && (
                     <GeminiContextPanel
                       items={providerItems.context}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={domainState.saving}
                       onSave={gemini.saveContextFile}
                       onCreate={gemini.createContextResource}
@@ -416,6 +581,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                   {category === 'skills' && provider === 'opencode' && (
                     <OpenCodeSkillsPanel
                       items={providerItems.skills}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={domainState.saving}
                       onSave={opencode.saveSkillFile}
                       onDelete={opencode.deleteSkillResource}
@@ -427,6 +594,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                       items={codex.skills}
                       configContent={codex.config[0]?.content ?? ''}
                       configPath={codex.config[0]?.path ?? ''}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={domainState.saving}
                       onSave={codex.saveSkillFile}
                       onDelete={codex.deleteSkillFile}
@@ -437,6 +606,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                   {category === 'commands' && provider === 'opencode' && (
                     <OpenCodeCommandsPanel
                       items={providerItems.commands}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={domainState.saving}
                       onSave={opencode.saveCommandFile}
                       onDelete={opencode.deleteCommandResource}
@@ -446,6 +617,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                   {category === 'commands' && provider === 'gemini' && (
                     <GeminiCommandsPanel
                       items={providerItems.commands}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={domainState.saving}
                       onSave={gemini.saveCommandFile}
                       onDelete={gemini.deleteCommandFile}
@@ -455,6 +628,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                   {category === 'agents' && provider === 'opencode' && (
                     <OpenCodeAgentsPanel
                       items={providerItems.agents}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={domainState.saving}
                       onSave={opencode.saveAgentFile}
                       onDelete={opencode.deleteAgentFile}
@@ -466,6 +641,8 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                       items={codex.subagents}
                       configContent={codex.config[0]?.content ?? ''}
                       configPath={codex.config[0]?.path ?? ''}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={domainState.saving}
                       onSave={codex.saveSubagentFile}
                       onDelete={codex.deleteSubagentFile}
@@ -477,16 +654,35 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                   {category === 'rules' && provider === 'codex' && (
                     <CodexRulesPanel
                       items={codex.rules}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={codex.saving}
                       onSave={codex.saveRuleFile}
                       onDelete={codex.deleteRuleFile}
                     />
                   )}
-                  {category === 'mcp' && <MCPPanel providerServers={domainState.providerMcpServers} orchestraServers={domainState.orchestraMcpServers} onAddProvider={domainState.addMCPServer} onUpdateProvider={domainState.updateMCPServer} onToggleProvider={domainState.toggleMCPServer} onDeleteProvider={domainState.deleteMCPServer} onDeleteOrchestra={domainState.deleteOrchestraMCPServer} loading={domainState.loading} saving={domainState.saving} provider={provider} />}
+                  {category === 'mcp' && (
+                    <MCPPanel
+                      providerServers={domainState.providerMcpServers}
+                      orchestraServers={domainState.orchestraMcpServers}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
+                      onAddProvider={domainState.addMCPServer}
+                      onUpdateProvider={domainState.updateMCPServer}
+                      onToggleProvider={domainState.toggleMCPServer}
+                      onDeleteProvider={domainState.deleteMCPServer}
+                      onDeleteOrchestra={domainState.deleteOrchestraMCPServer}
+                      loading={domainState.loading}
+                      saving={domainState.saving}
+                      provider={provider}
+                    />
+                  )}
                   {category === 'permissions' && provider === 'gemini' && (
                     <GeminiPermissionsPanel
                       settingsPath={gemini.settings[0]?.path ?? ''}
                       settingsContent={gemini.settings[0]?.content ?? ''}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={gemini.saving}
                       onSave={gemini.saveSettingsFile}
                     />
@@ -495,12 +691,21 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
                     <OpenCodePermissionsPanel
                       configPath={opencode.config[0]?.path ?? ''}
                       configContent={opencode.config[0]?.content ?? ''}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
                       saving={opencode.saving}
                       onSave={opencode.saveConfigResource}
                     />
                   )}
                   {category === 'permissions' && provider !== 'gemini' && provider !== 'opencode' && (
-                    <PermissionsPanel permissions={domainState.permissions} saving={domainState.saving} onSave={domainState.savePermissions} provider={provider} />
+                    <PermissionsPanel
+                      permissions={domainState.permissions}
+                      scope={agentHubScope}
+                      projectName={selectedProject?.name ?? null}
+                      saving={domainState.saving}
+                      onSave={domainState.savePermissions}
+                      provider={provider}
+                    />
                   )}
                   {!category && (
                     <div className="flex items-center justify-center h-full text-muted-foreground/20">
@@ -512,6 +717,36 @@ export function AgentsDashboard({ config }: AgentsDashboardProps) {
             </div>
           </div>
         </div>
+
+        <Dialog
+          open={!!agentHubPendingNav}
+          onOpenChange={(o) => { if (!o) setAgentHubPendingNav(null) }}
+        >
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Discard unsaved changes?</DialogTitle>
+              <DialogDescription>
+                You have unsaved edits in this panel. Switching will discard them.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setAgentHubPendingNav(null)}>
+                Keep editing
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  const apply = agentHubPendingNav
+                  setAgentHubPendingNav(null)
+                  setAgentHubDirty(false)
+                  apply?.()
+                }}
+              >
+                Discard
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
   )
 }

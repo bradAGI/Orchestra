@@ -282,10 +282,10 @@ func (s *Server) CreateProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		RootPath          string `json:"root_path"`
-		IssueSourceType   string `json:"issue_source_type"`
+		RootPath            string `json:"root_path"`
+		IssueSourceType     string `json:"issue_source_type"`
 		IssueSourceEndpoint string `json:"issue_source_endpoint"`
-		IssueSourceToken  string `json:"issue_source_token"`
+		IssueSourceToken    string `json:"issue_source_token"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSONError(w, http.StatusBadRequest, "invalid_json", "invalid request")
@@ -2166,4 +2166,68 @@ func (s *Server) PostProjectIssueSourceTest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// PostProjectIssueSourceListProjects handles POST /api/v1/projects/{project_id}/issue-source/list-projects.
+// Builds a temporary adapter from stored or request-provided credentials and returns
+// the tracker's available projects so the UI can show a picker before saving.
+func (s *Server) PostProjectIssueSourceListProjects(w http.ResponseWriter, r *http.Request) {
+	if s.db == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "db_unavailable", "database not available")
+		return
+	}
+	if s.registry == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "no_registry", "registry not available")
+		return
+	}
+	projectID := chi.URLParam(r, "project_id")
+	project, err := s.db.GetProjectByID(r.Context(), projectID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeJSONError(w, http.StatusNotFound, "not_found", "project not found")
+			return
+		}
+		writeJSONError(w, http.StatusInternalServerError, "db_error", err.Error())
+		return
+	}
+
+	var req struct {
+		Type     string `json:"type"`
+		Endpoint string `json:"endpoint"`
+		Token    string `json:"token"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	testProject := project
+	if req.Type != "" {
+		testProject.IssueSourceType = req.Type
+	}
+	if req.Endpoint != "" {
+		testProject.IssueSourceEndpoint = req.Endpoint
+	}
+	if req.Token != "" {
+		testProject.IssueSourceToken = req.Token
+	}
+
+	if testProject.IssueSourceType == "" {
+		writeJSONError(w, http.StatusBadRequest, "no_source", "no issue source type configured")
+		return
+	}
+
+	adapter, err := s.registry.GetAdapterForProjectDirect(testProject)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "adapter_error", err.Error())
+		return
+	}
+	if adapter == nil {
+		writeJSONError(w, http.StatusBadRequest, "no_adapter", "no issue source configured")
+		return
+	}
+
+	projects, err := adapter.FetchProjects(r.Context())
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "fetch_error", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, projects)
 }

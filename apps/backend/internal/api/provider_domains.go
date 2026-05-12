@@ -90,7 +90,11 @@ func (s *Server) PostCodexConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	targets := codexConfigPaths(home, projectRoot, scope)
-	s.writeProviderContent(w, r, targets[0])
+	preferred := targets[0]
+	if scope == "project" && projectRoot != "" {
+		preferred = filepath.Join(projectRoot, ".codex", "config.toml")
+	}
+	s.writeProviderContent(w, r, preferred)
 }
 
 func (s *Server) GetCodexInstructions(w http.ResponseWriter, r *http.Request) {
@@ -278,7 +282,11 @@ func (s *Server) PostGeminiSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	targets := geminiSettingsPaths(home, projectRoot, scope)
-	s.writeProviderContent(w, r, targets[0])
+	preferred := targets[0]
+	if scope == "project" && projectRoot != "" {
+		preferred = filepath.Join(projectRoot, ".gemini", "settings.json")
+	}
+	s.writeProviderContent(w, r, preferred)
 }
 
 func (s *Server) GetGeminiContext(w http.ResponseWriter, r *http.Request) {

@@ -32,4 +32,5 @@ export interface WorkItemFilter {
   labels?: string[]
   assigneeId?: string
   search?: string
+  source?: WorkItemSource | 'all'
 }

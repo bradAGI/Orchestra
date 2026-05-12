@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useAppStore } from '@core/store'
 import { ChevronDown, ChevronRight, ExternalLink, CircleDot, GitPullRequest, Plus, X } from 'lucide-react'
 import type { BackendConfig, GitHubIssue, GitHubPR } from '@core/api/client'
 import {
@@ -317,9 +318,8 @@ export function GitHubPanel({
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          const bridge = (window as any).orchestraDesktop
-                          if (bridge?.openExternal) { void bridge.openExternal(issue.html_url) }
-                          else { window.open(issue.html_url, '_blank') }
+                          useAppStore.getState().setActiveSection('CONSOLE')
+                          useAppStore.getState().openBrowserTab(issue.html_url)
                         }}
                         className="opacity-0 group-hover:opacity-100 text-muted-foreground/50 hover:text-foreground transition-all p-0.5"
                       >

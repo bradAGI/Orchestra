@@ -39,7 +39,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
 
   return (
     <div className="px-4 pt-2.5 pb-4">
-      <div className="flex items-end gap-2">
+      <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <textarea
             ref={textareaRef}
@@ -57,7 +57,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
             className="w-full resize-none rounded-md bg-muted/30 pl-3 pr-9 py-2 text-[13px] outline-none transition-all placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-primary/40 disabled:opacity-40"
             style={{ maxHeight: 120 }}
           />
-          <div className="absolute right-1.5 top-0 flex h-[36px] items-center">
+          <div className="absolute right-1.5 inset-y-0 flex items-center">
             <VoiceInput onTranscription={handleTranscription} disabled={disabled || isStreaming} />
           </div>
         </div>

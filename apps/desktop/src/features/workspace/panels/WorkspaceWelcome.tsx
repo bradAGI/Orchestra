@@ -107,10 +107,8 @@ export function WorkspaceWelcome({ onAddTerminal }: WorkspaceWelcomeProps) {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="h-full overflow-auto bg-background">
-      <div className="min-h-full flex items-center justify-center px-10 py-20">
-        <div className="w-full max-w-xl">{children}</div>
-      </div>
+    <div className="flex-1 w-full overflow-y-auto bg-background flex flex-col">
+      <div className="m-auto w-full max-w-sm px-8 py-16">{children}</div>
     </div>
   )
 }

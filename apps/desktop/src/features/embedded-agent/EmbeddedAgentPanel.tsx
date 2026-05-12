@@ -44,24 +44,24 @@ export function EmbeddedAgentPanel({ onOpenSettings }: { onOpenSettings?: () => 
 
   return (
     <div
-      className="agent-panel-enter fixed bottom-6 right-6 z-50 flex w-[420px] flex-col overflow-hidden rounded-xl border border-border/50 bg-background shadow-xl shadow-black/30"
-      style={{ top: '140px' }}
+      className="agent-panel-enter fixed bottom-6 right-6 z-50 flex flex-col overflow-hidden rounded-xl border border-border/50 bg-background shadow-xl shadow-black/30"
+      style={{ top: '140px', width: 'min(420px, calc(100vw - 48px))' }}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-5 pb-3">
-        <div className="min-w-0 space-y-1">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">Maestro</p>
+        <div className="min-w-0 flex items-center gap-2">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 shrink-0">Maestro</p>
           {modelLabel ? (
-            <h2 className="text-base font-black tracking-tight truncate capitalize">{modelLabel}</h2>
+            <span className="text-[12px] font-medium text-foreground/70 truncate capitalize">{modelLabel}</span>
           ) : onOpenSettings ? (
             <button
               onClick={() => { togglePanel(); onOpenSettings() }}
-              className="text-base font-black tracking-tight text-primary hover:text-primary/80 transition-colors"
+              className="text-[12px] font-medium text-primary hover:text-primary/80 transition-colors"
             >
               Configure API key
             </button>
           ) : (
-            <h2 className="text-base font-black tracking-tight text-muted-foreground/60">No API key</h2>
+            <span className="text-[12px] font-medium text-muted-foreground/60">No API key</span>
           )}
         </div>
         <div className="flex items-center gap-0.5 shrink-0 -mt-1">

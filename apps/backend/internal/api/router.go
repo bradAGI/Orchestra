@@ -130,6 +130,7 @@ func NewRouterWithPubSub(
 	// Per-project embedded issue source (replaces global tracker config)
 	protected.Patch("/api/v1/projects/{project_id}/issue-source", server.PatchProjectIssueSource)
 	protected.Post("/api/v1/projects/{project_id}/issue-source/test", server.PostProjectIssueSourceTest)
+	protected.Post("/api/v1/projects/{project_id}/issue-source/list-projects", server.PostProjectIssueSourceListProjects)
 	// Live browse of a project's issue source (used by TrackerViewer)
 	protected.Get("/api/v1/projects/{project_id}/tracker/issues", server.GetProjectTrackerIssues)
 

@@ -164,14 +164,14 @@ export function EditorContent({ file }: EditorContentProps) {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between px-3 h-8 shrink-0 border-b border-border bg-card/50 text-[11px]">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-2 px-3 h-8 shrink-0 border-b border-border bg-card/50 text-[11px] overflow-hidden">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           <span className="truncate text-muted-foreground" title={file.filePath}>{file.relativePath}</span>
           {file.isDirty && (
             <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" title="Unsaved changes" />
           )}
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0">
           {isPreviewable && (
             <div className="flex items-center rounded-md bg-muted/40 p-0.5">
               <button

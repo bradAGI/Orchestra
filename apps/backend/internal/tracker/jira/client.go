@@ -161,15 +161,34 @@ func (c *Client) Search(ctx context.Context, query string) ([]tracker.WorkItem, 
 	return c.Fetch(ctx, FilterFromJQL(jql))
 }
 
+// toDescription converts a plain text string into the appropriate Jira
+// description format. Cloud (api/3) requires Atlassian Document Format (ADF);
+// Server (api/2) accepts a plain string.
+func (c *Client) toDescription(text string) any {
+	if !c.cloud {
+		return text
+	}
+	// Minimal ADF document wrapping the text as a single paragraph.
+	content := []map[string]any{}
+	if text != "" {
+		content = append(content, map[string]any{
+			"type": "paragraph",
+			"content": []map[string]any{
+				{"type": "text", "text": text},
+			},
+		})
+	}
+	return map[string]any{
+		"version": 1,
+		"type":    "doc",
+		"content": content,
+	}
+}
+
 // Create creates a new Jira issue. Jira REST requires fields.project.key on
 // every issueCreate call; the project key is taken from item.ProjectID if set,
 // otherwise from c.defaultProject. If neither is set, returns an error rather
 // than silently 400-ing on the server side.
-//
-// NOTE: Cloud (v3) expects description as an Atlassian Document Format (ADF)
-// object. This adapter currently sends a plain string, which Cloud may reject
-// or store empty. Server (v2) accepts the plain string. ADF support is a
-// follow-up.
 func (c *Client) Create(ctx context.Context, item tracker.WorkItem) (*tracker.WorkItem, error) {
 	projectKey := item.ProjectID
 	if projectKey == "" {
@@ -182,7 +201,7 @@ func (c *Client) Create(ctx context.Context, item tracker.WorkItem) (*tracker.Wo
 		"fields": map[string]any{
 			"project":     map[string]any{"key": projectKey},
 			"summary":     item.Title,
-			"description": item.Description,
+			"description": c.toDescription(item.Description),
 		},
 	}
 	var resp struct {
@@ -212,7 +231,11 @@ func (c *Client) Update(ctx context.Context, id string, updates map[string]any) 
 		fields["summary"] = v
 	}
 	if v, ok := updates["description"]; ok {
-		fields["description"] = v
+		if text, ok := v.(string); ok {
+			fields["description"] = c.toDescription(text)
+		} else {
+			fields["description"] = v
+		}
 	}
 	if v, ok := updates["state"]; ok {
 		if name, ok := v.(string); ok && name != "" {
