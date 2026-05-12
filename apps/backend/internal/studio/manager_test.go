@@ -8,10 +8,10 @@ import (
 	"sync"
 	"testing"
 
-	_ "modernc.org/sqlite"
 	"github.com/orchestra/orchestra/apps/backend/internal/db"
 	"github.com/orchestra/orchestra/apps/backend/internal/observability"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
+	_ "modernc.org/sqlite"
 )
 
 // fakeTracker is an in-memory Tracker implementation for testing Push.
@@ -183,5 +183,46 @@ func TestPushRejectsEmptyDescription(t *testing.T) {
 	_ = m.SetTitle(sess.ID, "T")
 	if _, err := m.Push(context.Background(), sess.ID); err == nil {
 		t.Fatalf("expected validation error")
+	}
+}
+
+func TestPushIsIdempotent_ConcurrentCallsCreateOneIssue(t *testing.T) {
+	m := newTestManager(t)
+	tr := &fakeTracker{}
+	m.SetTracker(tr)
+	sess, err := m.StartSession(context.Background(), StartSessionRequest{ProjectID: "p", Runner: "claude-code"})
+	if err != nil {
+		t.Fatalf("start session: %v", err)
+	}
+	if err := m.SetTitle(sess.ID, "T"); err != nil {
+		t.Fatalf("set title: %v", err)
+	}
+	if err := m.SetDescription(sess.ID, "D"); err != nil {
+		t.Fatalf("set description: %v", err)
+	}
+
+	const n = 5
+	var wg sync.WaitGroup
+	errs := make([]error, n)
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			_, errs[idx] = m.Push(context.Background(), sess.ID)
+		}(i)
+	}
+	wg.Wait()
+
+	successCount := 0
+	for _, e := range errs {
+		if e == nil {
+			successCount++
+		}
+	}
+	if successCount != 1 {
+		t.Fatalf("expected exactly 1 successful push, got %d (errs=%v)", successCount, errs)
+	}
+	if len(tr.created) != 1 {
+		t.Fatalf("expected exactly 1 tracker issue, got %d", len(tr.created))
 	}
 }

@@ -134,6 +134,9 @@ func (m *Manager) Discard(sessionID string) error {
 // persists studio-specific fields, then closes out the session.
 // Returns the new issue's identifier.
 func (m *Manager) Push(ctx context.Context, sessionID string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	snap, err := m.GetDraft(sessionID)
 	if err != nil {
 		return "", err
