@@ -193,4 +193,36 @@ CREATE TABLE IF NOT EXISTS tracker_configs (
 	created_at   INTEGER NOT NULL,
 	updated_at   INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS studio_sessions (
+	id TEXT PRIMARY KEY,
+	project_id TEXT,
+	runner TEXT NOT NULL,
+	started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	ended_at DATETIME,
+	outcome TEXT,
+	FOREIGN KEY (project_id) REFERENCES projects(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_studio_sessions_project_id ON studio_sessions(project_id);
+
+CREATE TABLE IF NOT EXISTS issue_drafts (
+	id TEXT PRIMARY KEY,
+	session_id TEXT NOT NULL UNIQUE,
+	title TEXT NOT NULL DEFAULT '',
+	description TEXT NOT NULL DEFAULT '',
+	acceptance_criteria TEXT NOT NULL DEFAULT '[]',
+	attachments TEXT NOT NULL DEFAULT '[]',
+	suggested_provider TEXT,
+	suggested_model TEXT,
+	max_turns INTEGER,
+	template_name TEXT,
+	template_vars TEXT NOT NULL DEFAULT '{}',
+	agent_guidance TEXT NOT NULL DEFAULT '{}',
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (session_id) REFERENCES studio_sessions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_issue_drafts_session_id ON issue_drafts(session_id);
 `
