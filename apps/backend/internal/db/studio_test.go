@@ -49,3 +49,47 @@ func TestIssuesStudioColumnsExist(t *testing.T) {
 		}
 	}
 }
+
+func TestCreateAndGetStudioSession(t *testing.T) {
+	d := openTestDB(t)
+
+	s := StudioSession{ID: "sess1", ProjectID: "proj1", Runner: "claude-code"}
+	if err := CreateStudioSession(d, s); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	got, err := GetStudioSession(d, "sess1")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.Runner != "claude-code" {
+		t.Fatalf("runner = %q, want claude-code", got.Runner)
+	}
+}
+
+func TestCreateDraftAndUpdate(t *testing.T) {
+	d := openTestDB(t)
+	_ = CreateStudioSession(d, StudioSession{ID: "sess1", ProjectID: "proj1", Runner: "claude-code"})
+
+	if err := CreateDraft(d, "sess1"); err != nil {
+		t.Fatalf("create draft: %v", err)
+	}
+	if err := UpdateDraftField(d, "sess1", "title", "Refactor auth"); err != nil {
+		t.Fatalf("update title: %v", err)
+	}
+	d2, err := GetDraft(d, "sess1")
+	if err != nil {
+		t.Fatalf("get draft: %v", err)
+	}
+	if d2.Title != "Refactor auth" {
+		t.Fatalf("title = %q", d2.Title)
+	}
+}
+
+func TestUpdateDraftFieldRejectsUnknownColumn(t *testing.T) {
+	d := openTestDB(t)
+	_ = CreateStudioSession(d, StudioSession{ID: "sess1", ProjectID: "proj1", Runner: "claude-code"})
+	_ = CreateDraft(d, "sess1")
+	if err := UpdateDraftField(d, "sess1", "id; DROP TABLE issues;--", "x"); err == nil {
+		t.Fatalf("expected rejection of unknown column")
+	}
+}
