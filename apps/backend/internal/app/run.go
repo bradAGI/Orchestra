@@ -182,8 +182,24 @@ func Run(logger zerolog.Logger) error {
 		usageService = nil
 	}
 
-	studioMgr := studio.NewManager(warehouseDB.DB, pubsub, nil)
+	daemonBin, exeErr := os.Executable()
+	if exeErr != nil {
+		logger.Warn().Err(exeErr).Msg("studio: cannot resolve daemon binary path; mcp-bridge will fail")
+		daemonBin = ""
+	}
+	socketPath := studio.SocketPath(cfg.WorkspaceRoot)
+
+	var studioSpawner studio.RunnerSpawner
+	if agentRegistry != nil && daemonBin != "" {
+		studioSpawner = studio.NewStudioSpawner(agentRegistry, cfg.WorkspaceRoot, daemonBin, socketPath)
+	}
+
+	studioMgr := studio.NewManager(warehouseDB.DB, pubsub, studioSpawner)
 	studioMgr.SetTracker(studio.NewOrchestratorTrackerAdapter(orchestratorService))
+
+	if _, err := studio.StartBridgeListener(context.Background(), socketPath, studioMgr); err != nil {
+		logger.Warn().Err(err).Str("socket", socketPath).Msg("studio: bridge listener not started")
+	}
 
 	router := api.NewRouterWithPubSub(logger, orchestratorService, &cfg, pubsub, warehouseDB, termManager, usageService, trackerRegistry, studioMgr)
 
