@@ -1,0 +1,178 @@
+import { useEffect, useMemo, useState } from 'react'
+import {
+  createStudioSession,
+  discardStudioSession,
+  getStudioDraft,
+  patchStudioDraft,
+  pushStudioToBacklog,
+  sendStudioMessage,
+  studioEventsURL,
+  type BackendConfig,
+} from '@core/api/client'
+import { StudioChat } from './chat/StudioChat'
+import { useStudioSession, type StudioSessionClient } from './chat/useStudioSession'
+import { DraftPanel } from './draft/DraftPanel'
+
+export interface StudioSectionProps {
+  config: BackendConfig
+  projectId: string
+}
+
+const RUNNERS = ['claude-code', 'codex', 'opencode', 'gemini']
+
+export function StudioSection({ config, projectId }: StudioSectionProps) {
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [runner, setRunner] = useState(RUNNERS[0])
+  const [pushing, setPushing] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+  const [startError, setStartError] = useState<string | null>(null)
+
+  const client = useMemo<StudioSessionClient>(
+    () => ({
+      studioEventsURL: (id) => studioEventsURL(config, id),
+      getStudioDraft: (id) => getStudioDraft(config, id),
+      sendStudioMessage: (id, m) => sendStudioMessage(config, id, m),
+      patchStudioDraft: (id, p) => patchStudioDraft(config, id, p),
+      pushStudioToBacklog: (id) => pushStudioToBacklog(config, id),
+      discardStudioSession: (id) => discardStudioSession(config, id),
+    }),
+    [config],
+  )
+
+  useEffect(() => {
+    if (sessionId) return
+    let cancelled = false
+    createStudioSession(config, { project_id: projectId, runner })
+      .then((h) => {
+        if (!cancelled) setSessionId(h.session_id)
+      })
+      .catch((err) => {
+        if (!cancelled) setStartError(err instanceof Error ? err.message : String(err))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [config, projectId, runner, sessionId])
+
+  if (startError) {
+    return <div className="p-6 text-sm text-red-400">Failed to start studio session: {startError}</div>
+  }
+  if (!sessionId) {
+    return <div className="p-6 text-sm opacity-60">Starting studio session…</div>
+  }
+
+  return (
+    <StudioBody
+      sessionId={sessionId}
+      runner={runner}
+      onRunnerChange={(r) => {
+        setRunner(r)
+        setSessionId(null)
+      }}
+      client={client}
+      pushing={pushing}
+      setPushing={setPushing}
+      onPushed={(issueId) => {
+        setToast(`Pushed to backlog: ${issueId}`)
+        setSessionId(null)
+      }}
+      onDiscarded={() => setSessionId(null)}
+      toast={toast}
+      clearToast={() => setToast(null)}
+    />
+  )
+}
+
+function StudioBody({
+  sessionId,
+  runner,
+  onRunnerChange,
+  client,
+  pushing,
+  setPushing,
+  onPushed,
+  onDiscarded,
+  toast,
+  clearToast,
+}: {
+  sessionId: string
+  runner: string
+  onRunnerChange: (runner: string) => void
+  client: StudioSessionClient
+  pushing: boolean
+  setPushing: (b: boolean) => void
+  onPushed: (issueId: string) => void
+  onDiscarded: () => void
+  toast: string | null
+  clearToast: () => void
+}) {
+  const { draft, messages, sendMessage, editDraft, push, discard } = useStudioSession(sessionId, client)
+
+  const pushDisabledReason = !draft
+    ? 'Loading draft…'
+    : !draft.title.trim()
+      ? 'Title required'
+      : !draft.description.trim()
+        ? 'Description required'
+        : undefined
+
+  const handlePush = async () => {
+    setPushing(true)
+    try {
+      const { issue_id } = await push()
+      onPushed(issue_id)
+    } finally {
+      setPushing(false)
+    }
+  }
+
+  const handleDiscard = async () => {
+    await discard()
+    onDiscarded()
+  }
+
+  return (
+    <div className="h-full flex relative">
+      <div className="flex-[1.4] min-w-0 flex flex-col">
+        <div className="px-4 py-2 border-b border-white/10 flex items-center gap-2 text-xs">
+          <span className="opacity-60">Runner</span>
+          <select
+            className="bg-transparent border border-white/20 rounded px-1 py-0.5"
+            value={runner}
+            onChange={(e) => onRunnerChange(e.target.value)}
+          >
+            {RUNNERS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex-1 min-h-0">
+          <StudioChat messages={messages} onSend={sendMessage} runner={runner} />
+        </div>
+      </div>
+      <div className="flex-1 min-w-0">
+        {draft && (
+          <DraftPanel
+            draft={draft}
+            onChange={editDraft}
+            onPush={handlePush}
+            onDiscard={handleDiscard}
+            pushing={pushing}
+            pushDisabledReason={pushDisabledReason}
+          />
+        )}
+      </div>
+      {toast && (
+        <button
+          type="button"
+          onClick={clearToast}
+          className="absolute bottom-4 right-4 bg-sky-600 text-white text-sm px-3 py-2 rounded shadow"
+        >
+          {toast}
+        </button>
+      )}
+    </div>
+  )
+}
