@@ -2660,3 +2660,64 @@ export async function discardStudioSession(config: BackendConfig, sessionId: str
 export function studioEventsURL(config: BackendConfig, sessionId: string): string {
   return new URL(`/api/v1/studio/sessions/${encodeURIComponent(sessionId)}/events`, config.baseUrl).toString()
 }
+
+export interface StudioTemplate {
+  path: string
+  meta: {
+    name: string
+    description: string
+    variables: Array<{ name: string; required: boolean; default?: string }>
+    suggested_provider?: string
+    suggested_model?: string
+    suggested_max_turns?: number
+  }
+  body: string
+}
+
+export async function listStudioTemplates(config: BackendConfig): Promise<StudioTemplate[]> {
+  const res = await requestJSON<StudioTemplate[] | null>(config, '/api/v1/studio/templates')
+  return res ?? []
+}
+
+export async function getStudioTemplate(config: BackendConfig, name: string): Promise<StudioTemplate> {
+  return requestJSON<StudioTemplate>(config, `/api/v1/studio/templates/${encodeURIComponent(name)}`)
+}
+
+export async function createStudioTemplate(config: BackendConfig, name: string, content: string): Promise<void> {
+  await requestJSON<void>(config, '/api/v1/studio/templates', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, content }),
+  })
+}
+
+export async function updateStudioTemplate(config: BackendConfig, name: string, content: string): Promise<void> {
+  await requestJSON<void>(config, `/api/v1/studio/templates/${encodeURIComponent(name)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  })
+}
+
+export async function deleteStudioTemplate(config: BackendConfig, name: string): Promise<void> {
+  await requestJSON<void>(config, `/api/v1/studio/templates/${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function applyStudioTemplate(
+  config: BackendConfig,
+  sessionId: string,
+  name: string,
+  vars: Record<string, string>,
+): Promise<void> {
+  await requestJSON<void>(
+    config,
+    `/api/v1/studio/sessions/${encodeURIComponent(sessionId)}/apply-template`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, vars }),
+    },
+  )
+}

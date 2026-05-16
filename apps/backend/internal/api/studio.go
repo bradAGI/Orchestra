@@ -173,3 +173,29 @@ func startsWithDotPrefix(s, prefix string) bool {
 	}
 	return s[:len(prefix)] == prefix && s[len(prefix)] == '.'
 }
+
+// PostStudioSessionApplyTemplate applies a template to a session's draft mid-session.
+func (s *Server) PostStudioSessionApplyTemplate(w http.ResponseWriter, r *http.Request) {
+	if s.studioMgr == nil {
+		http.Error(w, "studio not configured", http.StatusServiceUnavailable)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	var req struct {
+		Name string            `json:"name"`
+		Vars map[string]string `json:"vars"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Name == "" {
+		http.Error(w, "name required", http.StatusBadRequest)
+		return
+	}
+	if err := s.studioMgr.ApplyTemplate(id, req.Name, req.Vars); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

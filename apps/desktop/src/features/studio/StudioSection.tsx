@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  applyStudioTemplate,
   createStudioSession,
   discardStudioSession,
   getStudioDraft,
@@ -12,6 +13,8 @@ import {
 import { StudioChat } from './chat/StudioChat'
 import { useStudioSession, type StudioSessionClient } from './chat/useStudioSession'
 import { DraftPanel } from './draft/DraftPanel'
+import { TemplateLibrary } from './templates/TemplateLibrary'
+import { useTemplates } from './templates/useTemplates'
 
 export interface StudioSectionProps {
   config: BackendConfig
@@ -70,6 +73,7 @@ export function StudioSection({ config, projectId }: StudioSectionProps) {
         setSessionId(null)
       }}
       client={client}
+      config={config}
       pushing={pushing}
       setPushing={setPushing}
       onPushed={(issueId) => {
@@ -88,6 +92,7 @@ function StudioBody({
   runner,
   onRunnerChange,
   client,
+  config,
   pushing,
   setPushing,
   onPushed,
@@ -99,6 +104,7 @@ function StudioBody({
   runner: string
   onRunnerChange: (runner: string) => void
   client: StudioSessionClient
+  config: BackendConfig
   pushing: boolean
   setPushing: (b: boolean) => void
   onPushed: (issueId: string) => void
@@ -107,6 +113,19 @@ function StudioBody({
   clearToast: () => void
 }) {
   const { draft, messages, sendMessage, editDraft, push, discard } = useStudioSession(sessionId, client)
+  const { templates, save: saveTemplate, remove: removeTemplate } = useTemplates(config)
+  const [libraryOpen, setLibraryOpen] = useState(false)
+  const [templateError, setTemplateError] = useState<string | null>(null)
+
+  const applyTemplate = async (name: string, vars: Record<string, string>) => {
+    setTemplateError(null)
+    try {
+      await applyStudioTemplate(config, sessionId, name, vars)
+      setLibraryOpen(false)
+    } catch (err) {
+      setTemplateError(err instanceof Error ? err.message : String(err))
+    }
+  }
 
   const pushDisabledReason = !draft
     ? 'Loading draft…'
@@ -159,11 +178,26 @@ function StudioBody({
             onChange={editDraft}
             onPush={handlePush}
             onDiscard={handleDiscard}
+            onBrowseTemplates={() => setLibraryOpen(true)}
             pushing={pushing}
             pushDisabledReason={pushDisabledReason}
           />
         )}
       </div>
+      {libraryOpen && (
+        <TemplateLibrary
+          templates={templates}
+          onApply={applyTemplate}
+          onSave={saveTemplate}
+          onDelete={removeTemplate}
+          onClose={() => setLibraryOpen(false)}
+        />
+      )}
+      {templateError && (
+        <div className="absolute bottom-16 right-4 bg-red-700 text-white text-xs px-3 py-2 rounded shadow max-w-sm">
+          {templateError}
+        </div>
+      )}
       {toast && (
         <button
           type="button"

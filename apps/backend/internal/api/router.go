@@ -346,6 +346,7 @@ func NewRouterWithPubSub(
 	protected.Post("/api/v1/studio/sessions/{id}/draft", server.PostStudioSessionDraft)
 	protected.Get("/api/v1/studio/sessions/{id}/draft", server.GetStudioSessionDraft)
 	protected.Post("/api/v1/studio/sessions/{id}/push", server.PostStudioSessionPush)
+	protected.Post("/api/v1/studio/sessions/{id}/apply-template", server.PostStudioSessionApplyTemplate)
 	protected.Delete("/api/v1/studio/sessions/{id}", server.DeleteStudioSession)
 	protected.Get("/api/v1/studio/templates", server.ListStudioTemplates)
 	protected.Post("/api/v1/studio/templates", server.CreateStudioTemplate)

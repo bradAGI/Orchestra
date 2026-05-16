@@ -11,16 +11,17 @@ export interface DraftPanelProps {
   onChange: (patch: Partial<StudioDraft>) => void
   onPush: () => void
   onDiscard: () => void
+  onBrowseTemplates?: () => void
   pushing?: boolean
   pushDisabledReason?: string
 }
 
-export function DraftPanel({ draft, onChange, onPush, onDiscard, pushing, pushDisabledReason }: DraftPanelProps) {
+export function DraftPanel({ draft, onChange, onPush, onDiscard, onBrowseTemplates, pushing, pushDisabledReason }: DraftPanelProps) {
   return (
     <div className="h-full flex flex-col border-l border-white/10">
       <div className="px-4 py-3 border-b border-white/10 flex items-center gap-3">
         <h2 className="text-sm font-medium">Task draft</h2>
-        <TemplatePicker draft={draft} onChange={onChange} />
+        <TemplatePicker draft={draft} onChange={onChange} onBrowse={onBrowseTemplates} />
         <button type="button" onClick={onDiscard} className="ml-auto text-xs opacity-60 hover:opacity-100">
           Discard
         </button>
