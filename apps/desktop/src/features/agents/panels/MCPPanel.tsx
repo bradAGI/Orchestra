@@ -1,6 +1,7 @@
 // apps/desktop/src/features/agents/panels/MCPPanel.tsx
-import { useState, useEffect, useMemo } from 'react'
-import Editor from '@monaco-editor/react'
+import { lazy, Suspense, useId, useMemo, useReducer, useState } from 'react'
+
+const Editor = lazy(() => import('@monaco-editor/react'))
 import { useAppStore } from '@core/store'
 import { Plus, Trash2, Power, PowerOff } from 'lucide-react'
 import { Button } from '@ui/button'
@@ -15,6 +16,8 @@ import { EmptyStateCard } from '../components/EmptyStateCard'
 import { ErrorStrip } from '../components/ErrorStrip'
 import { TOKENS } from '../tokens'
 import type { Provider, Scope } from '../types'
+
+const EMPTY_GLOBAL_SERVERS: readonly ProviderMCPServer[] = Object.freeze([])
 
 interface MCPPanelProps {
   providerServers: ProviderMCPServer[]
@@ -45,30 +48,54 @@ type ListItem = {
   server: ProviderMCPServer | MCPServer
 }
 
+interface DialogState {
+  createOpen: boolean
+  createName: string
+  savingItem: boolean
+  deleteTarget: { name: string; kind: 'provider' | 'orchestra' } | null
+}
+
+type DialogAction =
+  | { type: 'open_create' }
+  | { type: 'set_create_name'; name: string }
+  | { type: 'close_create' }
+  | { type: 'create_start' }
+  | { type: 'create_done' }
+  | { type: 'open_delete'; target: { name: string; kind: 'provider' | 'orchestra' } }
+  | { type: 'close_delete' }
+
+const initialDialogState: DialogState = {
+  createOpen: false,
+  createName: '',
+  savingItem: false,
+  deleteTarget: null,
+}
+
+function dialogReducer(state: DialogState, action: DialogAction): DialogState {
+  switch (action.type) {
+    case 'open_create': return { ...state, createOpen: true }
+    case 'set_create_name': return { ...state, createName: action.name }
+    case 'close_create': return { ...state, createOpen: false, createName: '' }
+    case 'create_start': return { ...state, savingItem: true }
+    case 'create_done': return { ...state, savingItem: false, createOpen: false, createName: '' }
+    case 'open_delete': return { ...state, deleteTarget: action.target }
+    case 'close_delete': return { ...state, deleteTarget: null }
+    default: return state
+  }
+}
+
 function serverToJson(server: ProviderMCPServer | MCPServer): string {
-  // Exclude name (it's the key) and produce the config object
   const { name: _name, ...rest } = server as Record<string, unknown>
   void _name
   return JSON.stringify(rest, null, 2)
 }
 
 export function MCPPanel({
-  providerServers, orchestraServers, globalProviderServers = [],
+  providerServers, orchestraServers, globalProviderServers = EMPTY_GLOBAL_SERVERS as ProviderMCPServer[],
   scope = 'GLOBAL', projectName = null,
   onAddProvider, onUpdateProvider, onToggleProvider, onDeleteProvider, onDeleteOrchestra,
   loading, saving, provider,
 }: MCPPanelProps) {
-  const theme = useAppStore(s => s.theme)
-  const editorSettings = useAppStore(s => s.editorSettings)
-  const [selectedKey, setSelectedKey] = useState<string | null>(null)
-  const [content, setContent] = useState('')
-  const [jsonError, setJsonError] = useState<string | null>(null)
-  const [error, setError] = useState('')
-  const [deleteTarget, setDeleteTarget] = useState<{ name: string; kind: 'provider' | 'orchestra' } | null>(null)
-  const [createOpen, setCreateOpen] = useState(false)
-  const [createName, setCreateName] = useState('')
-  const [savingItem, setSavingItem] = useState(false)
-
   const items: ListItem[] = useMemo(() => {
     const provided = providerServers.map(s => ({
       key: `provider:${s.name}`,
@@ -83,41 +110,20 @@ export function MCPPanel({
       kind: 'orchestra' as const,
       server: s,
     }))
+    const providerNames = new Set(providerServers.map(p => p.name))
     const inherited = scope === 'PROJECT'
-      ? globalProviderServers
-          .filter(g => !providerServers.some(p => p.name === g.name))
-          .map(s => ({
+      ? globalProviderServers.flatMap(s => providerNames.has(s.name) ? [] : [{
             key: `inherited:${s.name}`,
             name: s.name,
             kind: 'inherited' as const,
             enabled: s.enabled,
             server: s,
-          }))
+          }])
       : []
     return [...provided, ...orchestra, ...inherited]
   }, [providerServers, orchestraServers, globalProviderServers, scope])
 
-  useEffect(() => {
-    if (!selectedKey && items.length > 0) setSelectedKey(items[0].key)
-  }, [selectedKey, items])
-
-  useEffect(() => {
-    if (selectedKey && !items.find(i => i.key === selectedKey)) {
-      setSelectedKey(items.length > 0 ? items[0].key : null)
-    }
-  }, [selectedKey, items])
-
-  const selected = items.find(i => i.key === selectedKey) ?? null
-
-  useEffect(() => {
-    setContent(selected ? serverToJson(selected.server) : '')
-    setJsonError(null)
-    setError('')
-  }, [selected])
-
-  const dirty = selected && selected.kind === 'provider'
-    ? content !== serverToJson(selected.server)
-    : false
+  const [dialog, dispatch] = useReducer(dialogReducer, initialDialogState)
 
   if (loading) {
     return <div className="p-6 space-y-3"><Skeleton className="h-6 w-48" /><Skeleton className="h-[200px] w-full" /></div>
@@ -128,20 +134,144 @@ export function MCPPanel({
   const sub = `.mcp.json · ${total} server${total === 1 ? '' : 's'}`
 
   const handleCreate = async () => {
-    const n = createName.trim()
+    const n = dialog.createName.trim()
     if (!n) return
-    setSavingItem(true)
+    dispatch({ type: 'create_start' })
     try {
       let parsed: { command?: string; args?: string[] }
       try { parsed = JSON.parse(DEFAULT_SERVER_JSON) } catch { parsed = {} }
       await onAddProvider(n, parsed.command ?? 'node')
-      setSelectedKey(`provider:${n}`)
-      setCreateOpen(false)
-      setCreateName('')
     } finally {
-      setSavingItem(false)
+      dispatch({ type: 'create_done' })
     }
   }
+
+  const handleConfirmDelete = async () => {
+    if (!dialog.deleteTarget) return
+    if (dialog.deleteTarget.kind === 'provider') {
+      await onDeleteProvider(dialog.deleteTarget.name)
+    } else {
+      await onDeleteOrchestra(dialog.deleteTarget.name)
+    }
+    dispatch({ type: 'close_delete' })
+  }
+
+  if (items.length === 0 && scope === 'PROJECT' && projectName) {
+    return (
+      <div className="flex flex-col h-full p-[18px]">
+        <PanelHeader eyebrow={eyebrow} title="MCP servers" sub="No project MCP servers · inherits 0 from global" />
+        <EmptyStateCard
+          title="No MCP servers at this scope"
+          description="Add an MCP server to extend this project's tools."
+          ctaLabel="New server"
+          onCreate={() => dispatch({ type: 'open_create' })}
+        />
+        <CreateDialog
+          open={dialog.createOpen}
+          name={dialog.createName}
+          setName={(n) => dispatch({ type: 'set_create_name', name: n })}
+          pending={dialog.savingItem}
+          onCancel={() => dispatch({ type: 'close_create' })}
+          onCreate={handleCreate}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <MCPPanelLoaded
+      key={items.map(i => i.key).join('|')}
+      items={items}
+      eyebrow={eyebrow}
+      sub={sub}
+      saving={saving}
+      provider={provider}
+      dialog={dialog}
+      dispatch={dispatch}
+      handleCreate={handleCreate}
+      handleConfirmDelete={handleConfirmDelete}
+      onUpdateProvider={onUpdateProvider}
+      onToggleProvider={onToggleProvider}
+    />
+  )
+}
+
+interface MCPPanelLoadedProps {
+  items: ListItem[]
+  eyebrow: string
+  sub: string
+  saving: string | null
+  provider: Provider
+  dialog: DialogState
+  dispatch: React.Dispatch<DialogAction>
+  handleCreate: () => Promise<void>
+  handleConfirmDelete: () => Promise<void>
+  onUpdateProvider: (name: string, server: Partial<ProviderMCPServer>) => Promise<void>
+  onToggleProvider: (name: string, enabled: boolean) => Promise<void>
+}
+
+function MCPPanelLoaded({
+  items, eyebrow, sub, saving, provider, dialog, dispatch,
+  handleCreate, handleConfirmDelete, onUpdateProvider, onToggleProvider,
+}: MCPPanelLoadedProps) {
+  const [selectedKey, setSelectedKey] = useState<string | null>(items[0]?.key ?? null)
+  const effectiveSelectedKey = selectedKey && items.some(i => i.key === selectedKey)
+    ? selectedKey
+    : (items[0]?.key ?? null)
+  const selected = items.find(i => i.key === effectiveSelectedKey) ?? null
+
+  return (
+    <MCPEditor
+      key={selected?.key ?? '__none__'}
+      selected={selected}
+      items={items}
+      selectedKey={effectiveSelectedKey}
+      setSelectedKey={setSelectedKey}
+      eyebrow={eyebrow}
+      sub={sub}
+      saving={saving}
+      provider={provider}
+      dialog={dialog}
+      dispatch={dispatch}
+      handleCreate={handleCreate}
+      handleConfirmDelete={handleConfirmDelete}
+      onUpdateProvider={onUpdateProvider}
+      onToggleProvider={onToggleProvider}
+    />
+  )
+}
+
+interface MCPEditorProps {
+  selected: ListItem | null
+  items: ListItem[]
+  selectedKey: string | null
+  setSelectedKey: (key: string | null) => void
+  eyebrow: string
+  sub: string
+  saving: string | null
+  provider: Provider
+  dialog: DialogState
+  dispatch: React.Dispatch<DialogAction>
+  handleCreate: () => Promise<void>
+  handleConfirmDelete: () => Promise<void>
+  onUpdateProvider: (name: string, server: Partial<ProviderMCPServer>) => Promise<void>
+  onToggleProvider: (name: string, enabled: boolean) => Promise<void>
+}
+
+function MCPEditor({
+  selected, items, selectedKey, setSelectedKey,
+  eyebrow, sub, saving, provider, dialog, dispatch,
+  handleCreate, handleConfirmDelete, onUpdateProvider, onToggleProvider,
+}: MCPEditorProps) {
+  const theme = useAppStore(s => s.theme)
+  const editorSettings = useAppStore(s => s.editorSettings)
+  const [content, setContent] = useState(selected ? serverToJson(selected.server) : '')
+  const [jsonError, setJsonError] = useState<string | null>(null)
+  const [error, setError] = useState('')
+
+  const dirty = selected && selected.kind === 'provider'
+    ? content !== serverToJson(selected.server)
+    : false
 
   const handleSave = async () => {
     if (!selected || selected.kind !== 'provider') return
@@ -168,43 +298,14 @@ export function MCPPanel({
     }
   }
 
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget) return
-    if (deleteTarget.kind === 'provider') {
-      await onDeleteProvider(deleteTarget.name)
-    } else {
-      await onDeleteOrchestra(deleteTarget.name)
-    }
-    setDeleteTarget(null)
-    setSelectedKey(null)
-  }
-
-  if (items.length === 0 && scope === 'PROJECT' && projectName) {
-    return (
-      <div className="flex flex-col h-full p-[18px]">
-        <PanelHeader eyebrow={eyebrow} title="MCP servers" sub="No project MCP servers · inherits 0 from global" />
-        <EmptyStateCard
-          title="No MCP servers at this scope"
-          description="Add an MCP server to extend this project's tools."
-          ctaLabel="New server"
-          onCreate={() => setCreateOpen(true)}
-        />
-        <CreateDialog open={createOpen} name={createName} setName={setCreateName} pending={savingItem}
-          onCancel={() => { setCreateOpen(false); setCreateName('') }}
-          onCreate={handleCreate}
-        />
-      </div>
-    )
-  }
-
   return (
-    <div className="flex flex-col h-full p-[18px] space-y-[14px]">
+    <div className="flex flex-col h-full p-[18px] gap-y-[14px]">
       <PanelHeader eyebrow={eyebrow} title="MCP servers" sub={sub} dirty={!!dirty} />
 
       <div className="flex flex-1 min-h-0 gap-3">
         <aside className={`w-[220px] flex flex-col shrink-0 ${TOKENS.surfaceCard}`}>
           <div className="p-2 border-b border-border/30">
-            <Button size="sm" variant="ghost" onClick={() => setCreateOpen(true)} className="w-full h-7 text-[10px]">
+            <Button size="sm" variant="ghost" onClick={() => dispatch({ type: 'open_create' })} className="w-full h-7 text-[10px]">
               <Plus size={10} className="mr-1" /> New server
             </Button>
           </div>
@@ -249,29 +350,31 @@ export function MCPPanel({
                 )}
               </div>
               <div className="flex-1 min-h-0 rounded-md border border-border/30 overflow-hidden">
-                <Editor
-                  language="json"
-                  value={content}
-                  theme={theme === 'dark' ? 'vs-dark' : 'vs'}
-                  onChange={(v) => {
-                    if (v !== undefined && selected.kind === 'provider') {
-                      setContent(v)
-                      setJsonError(null)
-                    }
-                  }}
-                  options={{
-                    readOnly: selected.kind !== 'provider',
-                    minimap: { enabled: false },
-                    fontSize: editorSettings.fontSize,
-                    fontFamily: editorSettings.fontFamily || undefined,
-                    lineNumbers: 'on',
-                    wordWrap: 'on',
-                    scrollBeyondLastLine: false,
-                    automaticLayout: true,
-                    tabSize: 2,
-                    padding: { top: 10, bottom: 10 },
-                  }}
-                />
+                <Suspense fallback={null}>
+                  <Editor
+                    language="json"
+                    value={content}
+                    theme={theme === 'dark' ? 'vs-dark' : 'vs'}
+                    onChange={(v) => {
+                      if (v !== undefined && selected.kind === 'provider') {
+                        setContent(v)
+                        setJsonError(null)
+                      }
+                    }}
+                    options={{
+                      readOnly: selected.kind !== 'provider',
+                      minimap: { enabled: false },
+                      fontSize: editorSettings.fontSize,
+                      fontFamily: editorSettings.fontFamily || undefined,
+                      lineNumbers: 'on',
+                      wordWrap: 'on',
+                      scrollBeyondLastLine: false,
+                      automaticLayout: true,
+                      tabSize: 2,
+                      padding: { top: 10, bottom: 10 },
+                    }}
+                  />
+                </Suspense>
               </div>
               {jsonError && <p className="text-[10px] text-red-400 font-mono">{jsonError}</p>}
             </>
@@ -294,7 +397,7 @@ export function MCPPanel({
           selected && selected.kind !== 'inherited' ? (
             <button
               type="button"
-              onClick={() => setDeleteTarget({ name: selected.name, kind: selected.kind as 'provider' | 'orchestra' })}
+              onClick={() => dispatch({ type: 'open_delete', target: { name: selected.name, kind: selected.kind as 'provider' | 'orchestra' } })}
               className="text-[10px] text-foreground/40 hover:text-red-400 inline-flex items-center gap-1"
             >
               <Trash2 size={11} /> Delete
@@ -304,25 +407,25 @@ export function MCPPanel({
       />
 
       <CreateDialog
-        open={createOpen}
-        name={createName}
-        setName={setCreateName}
-        pending={savingItem}
-        onCancel={() => { setCreateOpen(false); setCreateName('') }}
+        open={dialog.createOpen}
+        name={dialog.createName}
+        setName={(n) => dispatch({ type: 'set_create_name', name: n })}
+        pending={dialog.savingItem}
+        onCancel={() => dispatch({ type: 'close_create' })}
         onCreate={handleCreate}
       />
 
-      <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+      <Dialog open={!!dialog.deleteTarget} onOpenChange={(o) => !o && dispatch({ type: 'close_delete' })}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-red-400">Delete MCP server</DialogTitle>
             <DialogDescription>This removes the server from configuration. Cannot be undone.</DialogDescription>
           </DialogHeader>
           <div className="py-4 rounded-md border bg-muted/30 p-3">
-            <p className="text-sm font-mono text-primary">{deleteTarget?.name}</p>
+            <p className="text-sm font-mono text-primary">{dialog.deleteTarget?.name}</p>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => dispatch({ type: 'close_delete' })}>Cancel</Button>
             <Button variant="destructive" onClick={handleConfirmDelete}>
               <Trash2 size={14} className="mr-2" /> Delete
             </Button>
@@ -330,7 +433,6 @@ export function MCPPanel({
         </DialogContent>
       </Dialog>
 
-      {/* Hint about provider/orchestra/inherited badges */}
       <div className="text-[9px] text-muted-foreground/30 font-mono">
         {provider} provider · (O) orchestra-managed · (G) inherited from global
       </div>
@@ -348,6 +450,7 @@ function CreateDialog({
   onCancel: () => void
   onCreate: () => void
 }) {
+  const nameId = useId()
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onCancel()}>
       <DialogContent className="max-w-md">
@@ -356,9 +459,9 @@ function CreateDialog({
           <DialogDescription>Adds a server entry to .mcp.json. Edit the config in the JSON editor after creation.</DialogDescription>
         </DialogHeader>
         <div className="py-2">
-          <label className="text-xs font-semibold text-foreground/60 mb-1.5 block">Server name</label>
+          <label htmlFor={nameId} className="text-xs font-semibold text-foreground/60 mb-1.5 block">Server name</label>
           <input
-            autoFocus
+            id={nameId}
             value={name}
             onChange={(e) => setName(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
             onKeyDown={(e) => e.key === 'Enter' && name.trim() && onCreate()}

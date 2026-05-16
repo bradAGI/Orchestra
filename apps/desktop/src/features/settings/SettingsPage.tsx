@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import {
   Bell,
   Cable,
@@ -273,14 +273,21 @@ export function SettingsPage({
   const duplicateTheme = useAppStore(s => s.duplicateTheme)
   const deleteCustomTheme = useAppStore(s => s.deleteCustomTheme)
   const reapply = useAppStore(s => s.reapply)
-  const [homepageDraft, setHomepageDraft] = useState(browserHomepage)
+  // Reset draft when the external homepage value changes — sync during render instead of in an effect.
+  const [homepageState, setHomepageDraftRaw] = useState<{ draft: string; lastProp: string }>(() => ({ draft: browserHomepage, lastProp: browserHomepage }))
+  const homepageDraft = homepageState.lastProp === browserHomepage ? homepageState.draft : browserHomepage
+  if (homepageState.lastProp !== browserHomepage) {
+    setHomepageDraftRaw({ draft: browserHomepage, lastProp: browserHomepage })
+  }
+  const setHomepageDraft = useCallback((draft: string) => {
+    setHomepageDraftRaw((prev) => ({ draft, lastProp: prev.lastProp }))
+  }, [])
   const [themeStudioOpen, setThemeStudioOpen] = useState(false)
   const [themeStudioDraft, setThemeStudioDraft] = useState<Theme | null>(null)
   const [themeStudioSourceId, setThemeStudioSourceId] = useState(activeThemeId)
   const [themeStudioPreviewMode, setThemeStudioPreviewMode] = useState<'light' | 'dark'>(
     modeOverride === 'auto' ? resolveMode('auto') : modeOverride,
   )
-  useEffect(() => { setHomepageDraft(browserHomepage) }, [browserHomepage])
 
   useEffect(() => {
     if (!themeStudioOpen) return
@@ -379,7 +386,7 @@ export function SettingsPage({
           {/* Page hero */}
           <header className="space-y-2 pb-2">
             <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary/80">Workspace</p>
-            <h1 className="text-3xl font-black tracking-tight">Settings</h1>
+            <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
             <p className="text-[12px] text-muted-foreground max-w-md">
               Tune Orchestra to your workflow. Changes save automatically.
             </p>
@@ -776,10 +783,10 @@ function SectionHeading({ icon: Icon, title, description }: { icon: React.Compon
   return (
     <div className="flex items-start gap-3 pb-1 border-b border-border/30">
       <div className="rounded-lg bg-gradient-to-br from-primary/15 to-primary/5 p-2 text-primary ring-1 ring-primary/15 mt-0.5">
-        <Icon className="h-4 w-4" />
+        <Icon className="size-4" />
       </div>
       <div className="flex-1 min-w-0 pb-3">
-        <h2 className="text-base font-black tracking-tight leading-tight">{title}</h2>
+        <h2 className="text-base font-semibold tracking-tight leading-tight">{title}</h2>
         <p className="text-[11px] text-muted-foreground/80 mt-0.5">{description}</p>
       </div>
     </div>
@@ -882,17 +889,18 @@ function EditorSettingsPane() {
           { key: 'minimap', label: 'Show Minimap' },
           { key: 'formatOnSave', label: 'Format on Save' },
         ] as const).map(({ key, label }) => (
-          <label key={key} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 hover:bg-muted/20 cursor-pointer">
+          <div key={key} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 hover:bg-muted/20">
             <span className="text-[12px] font-medium">{label}</span>
             <button
               type="button"
+              aria-label={label}
               aria-pressed={editorSettings[key]}
               onClick={() => setEditorSettings({ [key]: !editorSettings[key] })}
               className={`relative h-5 w-9 rounded-full transition-colors ${editorSettings[key] ? 'bg-primary' : 'bg-muted'}`}
             >
-              <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${editorSettings[key] ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              <span className={`absolute top-0.5 size-4 rounded-full bg-white transition-transform ${editorSettings[key] ? 'translate-x-4' : 'translate-x-0.5'}`} />
             </button>
-          </label>
+          </div>
         ))}
       </div>
     </div>
@@ -970,7 +978,7 @@ function ThemePresetPane({
           </p>
         </div>
         <Button size="sm" variant="outline" className="shrink-0 gap-2" onClick={onOpenStudio}>
-          <SlidersHorizontal className="h-3.5 w-3.5" />
+          <SlidersHorizontal className="size-3.5" />
           Theme Studio
         </Button>
       </div>
@@ -1070,16 +1078,16 @@ function ThemeStudioDialog({
                   </Button>
                   <div className="flex items-center gap-1 rounded-xl border border-border/40 bg-card/60 p-1">
                     <Button size="icon" variant="ghost" tooltip="Duplicate theme" onClick={onDuplicateDraft}>
-                      <Copy className="h-4 w-4" />
+                      <Copy className="size-4" />
                     </Button>
                     <Button size="icon" variant="ghost" tooltip="Import theme" onClick={() => importInputRef.current?.click()}>
-                      <Upload className="h-4 w-4" />
+                      <Upload className="size-4" />
                     </Button>
                     <Button size="icon" variant="ghost" tooltip="Export theme" onClick={onExportDraft}>
-                      <Download className="h-4 w-4" />
+                      <Download className="size-4" />
                     </Button>
                     <Button size="icon" variant="ghost" tooltip="Reset draft" onClick={onResetDraft}>
-                      <RefreshCcw className="h-4 w-4" />
+                      <RefreshCcw className="size-4" />
                     </Button>
                     <Button
                       size="icon"
@@ -1088,14 +1096,14 @@ function ThemeStudioDialog({
                       onClick={onDeleteDraft}
                       disabled={draft.builtin}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="size-4" />
                     </Button>
                   </div>
                 </div>
                 <DialogClose asChild>
                   <Button size="icon" variant="ghost" className="shrink-0" aria-label="Close Theme Studio">
                     <span className="sr-only">Close Theme Studio</span>
-                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M18 6 6 18" />
                       <path d="m6 6 12 12" />
                     </svg>
@@ -1172,7 +1180,7 @@ function ThemeStudioThemeList({
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="border-b border-border/40 px-4 py-4">
+      <div className="border-b border-border/40 p-4">
         <p className="text-[11px] font-black uppercase tracking-[0.18em] text-primary/80">Themes</p>
         <p className="mt-1 text-[11px] text-muted-foreground">Choose a base preset for the working draft.</p>
       </div>
@@ -1201,7 +1209,7 @@ function ThemeStudioThemeList({
                       {theme.builtin ? 'Built-in' : 'Custom'}{isActive ? ' • active' : ''}
                     </p>
                   </div>
-                  {isSelected ? <Check className="h-4 w-4 text-primary" /> : null}
+                  {isSelected ? <Check className="size-4 text-primary" /> : null}
                 </div>
                 <div className="flex gap-1.5">
                   <div className="h-8 flex-1 rounded-lg border border-black/10" style={{ background: `hsl(${roles.background})` }} />
@@ -1271,7 +1279,7 @@ function ThemeStudioEditorPane({
         <div className="surface p-4 lg:col-span-2">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-black tracking-tight">Color Roles</h3>
+              <h3 className="text-sm font-semibold tracking-tight">Color Roles</h3>
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Edit the {previewMode} palette directly or drive both palettes from a tone seed.
               </p>
@@ -1305,7 +1313,7 @@ function ThemeStudioEditorPane({
               {ROLE_SECTIONS.map((section) => (
                 <div key={section.title} className="rounded-2xl border border-border/40 bg-card/60 p-4">
                   <div className="mb-3">
-                    <h4 className="text-[12px] font-black tracking-tight">{section.title}</h4>
+                    <h4 className="text-[12px] font-semibold tracking-tight">{section.title}</h4>
                   </div>
                   <div className="space-y-4">
                     {section.roles.map((role) => (
@@ -1363,10 +1371,10 @@ function TypographyEditor({
     <div className="surface p-4">
       <div className="flex items-start gap-3">
         <div className="rounded-lg bg-primary/10 p-2 text-primary ring-1 ring-primary/15">
-          <Type className="h-4 w-4" />
+          <Type className="size-4" />
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-black tracking-tight">Typography</h3>
+          <h3 className="text-sm font-semibold tracking-tight">Typography</h3>
           <p className="mt-1 text-[11px] text-muted-foreground">Fonts, size scale, line-height, and weight tuning.</p>
         </div>
       </div>
@@ -1459,10 +1467,10 @@ function DensityShapeEditor({
     <div className="surface p-4">
       <div className="flex items-start gap-3">
         <div className="rounded-lg bg-primary/10 p-2 text-primary ring-1 ring-primary/15">
-          <PanelLeft className="h-4 w-4" />
+          <PanelLeft className="size-4" />
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-black tracking-tight">Density & Shape</h3>
+          <h3 className="text-sm font-semibold tracking-tight">Density & Shape</h3>
           <p className="mt-1 text-[11px] text-muted-foreground">Spacing cadence, control heights, border width, and radii.</p>
         </div>
       </div>
@@ -1582,10 +1590,10 @@ function SurfaceMotionEditor({
     <div className="surface p-4">
       <div className="flex items-start gap-3">
         <div className="rounded-lg bg-primary/10 p-2 text-primary ring-1 ring-primary/15">
-          <Eye className="h-4 w-4" />
+          <Eye className="size-4" />
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-black tracking-tight">Surface & Motion</h3>
+          <h3 className="text-sm font-semibold tracking-tight">Surface & Motion</h3>
           <p className="mt-1 text-[11px] text-muted-foreground">Shadow character, blur, motion scale, and reduced-motion tuning.</p>
         </div>
       </div>
@@ -1666,7 +1674,7 @@ function SurfaceMotionEditor({
 function ThemeSummaryCard({ draft }: { draft: ReturnType<typeof normalizeTheme> }) {
   return (
     <div className="surface p-4">
-      <h3 className="text-sm font-black tracking-tight">Current Draft Readout</h3>
+      <h3 className="text-sm font-semibold tracking-tight">Current Draft Readout</h3>
       <div className="mt-4 space-y-2">
         {[
           `Sans: ${draft.typography.fontSans}`,
@@ -1698,14 +1706,14 @@ function ToneSeedEditor({
     <div className="rounded-2xl border border-border/40 bg-card/60 p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h4 className="text-[12px] font-black tracking-tight">Tone Seed</h4>
+          <h4 className="text-[12px] font-semibold tracking-tight">Tone Seed</h4>
           <p className="mt-1 text-[11px] text-muted-foreground">
             Regenerate both light and dark role sets from a shared hue and saturation axis.
           </p>
         </div>
         <div className="flex gap-1.5">
           {(['background', 'surface', 'accent'] as const).map((key) => (
-            <div key={key} className="h-8 w-8 rounded-full border border-black/10" style={{ background: `hsl(${roleSet[key]})` }} />
+            <div key={key} className="size-8 rounded-full border border-black/10" style={{ background: `hsl(${roleSet[key]})` }} />
           ))}
         </div>
       </div>
@@ -1752,8 +1760,8 @@ function RoleEditorCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <div className="h-5 w-5 rounded-full border border-black/10" style={{ background: `hsl(${value})` }} />
-            <h5 className="text-[12px] font-bold tracking-tight">{label}</h5>
+            <div className="size-5 rounded-full border border-black/10" style={{ background: `hsl(${value})` }} />
+            <h5 className="text-[12px] font-semibold tracking-tight">{label}</h5>
           </div>
           <p className="mt-1 text-[10px] text-muted-foreground">{description}</p>
         </div>
@@ -1775,7 +1783,7 @@ function RoleEditorCard({
                   const next = hexToHslTriplet(event.target.value)
                   if (next) onChange(next)
                 }}
-                className="h-8 w-8 shrink-0 cursor-pointer rounded-md border border-border/40 bg-card p-0.5 disabled:cursor-not-allowed"
+                className="size-8 shrink-0 cursor-pointer rounded-md border border-border/40 bg-card p-0.5 disabled:cursor-not-allowed"
               />
               <input
                 value={hexValue}
@@ -1784,7 +1792,7 @@ function RoleEditorCard({
                   const next = hexToHslTriplet(event.target.value)
                   if (next) onChange(next)
                 }}
-                className="w-full rounded-lg border border-border/40 bg-card px-2 py-2 text-[11px] font-mono outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed"
+                className="w-full rounded-lg border border-border/40 bg-card p-2 text-[11px] font-mono outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed"
               />
             </div>
           </label>
@@ -1827,7 +1835,7 @@ function ContrastPanel({ roleSet }: { roleSet: RoleSet }) {
   return (
     <div className="rounded-2xl border border-border/40 bg-card/60 p-4">
       <div className="mb-3">
-        <h4 className="text-[12px] font-black tracking-tight">Contrast</h4>
+        <h4 className="text-[12px] font-semibold tracking-tight">Contrast</h4>
         <p className="mt-1 text-[11px] text-muted-foreground">Quick WCAG readout for the key foreground/background pairs.</p>
       </div>
       <div className="space-y-2">
@@ -1867,7 +1875,7 @@ function ChartPaletteEditor({
   return (
     <div className="rounded-2xl border border-border/40 bg-card/60 p-4">
       <div className="mb-3">
-        <h4 className="text-[12px] font-black tracking-tight">Chart Palette</h4>
+        <h4 className="text-[12px] font-semibold tracking-tight">Chart Palette</h4>
         <p className="mt-1 text-[11px] text-muted-foreground">Edit the five chart stops used by shared data visualizations.</p>
       </div>
       <div className="space-y-3">
@@ -1875,7 +1883,7 @@ function ChartPaletteEditor({
           <div key={`${index}-${stop}`} className="rounded-xl border border-border/30 bg-background/70 p-3">
             <div className="mb-2 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <div className="h-5 w-5 rounded-full border border-black/10" style={{ background: `hsl(${stop})` }} />
+                <div className="size-5 rounded-full border border-black/10" style={{ background: `hsl(${stop})` }} />
                 <span className="text-[11px] font-bold">Slot {index + 1}</span>
               </div>
               <span className="text-[10px] font-mono text-muted-foreground">{stop}</span>
@@ -1888,7 +1896,7 @@ function ChartPaletteEditor({
                   const next = hexToHslTriplet(event.target.value)
                   if (next) onChange(index, next)
                 }}
-                className="h-8 w-8 shrink-0 cursor-pointer rounded-md border border-border/40 bg-card p-0.5"
+                className="size-8 shrink-0 cursor-pointer rounded-md border border-border/40 bg-card p-0.5"
               />
               <input
                 value={hslTripletToHex(stop)}
@@ -1896,7 +1904,7 @@ function ChartPaletteEditor({
                   const next = hexToHslTriplet(event.target.value)
                   if (next) onChange(index, next)
                 }}
-                className="w-full rounded-lg border border-border/40 bg-card px-2 py-2 text-[11px] font-mono outline-none focus:ring-2 focus:ring-primary/20"
+                className="w-full rounded-lg border border-border/40 bg-card p-2 text-[11px] font-mono outline-none focus:ring-2 focus:ring-primary/20"
               />
             </div>
           </div>
@@ -1924,7 +1932,7 @@ function RangeField({
   onChange: (value: number) => void
 }) {
   return (
-    <label className="block">
+    <label className="block" aria-label={label}>
       <div className="mb-1 flex items-center justify-between gap-3">
         <span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">{label}</span>
         <span className="text-[10px] font-mono text-muted-foreground">{Number.isInteger(value) ? value : value.toFixed(step < 0.1 ? 3 : step < 1 ? 2 : 0)}</span>
@@ -1936,6 +1944,7 @@ function RangeField({
         step={step}
         value={value}
         disabled={disabled}
+        aria-label={label}
         onChange={(event) => onChange(Number(event.target.value))}
         className="w-full accent-primary disabled:cursor-not-allowed"
       />
@@ -2001,10 +2010,11 @@ function ToggleField({
   onChange: (checked: boolean) => void
 }) {
   return (
-    <label className="flex items-center justify-between gap-3 rounded-xl border border-border/30 bg-background/70 px-3 py-2">
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border/30 bg-background/70 px-3 py-2">
       <span className="text-[11px] font-bold">{label}</span>
       <button
         type="button"
+        aria-label={label}
         aria-pressed={checked}
         onClick={() => onChange(!checked)}
         className={`relative h-6 w-11 rounded-full transition-colors ${
@@ -2012,12 +2022,12 @@ function ToggleField({
         }`}
       >
         <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+          className={`absolute top-0.5 size-5 rounded-full bg-white transition-transform ${
             checked ? 'translate-x-5' : 'translate-x-0.5'
           }`}
         />
       </button>
-    </label>
+    </div>
   )
 }
 
@@ -2046,7 +2056,7 @@ function ThemeStudioPreviewPane({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="border-b border-border/40 px-4 py-4">
+      <div className="border-b border-border/40 p-4">
         <p className="text-[11px] font-black uppercase tracking-[0.18em] text-primary/80">Preview</p>
         <p className="mt-1 text-[11px] text-muted-foreground">Live readout of the current draft in {previewMode} mode.</p>
       </div>
@@ -2056,7 +2066,7 @@ function ThemeStudioPreviewPane({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: `hsl(${roles.textMuted})` }}>Workspace</p>
-                <h3 className="mt-1 text-lg font-black tracking-tight">{draft.name}</h3>
+                <h3 className="mt-1 text-lg font-semibold tracking-tight">{draft.name}</h3>
               </div>
               <div
                 className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em]"
@@ -2092,7 +2102,7 @@ function ThemeStudioPreviewPane({
 
           <div style={cardStyle} className="p-4">
             <div className="mb-3 flex items-center justify-between">
-              <h4 className="text-sm font-black tracking-tight">Chart Palette</h4>
+              <h4 className="text-sm font-semibold tracking-tight">Chart Palette</h4>
               <span className="text-[10px]" style={{ color: `hsl(${roles.textMuted})` }}>5 slots</span>
             </div>
             <div className="flex gap-2">
@@ -2235,9 +2245,9 @@ function ThemeSwatchCard({
       {/* Mini preview */}
       <div className="p-2.5 flex flex-col gap-1.5" style={{ background: bg }}>
         <div className="flex gap-1.5">
-          <div className="h-2 w-2 rounded-full" style={{ background: accent }} />
-          <div className="h-2 w-2 rounded-full opacity-60" style={{ background: text }} />
-          <div className="h-2 w-2 rounded-full opacity-30" style={{ background: text }} />
+          <div className="size-2 rounded-full" style={{ background: accent }} />
+          <div className="size-2 rounded-full opacity-60" style={{ background: text }} />
+          <div className="size-2 rounded-full opacity-30" style={{ background: text }} />
         </div>
         <div
           className="h-6 rounded-md flex items-center px-1.5 gap-1"
@@ -2254,7 +2264,7 @@ function ThemeSwatchCard({
       {/* Label */}
       <div className="px-2.5 py-2 flex items-center justify-between gap-2 bg-card/60 backdrop-blur border-t border-border/30">
         <span className="text-[11px] font-bold tracking-tight truncate">{theme.name}</span>
-        {active && <Check className="h-3 w-3 text-white shrink-0" />}
+        {active && <Check className="size-3 text-white shrink-0" />}
       </div>
     </button>
   )
@@ -2303,6 +2313,37 @@ const PROVIDER_META: Record<string, { label: string; color: string; authFields: 
 }
 
 type TestResult = { ok: boolean; latency_ms?: number; error?: string }
+
+function TrackerAuthField({
+  field,
+  value,
+  isEdit,
+  hasToken,
+  onChange,
+}: {
+  field: AuthField
+  value: string
+  isEdit: boolean
+  hasToken: boolean
+  onChange: (value: string) => void
+}) {
+  const fieldId = useId()
+  return (
+    <div className="space-y-1">
+      <label htmlFor={fieldId} className="text-[11px] font-medium text-muted-foreground/70">
+        {field.label}{field.required && <span className="text-destructive ml-0.5">*</span>}
+      </label>
+      <input
+        id={fieldId}
+        type={field.type}
+        className="w-full h-8 rounded-md border border-border/50 bg-background px-3 text-[12px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-ring/50 transition-colors"
+        placeholder={field.key === 'token' && isEdit && hasToken ? '••••••••' : field.placeholder}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+      />
+    </div>
+  )
+}
 
 function IntegrationsPane({ config }: { config: BackendConfig | null }) {
   const [configs, setConfigs] = useState<TrackerConfig[]>([])
@@ -2456,18 +2497,14 @@ function IntegrationsPane({ config }: { config: BackendConfig | null }) {
     return (
       <div className="mt-2 rounded-xl border border-border/50 bg-muted/20 p-4 space-y-3">
         {meta.authFields.map(f => (
-          <div key={f.key} className="space-y-1">
-            <label className="text-[11px] font-medium text-muted-foreground/70">
-              {f.label}{f.required && <span className="text-destructive ml-0.5">*</span>}
-            </label>
-            <input
-              type={f.type}
-              className="w-full h-8 rounded-md border border-border/50 bg-background px-3 text-[12px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-ring/50 transition-colors"
-              placeholder={f.key === 'token' && isEdit && tc?.has_token ? '••••••••' : f.placeholder}
-              value={formValues[f.key] ?? ''}
-              onChange={e => setFormValues(prev => ({ ...prev, [f.key]: e.target.value }))}
-            />
-          </div>
+          <TrackerAuthField
+            key={f.key}
+            field={f}
+            value={formValues[f.key] ?? ''}
+            isEdit={isEdit}
+            hasToken={!!tc?.has_token}
+            onChange={(value) => setFormValues(prev => ({ ...prev, [f.key]: value }))}
+          />
         ))}
         <div className="flex items-center gap-2 pt-1">
           <button
@@ -2522,7 +2559,7 @@ function IntegrationsPane({ config }: { config: BackendConfig | null }) {
       {addingType && (
         <div className="rounded-xl border border-border/50 bg-card p-4">
           <div className="flex items-center gap-2 mb-3">
-            <span className={`h-2 w-2 rounded-full ${providerDot(addingType)}`} />
+            <span className={`size-2 rounded-full ${providerDot(addingType)}`} />
             <span className="text-[12px] font-semibold">{PROVIDER_META[addingType]?.label}</span>
             <span className="text-[11px] text-muted-foreground/50">new connection</span>
           </div>
@@ -2549,7 +2586,7 @@ function IntegrationsPane({ config }: { config: BackendConfig | null }) {
             return (
               <div key={tc.id} className="p-3">
                 <div className="flex items-center gap-3">
-                  <span className={`h-2 w-2 rounded-full shrink-0 ${providerDot(tc.type)}`} />
+                  <span className={`size-2 rounded-full shrink-0 ${providerDot(tc.type)}`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[12px] font-semibold truncate">{tc.display_name}</span>
@@ -2706,7 +2743,7 @@ function GitConnectionsPane({ config }: { config: BackendConfig | null }) {
           <span className="text-[12px] font-semibold tracking-tight">GitHub project links</span>
         </div>
         <p className="text-[11px] text-muted-foreground/60 mb-4">
-          Projects linked to a GitHub repo — connect from the Git tab inside a project.
+          Projects linked to a GitHub repo: connect from the Git tab inside a project.
         </p>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -2785,7 +2822,7 @@ function GitConnectionsPane({ config }: { config: BackendConfig | null }) {
                 key={project.id}
                 className={`flex items-center gap-3 px-3.5 py-2.5 ${idx > 0 ? 'border-t border-border/20' : ''}`}
               >
-                <span className="w-2 h-2 rounded-full bg-muted-foreground/20 shrink-0" />
+                <span className="size-2 rounded-full bg-muted-foreground/20 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-[12.5px] font-medium tracking-tight text-foreground/85 truncate">
                     {project.name}
@@ -2844,7 +2881,7 @@ function NotificationsPane({
             }}
             className={`h-8 w-14 rounded-full transition-colors ${notifMuted ? 'bg-muted' : 'bg-white'} relative`}
           >
-            <div className={`absolute top-1 h-6 w-6 rounded-full ${notifMuted ? 'bg-white' : 'bg-black'} shadow transition-transform ${notifMuted ? 'left-7' : 'left-1'}`} />
+            <div className={`absolute top-1 size-6 rounded-full ${notifMuted ? 'bg-white' : 'bg-black'} shadow transition-transform ${notifMuted ? 'left-7' : 'left-1'}`} />
           </button>
           <span className={`text-[9px] font-bold uppercase tracking-widest ${notifMuted ? 'text-red-400' : 'text-muted-foreground/30'}`}>Mute</span>
         </div>
@@ -2975,8 +3012,8 @@ function ShortcutsPane({ isMac }: { isMac: boolean }) {
         { label: 'Refresh Tracker', desc: 'Full state synchronization', keys: [isMac ? '⌘' : 'Ctrl', 'R'] },
         { label: 'Toggle Sidebar', desc: 'Collapse/expand navigation', keys: [isMac ? '⌘' : 'Ctrl', '/'] },
         { label: 'Switch Tab', desc: 'Ctrl+1 Tasks, Ctrl+2 Projects, etc.', keys: [isMac ? '⌘' : 'Ctrl', '1-8'] },
-      ].map((s, idx) => (
-        <div key={idx} className="group/item relative flex items-center justify-between p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 shadow-sm transition-all hover:border-primary/20 overflow-hidden">
+      ].map((s) => (
+        <div key={s.label} className="group/item relative flex items-center justify-between p-4 rounded-xl border border-border/40 bg-gradient-to-b from-card via-card to-muted/20 shadow-sm transition-all hover:border-primary/20 overflow-hidden">
           <div className="space-y-0.5">
             <p className="text-xs font-black tracking-tight">{s.label}</p>
             <p className="text-[10px] text-muted-foreground leading-tight">{s.desc}</p>
@@ -2997,6 +3034,183 @@ function ShortcutsPane({ isMac }: { isMac: boolean }) {
 // ---------------------------------------------------------------------------
 // BackendConfigForm (migrated from SettingsCard)
 // ---------------------------------------------------------------------------
+
+function ActiveProfileField({
+  activeProfileId,
+  backendProfiles,
+  disabled,
+  profilesPending,
+  onSetActiveProfile,
+  onDeleteProfile,
+}: {
+  activeProfileId: string
+  backendProfiles: BackendProfile[]
+  disabled?: boolean
+  profilesPending: boolean
+  onSetActiveProfile: (profileId: string) => Promise<void>
+  onDeleteProfile: (profileId: string) => Promise<void>
+}) {
+  const labelId = useId()
+  return (
+    <div className="space-y-1.5 block" aria-labelledby={labelId}>
+      <span id={labelId} className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground px-1">Active Profile</span>
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <CustomDropdown
+            className="w-full"
+            value={activeProfileId}
+            options={backendProfiles.map((p) => ({ label: p.name, value: p.id, icon: <ShieldCheck className="size-3" /> }))}
+            onChange={(val) => void onSetActiveProfile(val)}
+            disabled={disabled || backendProfiles.length === 0}
+          />
+          {profilesPending && (
+            <div className="absolute right-8 top-1/2 -translate-y-1/2">
+              <Loader2 className="size-3 animate-spin-smooth text-primary" />
+            </div>
+          )}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label="Delete"
+          className="h-9 px-3 rounded-lg border-destructive/20 bg-destructive/5 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all"
+          disabled={disabled || backendProfiles.length <= 1 || activeProfileId === ''}
+          onClick={(e) => {
+            e.preventDefault()
+            if (activeProfileId === '') return
+            const name = backendProfiles.find((p) => p.id === activeProfileId)?.name ?? activeProfileId
+            if (window.confirm(`Delete backend profile "${name}"? This cannot be undone.`)) {
+              void onDeleteProfile(activeProfileId)
+            }
+          }}
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function NewProfileField({
+  newProfileName,
+  setNewProfileName,
+  disabled,
+  onCreateProfile,
+}: {
+  newProfileName: string
+  setNewProfileName: (value: string) => void
+  disabled?: boolean
+  onCreateProfile: (name: string) => Promise<void>
+}) {
+  const inputId = useId()
+  return (
+    <div className="space-y-1.5 block pt-2 border-t border-border/20">
+      <label htmlFor={inputId} className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground px-1">New Profile</label>
+      <div className="flex gap-2">
+        <input
+          id={inputId}
+          className="h-9 flex-1 rounded-lg border border-border bg-background px-3 text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+          value={newProfileName}
+          onChange={(event) => setNewProfileName(event.target.value)}
+          placeholder="Production, Staging, Local..."
+          disabled={disabled}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label="Create"
+          className="h-9 px-3 rounded-lg bg-white/5 border-white/20 text-foreground hover:bg-white hover:text-black"
+          disabled={disabled || newProfileName.trim() === ''}
+          onClick={() => {
+            void onCreateProfile(newProfileName.trim())
+            setNewProfileName('')
+          }}
+        >
+          <Plus className="size-3.5" />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function EndpointUrlField({
+  baseUrl,
+  setBaseUrl,
+  baseUrlInvalid,
+  disabled,
+}: {
+  baseUrl: string
+  setBaseUrl: (value: string) => void
+  baseUrlInvalid: boolean
+  disabled?: boolean
+}) {
+  const inputId = useId()
+  return (
+    <div className="space-y-1.5 block">
+      <label htmlFor={inputId} className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground px-1">Endpoint URL</label>
+      <div className="relative">
+        <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40">
+          <Globe className="size-3" />
+        </div>
+        <input
+          id={inputId}
+          className={`h-9 w-full rounded-lg border bg-background pl-8 pr-3 text-xs font-mono focus:ring-2 transition-all shadow-sm ${baseUrlInvalid ? 'border-destructive/60 focus:ring-destructive/20 focus:border-destructive' : 'border-border focus:ring-primary/20 focus:border-primary'}`}
+          value={baseUrl}
+          onChange={(event) => setBaseUrl(event.target.value)}
+          placeholder="http://127.0.0.1:4010"
+          disabled={disabled}
+          aria-invalid={baseUrlInvalid || undefined}
+        />
+      </div>
+      {baseUrlInvalid && (
+        <span className="block text-[10px] text-destructive px-1">Must be a valid absolute URL (http:// or https://)</span>
+      )}
+    </div>
+  )
+}
+
+function AccessTokenField({
+  apiToken,
+  setApiToken,
+  showToken,
+  setShowToken,
+  disabled,
+}: {
+  apiToken: string
+  setApiToken: (value: string) => void
+  showToken: boolean
+  setShowToken: (value: boolean) => void
+  disabled?: boolean
+}) {
+  const inputId = useId()
+  return (
+    <div className="space-y-1.5 block">
+      <label htmlFor={inputId} className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground px-1">Access Token</label>
+      <div className="relative group/token">
+        <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40 group-focus-within/token:text-primary/60 transition-colors">
+          <ShieldCheck className="size-3" />
+        </div>
+        <input
+          id={inputId}
+          type={showToken ? 'text' : 'password'}
+          className="h-9 w-full rounded-lg border border-border bg-background pl-8 pr-9 text-xs font-mono focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+          value={apiToken}
+          onChange={(event) => setApiToken(event.target.value)}
+          placeholder="Bearer token (optional)"
+          disabled={disabled}
+        />
+        <button
+          type="button"
+          onClick={() => setShowToken(!showToken)}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-all"
+          title={showToken ? 'Hide token' : 'Reveal token'}
+        >
+          {showToken ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+        </button>
+      </div>
+    </div>
+  )
+}
 
 function BackendConfigForm({
   loadingConfig: _loadingConfig,
@@ -3048,135 +3262,58 @@ function BackendConfigForm({
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between pb-2 border-b border-border/20">
         <div className="flex items-center gap-2">
-          <Database className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-black uppercase tracking-wider">Connection Profiles</h3>
+          <Database className="size-4 text-primary" />
+          <h3 className="text-sm font-semibold uppercase tracking-wider">Connection Profiles</h3>
         </div>
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2">
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <Users className="h-3.5 w-3.5 text-primary" />
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-foreground/80">Profile Management</h4>
+            <Users className="size-3.5 text-primary" />
+            <h4 className="text-[10px] font-semibold uppercase tracking-widest text-foreground/80">Profile Management</h4>
           </div>
 
           <div className="space-y-4 p-4 rounded-xl bg-muted/20 border border-border/40">
-            <label className="space-y-1.5 block">
-              <span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground px-1">Active Profile</span>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <CustomDropdown
-                    className="w-full"
-                    value={activeProfileId}
-                    options={backendProfiles.map((p) => ({ label: p.name, value: p.id, icon: <ShieldCheck className="h-3 w-3" /> }))}
-                    onChange={(val) => void onSetActiveProfile(val)}
-                    disabled={disabled || backendProfiles.length === 0}
-                  />
-                  {profilesPending && (
-                    <div className="absolute right-8 top-1/2 -translate-y-1/2">
-                      <Loader2 className="h-3 w-3 animate-spin-smooth text-primary" />
-                    </div>
-                  )}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  aria-label="Delete"
-                  className="h-9 px-3 rounded-lg border-destructive/20 bg-destructive/5 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all"
-                  disabled={disabled || backendProfiles.length <= 1 || activeProfileId === ''}
-                  onClick={(e) => {
-                    e.preventDefault()
-                    if (activeProfileId === '') return
-                    const name = backendProfiles.find((p) => p.id === activeProfileId)?.name ?? activeProfileId
-                    if (window.confirm(`Delete backend profile "${name}"? This cannot be undone.`)) {
-                      void onDeleteProfile(activeProfileId)
-                    }
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </label>
+            <ActiveProfileField
+              activeProfileId={activeProfileId}
+              backendProfiles={backendProfiles}
+              disabled={disabled}
+              profilesPending={profilesPending}
+              onSetActiveProfile={onSetActiveProfile}
+              onDeleteProfile={onDeleteProfile}
+            />
 
-            <label className="space-y-1.5 block pt-2 border-t border-border/20">
-              <span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground px-1">New Profile</span>
-              <div className="flex gap-2">
-                <input
-                  className="h-9 flex-1 rounded-lg border border-border bg-background px-3 text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
-                  value={newProfileName}
-                  onChange={(event) => setNewProfileName(event.target.value)}
-                  placeholder="Production, Staging, Local..."
-                  disabled={disabled}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  aria-label="Create"
-                  className="h-9 px-3 rounded-lg bg-white/5 border-white/20 text-foreground hover:bg-white hover:text-black"
-                  disabled={disabled || newProfileName.trim() === ''}
-                  onClick={() => {
-                    void onCreateProfile(newProfileName.trim())
-                    setNewProfileName('')
-                  }}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </label>
+            <NewProfileField
+              newProfileName={newProfileName}
+              setNewProfileName={setNewProfileName}
+              disabled={disabled}
+              onCreateProfile={onCreateProfile}
+            />
           </div>
         </div>
 
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <SignalHigh className="h-3.5 w-3.5 text-primary" />
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-foreground/80">Connection Parameters</h4>
+            <SignalHigh className="size-3.5 text-primary" />
+            <h4 className="text-[10px] font-semibold uppercase tracking-widest text-foreground/80">Connection Parameters</h4>
           </div>
 
           <div className="space-y-4 p-4 rounded-xl bg-muted/20 border border-border/40">
-            <label className="space-y-1.5 block">
-              <span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground px-1">Endpoint URL</span>
-              <div className="relative">
-                <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40">
-                  <Globe className="h-3 w-3" />
-                </div>
-                <input
-                  className={`h-9 w-full rounded-lg border bg-background pl-8 pr-3 text-xs font-mono focus:ring-2 transition-all shadow-sm ${baseUrlInvalid ? 'border-destructive/60 focus:ring-destructive/20 focus:border-destructive' : 'border-border focus:ring-primary/20 focus:border-primary'}`}
-                  value={baseUrl}
-                  onChange={(event) => setBaseUrl(event.target.value)}
-                  placeholder="http://127.0.0.1:4010"
-                  disabled={disabled}
-                  aria-invalid={baseUrlInvalid || undefined}
-                />
-              </div>
-              {baseUrlInvalid && (
-                <span className="block text-[10px] text-destructive px-1">Must be a valid absolute URL (http:// or https://)</span>
-              )}
-            </label>
+            <EndpointUrlField
+              baseUrl={baseUrl}
+              setBaseUrl={setBaseUrl}
+              baseUrlInvalid={baseUrlInvalid}
+              disabled={disabled}
+            />
 
-            <label className="space-y-1.5 block">
-              <span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground px-1">Access Token</span>
-              <div className="relative group/token">
-                <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40 group-focus-within/token:text-primary/60 transition-colors">
-                  <ShieldCheck className="h-3 w-3" />
-                </div>
-                <input
-                  type={showToken ? 'text' : 'password'}
-                  className="h-9 w-full rounded-lg border border-border bg-background pl-8 pr-9 text-xs font-mono focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
-                  value={apiToken}
-                  onChange={(event) => setApiToken(event.target.value)}
-                  placeholder="Bearer token (optional)"
-                  disabled={disabled}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowToken(!showToken)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-all"
-                  title={showToken ? 'Hide token' : 'Reveal token'}
-                >
-                  {showToken ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                </button>
-              </div>
-            </label>
+            <AccessTokenField
+              apiToken={apiToken}
+              setApiToken={setApiToken}
+              showToken={showToken}
+              setShowToken={setShowToken}
+              disabled={disabled}
+            />
           </div>
         </div>
       </div>
@@ -3190,11 +3327,11 @@ function BackendConfigForm({
             onClick={syncFromConfig}
             disabled={disabled}
           >
-            <RefreshCcw className="h-3 w-3 mr-2" />
+            <RefreshCcw className="size-3 mr-2" />
             Revert
           </Button>
           <div className="hidden sm:flex items-center gap-2 text-primary/40 px-3 border-l border-border/20">
-            <Info className="h-3 w-3" />
+            <Info className="size-3" />
             <span className="text-[9px] font-medium italic">Base URL changes trigger reconnect.</span>
           </div>
         </div>
@@ -3203,7 +3340,7 @@ function BackendConfigForm({
           disabled={disabled || baseUrlTrimmed === '' || baseUrlInvalid}
           className="px-6 shadow-lg shadow-black/20 font-black uppercase tracking-widest text-[9px] h-9 rounded-lg"
         >
-          {savingConfig ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : 'Save Backend Config'}
+          {savingConfig ? <Loader2 className="size-3 animate-spin-smooth" /> : 'Save Backend Config'}
         </Button>
       </div>
     </div>
@@ -3232,6 +3369,7 @@ function ModelSearchDropdown({
   const [search, setSearch] = useState('')
   const [open, setOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const modelInputId = useId()
 
   const filtered = search
     ? models.filter(m =>
@@ -3245,7 +3383,7 @@ function ModelSearchDropdown({
   if (error) {
     return (
       <div className="space-y-1">
-        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Model</label>
+        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Model</span>
         <p className="text-[11px] text-red-500">{error}</p>
       </div>
     )
@@ -3254,7 +3392,7 @@ function ModelSearchDropdown({
   if (!hasKey) {
     return (
       <div className="space-y-1">
-        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Model</label>
+        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Model</span>
         <p className="text-[11px] text-muted-foreground/60">Enter an API key to load models</p>
       </div>
     )
@@ -3263,25 +3401,26 @@ function ModelSearchDropdown({
   if (models.length === 0) {
     return (
       <div className="space-y-1">
-        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           Model
-          {loading && <Loader2 className="ml-1.5 inline h-2.5 w-2.5 animate-spin-smooth" />}
-        </label>
-        <p className="text-[11px] text-muted-foreground/60">Loading models...</p>
+          {loading && <Loader2 className="ml-1.5 inline size-2.5 animate-spin-smooth" />}
+        </span>
+        <p className="text-[11px] text-muted-foreground/60">Loading models…</p>
       </div>
     )
   }
 
   return (
     <div className="space-y-1 relative">
-      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+      <label htmlFor={modelInputId} className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
         Model
-        {loading && <Loader2 className="ml-1.5 inline h-2.5 w-2.5 animate-spin-smooth" />}
+        {loading && <Loader2 className="ml-1.5 inline size-2.5 animate-spin-smooth" />}
         <span className="ml-2 text-muted-foreground/40 normal-case tracking-normal font-normal">{models.length} available</span>
       </label>
 
       <div className="relative">
         <input
+          id={modelInputId}
           ref={inputRef}
           type="text"
           value={open ? search : (selectedModel?.name || modelId || '')}
@@ -3326,14 +3465,19 @@ function ModelSearchDropdown({
           )}
           {filtered.length > 100 && (
             <div className="px-3 py-1.5 text-[10px] text-muted-foreground/40 border-t border-border/20">
-              Showing first 100 of {filtered.length} — type to filter
+              Showing first 100 of {filtered.length}; type to filter
             </div>
           )}
         </div>
       )}
 
       {open && (
-        <div className="fixed inset-0 z-40" onClick={() => { setOpen(false); setSearch('') }} />
+        <button
+          type="button"
+          aria-label="Close model picker"
+          className="fixed inset-0 z-40 cursor-default bg-transparent"
+          onClick={() => { setOpen(false); setSearch('') }}
+        />
       )}
     </div>
   )
@@ -3343,8 +3487,15 @@ function ModelSearchDropdown({
 // EmbeddedAgentConfigForm (migrated from SettingsCard)
 // ---------------------------------------------------------------------------
 
+const AGENT_PROVIDER_PREFS_KEY = 'orchestra-agent-provider-prefs'
+function readAgentProviderPrefs(): { providerId?: string; modelId?: string } {
+  try { return JSON.parse(localStorage.getItem(AGENT_PROVIDER_PREFS_KEY) ?? '{}') } catch { return {} }
+}
+
 function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig | null; disabled: boolean }) {
-  const savedPrefs = (() => { try { return JSON.parse(localStorage.getItem('orchestra-agent-provider-prefs') ?? '{}') } catch { return {} } })()
+  const providerLabelId = useId()
+  const apiKeyId = useId()
+  const savedPrefs = readAgentProviderPrefs()
   const [providerId, setProviderId] = useState<string>(savedPrefs.providerId ?? CHAT_PROVIDERS[0].id)
   const [modelId, setModelId] = useState<string>(savedPrefs.modelId ?? '')
   const [models, setModels] = useState<{ id: string; name: string }[]>([])
@@ -3362,7 +3513,7 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
     if (!config) return
     fetchAgentProviderKeys(config)
       .then((result) => {
-        const prefs = (() => { try { return JSON.parse(localStorage.getItem('orchestra-agent-provider-prefs') ?? '{}') } catch { return {} } })()
+        const prefs = readAgentProviderPrefs()
         const target = prefs.providerId && result.providers[prefs.providerId]?.configured
           ? prefs.providerId
           : CHAT_PROVIDERS.find(p => result.providers[p.id]?.configured)?.id
@@ -3397,9 +3548,10 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
         if (fetched.length > 0) {
           setModelId((prev) => {
             if (prev && fetched.find((m: { id: string }) => m.id === prev)) return prev
-            const prefs = (() => { try { return JSON.parse(localStorage.getItem('orchestra-agent-provider-prefs') ?? '{}') } catch { return {} } })()
-            const match = prefs.modelId && fetched.find((m: { id: string }) => m.id === prefs.modelId)
-            return match ? prefs.modelId : fetched[0].id
+            const prefs = readAgentProviderPrefs()
+            const prefModelId = prefs.modelId
+            if (prefModelId && fetched.find((m: { id: string }) => m.id === prefModelId)) return prefModelId
+            return fetched[0].id
           })
         }
       })
@@ -3461,8 +3613,8 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
           <p className="text-[10px] text-muted-foreground">Configure the LLM provider for the chat widget</p>
         </div>
 
-        <div className="space-y-1">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Provider</label>
+        <div className="space-y-1" aria-labelledby={providerLabelId}>
+          <span id={providerLabelId} className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Provider</span>
           <CustomDropdown
             className="w-full"
             value={providerId}
@@ -3495,11 +3647,11 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
         </div>
 
         <div className="space-y-1">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          <label htmlFor={apiKeyId} className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
             API Key
             {hasKey && (
               <span className="ml-2 inline-flex items-center gap-1 text-emerald-500">
-                <CheckCircle2 className="h-2.5 w-2.5" />
+                <CheckCircle2 className="size-2.5" />
                 Configured
               </span>
             )}
@@ -3507,6 +3659,7 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
           <div className="flex gap-2">
             <div className="relative flex-1">
               <input
+                id={apiKeyId}
                 type={showKey ? 'text' : 'password'}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
@@ -3519,7 +3672,7 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
                 onClick={() => setShowKey(!showKey)}
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-all"
               >
-                {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                {showKey ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
               </button>
             </div>
             <button
@@ -3527,7 +3680,7 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
               disabled={disabled || saving || !apiKey.trim()}
               className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-black hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {saving ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <Check className="h-3 w-3" />}
+              {saving ? <Loader2 className="size-3 animate-spin-smooth" /> : <Check className="size-3" />}
               Save
             </button>
           </div>
@@ -3551,7 +3704,7 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
             disabled={disabled || testing || !modelId || (!hasKey && !apiKey.trim())}
             className="flex items-center gap-1.5 rounded-lg border border-border/40 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:border-border disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {testing ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <ShieldCheck className="h-3 w-3" />}
+            {testing ? <Loader2 className="size-3 animate-spin-smooth" /> : <ShieldCheck className="size-3" />}
             Test Connection
           </button>
         </div>
@@ -3575,6 +3728,8 @@ function EmbeddedAgentConfigForm({ config, disabled }: { config: BackendConfig |
 // ---------------------------------------------------------------------------
 
 function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | null; disabled: boolean }) {
+  const publicKeyId = useId()
+  const secretKeyId = useId()
   const [publicKey, setPublicKey] = useState('')
   const [secretKey, setSecretKey] = useState('')
   const [saving, setSaving] = useState(false)
@@ -3670,7 +3825,7 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
                 title="Open unsandbox.com"
               >
                 unsandbox.com
-                <ExternalLink className="h-2.5 w-2.5" />
+                <ExternalLink className="size-2.5" />
               </button>
             </div>
             <p className="text-[10px] text-muted-foreground">Remote code execution across 42+ languages</p>
@@ -3678,12 +3833,12 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
           <div className="flex items-center gap-2">
             {isConfigured ? (
               <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-500">
-                <CheckCircle2 className="h-3.5 w-3.5" />
+                <CheckCircle2 className="size-3.5" />
                 Configured
               </span>
             ) : (
               <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                <CircleDashed className="h-3.5 w-3.5" />
+                <CircleDashed className="size-3.5" />
                 Not configured
               </span>
             )}
@@ -3692,8 +3847,9 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
 
         <div className="space-y-3">
           <div className="space-y-1">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Public Key</label>
+            <label htmlFor={publicKeyId} className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Public Key</label>
             <input
+              id={publicKeyId}
               type="text"
               value={publicKey}
               onChange={(e) => setPublicKey(e.target.value)}
@@ -3703,11 +3859,12 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
             />
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <label htmlFor={secretKeyId} className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
               Secret Key {isConfigured && <span className="text-muted-foreground/60">(leave blank to keep current)</span>}
             </label>
             <div className="relative">
               <input
+                id={secretKeyId}
                 type={showSecret ? 'text' : 'password'}
                 value={secretKey}
                 onChange={(e) => setSecretKey(e.target.value)}
@@ -3721,7 +3878,7 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-all"
                 title={showSecret ? 'Hide key' : 'Reveal key'}
               >
-                {showSecret ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                {showSecret ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
               </button>
             </div>
           </div>
@@ -3733,7 +3890,7 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
             disabled={disabled || saving || !publicKey.trim() || (!secretKey.trim() && !isConfigured)}
             className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-black hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {saving ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <Check className="h-3 w-3" />}
+            {saving ? <Loader2 className="size-3 animate-spin-smooth" /> : <Check className="size-3" />}
             Save Keys
           </button>
           <button
@@ -3741,7 +3898,7 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
             disabled={disabled || checking || !isConfigured}
             className="flex items-center gap-1.5 rounded-lg border border-border/40 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:border-border disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {checking ? <Loader2 className="h-3 w-3 animate-spin-smooth" /> : <ShieldCheck className="h-3 w-3" />}
+            {checking ? <Loader2 className="size-3 animate-spin-smooth" /> : <ShieldCheck className="size-3" />}
             Test Connection
           </button>
           {isConfigured && (
@@ -3750,7 +3907,7 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
               disabled={disabled || saving}
               className="flex items-center gap-1.5 rounded-lg border border-red-500/20 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-red-500 hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <Trash2 className="h-3 w-3" />
+              <Trash2 className="size-3" />
               Remove
             </button>
           )}
@@ -3782,7 +3939,7 @@ function UnsandboxConfigForm({ config, disabled }: { config: BackendConfig | nul
           onClick={() => openInBrowser('https://unsandbox.com/docs')}
           className="inline-flex items-center gap-0.5 text-primary hover:underline"
         >
-          API docs <ExternalLink className="h-2.5 w-2.5" />
+          API docs <ExternalLink className="size-2.5" />
         </button>
       </p>
     </div>

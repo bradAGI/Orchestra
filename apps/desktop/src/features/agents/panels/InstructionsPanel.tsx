@@ -1,6 +1,7 @@
 // apps/desktop/src/features/agents/panels/InstructionsPanel.tsx
-import { useEffect, useState } from 'react'
-import Editor from '@monaco-editor/react'
+import { lazy, Suspense, useState } from 'react'
+
+const Editor = lazy(() => import('@monaco-editor/react'))
 import { useAppStore } from '@core/store'
 import { PanelHeader } from '../components/PanelHeader'
 import { PanelFooter } from '../components/PanelFooter'
@@ -21,17 +22,8 @@ interface InstructionsPanelProps {
 }
 
 export function InstructionsPanel({
-  content: propsContent, path, exists, saving, scope, projectName, onSave, onDelete,
+  content, path, exists, saving, scope, projectName, onSave, onDelete,
 }: InstructionsPanelProps) {
-  const theme = useAppStore(s => s.theme)
-  const editorSettings = useAppStore(s => s.editorSettings)
-  const [content, setContent] = useState(propsContent)
-  const [error, setError] = useState('')
-  const dirty = content !== propsContent
-  usePublishDirty(dirty)
-
-  useEffect(() => { setContent(propsContent); setError('') }, [propsContent])
-
   const eyebrow = scope === 'GLOBAL' ? 'Global / Instructions' : `${projectName ?? 'Project'} / Instructions`
   const sub = scope === 'GLOBAL'
     ? `Global instructions · ${path}`
@@ -58,6 +50,38 @@ export function InstructionsPanel({
     )
   }
 
+  return (
+    <InstructionsEditor
+      key={`${scope}:${path}`}
+      eyebrow={eyebrow}
+      sub={sub}
+      initialContent={content}
+      saving={saving}
+      onSave={onSave}
+      onDelete={onDelete}
+    />
+  )
+}
+
+interface InstructionsEditorProps {
+  eyebrow: string
+  sub: string
+  initialContent: string
+  saving: string | null
+  onSave: (content: string) => Promise<void>
+  onDelete?: () => Promise<void>
+}
+
+function InstructionsEditor({
+  eyebrow, sub, initialContent, saving, onSave, onDelete,
+}: InstructionsEditorProps) {
+  const theme = useAppStore(s => s.theme)
+  const editorSettings = useAppStore(s => s.editorSettings)
+  const [content, setContent] = useState(initialContent)
+  const [error, setError] = useState('')
+  const dirty = content !== initialContent
+  usePublishDirty(dirty)
+
   const handleSave = async () => {
     setError('')
     try { await onSave(content) } catch (e) {
@@ -66,7 +90,7 @@ export function InstructionsPanel({
   }
 
   return (
-    <div className="flex flex-col h-full p-[18px] space-y-[14px]">
+    <div className="flex flex-col h-full p-[18px] gap-y-[14px]">
       <PanelHeader
         eyebrow={eyebrow}
         title="CLAUDE.md"
@@ -75,24 +99,26 @@ export function InstructionsPanel({
       />
 
       <div className="flex-1 min-h-0 rounded-lg border border-border/30 overflow-hidden">
-        <Editor
-          language="markdown"
-          value={content}
-          theme={theme === 'dark' ? 'vs-dark' : 'vs'}
-          onChange={(v) => { if (v !== undefined) setContent(v) }}
-          options={{
-            minimap: { enabled: false },
-            fontSize: editorSettings.fontSize,
-            fontFamily: editorSettings.fontFamily || undefined,
-            lineNumbers: 'off',
-            wordWrap: 'on',
-            scrollBeyondLastLine: false,
-            automaticLayout: true,
-            tabSize: 2,
-            renderWhitespace: 'none',
-            padding: { top: 12, bottom: 12 },
-          }}
-        />
+        <Suspense fallback={null}>
+          <Editor
+            language="markdown"
+            value={content}
+            theme={theme === 'dark' ? 'vs-dark' : 'vs'}
+            onChange={(v) => { if (v !== undefined) setContent(v) }}
+            options={{
+              minimap: { enabled: false },
+              fontSize: editorSettings.fontSize,
+              fontFamily: editorSettings.fontFamily || undefined,
+              lineNumbers: 'off',
+              wordWrap: 'on',
+              scrollBeyondLastLine: false,
+              automaticLayout: true,
+              tabSize: 2,
+              renderWhitespace: 'none',
+              padding: { top: 12, bottom: 12 },
+            }}
+          />
+        </Suspense>
       </div>
 
       <ErrorStrip message={error} onDismiss={() => setError('')} />
@@ -101,7 +127,7 @@ export function InstructionsPanel({
         dirty={dirty}
         saving={!!saving}
         onSave={handleSave}
-        onDiscard={() => setContent(propsContent)}
+        onDiscard={() => setContent(initialContent)}
         extraLeft={
           onDelete && (
             <button

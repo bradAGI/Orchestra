@@ -1,5 +1,5 @@
 // apps/desktop/src/features/agents/panels/CodexApprovalsPanel.tsx
-import { useEffect, useState } from 'react'
+import { useReducer } from 'react'
 import { PanelHeader } from '../components/PanelHeader'
 import { PanelFooter } from '../components/PanelFooter'
 import { ErrorStrip } from '../components/ErrorStrip'
@@ -22,34 +22,60 @@ const SANDBOX_OPTIONS = [
   { value: 'danger-full-access', label: 'Danger Full Access' },
 ]
 
-export function CodexApprovalsPanel({ permissions, scope, projectName, saving, onSave }: CodexApprovalsPanelProps) {
-  const [mode, setMode] = useState(permissions.approval_mode)
-  const [sandbox, setSandbox] = useState(permissions.sandbox ?? '')
-  const [error, setError] = useState('')
+type FormState = {
+  mode: string
+  sandbox: string
+  error: string
+}
 
-  useEffect(() => {
-    setMode(permissions.approval_mode)
-    setSandbox(permissions.sandbox ?? '')
-  }, [permissions])
+type FormAction =
+  | { type: 'reset', mode: string, sandbox: string }
+  | { type: 'set-mode', value: string }
+  | { type: 'set-sandbox', value: string }
+  | { type: 'set-error', value: string }
 
-  const isDirty = mode !== permissions.approval_mode || sandbox !== (permissions.sandbox ?? '')
+function formReducer(state: FormState, action: FormAction): FormState {
+  switch (action.type) {
+    case 'reset':
+      return { mode: action.mode, sandbox: action.sandbox, error: '' }
+    case 'set-mode':
+      return { ...state, mode: action.value }
+    case 'set-sandbox':
+      return { ...state, sandbox: action.value }
+    case 'set-error':
+      return { ...state, error: action.value }
+  }
+}
+
+export function CodexApprovalsPanel(props: CodexApprovalsPanelProps) {
+  const key = `${props.permissions.approval_mode}::${props.permissions.sandbox ?? ''}`
+  return <CodexApprovalsPanelInner key={key} {...props} />
+}
+
+function CodexApprovalsPanelInner({ permissions, scope, projectName, saving, onSave }: CodexApprovalsPanelProps) {
+  const [state, dispatch] = useReducer(formReducer, undefined as never, () => ({
+    mode: permissions.approval_mode,
+    sandbox: permissions.sandbox ?? '',
+    error: '',
+  }))
+
+  const isDirty = state.mode !== permissions.approval_mode || state.sandbox !== (permissions.sandbox ?? '')
 
   const eyebrow = scope === 'GLOBAL' ? 'Global / Approvals & Sandbox' : `${projectName ?? 'Project'} / Approvals & Sandbox`
 
   const handleDiscard = () => {
-    setMode(permissions.approval_mode)
-    setSandbox(permissions.sandbox ?? '')
+    dispatch({ type: 'reset', mode: permissions.approval_mode, sandbox: permissions.sandbox ?? '' })
   }
 
   const handleSave = async () => {
-    setError('')
-    try { await onSave({ ...permissions, approval_mode: mode, sandbox }) } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to save')
+    dispatch({ type: 'set-error', value: '' })
+    try { await onSave({ ...permissions, approval_mode: state.mode, sandbox: state.sandbox }) } catch (e) {
+      dispatch({ type: 'set-error', value: e instanceof Error ? e.message : 'Failed to save' })
     }
   }
 
   return (
-    <div className="flex flex-col h-full p-[18px] space-y-[14px]">
+    <div className="flex flex-col h-full p-[18px] gap-y-[14px]">
       <PanelHeader
         eyebrow={eyebrow}
         title="Approvals"
@@ -60,10 +86,10 @@ export function CodexApprovalsPanel({ permissions, scope, projectName, saving, o
       <div className="flex-1 min-h-0 overflow-y-auto pr-1">
         <div className="max-w-2xl mx-auto w-full flex flex-col gap-6">
           <section className="space-y-2">
-            <h4 className="text-[10px] font-bold uppercase tracking-widest text-foreground/45">Approval Policy</h4>
+            <h4 className="text-[10px] font-semibold uppercase tracking-widest text-foreground/45">Approval Policy</h4>
             <select
-              value={mode}
-              onChange={(event) => setMode(event.target.value)}
+              value={state.mode}
+              onChange={(event) => dispatch({ type: 'set-mode', value: event.target.value })}
               className="w-full max-w-sm px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
               {APPROVAL_MODES.codex.map(option => (
@@ -73,10 +99,10 @@ export function CodexApprovalsPanel({ permissions, scope, projectName, saving, o
           </section>
 
           <section className="space-y-2">
-            <h4 className="text-[10px] font-bold uppercase tracking-widest text-foreground/45">Sandbox Mode</h4>
+            <h4 className="text-[10px] font-semibold uppercase tracking-widest text-foreground/45">Sandbox Mode</h4>
             <select
-              value={sandbox}
-              onChange={(event) => setSandbox(event.target.value)}
+              value={state.sandbox}
+              onChange={(event) => dispatch({ type: 'set-sandbox', value: event.target.value })}
               className="w-full max-w-sm px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
               {SANDBOX_OPTIONS.map(option => (
@@ -92,7 +118,7 @@ export function CodexApprovalsPanel({ permissions, scope, projectName, saving, o
         </div>
       </div>
 
-      <ErrorStrip message={error} onDismiss={() => setError('')} />
+      <ErrorStrip message={state.error} onDismiss={() => dispatch({ type: 'set-error', value: '' })} />
 
       <PanelFooter
         dirty={isDirty}

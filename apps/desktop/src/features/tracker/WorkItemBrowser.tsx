@@ -64,7 +64,7 @@ export function WorkItemBrowser({
   const presentSources = useMemo(() => {
     const s = new Set<WorkItemSource>()
     for (const item of items) s.add(item.source as WorkItemSource)
-    return [...s].sort()
+    return [...s].toSorted()
   }, [items])
 
   const activeSource = (filter.source && filter.source !== 'all') ? filter.source : null
@@ -106,7 +106,7 @@ export function WorkItemBrowser({
       {/* Search bar */}
       <div className="p-2 border-b border-border space-y-2">
         <div className="relative">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
           <input
             type="text"
             placeholder="Search title or identifier…"

@@ -1,5 +1,5 @@
-import { forwardRef, useEffect, useRef, useState, type MutableRefObject, type ReactElement, type ReactNode, type Ref } from 'react'
-import { AlertCircle, Bot, ChevronDown, CircleDashed, Folder, FolderTree, MoreHorizontal, Server, SignalHigh, SignalLow, SignalMedium, User } from 'lucide-react'
+import { useEffect, useRef, useState, type MutableRefObject, type ReactNode, type Ref } from 'react'
+import { Bot, ChevronDown, Folder, FolderTree, Server, User } from 'lucide-react'
 import type { RuntimeEntry } from '@core/api/client'
 
 export function getAgentIcon(name: string, size = 12): ReactNode {
@@ -26,8 +26,6 @@ type CustomDropdownProps<T extends DropdownValue> = {
   direction?: 'up' | 'down'
 }
 
-type CustomDropdownComponent = <T extends DropdownValue>(props: CustomDropdownProps<T> & { ref?: Ref<HTMLDivElement> }) => ReactElement
-
 function mergeRefs<T>(...refs: Array<Ref<T> | undefined>) {
   return (node: T | null) => {
     refs.forEach((ref) => {
@@ -41,19 +39,17 @@ function mergeRefs<T>(...refs: Array<Ref<T> | undefined>) {
   }
 }
 
-function CustomDropdownImpl<T extends DropdownValue>(
-  {
-    value,
-    options,
-    onChange,
-    className = '',
-    disabled = false,
-    placeholder = 'Select...',
-    triggerContent,
-    direction = 'down',
-  }: CustomDropdownProps<T>,
-  ref: Ref<HTMLDivElement>,
-) {
+export function CustomDropdown<T extends DropdownValue>({
+  value,
+  options,
+  onChange,
+  className = '',
+  disabled = false,
+  placeholder = 'Select...',
+  triggerContent,
+  direction = 'down',
+  ref,
+}: CustomDropdownProps<T> & { ref?: Ref<HTMLDivElement> }) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement | null>(null)
 
@@ -86,7 +82,7 @@ function CustomDropdownImpl<T extends DropdownValue>(
               {selectedOption?.icon}
               <span className="whitespace-nowrap">{selectedOption?.label || placeholder}</span>
             </div>
-            <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
           </>
         )}
       </button>
@@ -106,7 +102,7 @@ function CustomDropdownImpl<T extends DropdownValue>(
               >
                 {option.icon}
                 <span className="flex-1 whitespace-nowrap">{option.label}</span>
-                {option.value === value && <div className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                {option.value === value && <div className="size-1.5 rounded-full bg-primary" />}
               </button>
             ))}
           </div>
@@ -115,8 +111,6 @@ function CustomDropdownImpl<T extends DropdownValue>(
     </div>
   )
 }
-
-export const CustomDropdown = forwardRef(CustomDropdownImpl) as CustomDropdownComponent
 
 export function AgentSelector({ value, agents, onChange, direction = 'up' }: { value: string; agents: string[]; onChange: (a: string) => void; direction?: 'up' | 'down' }) {
   const normalizedValue = value.startsWith('agent-') ? value.replace('agent-', '') : value
@@ -160,7 +154,7 @@ export function RuntimeSelector({
       options={configured.map((r) => ({
         label: r.target === 'LOCAL' ? 'Local' : r.target.charAt(0) + r.target.slice(1).toLowerCase(),
         value: r.target,
-        icon: <Server className="h-3.5 w-3.5 opacity-60" />,
+        icon: <Server className="size-3.5 opacity-60" />,
       }))}
       onChange={onChange}
       triggerContent={
@@ -171,26 +165,6 @@ export function RuntimeSelector({
       }
     />
   )
-}
-
-export function PriorityIcon({ priority, className }: { priority: number; className?: string }) {
-  switch (priority) {
-    case 1:
-      return <SignalLow className={`text-muted-foreground/60 ${className}`} />
-    case 2:
-      return <SignalMedium className={`text-amber-500/60 ${className}`} />
-    case 3:
-      return <SignalHigh className={`text-orange-500/80 ${className}`} />
-    case 4:
-      return <AlertCircle className={`text-red-500 ${className}`} />
-    default:
-      return <MoreHorizontal className={`text-muted-foreground/40 ${className}`} />
-  }
-}
-
-export function PriorityLabel({ priority }: { priority: number }) {
-  const labels = ['No Priority', 'Low', 'Medium', 'High', 'Urgent']
-  return <span>{labels[priority] || 'No Priority'}</span>
 }
 
 export function ProjectSelector({
@@ -212,8 +186,8 @@ export function ProjectSelector({
       value={value}
       direction={direction}
       options={[
-        { label: 'Select Project', value: '', icon: <FolderTree className="h-3.5 w-3.5 opacity-40" /> },
-        ...projects.map((p) => ({ label: p.name, value: p.id, icon: <Folder className="h-3.5 w-3.5 text-primary/60" /> })),
+        { label: 'Select Project', value: '', icon: <FolderTree className="size-3.5 opacity-40" /> },
+        ...projects.map((p) => ({ label: p.name, value: p.id, icon: <Folder className="size-3.5 text-primary/60" /> })),
       ]}
       onChange={onChange}
       triggerContent={
@@ -226,28 +200,3 @@ export function ProjectSelector({
   )
 }
 
-export function PrioritySelector({ value, onChange }: { value: number; onChange: (p: number) => void }) {
-  const priorities = [
-    { label: 'No Priority', value: 0, icon: <CircleDashed size={12} className="opacity-40" /> },
-    { label: 'Low', value: 1, icon: <SignalLow size={12} className="text-blue-500/60" /> },
-    { label: 'Medium', value: 2, icon: <SignalMedium size={12} className="text-amber-500/60" /> },
-    { label: 'High', value: 3, icon: <SignalHigh size={12} className="text-red-500/60" /> },
-  ]
-  const current = priorities.find((p) => p.value === value) || priorities[0]
-
-  return (
-    <CustomDropdown
-      className="bg-transparent border-none hover:bg-muted/20 !h-7 !px-2 rounded-md transition-colors shadow-none"
-      value={value.toString()}
-      direction="up"
-      options={priorities.map((p) => ({ label: p.label, value: p.value.toString(), icon: p.icon }))}
-      onChange={(v) => onChange(Number.parseInt(v, 10))}
-      triggerContent={
-        <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground/70 uppercase">
-          {current.icon}
-          <span>{value > 0 ? current.label : 'Priority'}</span>
-        </div>
-      }
-    />
-  )
-}

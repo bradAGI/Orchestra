@@ -18,7 +18,7 @@ export function FeedbackDialog({ onSubmit, onCancel, hasPR }: FeedbackDialogProp
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-card border border-border/40 rounded-xl shadow-lg p-6 max-w-md w-full mx-4">
-        <h3 className="text-sm font-bold text-foreground mb-3">Request Changes</h3>
+        <h3 className="text-sm font-semibold text-foreground mb-3">Request Changes</h3>
         <p className="text-[11px] text-muted-foreground mb-3">
           {hasPR
             ? 'Describe what needs to change. The agent will make the changes directly and update the PR.'
@@ -29,7 +29,6 @@ export function FeedbackDialog({ onSubmit, onCancel, hasPR }: FeedbackDialogProp
           onChange={(e) => setFeedback(e.target.value)}
           placeholder="What needs to change?"
           rows={4}
-          autoFocus
           className="w-full bg-muted/10 border border-border/40 rounded-lg px-3 py-2 text-[11px] text-foreground placeholder:text-muted-foreground/40 resize-none outline-none focus:border-primary/60"
         />
         <div className="flex justify-end gap-2 mt-3">

@@ -20,7 +20,7 @@ export function RightSidebar({ children }: RightSidebarProps) {
       {/* Resize handle on left edge */}
       <ResizeHandle
         direction="horizontal"
-        onResize={(delta) => setRightSidebarWidth(rightSidebarWidth - delta)}
+        onResize={(delta) => setRightSidebarWidth(useAppStore.getState().rightSidebarWidth - delta)}
       />
 
       {/* Sidebar content */}
@@ -33,7 +33,7 @@ export function RightSidebar({ children }: RightSidebarProps) {
             onClick={() => setRightSidebarOpen(false)}
             aria-label="Close issue detail"
           >
-            <X className="h-4 w-4" />
+            <X className="size-4" />
           </button>
         </div>
 

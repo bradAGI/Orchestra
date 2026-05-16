@@ -49,18 +49,21 @@ export function FileExplorer() {
     if (!explorerRoot) return
     clearExplorerCache()
 
+    const ctrl = new AbortController()
     const loadRoot = async () => {
       if (!config) return
       try {
         const url = `${config.baseUrl}/api/v1/workspace/tree?path=${encodeURIComponent(explorerRoot)}`
         const res = await fetch(url, {
           headers: { Authorization: `Bearer ${config.apiToken}` },
+          signal: ctrl.signal,
         })
         if (!res.ok) {
           setDirChildren(explorerRoot, [])
           return
         }
         const tree: Array<{ name: string; path: string; is_dir: boolean }> = await res.json()
+        if (ctrl.signal.aborted) return
         const children: TreeNode[] = tree.map((entry) => ({
           name: entry.name,
           path: `${explorerRoot}/${entry.name}`,
@@ -72,14 +75,15 @@ export function FileExplorer() {
 
         try {
           const status = await window.orchestraDesktop?.fs?.gitStatus?.(explorerRoot)
-          if (status) setGitStatusMap(status)
+          if (status && !ctrl.signal.aborted) setGitStatusMap(status)
         } catch { /* git status is best-effort */ }
       } catch {
-        setDirChildren(explorerRoot, [])
+        if (!ctrl.signal.aborted) setDirChildren(explorerRoot, [])
       }
     }
 
     loadRoot()
+    return () => ctrl.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [explorerRoot])
 
@@ -494,7 +498,6 @@ export function FileExplorer() {
             </DialogDescription>
           </DialogHeader>
           <input
-            autoFocus
             type="text"
             value={promptValue}
             onChange={(e) => setPromptValue(e.target.value)}
@@ -544,7 +547,7 @@ export function FileExplorer() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
-              <Trash2 className="h-5 w-5" /> Delete
+              <Trash2 className="size-5" /> Delete
             </DialogTitle>
             <DialogDescription>
               {confirmDialog?.node.isDirectory
@@ -573,7 +576,7 @@ export function FileExplorer() {
               onClick={() => void submitConfirm()}
               disabled={confirmPending}
             >
-              <Trash2 className="h-4 w-4 mr-2" />
+              <Trash2 className="size-4 mr-2" />
               {confirmPending ? 'Deleting…' : 'Delete'}
             </Button>
           </DialogFooter>

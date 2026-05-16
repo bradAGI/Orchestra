@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Activity, AppWindow, Circle, CircleDashed, Cpu, RefreshCcw } from 'lucide-react'
 
 import { CustomDropdown } from '@layout/shared/controls'
@@ -75,6 +75,11 @@ export function OperationsQueueCard({
     return laneMatch && stateMatch
   })
 
+  const formattedTimes = useMemo(
+    () => rows.map((row) => new Date(row.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
+    [rows],
+  )
+
 
   return (
     <Card className="group relative border bg-gradient-to-b from-card via-card to-muted/20 shadow-lg flex flex-col h-full overflow-hidden">
@@ -83,7 +88,7 @@ export function OperationsQueueCard({
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="space-y-1">
             <CardTitle className="text-xl font-bold flex items-center gap-2">
-              <AppWindow className="h-5 w-5 text-primary" />
+              <AppWindow className="size-5 text-primary" />
               Operations Queue
             </CardTitle>
             <CardDescription className="text-xs">Live orchestrator surface for active and retrying issue sessions.</CardDescription>
@@ -95,9 +100,9 @@ export function OperationsQueueCard({
                 className="w-36 h-8"
                 value={laneFilter}
                 options={[
-                  { label: 'All Lanes', value: 'all', icon: <Circle className="h-2 w-2" /> },
-                  { label: 'Running', value: 'running', icon: <Activity className="h-2 w-2 text-primary" /> },
-                  { label: 'Retrying', value: 'retrying', icon: <RefreshCcw className="h-2 w-2 text-amber-500" /> },
+                  { label: 'All Lanes', value: 'all', icon: <Circle className="size-2" /> },
+                  { label: 'Running', value: 'running', icon: <Activity className="size-2 text-primary" /> },
+                  { label: 'Retrying', value: 'retrying', icon: <RefreshCcw className="size-2 text-amber-500" /> },
                 ]}
                 onChange={(value) => setLaneFilter(value as 'all' | 'running' | 'retrying')}
               />
@@ -108,7 +113,7 @@ export function OperationsQueueCard({
                 className="w-44 h-8"
                 value={stateFilter}
                 options={[
-                  { label: 'All States', value: 'all', icon: <CircleDashed className="h-2 w-2" /> },
+                  { label: 'All States', value: 'all', icon: <CircleDashed className="size-2" /> },
                   ...uniqueStates.map((state) => ({ label: state, value: state })),
                 ]}
                 onChange={setStateFilter}
@@ -123,9 +128,9 @@ export function OperationsQueueCard({
                     setLaneFilter('all')
                     setStateFilter('all')
                   }}
-                  className="grid h-8 w-8 place-items-center rounded-lg bg-transparent text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                  className="grid size-8 place-items-center rounded-lg bg-transparent text-muted-foreground transition hover:bg-muted hover:text-foreground"
                 >
-                  <RefreshCcw className="h-4 w-4" />
+                  <RefreshCcw className="size-4" />
                 </button>
               </AppTooltip>
             )}
@@ -163,7 +168,7 @@ export function OperationsQueueCard({
                       </TableCell>
                     </TableRow>
                     )
-                  : rows.map((row) => (
+                  : rows.map((row, rowIdx) => (
                     <TableRow key={`${row.lane}-${row.issue_id}-${row.provider}`} className="group transition-colors hover:bg-muted/30">
                       <TableCell className="font-bold font-mono text-xs">
                         <button
@@ -176,7 +181,7 @@ export function OperationsQueueCard({
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1.5">
-                          <Cpu className="h-3 w-3 text-muted-foreground/40" />
+                          <Cpu className="size-3 text-muted-foreground/40" />
                           <span className="text-[10px] font-bold capitalize text-foreground/70">{row.provider}</span>
                         </div>
                       </TableCell>
@@ -205,7 +210,7 @@ export function OperationsQueueCard({
                         </AppTooltip>
                       </TableCell>
                       <TableCell className="text-right text-[10px] text-muted-foreground/60 font-medium whitespace-nowrap">
-                        {new Date(row.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {formattedTimes[rowIdx]}
                       </TableCell>
                     </TableRow>
                   ))}

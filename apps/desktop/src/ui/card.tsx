@@ -12,8 +12,12 @@ export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDiv
 }
 
 /** Styled heading (h3) for the card title. */
-export function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h3 className={cn('text-base font-semibold leading-none tracking-tight', className)} {...props} />
+export function CardTitle({ className, children, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
+  return (
+    <h3 className={cn('text-base font-semibold leading-none tracking-tight', className)} {...props}>
+      {children ?? <span className="sr-only">Section</span>}
+    </h3>
+  )
 }
 
 /** Muted description paragraph beneath the card title. */
@@ -26,7 +30,3 @@ export function CardContent({ className, ...props }: React.HTMLAttributes<HTMLDi
   return <div className={cn('p-6 pt-0', className)} {...props} />
 }
 
-/** Footer section of a Card, typically used for action buttons. */
-export function CardFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('flex items-center p-6 pt-0', className)} {...props} />
-}
