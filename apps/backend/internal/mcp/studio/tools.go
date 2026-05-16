@@ -147,3 +147,20 @@ func (s *Server) handlePush(ctx context.Context, _ json.RawMessage) (json.RawMes
 	out, _ := json.Marshal(map[string]string{"issue_id": id})
 	return out, nil
 }
+
+func (s *Server) handleApplyTemplate(_ context.Context, raw json.RawMessage) (json.RawMessage, error) {
+	var a struct {
+		Name string            `json:"name"`
+		Vars map[string]string `json:"vars"`
+	}
+	if err := json.Unmarshal(raw, &a); err != nil {
+		return nil, err
+	}
+	if a.Name == "" {
+		return nil, fmt.Errorf("name required")
+	}
+	if err := s.mgr.ApplyTemplate(s.sessionID, a.Name, a.Vars); err != nil {
+		return nil, err
+	}
+	return ok(), nil
+}

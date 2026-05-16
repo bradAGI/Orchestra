@@ -6,15 +6,21 @@ import (
 	"testing"
 )
 
+type templateCall struct {
+	Name string
+	Vars map[string]string
+}
+
 type recordingManager struct {
-	titles       []string
-	descriptions []string
-	acs          []string
-	files        []string
-	links        [][2]string
-	providers    []string
-	models       []string
-	maxTurns     []int
+	titles        []string
+	descriptions  []string
+	acs           []string
+	files         []string
+	links         [][2]string
+	providers     []string
+	models        []string
+	maxTurns      []int
+	templateCalls []templateCall
 }
 
 func (r *recordingManager) SetTitle(_, title string) error {
@@ -51,6 +57,32 @@ func (r *recordingManager) SetMaxTurns(_ string, n int) error {
 	return nil
 }
 func (r *recordingManager) Push(context.Context, string) (string, error) { return "ISS-1", nil }
+func (r *recordingManager) ApplyTemplate(_, name string, vars map[string]string) error {
+	r.templateCalls = append(r.templateCalls, templateCall{Name: name, Vars: vars})
+	return nil
+}
+
+func TestApplyTemplateTool(t *testing.T) {
+	rm := &recordingManager{}
+	srv := New(rm, "sess1")
+	if _, err := srv.Dispatch(context.Background(), "apply_template",
+		json.RawMessage(`{"name":"add-tests","vars":{"file":"a.go"}}`)); err != nil {
+		t.Fatalf("dispatch: %v", err)
+	}
+	if len(rm.templateCalls) != 1 || rm.templateCalls[0].Name != "add-tests" {
+		t.Fatalf("calls=%+v", rm.templateCalls)
+	}
+	if rm.templateCalls[0].Vars["file"] != "a.go" {
+		t.Fatalf("vars=%+v", rm.templateCalls[0].Vars)
+	}
+}
+
+func TestApplyTemplateRequiresName(t *testing.T) {
+	srv := New(&recordingManager{}, "sess1")
+	if _, err := srv.Dispatch(context.Background(), "apply_template", json.RawMessage(`{}`)); err == nil {
+		t.Fatalf("expected error")
+	}
+}
 
 func TestSetTitleTool(t *testing.T) {
 	rm := &recordingManager{}

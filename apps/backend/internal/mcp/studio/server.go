@@ -18,6 +18,7 @@ type ManagerAPI interface {
 	SetModel(sessionID, model string) error
 	SetMaxTurns(sessionID string, turns int) error
 	Push(ctx context.Context, sessionID string) (string, error)
+	ApplyTemplate(sessionID, name string, vars map[string]string) error
 }
 
 type Server struct {
@@ -41,6 +42,7 @@ func New(mgr ManagerAPI, sessionID string) *Server {
 		"set_model":                   s.handleSetModel,
 		"set_max_turns":               s.handleSetMaxTurns,
 		"push_to_backlog":             s.handlePush,
+		"apply_template":              s.handleApplyTemplate,
 	}
 	return s
 }

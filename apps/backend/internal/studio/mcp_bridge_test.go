@@ -24,6 +24,9 @@ func (r *recordingMgrForBridge) SetProvider(_, _ string) error                  
 func (r *recordingMgrForBridge) SetModel(_, _ string) error                      { return nil }
 func (r *recordingMgrForBridge) SetMaxTurns(_ string, _ int) error               { return nil }
 func (r *recordingMgrForBridge) Push(context.Context, string) (string, error)    { return "ISS-1", nil }
+func (r *recordingMgrForBridge) ApplyTemplate(_, _ string, _ map[string]string) error {
+	return nil
+}
 
 func TestBridgeDispatchesToolCall(t *testing.T) {
 	rm := &recordingMgrForBridge{}
