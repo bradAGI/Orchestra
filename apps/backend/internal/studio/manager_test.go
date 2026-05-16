@@ -5,11 +5,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/orchestra/orchestra/apps/backend/internal/db"
 	"github.com/orchestra/orchestra/apps/backend/internal/observability"
+	"github.com/orchestra/orchestra/apps/backend/internal/studio/templates"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
 	_ "modernc.org/sqlite"
 )
@@ -224,5 +226,102 @@ func TestPushIsIdempotent_ConcurrentCallsCreateOneIssue(t *testing.T) {
 	}
 	if len(tr.created) != 1 {
 		t.Fatalf("expected exactly 1 tracker issue, got %d", len(tr.created))
+	}
+}
+
+func writeTemplateForTest(t *testing.T, name, body string) *templates.Store {
+	t.Helper()
+	dir := t.TempDir()
+	store := templates.NewStore(dir)
+	if err := store.Write(name, []byte(body)); err != nil {
+		t.Fatalf("write template: %v", err)
+	}
+	return store
+}
+
+func TestStartSessionWithTemplatePrefillsDraft(t *testing.T) {
+	m := newTestManager(t)
+	store := writeTemplateForTest(t, "add-tests", `---
+name: add-tests
+description: Add tests
+variables:
+  - name: file
+    required: true
+suggested_provider: claude-code
+suggested_max_turns: 8
+---
+Add tests to {{file}}.
+`)
+	m.SetTemplateStore(store)
+
+	sess, err := m.StartSession(context.Background(), StartSessionRequest{
+		ProjectID:    "p",
+		Runner:       "claude-code",
+		Template:     "add-tests",
+		TemplateVars: map[string]string{"file": "auth.go"},
+	})
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	snap, err := m.GetDraft(sess.ID)
+	if err != nil {
+		t.Fatalf("draft: %v", err)
+	}
+	if snap.SuggestedProvider != "claude-code" {
+		t.Fatalf("provider=%q", snap.SuggestedProvider)
+	}
+	if snap.MaxTurns == nil || *snap.MaxTurns != 8 {
+		t.Fatalf("max_turns=%v", snap.MaxTurns)
+	}
+	if snap.TemplateName != "add-tests" {
+		t.Fatalf("template_name=%q", snap.TemplateName)
+	}
+	if !strings.Contains(snap.Description, "auth.go") {
+		t.Fatalf("description missing rendered body: %q", snap.Description)
+	}
+}
+
+func TestApplyTemplateMidSession(t *testing.T) {
+	m := newTestManager(t)
+	store := writeTemplateForTest(t, "refactor", `---
+name: refactor
+variables:
+  - name: target
+    required: true
+---
+Refactor {{target}}.
+`)
+	m.SetTemplateStore(store)
+
+	sess, _ := m.StartSession(context.Background(), StartSessionRequest{ProjectID: "p", Runner: "claude-code"})
+	if err := m.ApplyTemplate(sess.ID, "refactor", map[string]string{"target": "auth.go"}); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	snap, _ := m.GetDraft(sess.ID)
+	if snap.TemplateName != "refactor" {
+		t.Fatalf("template_name=%q", snap.TemplateName)
+	}
+	if !strings.Contains(snap.Description, "auth.go") {
+		t.Fatalf("description missing rendered body: %q", snap.Description)
+	}
+}
+
+func TestApplyTemplateMissingRequired(t *testing.T) {
+	m := newTestManager(t)
+	store := writeTemplateForTest(t, "needs-var", `---
+name: needs-var
+variables:
+  - name: target
+    required: true
+---
+{{target}}
+`)
+	m.SetTemplateStore(store)
+
+	if _, err := m.StartSession(context.Background(), StartSessionRequest{
+		ProjectID: "p", Runner: "claude-code",
+		Template: "needs-var", TemplateVars: map[string]string{},
+	}); err == nil {
+		t.Fatalf("expected error for missing required var")
 	}
 }

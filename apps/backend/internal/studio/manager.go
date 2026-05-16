@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/orchestra/orchestra/apps/backend/internal/db"
 	"github.com/orchestra/orchestra/apps/backend/internal/observability"
+	"github.com/orchestra/orchestra/apps/backend/internal/studio/templates"
 	"github.com/orchestra/orchestra/apps/backend/internal/tracker"
 )
 
@@ -28,11 +29,12 @@ type Tracker interface {
 }
 
 type Manager struct {
-	d       *sql.DB
-	bus     *observability.PubSub
-	spawner RunnerSpawner
-	tracker Tracker
-	mu      sync.Mutex // guards read-modify-write draft operations
+	d             *sql.DB
+	bus           *observability.PubSub
+	spawner       RunnerSpawner
+	tracker       Tracker
+	templateStore *templates.Store
+	mu            sync.Mutex // guards read-modify-write draft operations
 }
 
 func NewManager(d *sql.DB, bus *observability.PubSub, spawner RunnerSpawner) *Manager {
@@ -42,6 +44,56 @@ func NewManager(d *sql.DB, bus *observability.PubSub, spawner RunnerSpawner) *Ma
 // SetTracker configures the tracker backend used by Push.
 func (m *Manager) SetTracker(t Tracker) {
 	m.tracker = t
+}
+
+// SetTemplateStore configures the template store used by ApplyTemplate and
+// StartSession's template hook. Nil disables template features.
+func (m *Manager) SetTemplateStore(s *templates.Store) {
+	m.templateStore = s
+}
+
+// ApplyTemplate loads the named template, renders its body with the given
+// vars, and applies the rendered body plus any suggested provider/model/turns
+// to the draft. Validates required variables before mutating.
+func (m *Manager) ApplyTemplate(sessionID, name string, vars map[string]string) error {
+	if m.templateStore == nil {
+		return fmt.Errorf("studio: template store not configured")
+	}
+	tpl, err := m.templateStore.Get(name)
+	if err != nil {
+		return fmt.Errorf("get template: %w", err)
+	}
+	if err := templates.Validate(tpl, vars); err != nil {
+		return err
+	}
+	rendered, err := templates.Render(tpl.Body, vars)
+	if err != nil {
+		return err
+	}
+
+	if tpl.Meta.SuggestedProvider != "" {
+		if err := m.SetProvider(sessionID, tpl.Meta.SuggestedProvider); err != nil {
+			return err
+		}
+	}
+	if tpl.Meta.SuggestedModel != "" {
+		if err := m.SetModel(sessionID, tpl.Meta.SuggestedModel); err != nil {
+			return err
+		}
+	}
+	if tpl.Meta.SuggestedMaxTurns > 0 {
+		if err := m.SetMaxTurns(sessionID, tpl.Meta.SuggestedMaxTurns); err != nil {
+			return err
+		}
+	}
+	if err := db.UpdateDraftField(m.d, sessionID, "template_name", name); err != nil {
+		return err
+	}
+	varsJSON, _ := json.Marshal(vars)
+	if err := db.UpdateDraftField(m.d, sessionID, "template_vars", string(varsJSON)); err != nil {
+		return err
+	}
+	return m.SetDescription(sessionID, rendered)
 }
 
 func (m *Manager) StartSession(ctx context.Context, req StartSessionRequest) (Session, error) {
@@ -57,6 +109,13 @@ func (m *Manager) StartSession(ctx context.Context, req StartSessionRequest) (Se
 		return Session{}, fmt.Errorf("create draft: %w", err)
 	}
 	sess := Session{ID: id, ProjectID: req.ProjectID, Runner: req.Runner, Status: StatusActive}
+	if req.Template != "" {
+		if err := m.ApplyTemplate(id, req.Template, req.TemplateVars); err != nil {
+			_ = db.DeleteDraft(m.d, id)
+			_ = db.EndStudioSession(m.d, id, string(StatusDiscarded))
+			return Session{}, fmt.Errorf("apply template: %w", err)
+		}
+	}
 	if m.spawner != nil {
 		if err := m.spawner.Spawn(ctx, sess, m.dispatch); err != nil {
 			_ = db.DeleteDraft(m.d, id)
