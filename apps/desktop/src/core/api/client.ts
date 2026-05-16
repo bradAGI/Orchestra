@@ -2567,3 +2567,96 @@ export async function testTrackerConfig(
     { method: 'POST' },
   )
 }
+
+// ---- Studio (task authoring) ----
+
+export interface StudioAttachment {
+  kind: 'file' | 'link'
+  path?: string
+  url?: string
+  label?: string
+}
+
+export interface StudioDraft {
+  session_id: string
+  title: string
+  description: string
+  acceptance_criteria: string[]
+  attachments: StudioAttachment[]
+  suggested_provider: string
+  suggested_model: string
+  max_turns?: number
+  template_name?: string
+  template_vars: Record<string, string>
+  agent_guidance: Record<string, unknown>
+}
+
+export interface StudioSessionHandle {
+  session_id: string
+  sse_url: string
+}
+
+export interface StartStudioSession {
+  project_id: string
+  runner: string
+  template?: string
+  template_vars?: Record<string, string>
+}
+
+export async function createStudioSession(
+  config: BackendConfig,
+  body: StartStudioSession,
+): Promise<StudioSessionHandle> {
+  return requestJSON<StudioSessionHandle>(config, '/api/v1/studio/sessions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+export async function sendStudioMessage(
+  config: BackendConfig,
+  sessionId: string,
+  message: string,
+): Promise<void> {
+  await requestJSON<void>(config, `/api/v1/studio/sessions/${encodeURIComponent(sessionId)}/message`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  })
+}
+
+export async function getStudioDraft(config: BackendConfig, sessionId: string): Promise<StudioDraft> {
+  return requestJSON<StudioDraft>(config, `/api/v1/studio/sessions/${encodeURIComponent(sessionId)}/draft`)
+}
+
+export async function patchStudioDraft(
+  config: BackendConfig,
+  sessionId: string,
+  patch: Partial<StudioDraft>,
+): Promise<void> {
+  await requestJSON<void>(config, `/api/v1/studio/sessions/${encodeURIComponent(sessionId)}/draft`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  })
+}
+
+export async function pushStudioToBacklog(
+  config: BackendConfig,
+  sessionId: string,
+): Promise<{ issue_id: string }> {
+  return requestJSON<{ issue_id: string }>(config, `/api/v1/studio/sessions/${encodeURIComponent(sessionId)}/push`, {
+    method: 'POST',
+  })
+}
+
+export async function discardStudioSession(config: BackendConfig, sessionId: string): Promise<void> {
+  await requestJSON<void>(config, `/api/v1/studio/sessions/${encodeURIComponent(sessionId)}`, {
+    method: 'DELETE',
+  })
+}
+
+export function studioEventsURL(config: BackendConfig, sessionId: string): string {
+  return new URL(`/api/v1/studio/sessions/${encodeURIComponent(sessionId)}/events`, config.baseUrl).toString()
+}
