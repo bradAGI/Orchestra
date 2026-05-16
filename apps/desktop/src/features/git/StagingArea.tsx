@@ -82,17 +82,25 @@ function FileRow({
     <div
       ref={setNodeRef}
       style={style}
+      {...attributes}
+      {...listeners}
+      role="button"
+      tabIndex={0}
       data-testid={`file-row-${isStaged ? 'staged' : 'unstaged'}-${entry.path}`}
       data-selected={isSelected ? 'true' : undefined}
       onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onSelect()
+        }
+      }}
       className={`group flex items-center gap-2 h-6 px-3 cursor-pointer transition-colors ${
         isSelected
           ? 'bg-foreground/[0.06] text-foreground'
           : 'text-foreground/85 hover:bg-foreground/[0.03]'
       }`}
       title={entry.path}
-      {...attributes}
-      {...listeners}
     >
       <span data-file-path={entry.path} className={`min-w-0 flex-1 truncate text-[12px] font-mono leading-none ${isDeleted ? 'line-through text-muted-foreground/60' : ''}`}>
         {filename}
@@ -105,7 +113,7 @@ function FileRow({
         <button
           onClick={(e) => { e.stopPropagation(); onAction() }}
           onPointerDown={(e) => e.stopPropagation()}
-          className={`hidden group-hover:inline-flex items-center justify-center w-5 h-5 rounded text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.06] transition-colors`}
+          className={`hidden group-hover:inline-flex items-center justify-center size-5 rounded text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.06] transition-colors`}
           title={isStaged ? 'Unstage' : 'Stage'}
         >
           {isStaged ? <Minus size={11} strokeWidth={2.5} /> : <Plus size={11} strokeWidth={2.5} />}
@@ -114,7 +122,7 @@ function FileRow({
           <button
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
-            className="hidden group-hover:inline-flex items-center justify-center w-5 h-5 rounded text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.06] transition-colors"
+            className="hidden group-hover:inline-flex items-center justify-center size-5 rounded text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.06] transition-colors"
             title="Discard changes"
           >
             <RotateCcw size={10} strokeWidth={2.25} />

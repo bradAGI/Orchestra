@@ -62,6 +62,7 @@ export function FileContextMenu({
   return createPortal(
     <div
       ref={ref}
+      role="menu"
       data-portal-menu="open"
       className="fixed z-[9999] bg-popover border border-border/60 rounded-lg shadow-xl py-1 backdrop-blur-sm text-foreground"
       style={{ left, top, minWidth: MENU_W }}
@@ -112,7 +113,7 @@ function Item({
         destructive ? 'text-destructive hover:text-destructive' : 'text-foreground'
       }`}
     >
-      <span className="inline-flex w-4 h-4 items-center justify-center shrink-0">{icon}</span>
+      <span className="inline-flex size-4 items-center justify-center shrink-0">{icon}</span>
       <span className="flex-1 truncate">{label}</span>
       {shortcut && (
         <span className="text-[10.5px] tabular-nums text-muted-foreground/70 font-mono">{shortcut}</span>

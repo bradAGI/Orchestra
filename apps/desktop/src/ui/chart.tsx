@@ -1,9 +1,20 @@
 import * as React from "react"
-import * as RechartsPrimitive from "recharts"
+import type * as RechartsPrimitive from "recharts"
 
 import { cn } from '@core/utils/cn'
 
-// Format: { THEME_NAME: CSS_SELECTOR }
+const ResponsiveContainer = React.lazy(() =>
+  import("recharts").then((m) => ({ default: m.ResponsiveContainer as unknown as React.ComponentType<React.ComponentProps<typeof RechartsPrimitive.ResponsiveContainer>> }))
+)
+
+const LazyTooltip = React.lazy(() =>
+  import("recharts").then((m) => ({ default: m.Tooltip as unknown as React.ComponentType<React.ComponentProps<typeof RechartsPrimitive.Tooltip>> }))
+)
+
+const LazyLegend = React.lazy(() =>
+  import("recharts").then((m) => ({ default: m.Legend as unknown as React.ComponentType<React.ComponentProps<typeof RechartsPrimitive.Legend>> }))
+)
+
 const THEMES = { light: "", dark: ".dark" } as const
 
 /** Configuration map defining chart series labels, icons, and colors (supports light/dark themes). */
@@ -37,15 +48,13 @@ function useChart() {
  * Responsive chart wrapper that provides theme-aware CSS custom properties
  * and a ChartConfig context for tooltip and legend components.
  */
-const ChartContainer = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<"div"> & {
-    config: ChartConfig
-    children: React.ComponentProps<
-      typeof RechartsPrimitive.ResponsiveContainer
-    >["children"]
-  }
->(({ id, className, children, config, ...props }, ref) => {
+type ChartContainerProps = React.ComponentProps<"div"> & {
+  config: ChartConfig
+  children: React.ComponentProps<typeof RechartsPrimitive.ResponsiveContainer>["children"]
+  ref?: React.Ref<HTMLDivElement>
+}
+
+const ChartContainer = ({ id, className, children, config, ref, ...props }: ChartContainerProps) => {
   const uniqueId = React.useId()
   const chartId = `chart-${id || uniqueId.replace(/:/g, "")}`
 
@@ -61,13 +70,15 @@ const ChartContainer = React.forwardRef<
         {...props}
       >
         <ChartStyle id={chartId} config={config} />
-        <RechartsPrimitive.ResponsiveContainer>
-          {children}
-        </RechartsPrimitive.ResponsiveContainer>
+        <React.Suspense fallback={null}>
+          <ResponsiveContainer>
+            {children}
+          </ResponsiveContainer>
+        </React.Suspense>
       </div>
     </ChartContext.Provider>
   )
-})
+}
 ChartContainer.displayName = "Chart"
 
 /** Injects CSS custom properties for chart colors based on the active theme. */
@@ -82,6 +93,7 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
 
   return (
     <style
+      // eslint-disable-next-line react/no-danger -- CSS built from internal config only, no user input
       dangerouslySetInnerHTML={{
         __html: Object.entries(THEMES)
           .map(
@@ -104,28 +116,31 @@ ${colorConfig
   )
 }
 
-/** Re-exported Recharts Tooltip component. */
-const ChartTooltip = RechartsPrimitive.Tooltip
+/** Lazy-loaded Recharts Tooltip wrapper. */
+const ChartTooltip = (props: React.ComponentProps<typeof RechartsPrimitive.Tooltip>) => (
+  <React.Suspense fallback={null}>
+    <LazyTooltip {...props} />
+  </React.Suspense>
+)
+
+type ChartTooltipContentProps = React.ComponentProps<"div"> & {
+  active?: boolean
+  payload?: Array<Record<string, any>>
+  label?: string
+  labelFormatter?: (value: any, payload: any[]) => React.ReactNode
+  formatter?: (value: any, name: any, item: any, index: number, payload: any) => React.ReactNode
+  color?: string
+  labelClassName?: string
+  hideLabel?: boolean
+  hideIndicator?: boolean
+  indicator?: "line" | "dot" | "dashed"
+  nameKey?: string
+  labelKey?: string
+  ref?: React.Ref<HTMLDivElement>
+}
 
 /** Styled tooltip content component that reads from ChartConfig context for labels and colors. */
-const ChartTooltipContent = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<"div"> & {
-      active?: boolean
-      payload?: Array<Record<string, any>>
-      label?: string
-      labelFormatter?: (value: any, payload: any[]) => React.ReactNode
-      formatter?: (value: any, name: any, item: any, index: number, payload: any) => React.ReactNode
-      color?: string
-      labelClassName?: string
-      hideLabel?: boolean
-      hideIndicator?: boolean
-      indicator?: "line" | "dot" | "dashed"
-      nameKey?: string
-      labelKey?: string
-    }
->(
-  (
+const ChartTooltipContent = (
     {
       active,
       payload,
@@ -140,8 +155,8 @@ const ChartTooltipContent = React.forwardRef<
       color,
       nameKey,
       labelKey,
-    },
-    ref
+      ref,
+    }: ChartTooltipContentProps
   ) => {
     const { config } = useChart()
 
@@ -197,9 +212,8 @@ const ChartTooltipContent = React.forwardRef<
       >
         {!nestLabel ? tooltipLabel : null}
         <div className="grid gap-1.5">
-          {payload!
-            .filter((item: any) => item.type !== "none")
-            .map((item: any, index: number) => {
+          {payload!.flatMap((item: any, index: number) => {
+              if (item.type === "none") return []
               const key = `${nameKey || item.name || item.dataKey || "value"}`
               const itemConfig = getPayloadConfigFromPayload(config, item, key)
               const indicatorColor = color || item.payload.fill || item.color
@@ -224,7 +238,7 @@ const ChartTooltipContent = React.forwardRef<
                             className={cn(
                               "shrink-0 rounded-[2px] border-[--color-border] bg-[--color-bg]",
                               {
-                                "h-2.5 w-2.5": indicator === "dot",
+                                "size-2.5": indicator === "dot",
                                 "w-1": indicator === "line",
                                 "w-0 border-[1.5px] border-dashed bg-transparent":
                                   indicator === "dashed",
@@ -267,25 +281,26 @@ const ChartTooltipContent = React.forwardRef<
       </div>
     )
   }
-)
 ChartTooltipContent.displayName = "ChartTooltip"
 
-/** Re-exported Recharts Legend component. */
-const ChartLegend = RechartsPrimitive.Legend
+/** Lazy-loaded Recharts Legend wrapper. */
+const ChartLegend = (props: React.ComponentProps<typeof RechartsPrimitive.Legend>) => (
+  <React.Suspense fallback={null}>
+    <LazyLegend {...props} />
+  </React.Suspense>
+)
+
+type ChartLegendContentProps = React.ComponentProps<"div"> & {
+  payload?: Array<Record<string, any>>
+  verticalAlign?: "top" | "bottom"
+  hideIcon?: boolean
+  nameKey?: string
+  ref?: React.Ref<HTMLDivElement>
+}
 
 /** Styled legend content component that reads from ChartConfig context for labels and icons. */
-const ChartLegendContent = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<"div"> & {
-      payload?: Array<Record<string, any>>
-      verticalAlign?: "top" | "bottom"
-      hideIcon?: boolean
-      nameKey?: string
-    }
->(
-  (
-    { className, hideIcon = false, payload, verticalAlign = "bottom", nameKey },
-    ref
+const ChartLegendContent = (
+    { className, hideIcon = false, payload, verticalAlign = "bottom", nameKey, ref }: ChartLegendContentProps
   ) => {
     const { config } = useChart()
 
@@ -302,9 +317,8 @@ const ChartLegendContent = React.forwardRef<
           className
         )}
       >
-        {payload!
-          .filter((item: any) => item.type !== "none")
-          .map((item: any) => {
+        {payload!.flatMap((item: any) => {
+            if (item.type === "none") return []
             const key = `${nameKey || item.dataKey || "value"}`
             const itemConfig = getPayloadConfigFromPayload(config, item, key)
 
@@ -319,7 +333,7 @@ const ChartLegendContent = React.forwardRef<
                   <itemConfig.icon />
                 ) : (
                   <div
-                    className="h-2 w-2 shrink-0 rounded-[2px]"
+                    className="size-2 shrink-0 rounded-[2px]"
                     style={{
                       backgroundColor: item.color,
                     }}
@@ -332,10 +346,8 @@ const ChartLegendContent = React.forwardRef<
       </div>
     )
   }
-)
 ChartLegendContent.displayName = "ChartLegend"
 
-// Helper to extract item config from a payload.
 function getPayloadConfigFromPayload(
   config: ChartConfig,
   payload: unknown,

@@ -21,23 +21,122 @@ interface DocsDashboardProps {
     theme?: 'light' | 'dark'
 }
 
-function AuthImage({ docPath, alt, config, ...props }: { docPath: string; alt: string; config: BackendConfig | null; [key: string]: unknown }) {
+function useAuthDocBlobUrl(docPath: string, config: BackendConfig | null): string | null {
     const [blobUrl, setBlobUrl] = useState<string | null>(null)
     useEffect(() => {
         if (!config) return
-        let revoked = false
+        const ctrl = new AbortController()
+        let created: string | null = null
         const url = new URL(`/api/v1/docs/${docPath}`, config.baseUrl).toString()
-        fetch(url, { headers: { Authorization: `Bearer ${config.apiToken}` } })
+        fetch(url, { headers: { Authorization: `Bearer ${config.apiToken}` }, signal: ctrl.signal })
             .then(r => r.blob())
             .then(blob => {
-                if (revoked) return
-                setBlobUrl(URL.createObjectURL(blob))
+                if (ctrl.signal.aborted) return
+                created = URL.createObjectURL(blob)
+                setBlobUrl(created)
             })
             .catch(() => {})
-        return () => { revoked = true; if (blobUrl) URL.revokeObjectURL(blobUrl) }
+        return () => {
+            ctrl.abort()
+            if (created) URL.revokeObjectURL(created)
+        }
     }, [config, docPath])
+    return blobUrl
+}
+
+function AuthImage({ docPath, alt, config, ...props }: { docPath: string; alt: string; config: BackendConfig | null; [key: string]: unknown }) {
+    const blobUrl = useAuthDocBlobUrl(docPath, config)
     if (!blobUrl) return <div className="h-48 bg-muted/10 rounded-xl animate-pulse" />
     return <img src={blobUrl} alt={alt} className="rounded-xl border border-border shadow-lg max-w-full" {...(props as React.ImgHTMLAttributes<HTMLImageElement>)} />
+}
+
+interface DocTreeProps {
+    items: DocItem[]
+    level?: number
+    parentDir?: string
+    expandedFolders: Set<string>
+    selectedPath: string | null
+    onToggleFolder: (path: string) => void
+    onSelectDoc: (path: string) => void
+    sortItems: (items: DocItem[], parentDir?: string) => DocItem[]
+    getDisplayName: (item: DocItem) => string
+}
+
+function DocTree({
+    items,
+    level = 0,
+    parentDir,
+    expandedFolders,
+    selectedPath,
+    onToggleFolder,
+    onSelectDoc,
+    sortItems,
+    getDisplayName,
+}: DocTreeProps) {
+    return (
+        <>
+            {sortItems(items, parentDir).map(item => {
+                if (item.is_folder) {
+                    const isExpanded = expandedFolders.has(item.path)
+                    return (
+                        <div key={item.path}>
+                            <button
+                                onClick={() => onToggleFolder(item.path)}
+                                className="group w-full flex items-center gap-2.5 h-9 rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.03] transition-colors text-left"
+                                style={{ paddingLeft: `${level * 12 + 10}px`, paddingRight: '10px' }}
+                            >
+                                {isExpanded
+                                    ? <FolderOpen size={15} strokeWidth={1.75} className="shrink-0 text-muted-foreground/60 group-hover:text-foreground transition-colors" />
+                                    : <Folder size={15} strokeWidth={1.75} className="shrink-0 text-muted-foreground/60 group-hover:text-foreground transition-colors" />
+                                }
+                                <span className="flex-1 truncate text-[12.5px] font-medium tracking-tight capitalize">{item.name}</span>
+                                <ChevronRight size={12} className={`shrink-0 transition-transform duration-150 text-muted-foreground/40 ${isExpanded ? 'rotate-90' : ''}`} />
+                            </button>
+                            {isExpanded && item.children && (
+                                <div className="mt-0.5">
+                                    <DocTree
+                                        items={item.children}
+                                        level={level + 1}
+                                        parentDir={item.name}
+                                        expandedFolders={expandedFolders}
+                                        selectedPath={selectedPath}
+                                        onToggleFolder={onToggleFolder}
+                                        onSelectDoc={onSelectDoc}
+                                        sortItems={sortItems}
+                                        getDisplayName={getDisplayName}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )
+                }
+
+                const isActive = selectedPath === item.path
+                return (
+                    <button
+                        key={item.path}
+                        onClick={() => onSelectDoc(item.path)}
+                        className={`group relative w-full flex items-center gap-2.5 h-9 rounded-md transition-all duration-150 text-left ${
+                            isActive
+                                ? 'bg-foreground/[0.06] text-foreground'
+                                : 'text-muted-foreground/80 hover:text-foreground hover:bg-foreground/[0.03]'
+                        }`}
+                        style={{ paddingLeft: `${level * 12 + 10}px`, paddingRight: '10px' }}
+                    >
+                        {isActive && <span className="absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-primary" />}
+                        <FileText
+                            size={15}
+                            strokeWidth={isActive ? 2.25 : 1.75}
+                            className={`shrink-0 transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground/60 group-hover:text-foreground'}`}
+                        />
+                        <span className="flex-1 truncate text-[12.5px] font-medium tracking-tight capitalize">
+                            {getDisplayName(item)}
+                        </span>
+                    </button>
+                )
+            })}
+        </>
+    )
 }
 
 export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) => {
@@ -52,7 +151,7 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
     const [content, setContent] = useState<string>('')
     const [contentLoading, setContentLoading] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
-    const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['plans', 'specs']))
+    const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => new Set(['plans', 'specs']))
     const [toc, setToc] = useState<{ id: string, text: string, level: number }[]>([])
     
     const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -165,14 +264,14 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
                 }
                 resolvedPath = normalized.join('/')
                 return (
-                    <a
-                        href="#"
-                        onClick={(e) => { e.preventDefault(); handleSelectDocRef.current(resolvedPath) }}
-                        className="text-primary border-b border-primary/30 hover:border-primary transition-colors cursor-pointer"
+                    <button
+                        type="button"
+                        onClick={() => handleSelectDocRef.current(resolvedPath)}
+                        className="text-primary border-b border-primary/30 hover:border-primary transition-colors cursor-pointer bg-transparent p-0 font-inherit"
                         {...props}
                     >
                         {children}
-                    </a>
+                    </button>
                 )
             }
             return (
@@ -215,13 +314,13 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
                         <div className="bg-muted/30 px-6 py-3 flex items-center justify-between border-b border-border">
                             <div className="flex items-center gap-3">
                                 <div className="flex gap-1.5">
-                                    <div className="h-2.5 w-2.5 rounded-full bg-destructive/20 border border-destructive/10" />
-                                    <div className="h-2.5 w-2.5 rounded-full bg-amber-500/20 border border-amber-500/10" />
-                                    <div className="h-2.5 w-2.5 rounded-full bg-emerald-500/20 border border-emerald-500/10" />
+                                    <div className="size-2.5 rounded-full bg-destructive/20 border border-destructive/10" />
+                                    <div className="size-2.5 rounded-full bg-amber-500/20 border border-amber-500/10" />
+                                    <div className="size-2.5 rounded-full bg-emerald-500/20 border border-emerald-500/10" />
                                 </div>
                                 <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">{match[1]}</span>
                             </div>
-                            <div className="h-5 w-5 rounded-md bg-muted/20 flex items-center justify-center border border-border">
+                            <div className="size-5 rounded-md bg-muted/20 flex items-center justify-center border border-border">
                                 <CodeIcon size={12} className="text-muted-foreground/40" />
                             </div>
                         </div>
@@ -343,7 +442,7 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
     }
 
     const sortItems = (items: DocItem[], parentDir?: string): DocItem[] => {
-        return [...items].sort((a, b) => {
+        return items.toSorted((a, b) => {
             // Folders before files, except index.md always first
             if (a.name === 'index.md') return -1
             if (b.name === 'index.md') return 1
@@ -454,7 +553,7 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
                         onClick={() => {
                             scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
                         }}
-                        className="absolute bottom-6 right-6 h-9 w-9 rounded-md bg-muted/40 text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 grid place-items-center transition-colors"
+                        className="absolute bottom-6 right-6 size-9 rounded-md bg-muted/40 text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 grid place-items-center transition-colors"
                         title="Back to top"
                     >
                         <ArrowUp size={15} />
@@ -464,7 +563,7 @@ export const DocsDashboard: React.FC<DocsDashboardProps> = ({ config, theme }) =
                 {/* Right Sidebar (Table of Contents) */}
                 <div className="w-64 border-l border-border/40 flex flex-col min-h-0">
                     <div className="px-5 pt-7 pb-3">
-                        <h2 className="text-[15px] font-black tracking-tight leading-none">On this page</h2>
+                        <h2 className="text-[15px] font-semibold tracking-tight leading-none">On this page</h2>
                     </div>
 
                     <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">

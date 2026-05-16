@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
     ArrowLeft, Globe, ExternalLink,
     GitBranch, RefreshCcw, Trash2, Github,
-    FileText, Layers, ChevronRight, ChevronDown, File, Folder as FolderIcon, FolderOpen, AlertCircle, Search, X,
+    FileText, Layers, ChevronDown, AlertCircle, Search, X,
     Cable, CheckCircle2, Loader2, ListFilter,
 } from 'lucide-react'
 import type { Project, ProjectStats, SnapshotPayload } from '@core/api/types'
@@ -27,6 +27,7 @@ import { EditorContent } from '@features/workspace/editor/EditorContent'
 import { useAppStore } from '@core/store'
 import { AppTooltip } from '@ui/tooltip-wrapper'
 import { Skeleton } from '@ui/skeleton'
+import { FileTree, injectTreeChildren, filterTreeNodes, flattenVisibleTree } from './FileTree'
 
 import {
     Dialog,
@@ -401,13 +402,13 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
             <div className="shrink-0 flex items-center gap-2 px-5 h-12 border-b border-border/30">
                 <button
                     onClick={onBack}
-                    className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors shrink-0"
+                    className="size-8 grid place-items-center rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors shrink-0"
                     title="Back to projects"
                 >
                     <ArrowLeft size={14} />
                 </button>
 
-                <h1 className="font-bold tracking-tight truncate shrink-0" style={{ fontSize: '11px' }}>{project.name}</h1>
+                <h1 className="text-xs font-semibold tracking-tight truncate shrink-0">{project.name}</h1>
 
                 <span className="text-[11px] font-mono text-muted-foreground/50 truncate min-w-0 hidden md:inline">
                     {project.root_path}
@@ -415,7 +416,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                 <AppTooltip content="Open folder">
                     <button
                         onClick={() => void handleOpenFolder()}
-                        className="h-7 w-7 grid place-items-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-foreground/[0.04] transition-colors shrink-0 hidden md:grid"
+                        className="size-7 grid place-items-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-foreground/[0.04] transition-colors shrink-0 hidden md:grid"
                     >
                         <ExternalLink size={11} />
                     </button>
@@ -467,7 +468,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                         <button
                             onClick={handleRefresh}
                             disabled={refreshing}
-                            className="h-7 w-7 grid place-items-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.04] transition-colors disabled:opacity-50"
+                            className="size-7 grid place-items-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.04] transition-colors disabled:opacity-50"
                         >
                             <RefreshCcw size={12} className={refreshing ? 'animate-refresh-spin' : ''} />
                         </button>
@@ -476,7 +477,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                         <AppTooltip content="Open repository in browser">
                             <button
                                 onClick={() => openUrl(sshToHttps(project.remote_url))}
-                                className="h-7 w-7 grid place-items-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                                className="size-7 grid place-items-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
                             >
                                 <Globe size={12} />
                             </button>
@@ -485,7 +486,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                     <AppTooltip content="Remove project">
                         <button
                             onClick={() => setIsDeleteDialogOpen(true)}
-                            className="h-7 w-7 grid place-items-center rounded text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            className="size-7 grid place-items-center rounded text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
                         >
                             <Trash2 size={12} />
                         </button>
@@ -617,7 +618,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                     onClick={() => { setSourceEndpoint(tp.id); setShowProjectPicker(false) }}
                                     className={`w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-foreground/[0.04] transition-colors ${idx > 0 ? 'border-t border-border/20' : ''} ${sourceEndpoint === tp.id ? 'bg-foreground/[0.06]' : ''}`}
                                 >
-                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${sourceEndpoint === tp.id ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
+                                    <span className={`size-1.5 rounded-full shrink-0 ${sourceEndpoint === tp.id ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
                                     <span className="text-[12px] font-medium text-foreground/85 truncate">{tp.name}</span>
                                     <span className="ml-auto font-mono text-[10.5px] text-muted-foreground/50 shrink-0">{tp.id}</span>
                                 </button>
@@ -625,7 +626,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                         </div>
                     )}
                     {showProjectPicker && trackerProjects.length === 0 && !projectsLoading && (
-                        <p className="text-[11px] text-muted-foreground/60">No projects found — check your credentials.</p>
+                        <p className="text-[11px] text-muted-foreground/60">No projects found: check your credentials.</p>
                     )}
                     {projectsError && <p className="text-[11px] text-destructive">{projectsError}</p>}
 
@@ -686,14 +687,12 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                 boardIssues={(() => {
                                     const local = boardIssues.filter(i => i.project_id === project.id)
                                     const localTitles = new Set(local.map(i => i.title))
-                                    const ghBacklog: IssueListItem[] = githubIssues
-                                        .filter(gh => !localTitles.has(gh.title))
-                                        .map(gh => ({
-                                            id: `github-${gh.number}`, issue_id: `github-${gh.number}`,
-                                            identifier: `GH-${gh.number}`, issue_identifier: `GH-${gh.number}`,
-                                            title: gh.title, description: gh.body, state: 'Backlog',
-                                            project_id: project.id, url: gh.html_url,
-                                        }))
+                                    const ghBacklog: IssueListItem[] = githubIssues.flatMap(gh => localTitles.has(gh.title) ? [] : [{
+                                        id: `github-${gh.number}`, issue_id: `github-${gh.number}`,
+                                        identifier: `GH-${gh.number}`, issue_identifier: `GH-${gh.number}`,
+                                        title: gh.title, description: gh.body, state: 'Backlog',
+                                        project_id: project.id, url: gh.html_url,
+                                    }])
                                     return [...local, ...ghBacklog]
                                 })()}
                                 projects={[project]}
@@ -718,7 +717,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                 <p className="text-[11px] mt-1 font-mono opacity-60">{tabError}</p>
                             </div>
                         ) : loadingTab ? (
-                            <div className="m-8 space-y-2">{[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-9 w-full rounded-md" />)}</div>
+                            <div className="m-8 space-y-2">{['s1', 's2', 's3', 's4', 's5'].map(k => <Skeleton key={k} className="h-9 w-full rounded-md" />)}</div>
                         ) : (
                             <div className="flex-1 flex min-h-0">
                                 {/* File tree */}
@@ -759,6 +758,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                     </div>
                                     <div
                                         className="flex-1 overflow-auto custom-scrollbar focus:outline-none pb-4"
+                                        role="tree"
                                         tabIndex={0}
                                         onKeyDown={(e) => { void handleTreeKeyDown(e) }}
                                         onFocus={() => { if (!focusedPath && visibleTreeNodes[0]) setFocusedPath(visibleTreeNodes[0].node.path) }}
@@ -818,102 +818,11 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                     <DialogFooter className="mt-4 flex gap-2 sm:gap-2">
                         <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)} className="flex-1 h-9" disabled={deletePending}>Cancel</Button>
                         <Button variant="destructive" onClick={handleDelete} className="flex-1 h-9 font-semibold" disabled={deletePending}>
-                            {deletePending ? 'Removing...' : 'Remove'}
+                            {deletePending ? 'Removing…' : 'Remove'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>
-    )
-}
-
-
-// --- File tree helpers (kept in same file for co-location) ---
-
-type VisibleTreeEntry = { node: ProjectTreeNode; level: number; parentPath: string | null }
-
-function injectTreeChildren(nodes: ProjectTreeNode[], targetPath: string, children: ProjectTreeNode[]): ProjectTreeNode[] {
-    return nodes.map((node) => {
-        if (node.path === targetPath) return { ...node, children }
-        if (node.children?.length) return { ...node, children: injectTreeChildren(node.children, targetPath, children) }
-        return node
-    })
-}
-
-function filterTreeNodes(nodes: ProjectTreeNode[], query: string, showHidden: boolean): ProjectTreeNode[] {
-    const q = query.trim().toLowerCase()
-    return nodes
-        .filter((n) => showHidden || !n.name.startsWith('.'))
-        .flatMap((n) => {
-            const kids = n.children ? filterTreeNodes(n.children, query, showHidden) : []
-            const match = !q || n.name.toLowerCase().includes(q) || n.path.toLowerCase().includes(q)
-            if (n.is_dir) return (match || kids.length || !q) ? [{ ...n, children: kids }] : []
-            return match ? [n] : []
-        })
-}
-
-function flattenVisibleTree(nodes: ProjectTreeNode[], expanded: Record<string, boolean>, level = 0, parent: string | null = null): VisibleTreeEntry[] {
-    const out: VisibleTreeEntry[] = []
-    for (const node of nodes) {
-        out.push({ node, level, parentPath: parent })
-        if (node.is_dir && expanded[node.path] && node.children?.length)
-            out.push(...flattenVisibleTree(node.children, expanded, level + 1, node.path))
-    }
-    return out
-}
-
-function getNodeIcon(node: ProjectTreeNode, isOpen: boolean, tone: 'active' | 'default') {
-    const cls = tone === 'active' ? 'text-primary' : 'text-muted-foreground/60'
-    if (node.is_dir) return isOpen ? <FolderOpen size={13} className={cls} strokeWidth={1.75} /> : <FolderIcon size={13} className={cls} strokeWidth={1.75} />
-    return <File size={13} className={cls} strokeWidth={1.75} />
-}
-
-function FileTree({ items, level = 0, expandedPaths, loadingPaths, onToggle, onFileClick, activeFile, focusedPath }: {
-    items: ProjectTreeNode[]; level?: number; expandedPaths: Record<string, boolean>; loadingPaths: Record<string, boolean>
-    onToggle: (n: ProjectTreeNode) => void | Promise<void>; onFileClick?: (p: string) => void; activeFile?: string | null; focusedPath?: string | null
-}) {
-    return (
-        <div className="flex flex-col">{items.map((item, i) => {
-            const isOpen = !!expandedPaths[item.path]
-            const isActive = activeFile === item.path
-            const isFocused = focusedPath === item.path
-            const loading = !!loadingPaths[item.path]
-            return (
-                <React.Fragment key={`${item.path}-${i}`}>
-                    <div
-                        style={{ paddingLeft: `${level * 12 + 12}px` }}
-                        className={`group relative flex items-center gap-2 h-7 pr-3 cursor-pointer transition-colors ${
-                            isActive
-                                ? 'bg-foreground/[0.06] text-foreground'
-                                : isFocused
-                                    ? 'bg-foreground/[0.03] text-foreground'
-                                    : 'text-muted-foreground/80 hover:text-foreground hover:bg-foreground/[0.03]'
-                        }`}
-                        onClick={() => item.is_dir ? void onToggle(item) : onFileClick?.(item.path)}
-                    >
-                        {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full bg-primary" />}
-                        {item.is_dir ? (
-                            loading
-                                ? <RefreshCcw size={11} className="text-muted-foreground/40 animate-refresh-spin shrink-0" />
-                                : <ChevronRight size={11} className={`text-muted-foreground/40 transition-transform shrink-0 ${isOpen ? 'rotate-90' : ''}`} />
-                        ) : <span className="w-[11px] shrink-0" />}
-                        {getNodeIcon(item, isOpen, isActive ? 'active' : 'default')}
-                        <span className="truncate text-[12px] font-medium tracking-tight">{item.name}</span>
-                    </div>
-                    {isOpen && item.children?.length ? (
-                        <FileTree items={item.children} level={level + 1} expandedPaths={expandedPaths} loadingPaths={loadingPaths}
-                            onToggle={onToggle} onFileClick={onFileClick} activeFile={activeFile} focusedPath={focusedPath} />
-                    ) : null}
-                    {isOpen && item.is_dir && !item.children?.length && !loading && (
-                        <div
-                            style={{ paddingLeft: `${(level + 1) * 12 + 12}px` }}
-                            className="h-6 flex items-center text-[10px] text-muted-foreground/40"
-                        >
-                            empty
-                        </div>
-                    )}
-                </React.Fragment>
-            )
-        })}</div>
     )
 }

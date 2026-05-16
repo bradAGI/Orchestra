@@ -51,9 +51,17 @@ export function FileTreeRow({
   return (
     <div
       role="treeitem"
+      tabIndex={0}
       className="flex items-center cursor-pointer select-none hover:bg-accent/50"
       style={{ ...style, height: 26, paddingLeft }}
       onClick={isDir ? onToggle : onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          if (isDir) onToggle()
+          else onClick()
+        }
+      }}
       onContextMenu={(e) => {
         if (!onContextMenu) return
         e.preventDefault()
@@ -75,12 +83,12 @@ export function FileTreeRow({
     >
       {isDir ? (
         isExpanded ? (
-          <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+          <ChevronDown className="size-3.5 flex-shrink-0 text-muted-foreground" />
         ) : (
-          <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+          <ChevronRight className="size-3.5 flex-shrink-0 text-muted-foreground" />
         )
       ) : (
-        <File className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+        <File className="size-3.5 flex-shrink-0 text-muted-foreground" />
       )}
       <span
         className={`ml-1.5 text-sm truncate ${gitStatusColor(gitStatus)}`}

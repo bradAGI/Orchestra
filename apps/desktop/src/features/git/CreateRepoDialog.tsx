@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Github, Lock, Globe } from 'lucide-react'
 
 export interface CreateRepoDialogProps {
@@ -15,11 +15,14 @@ function toKebabCase(str: string): string {
 }
 
 export function CreateRepoDialog({ projectName, onCancel, onCreate }: CreateRepoDialogProps) {
-  const [name, setName] = useState(toKebabCase(projectName))
+  const [name, setName] = useState(() => toKebabCase(projectName))
   const [description, setDescription] = useState('')
   const [isPrivate, setIsPrivate] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const nameId = useId()
+  const descriptionId = useId()
+  const visibilityId = useId()
 
   const handleCreate = async () => {
     if (!name.trim()) return
@@ -44,7 +47,7 @@ export function CreateRepoDialog({ projectName, onCancel, onCreate }: CreateRepo
             <Github size={14} className="text-muted-foreground/60" strokeWidth={2.25} />
             <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">GitHub</span>
           </div>
-          <h2 className="text-2xl font-black tracking-tight text-foreground">New repository</h2>
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground">New repository</h2>
           <p className="text-[12px] text-muted-foreground/70 mt-1.5">Push this project to GitHub.</p>
         </div>
 
@@ -53,8 +56,9 @@ export function CreateRepoDialog({ projectName, onCancel, onCreate }: CreateRepo
         {/* Form */}
         <div className="px-6 py-5 space-y-4">
           <div className="space-y-1.5">
-            <label className="text-[10.5px] font-bold uppercase tracking-[0.16em] text-muted-foreground/60">Repository name</label>
+            <label htmlFor={nameId} className="text-[10.5px] font-bold uppercase tracking-[0.16em] text-muted-foreground/60">Repository name</label>
             <input
+              id={nameId}
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -65,8 +69,9 @@ export function CreateRepoDialog({ projectName, onCancel, onCreate }: CreateRepo
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10.5px] font-bold uppercase tracking-[0.16em] text-muted-foreground/60">Description</label>
+            <label htmlFor={descriptionId} className="text-[10.5px] font-bold uppercase tracking-[0.16em] text-muted-foreground/60">Description</label>
             <textarea
+              id={descriptionId}
               rows={2}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -77,8 +82,8 @@ export function CreateRepoDialog({ projectName, onCancel, onCreate }: CreateRepo
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10.5px] font-bold uppercase tracking-[0.16em] text-muted-foreground/60">Visibility</label>
-            <div className="grid grid-cols-2 gap-2">
+            <span id={visibilityId} className="text-[10.5px] font-bold uppercase tracking-[0.16em] text-muted-foreground/60">Visibility</span>
+            <div aria-labelledby={visibilityId} className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setIsPrivate(true)}

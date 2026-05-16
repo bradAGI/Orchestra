@@ -31,32 +31,32 @@ export type TreeNode = {
   depth: number
 }
 
-export type DirCache = {
+type DirCache = {
   children: TreeNode[]
   loading: boolean
 }
 
-export type ToolSummary = {
+type ToolSummary = {
   name: string
   description?: string
 }
 
-export type AgentConfig = {
+type AgentConfig = {
   commands: Record<string, string>
   agent_provider: string
   max_turns: number
 }
 
-export type SettingsTab = 'agents' | 'backend' | 'integrations' | 'shortcuts' | 'notifications'
+type SettingsTab = 'agents' | 'backend' | 'integrations' | 'shortcuts' | 'notifications'
 
 /** Initial column/state for the create-task dialog. The dialog reads `state`
  * to preselect the column the new task lands in. Add fields here only when
  * the dialog actually consumes them. */
-export type CreateTaskInitialState = {
+type CreateTaskInitialState = {
   state: string
 }
 
-export type SearchMatch = { line: number; text: string }
+type SearchMatch = { line: number; text: string }
 export type SearchResultGroup = { file: string; relativePath: string; matches: SearchMatch[] }
 
 // ---------------------------------------------------------------------------
@@ -130,6 +130,10 @@ export interface UISlice {
   activeDocPath: string | null
   docTree: DocItem[]
   expandedDocFolders: Set<string>
+  agentHubProjectId: string | null
+  agentHubScope: 'GLOBAL' | 'PROJECT'
+  agentHubDirty: boolean
+  agentHubPendingNav: (() => void) | null
 
   // Actions
   setActiveSection: (section: SectionID) => void
@@ -158,6 +162,12 @@ export interface UISlice {
   setActiveDocPath: (path: string | null) => void
   setDocTree: (tree: DocItem[]) => void
   toggleDocFolder: (path: string) => void
+  setAgentHubProjectId: (id: string | null) => void
+  setAgentHubScope: (scope: 'GLOBAL' | 'PROJECT') => void
+  setAgentHubDirty: (dirty: boolean) => void
+  /** Request a navigation that may need a discard-confirm. If the agent hub is dirty, the action is stashed in agentHubPendingNav for the dashboard to confirm; otherwise it is applied immediately. */
+  requestAgentHubNav: (apply: () => void) => void
+  setAgentHubPendingNav: (apply: (() => void) | null) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -269,7 +279,7 @@ export interface TerminalsSlice {
 // Workspace Slice
 // ---------------------------------------------------------------------------
 
-export type ActiveWorkspaceTab = { type: 'terminal' | 'editor' | 'browser'; id: string } | null
+type ActiveWorkspaceTab = { type: 'terminal' | 'editor' | 'browser'; id: string } | null
 
 export interface WorkspaceSlice {
   // State

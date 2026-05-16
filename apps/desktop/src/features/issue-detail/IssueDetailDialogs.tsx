@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { GitBranch, Loader2, ShieldCheck, Terminal } from 'lucide-react'
@@ -32,6 +33,10 @@ export function PRReviewDialog({
   prHead: string
   onFinalize: () => Promise<void>
 }) {
+  const titleId = useId()
+  const descriptionId = useId()
+  const headBranchId = useId()
+  const baseBranchId = useId()
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl bg-card border-none shadow-2xl p-0 overflow-hidden rounded-2xl">
@@ -39,7 +44,7 @@ export function PRReviewDialog({
           <div className="p-6 border-b border-border/10 bg-muted/20">
             <div className="flex items-center gap-3 mb-1">
               <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
-                <GitBranch className="h-5 w-5 text-primary" />
+                <GitBranch className="size-5 text-primary" />
               </div>
               <div>
                 <DialogTitle className="text-xl font-bold tracking-tight">Pull Request Review</DialogTitle>
@@ -50,8 +55,9 @@ export function PRReviewDialog({
 
           <div className="flex-1 overflow-auto p-8 space-y-6 custom-scrollbar">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">PR Title</label>
+              <label htmlFor={titleId} className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">PR Title</label>
               <input
+                id={titleId}
                 className="w-full bg-muted/30 border border-border/50 rounded-xl px-4 py-3 text-sm font-bold placeholder:text-muted-foreground/20 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
                 value={prTitle}
                 onChange={(e) => setPrTitle(e.target.value)}
@@ -59,8 +65,9 @@ export function PRReviewDialog({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">Description</label>
+              <label htmlFor={descriptionId} className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">Description</label>
               <textarea
+                id={descriptionId}
                 className="w-full bg-muted/30 border border-border/50 rounded-xl px-4 py-3 text-sm font-medium placeholder:text-muted-foreground/20 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all min-h-[160px] leading-relaxed resize-none"
                 value={prBody}
                 onChange={(e) => setPrBody(e.target.value)}
@@ -69,15 +76,15 @@ export function PRReviewDialog({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">Head Branch</label>
-                <div className="flex items-center gap-2 bg-muted/30 border border-border/50 rounded-xl px-4 py-2 text-xs font-mono text-muted-foreground/80">
+                <label htmlFor={headBranchId} className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">Head Branch</label>
+                <div id={headBranchId} className="flex items-center gap-2 bg-muted/30 border border-border/50 rounded-xl px-4 py-2 text-xs font-mono text-muted-foreground/80">
                   <GitBranch size={12} className="opacity-40" />
                   {prHead}
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">Base Branch</label>
-                <div className="flex items-center gap-2 bg-muted/30 border border-border/50 rounded-xl px-4 py-2 text-xs font-mono text-muted-foreground/80">
+                <label htmlFor={baseBranchId} className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">Base Branch</label>
+                <div id={baseBranchId} className="flex items-center gap-2 bg-muted/30 border border-border/50 rounded-xl px-4 py-2 text-xs font-mono text-muted-foreground/80">
                   <GitBranch size={12} className="opacity-40" />
                   main
                 </div>
@@ -98,7 +105,7 @@ export function PRReviewDialog({
                 {prPending ? (
                   <div className="flex items-center gap-2">
                     <Loader2 size={14} className="animate-spin-smooth" />
-                    <span>Creating...</span>
+                    <span>Creating…</span>
                   </div>
                 ) : (
                   'Create Pull Request'
@@ -126,7 +133,7 @@ export function HookOutputDialog({
           <div className="p-4 border-b border-border/10 bg-muted/20 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-1.5 rounded-lg bg-primary/10 border border-primary/20">
-                <Terminal className="h-4 w-4 text-primary" />
+                <Terminal className="size-4 text-primary" />
               </div>
               <div>
                 <DialogTitle className="text-sm font-bold tracking-tight">{selectedHookLog?.label} Output</DialogTitle>

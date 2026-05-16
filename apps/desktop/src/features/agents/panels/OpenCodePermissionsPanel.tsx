@@ -1,96 +1,199 @@
-import { useEffect, useMemo, useState } from 'react'
+// apps/desktop/src/features/agents/panels/OpenCodePermissionsPanel.tsx
+import { useMemo, useReducer, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Loader2, RotateCcw, Save } from 'lucide-react'
 import { Button } from '@ui/button'
+import { PanelHeader } from '../components/PanelHeader'
+import { PanelFooter } from '../components/PanelFooter'
+import { ErrorStrip } from '../components/ErrorStrip'
+import type { Scope } from '../types'
 
 interface OpenCodePermissionsPanelProps {
   configPath: string
   configContent: string
+  scope: Scope
+  projectName: string | null
   saving: string | null
   onSave: (path: string, content: string) => Promise<void>
 }
 
-export function OpenCodePermissionsPanel({ configPath, configContent, saving, onSave }: OpenCodePermissionsPanelProps) {
+type PermissionAction = 'allow' | 'deny' | 'ask'
+
+interface PermissionsState {
+  defaultMode: string
+  allow: string[]
+  deny: string[]
+  ask: string[]
+}
+
+type PermissionsReducerAction =
+  | { type: 'setDefaultMode', value: string }
+  | { type: 'setList', list: PermissionAction, items: string[] }
+  | { type: 'reset', state: PermissionsState }
+
+function permissionsReducer(state: PermissionsState, action: PermissionsReducerAction): PermissionsState {
+  switch (action.type) {
+    case 'setDefaultMode':
+      return { ...state, defaultMode: action.value }
+    case 'setList':
+      return { ...state, [action.list]: action.items }
+    case 'reset':
+      return action.state
+    default:
+      return state
+  }
+}
+
+export function OpenCodePermissionsPanel({ configPath, configContent, scope, projectName, saving, onSave }: OpenCodePermissionsPanelProps) {
   const parsed = useMemo(() => safeParse(configContent), [configContent])
-  const [defaultMode, setDefaultMode] = useState(readDefaultMode(parsed))
-  const [allow, setAllow] = useState(readPermissionList(parsed, 'allow'))
-  const [deny, setDeny] = useState(readPermissionList(parsed, 'deny'))
-  const [ask, setAsk] = useState(readPermissionList(parsed, 'ask'))
-
-  useEffect(() => {
-    setDefaultMode(readDefaultMode(parsed))
-    setAllow(readPermissionList(parsed, 'allow'))
-    setDeny(readPermissionList(parsed, 'deny'))
-    setAsk(readPermissionList(parsed, 'ask'))
-  }, [parsed])
-
-  const isDirty =
-    defaultMode !== readDefaultMode(parsed) ||
-    JSON.stringify(allow) !== JSON.stringify(readPermissionList(parsed, 'allow')) ||
-    JSON.stringify(deny) !== JSON.stringify(readPermissionList(parsed, 'deny')) ||
-    JSON.stringify(ask) !== JSON.stringify(readPermissionList(parsed, 'ask'))
+  const eyebrow = scope === 'GLOBAL' ? 'Global / Permissions' : `${projectName ?? 'Project'} / Permissions`
 
   if (!configPath) {
-    return <EmptyPanel title="No config found" description="Create OpenCode config first, then manage permission rules here." />
+    return (
+      <div className="flex flex-col h-full p-[18px]">
+        <PanelHeader
+          eyebrow={eyebrow}
+          title="Permissions"
+          sub="Writes to opencode.json"
+        />
+        <div className="flex flex-1 items-center justify-center text-muted-foreground/30">
+          <div className="text-center space-y-2 max-w-md">
+            <p className="text-sm font-bold uppercase tracking-widest">No config found</p>
+            <p className="text-[10px]">Create OpenCode config first, then manage permission rules here.</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (!parsed) {
-    return <EmptyPanel title="Structured editing unavailable" description="This OpenCode config could not be parsed cleanly. Use the Config panel raw editor first." />
+    return (
+      <div className="flex flex-col h-full p-[18px]">
+        <PanelHeader
+          eyebrow={eyebrow}
+          title="Permissions"
+          sub={`Writes to ${configPath}`}
+        />
+        <div className="flex flex-1 items-center justify-center text-muted-foreground/30">
+          <div className="text-center space-y-2 max-w-md">
+            <p className="text-sm font-bold uppercase tracking-widest">Structured editing unavailable</p>
+            <p className="text-[10px]">This OpenCode config could not be parsed cleanly. Use the Config panel raw editor first.</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="flex flex-col h-full p-4 gap-6 overflow-y-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-bold">Permissions</h3>
-          <p className="text-[10px] text-muted-foreground/50 mt-0.5">OpenCode permissions live in <code className="font-mono">opencode.json</code> under <code className="font-mono">permission</code>.</p>
+    <PermissionsEditor
+      key={configContent}
+      configPath={configPath}
+      parsed={parsed}
+      eyebrow={eyebrow}
+      saving={saving}
+      onSave={onSave}
+    />
+  )
+}
+
+interface PermissionsEditorProps {
+  configPath: string
+  parsed: Record<string, unknown>
+  eyebrow: string
+  saving: string | null
+  onSave: (path: string, content: string) => Promise<void>
+}
+
+function PermissionsEditor({ configPath, parsed, eyebrow, saving, onSave }: PermissionsEditorProps) {
+  const baseline = useMemo<PermissionsState>(() => ({
+    defaultMode: readDefaultMode(parsed),
+    allow: readPermissionList(parsed, 'allow'),
+    deny: readPermissionList(parsed, 'deny'),
+    ask: readPermissionList(parsed, 'ask'),
+  }), [parsed])
+
+  const [state, dispatch] = useReducer(permissionsReducer, baseline)
+  const [error, setError] = useState('')
+
+  const isDirty =
+    state.defaultMode !== baseline.defaultMode ||
+    JSON.stringify(state.allow) !== JSON.stringify(baseline.allow) ||
+    JSON.stringify(state.deny) !== JSON.stringify(baseline.deny) ||
+    JSON.stringify(state.ask) !== JSON.stringify(baseline.ask)
+
+  const handleDiscard = () => {
+    dispatch({ type: 'reset', state: baseline })
+  }
+
+  const handleSave = async () => {
+    setError('')
+    try {
+      await onSave(configPath, buildOpenCodeConfig(parsed, state.defaultMode, state.allow, state.deny, state.ask))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save')
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full p-[18px] gap-y-[14px]">
+      <PanelHeader
+        eyebrow={eyebrow}
+        title="Permissions"
+        sub={`Writes to ${configPath}`}
+        dirty={isDirty}
+      />
+
+      <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+        <div className="max-w-2xl mx-auto w-full flex flex-col gap-6">
+
+          <Field label="Default Permission Mode">
+            <select
+              value={state.defaultMode}
+              onChange={(event) => dispatch({ type: 'setDefaultMode', value: event.target.value })}
+              className="w-full max-w-sm h-9 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="">Rule Map</option>
+              <option value="allow">allow</option>
+              <option value="deny">deny</option>
+              <option value="ask">ask</option>
+            </select>
+            <p className="text-[10px] text-muted-foreground/50 mt-1">When set, OpenCode uses a single global permission mode instead of per-tool rules.</p>
+          </Field>
+
+          <ListField
+            label="Allow Rules"
+            description="Tool rules that should run without prompting."
+            items={state.allow}
+            onChange={(items) => dispatch({ type: 'setList', list: 'allow', items })}
+            placeholder="bash(git status)"
+            disabled={state.defaultMode !== ''}
+          />
+          <ListField
+            label="Deny Rules"
+            description="Tool rules that should always be blocked."
+            items={state.deny}
+            onChange={(items) => dispatch({ type: 'setList', list: 'deny', items })}
+            placeholder="bash(rm *)"
+            disabled={state.defaultMode !== ''}
+          />
+          <ListField
+            label="Ask Rules"
+            description="Tool rules that should always prompt."
+            items={state.ask}
+            onChange={(items) => dispatch({ type: 'setList', list: 'ask', items })}
+            placeholder="edit"
+            disabled={state.defaultMode !== ''}
+          />
         </div>
-        {isDirty ? (
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest animate-pulse">Unsaved</span>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setDefaultMode(readDefaultMode(parsed))
-                setAllow(readPermissionList(parsed, 'allow'))
-                setDeny(readPermissionList(parsed, 'deny'))
-                setAsk(readPermissionList(parsed, 'ask'))
-              }}
-              className="h-7 text-[10px]"
-            >
-              <RotateCcw size={10} className="mr-1" /> Discard
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => onSave(configPath, buildOpenCodeConfig(parsed, defaultMode, allow, deny, ask))}
-              disabled={saving === configPath}
-              className="h-7 bg-primary text-primary-foreground font-bold uppercase text-[10px] px-4 rounded-lg"
-            >
-              {saving === configPath ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <Save size={12} className="mr-1.5" />}
-              Save
-            </Button>
-          </div>
-        ) : null}
       </div>
 
-      <Field label="Default Permission Mode">
-        <select
-          value={defaultMode}
-          onChange={(event) => setDefaultMode(event.target.value)}
-          className="w-full max-w-sm h-9 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-        >
-          <option value="">Rule Map</option>
-          <option value="allow">allow</option>
-          <option value="deny">deny</option>
-          <option value="ask">ask</option>
-        </select>
-        <p className="text-[10px] text-muted-foreground/50 mt-1">When set, OpenCode uses a single global permission mode instead of per-tool rules.</p>
-      </Field>
+      <ErrorStrip message={error} onDismiss={() => setError('')} />
 
-      <ListField label="Allow Rules" description="Tool rules that should run without prompting." items={allow} onChange={setAllow} placeholder="bash(git status)" disabled={defaultMode !== ''} />
-      <ListField label="Deny Rules" description="Tool rules that should always be blocked." items={deny} onChange={setDeny} placeholder="bash(rm *)" disabled={defaultMode !== ''} />
-      <ListField label="Ask Rules" description="Tool rules that should always prompt." items={ask} onChange={setAsk} placeholder="edit" disabled={defaultMode !== ''} />
+      <PanelFooter
+        dirty={isDirty}
+        saving={saving === configPath}
+        onSave={handleSave}
+        onDiscard={handleDiscard}
+      />
     </div>
   )
 }
@@ -159,7 +262,7 @@ function safeParse(content: string): Record<string, unknown> | null {
 function Field({ label, children }: { label: string, children: ReactNode }) {
   return (
     <section className="space-y-2">
-      <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">{label}</h4>
+      <h4 className="text-[10px] font-semibold uppercase tracking-widest text-foreground/45">{label}</h4>
       {children}
     </section>
   )
@@ -172,7 +275,7 @@ function ListField({
   return (
     <section className="space-y-2">
       <div>
-        <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">{label}</h4>
+        <h4 className="text-[10px] font-semibold uppercase tracking-widest text-foreground/45">{label}</h4>
         <p className="text-[10px] text-muted-foreground/50 mt-1">{description}</p>
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -223,16 +326,5 @@ function ListField({
         </Button>
       </div>
     </section>
-  )
-}
-
-function EmptyPanel({ title, description }: { title: string, description: string }) {
-  return (
-    <div className="flex items-center justify-center h-full text-muted-foreground/20">
-      <div className="text-center space-y-2 max-w-md">
-        <p className="text-sm font-bold uppercase tracking-widest">{title}</p>
-        <p className="text-[10px]">{description}</p>
-      </div>
-    </div>
   )
 }

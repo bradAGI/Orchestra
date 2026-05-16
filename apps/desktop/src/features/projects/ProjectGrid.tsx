@@ -6,6 +6,7 @@ import {
 import type { Project, ProjectStats } from '@core/api/types'
 import { Skeleton } from '@ui/skeleton'
 import { Button } from '@ui/button'
+import { useNow } from '@/hooks'
 
 import {
   Dialog,
@@ -15,6 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@ui/dialog'
+
+const SKELETON_KEYS = ['s1', 's2', 's3', 's4', 's5', 's6'] as const
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -26,9 +29,10 @@ function formatTokens(n: number): string {
   return String(n)
 }
 
-function relativeTime(iso: string): string {
+function relativeTime(iso: string, now: number): string {
   if (!iso) return '—'
-  const diff = Date.now() - new Date(iso).getTime()
+  if (!now) return ''
+  const diff = now - new Date(iso).getTime()
   const mins = Math.floor(diff / 60000)
   if (mins < 1) return 'just now'
   if (mins < 60) return `${mins}m ago`
@@ -64,9 +68,9 @@ function SortHeader({ label, sortKey, currentKey, currentDir, onSort }: {
     >
       {label}
       {active ? (
-        currentDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+        currentDir === 'asc' ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />
       ) : (
-        <ArrowUpDown className="h-3 w-3 opacity-0 group-hover/header:opacity-50" />
+        <ArrowUpDown className="size-3 opacity-0 group-hover/header:opacity-50" />
       )}
     </button>
   )
@@ -97,6 +101,7 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const now = useNow()
 
   const handleSort = useCallback((key: SortKey) => {
     if (key === sortKey) {
@@ -146,9 +151,9 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
   if (loading && projects.length === 0) {
     return (
       <div className="flex flex-col gap-2 p-5">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="flex items-center gap-3 p-3 rounded-lg animate-pulse">
-            <Skeleton className="h-8 w-8 rounded-lg" />
+        {SKELETON_KEYS.map((k) => (
+          <div key={k} className="flex items-center gap-3 p-3 rounded-lg animate-pulse">
+            <Skeleton className="size-8 rounded-lg" />
             <div className="flex-1 space-y-2">
               <Skeleton className="h-4 w-1/4" />
               <Skeleton className="h-3 w-1/2" />
@@ -163,7 +168,7 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
       <div className="px-8 pt-10 pb-6">
-        <h1 className="text-3xl font-black tracking-tight">Projects</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Projects</h1>
         <p className="text-sm text-muted-foreground mt-1">
           {sorted.length} {sorted.length === 1 ? 'project' : 'projects'}
         </p>
@@ -172,7 +177,7 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
       {/* Toolbar */}
       <div className="px-8 pb-4 flex items-center gap-3">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground/50" />
           <input
             type="text"
             placeholder="Search projects..."
@@ -195,7 +200,7 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
         {sorted.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <Folder size={28} className="text-muted-foreground/40 mb-3" strokeWidth={1.5} />
-            <h2 className="text-base font-bold tracking-tight mb-1">{search ? 'No matches' : 'No projects yet'}</h2>
+            <h2 className="text-base font-semibold tracking-tight mb-1">{search ? 'No matches' : 'No projects yet'}</h2>
             <p className="text-muted-foreground/60 max-w-xs text-xs">
               {search ? `Nothing matched "${search}"` : 'Add a local repository to get started.'}
             </p>
@@ -232,14 +237,22 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
                 return (
                   <div
                     key={project.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => onProjectClick(project.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        onProjectClick(project.id)
+                      }
+                    }}
                     className="group flex items-center gap-3 px-3 h-12 rounded-md cursor-pointer border border-border/30 bg-card/40 transition-colors hover:bg-foreground/[0.03] hover:border-border/60"
                   >
-                    <Folder className="w-[15px] h-[15px] shrink-0 text-muted-foreground/60 group-hover:text-foreground transition-colors" strokeWidth={1.75} />
+                    <Folder className="size-[15px] shrink-0 text-muted-foreground/60 group-hover:text-foreground transition-colors" strokeWidth={1.75} />
 
                     <div className="flex-1 min-w-0 flex items-center gap-2">
                       <span className="text-[13px] font-semibold tracking-tight truncate text-foreground/90 group-hover:text-foreground">{project.name}</span>
-                      {hasGit && <GitBranch className="h-3 w-3 shrink-0 text-muted-foreground/40" />}
+                      {hasGit && <GitBranch className="size-3 shrink-0 text-muted-foreground/40" />}
                       {project.github_token ? (
                         <span className="text-[10px] font-medium text-primary/80">GitHub</span>
                       ) : project.github_owner ? (
@@ -260,13 +273,13 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
                     </div>
 
                     <div className="w-20 text-right">
-                      <span className="text-[11px] text-muted-foreground/50">{relativeTime(s?.last_active || '')}</span>
+                      <span className="text-[11px] text-muted-foreground/50">{relativeTime(s?.last_active || '', now)}</span>
                     </div>
 
                     <div className="w-7 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         type="button"
-                        className="h-6 w-6 grid place-items-center rounded text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        className="size-6 grid place-items-center rounded text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
                         data-testid="project-delete-btn"
                         onClick={(e) => { e.stopPropagation(); setProjectToDelete(project) }}
                         title="Remove project"
