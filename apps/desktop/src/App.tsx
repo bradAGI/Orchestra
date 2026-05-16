@@ -43,6 +43,7 @@ const SettingsPage = lazy(() => import('@layout/panels').then(m => ({ default: m
 const WorkspaceLayout = lazy(() => import('@features/workspace/WorkspaceLayout').then(m => ({ default: m.WorkspaceLayout })))
 const SandboxDashboard = lazy(() => import('@features/sandbox/SandboxDashboard').then(m => ({ default: m.SandboxDashboard })))
 const TrackerViewer = lazy(() => import('@features/tracker').then(m => ({ default: m.TrackerViewer })))
+const StudioSection = lazy(() => import('@features/studio').then(m => ({ default: m.StudioSection })))
 
 const SectionLoader = () => (
   <div className="flex-1 grid place-items-center text-muted-foreground text-sm">Loading…</div>
@@ -474,6 +475,20 @@ export default function App() {
                   onStopSession={handleStopSession}
                   onCreateIssue={handleCreateIssue}
                 />
+              </section>
+            </SectionErrorBoundary>
+          ) : null}
+
+          {sectionVisibility.showStudio ? (
+            <SectionErrorBoundary name="Studio">
+              <section className="flex-1 flex flex-col min-h-0">
+                <Suspense fallback={<SectionLoader />}>
+                  {config && selectedProjectID ? (
+                    <StudioSection config={config} projectId={selectedProjectID} />
+                  ) : (
+                    <div className="p-6 text-sm opacity-60">Select a project to open the studio.</div>
+                  )}
+                </Suspense>
               </section>
             </SectionErrorBoundary>
           ) : null}
