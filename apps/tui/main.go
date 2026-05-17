@@ -39,7 +39,7 @@ func initialModel(noStart bool) *model {
 		frontend: &Service{
 			Name: "Orchestra Desktop",
 			Cmd:  "npm run dev",
-			Cwd:  "../desktop",
+			Cwd:  "../apps/desktop",
 			Env:  []string{"ORCHESTRA_API_TOKEN=dev-token"},
 		},
 	}
