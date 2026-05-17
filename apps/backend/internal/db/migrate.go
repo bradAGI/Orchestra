@@ -93,6 +93,12 @@ func runMigrations(db *sql.DB) error {
 		{"projects", "issue_source_type", "TEXT NOT NULL DEFAULT ''"},
 		{"projects", "issue_source_endpoint", "TEXT NOT NULL DEFAULT ''"},
 		{"projects", "issue_source_token", "TEXT NOT NULL DEFAULT ''"}, // AES-GCM encrypted
+		// Task Authoring Studio fields on issues
+		{"issues", "acceptance_criteria", "TEXT NOT NULL DEFAULT '[]'"},
+		{"issues", "attachments", "TEXT NOT NULL DEFAULT '[]'"},
+		{"issues", "agent_guidance", "TEXT NOT NULL DEFAULT '{}'"},
+		{"issues", "source_template", "TEXT"},
+		{"issues", "authoring_session_id", "TEXT"},
 	}
 
 	for _, m := range migrations {

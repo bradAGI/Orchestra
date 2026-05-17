@@ -30,6 +30,8 @@ import (
 	"github.com/orchestra/orchestra/apps/backend/internal/prompt"
 	"github.com/orchestra/orchestra/apps/backend/internal/runtime"
 	"github.com/orchestra/orchestra/apps/backend/internal/sessionlogger"
+	"github.com/orchestra/orchestra/apps/backend/internal/studio"
+	"github.com/orchestra/orchestra/apps/backend/internal/studio/templates"
 	"github.com/orchestra/orchestra/apps/backend/internal/telemetry"
 	"github.com/orchestra/orchestra/apps/backend/internal/terminal"
 	"github.com/orchestra/orchestra/apps/backend/internal/tools"
@@ -181,7 +183,28 @@ func Run(logger zerolog.Logger) error {
 		usageService = nil
 	}
 
-	router := api.NewRouterWithPubSub(logger, orchestratorService, &cfg, pubsub, warehouseDB, termManager, usageService, trackerRegistry)
+	daemonBin, exeErr := os.Executable()
+	if exeErr != nil {
+		logger.Warn().Err(exeErr).Msg("studio: cannot resolve daemon binary path; mcp-bridge will fail")
+		daemonBin = ""
+	}
+	socketPath := studio.SocketPath(cfg.WorkspaceRoot)
+
+	var studioSpawner studio.RunnerSpawner
+	if agentRegistry != nil && daemonBin != "" {
+		studioSpawner = studio.NewStudioSpawner(agentRegistry, cfg.WorkspaceRoot, daemonBin, socketPath)
+	}
+
+	studioMgr := studio.NewManager(warehouseDB.DB, pubsub, studioSpawner)
+	studioMgr.SetTracker(studio.NewOrchestratorTrackerAdapter(orchestratorService))
+	studioTpls := templates.NewStore(cfg.WorkspaceRoot)
+	studioMgr.SetTemplateStore(studioTpls)
+
+	if _, err := studio.StartBridgeListener(context.Background(), socketPath, studioMgr); err != nil {
+		logger.Warn().Err(err).Str("socket", socketPath).Msg("studio: bridge listener not started")
+	}
+
+	router := api.NewRouterWithPubSub(logger, orchestratorService, &cfg, pubsub, warehouseDB, termManager, usageService, trackerRegistry, studioMgr, studioTpls)
 
 	cleanupTerminalWorkspaces(orchestratorService, trackerClient, workspaceService, cfg.WorkspaceHooks, warehouseDB, logger)
 

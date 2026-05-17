@@ -6,6 +6,7 @@ import {
   FolderTree,
   ListTodo,
   Settings2,
+  Sparkles,
   Terminal,
 } from 'lucide-react'
 import type { SidebarItem } from '@layout/types'
@@ -32,6 +33,12 @@ export const sidebarItems: SidebarItem[] = [
     label: 'Tasks',
     description: 'Task board and inspector',
     icon: ListTodo,
+  },
+  {
+    id: 'STUDIO',
+    label: 'Studio',
+    description: 'Author tasks with a CLI agent',
+    icon: Sparkles,
   },
   {
     id: 'PROJECTS',
@@ -80,6 +87,7 @@ export const sidebarItems: SidebarItem[] = [
 /** Union type of all navigable section identifiers in the desktop app. */
 export type SectionID =
   | 'ISSUES'
+  | 'STUDIO'
   | 'PROJECTS'
   | 'AGENTS'
   | 'WAREHOUSE'
@@ -91,6 +99,7 @@ export type SectionID =
 /** Ordered list of all valid section IDs, used for validation. */
 const SECTION_IDS: readonly SectionID[] = [
   'ISSUES',
+  'STUDIO',
   'PROJECTS',
   'AGENTS',
   'WAREHOUSE',
@@ -112,6 +121,7 @@ export function isSectionID(value: string): value is SectionID {
 /** Boolean flags indicating which section panels are currently visible. */
 export type SectionVisibility = {
   showIssueBoard: boolean
+  showStudio: boolean
   showProjects: boolean
   showAgents: boolean
   showWarehouse: boolean
@@ -124,6 +134,7 @@ export type SectionVisibility = {
 /** Display metadata (breadcrumb label and page title) for each section. */
 const sectionMeta: Record<SectionID, { label: string; title: string }> = {
   ISSUES: { label: 'Tracker', title: 'Tasks' },
+  STUDIO: { label: 'Authoring', title: 'Studio' },
   PROJECTS: { label: 'Workspace', title: 'Projects' },
   AGENTS: { label: 'Compute', title: 'Agents' },
   WAREHOUSE: { label: 'Usage', title: 'Usage' },
@@ -141,6 +152,7 @@ const sectionMeta: Record<SectionID, { label: string; title: string }> = {
 export function getSectionVisibility(activeSection: SectionID): SectionVisibility {
   return {
     showIssueBoard: activeSection === 'ISSUES',
+    showStudio: activeSection === 'STUDIO',
     showProjects: activeSection === 'PROJECTS',
     showAgents: activeSection === 'AGENTS',
     showWarehouse: activeSection === 'WAREHOUSE',
