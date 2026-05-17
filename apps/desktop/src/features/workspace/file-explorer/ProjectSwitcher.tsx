@@ -14,6 +14,7 @@ export function ProjectSwitcher({ projects }: ProjectSwitcherProps) {
   const openProjectTab = useAppStore((s) => s.openProjectTab)
   const closeProjectTab = useAppStore((s) => s.closeProjectTab)
   const setActiveProjectId = useAppStore((s) => s.setActiveProjectId)
+  const setSelectedProjectID = useAppStore((s) => s.setSelectedProjectID)
 
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -72,6 +73,7 @@ export function ProjectSwitcher({ projects }: ProjectSwitcherProps) {
                     <button
                       onClick={() => {
                         setActiveProjectId(id)
+                        setSelectedProjectID(id)
                         setOpen(false)
                       }}
                       className="flex items-center gap-2 flex-1 py-1.5 text-left min-w-0"
