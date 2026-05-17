@@ -29,6 +29,12 @@ function SandboxIcon({ className, size }: { className?: string; size?: number })
 /** Sidebar navigation items displayed in the app shell, in display order. */
 export const sidebarItems: SidebarItem[] = [
   {
+    id: 'CONSOLE',
+    label: 'Development',
+    description: 'Editor, terminals, and browser preview',
+    icon: Terminal,
+  },
+  {
     id: 'ISSUES',
     label: 'Tasks',
     description: 'Task board and inspector',
@@ -45,12 +51,6 @@ export const sidebarItems: SidebarItem[] = [
     label: 'Projects',
     description: 'Local workspace grouping',
     icon: FolderTree,
-  },
-  {
-    id: 'CONSOLE',
-    label: 'Development',
-    description: 'Editor, terminals, and browser preview',
-    icon: Terminal,
   },
   {
     id: 'AGENTS',
