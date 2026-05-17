@@ -28,9 +28,9 @@ type fakeTracker struct {
 func (f *fakeTracker) CreateIssue(_ context.Context, title, description, state string, priority int, assigneeID, projectID, provider string, disabledTools []string) (*tracker.Issue, error) {
 	f.nextID++
 	iss := &tracker.Issue{
-		ID:         fmt.Sprintf("uuid-%d", f.nextID),
-		Identifier: fmt.Sprintf("ISS-%d", f.nextID),
-		Title:      title,
+		ID:          fmt.Sprintf("uuid-%d", f.nextID),
+		Identifier:  fmt.Sprintf("ISS-%d", f.nextID),
+		Title:       title,
 		Description: description,
 	}
 	f.created = append(f.created, iss)

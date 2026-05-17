@@ -44,7 +44,7 @@ type DraftSnapshot struct {
 }
 
 type Attachment struct {
-	Kind  string `json:"kind"`  // "file" | "link"
+	Kind  string `json:"kind"` // "file" | "link"
 	Path  string `json:"path,omitempty"`
 	URL   string `json:"url,omitempty"`
 	Label string `json:"label,omitempty"`

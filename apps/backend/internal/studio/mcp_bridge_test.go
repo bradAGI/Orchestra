@@ -14,7 +14,10 @@ type recordingMgrForBridge struct {
 	titles []string
 }
 
-func (r *recordingMgrForBridge) SetTitle(_, t string) error { r.titles = append(r.titles, t); return nil }
+func (r *recordingMgrForBridge) SetTitle(_, t string) error {
+	r.titles = append(r.titles, t)
+	return nil
+}
 func (r *recordingMgrForBridge) SetDescription(_, _ string) error                { return nil }
 func (r *recordingMgrForBridge) AddAcceptanceCriterion(_, _ string) error        { return nil }
 func (r *recordingMgrForBridge) RemoveAcceptanceCriterion(_ string, _ int) error { return nil }
